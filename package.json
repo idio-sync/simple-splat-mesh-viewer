@@ -1,0 +1,23 @@
+{
+  "name": "simple-splat-mesh-viewer",
+  "version": "1.0.0",
+  "description": "A simple web viewer for comparing Gaussian splats with 3D models",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "start": "npx serve . -p 8080",
+    "dev": "npx serve . -p 8080"
+  },
+  "keywords": [
+    "gaussian-splatting",
+    "3d-viewer",
+    "threejs",
+    "gltf",
+    "ply"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.2.0"
+  }
+}

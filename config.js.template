@@ -1,0 +1,6 @@
+// Runtime configuration - generated from environment variables
+window.APP_CONFIG = {
+    defaultSplatUrl: "${DEFAULT_SPLAT_URL}",
+    defaultModelUrl: "${DEFAULT_MODEL_URL}",
+    showControls: ${SHOW_CONTROLS}
+};

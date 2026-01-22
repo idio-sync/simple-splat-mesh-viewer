@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gaussian Splat & Mesh Viewer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="config.js"></script>
+</head>
+<body>
+    <div id="app">
+        <div id="viewer-container">
+            <canvas id="viewer-canvas"></canvas>
+            <button id="btn-toggle-controls" class="toggle-controls-btn" title="Toggle Controls">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="4" y1="21" x2="4" y2="14"></line>
+                    <line x1="4" y1="10" x2="4" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12" y2="3"></line>
+                    <line x1="20" y1="21" x2="20" y2="16"></line>
+                    <line x1="20" y1="12" x2="20" y2="3"></line>
+                    <line x1="1" y1="14" x2="7" y2="14"></line>
+                    <line x1="9" y1="8" x2="15" y2="8"></line>
+                    <line x1="17" y1="16" x2="23" y2="16"></line>
+                </svg>
+            </button>
+            <div id="transform-hint" class="hidden">
+                <span id="hint-text">Click on splat or model to select</span>
+            </div>
+        </div>
+
+        <div id="controls-panel">
+            <h2>Splat/Mesh Viewer</h2>
+
+            <div class="control-section">
+                <h3>Display Mode</h3>
+                <div class="toggle-group">
+                    <button id="btn-splat" class="toggle-btn">Splat</button>
+                    <button id="btn-model" class="toggle-btn">Model</button>
+                    <button id="btn-both" class="toggle-btn active">Both</button>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Load Gaussian Splat</h3>
+                <input type="file" id="splat-input" accept=".ply,.splat,.ksplat,.spz,.sog" />
+                <label for="splat-input" class="file-label">Choose Splat File</label>
+                <span id="splat-filename" class="filename">No file loaded</span>
+            </div>
+
+            <div class="control-section">
+                <h3>Load 3D Model</h3>
+                <input type="file" id="model-input" accept=".glb,.gltf,.obj" multiple />
+                <label for="model-input" class="file-label">Choose glTF/OBJ File</label>
+                <span id="model-filename" class="filename">No file loaded</span>
+            </div>
+
+            <div class="control-section">
+                <h3>Transform Controls</h3>
+                <div class="toggle-group">
+                    <button id="btn-select-splat" class="toggle-btn small">Splat</button>
+                    <button id="btn-select-model" class="toggle-btn small">Model</button>
+                    <button id="btn-select-none" class="toggle-btn small active">None</button>
+                </div>
+                <div class="toggle-group" style="margin-top: 8px;">
+                    <button id="btn-translate" class="toggle-btn small active">Move</button>
+                    <button id="btn-rotate" class="toggle-btn small">Rotate</button>
+                    <button id="btn-scale" class="toggle-btn small">Scale</button>
+                </div>
+                <p class="hint-text">W: Move | E: Rotate | R: Scale</p>
+            </div>
+
+            <div class="control-section">
+                <h3>Splat Settings</h3>
+                <div class="slider-group">
+                    <label for="splat-scale">Scale: <span id="splat-scale-value">1.0</span></label>
+                    <input type="range" id="splat-scale" min="0.1" max="5" step="0.1" value="1" />
+                </div>
+                <div class="position-inputs">
+                    <label>Position:</label>
+                    <div class="xyz-inputs">
+                        <input type="number" id="splat-pos-x" value="0" step="0.1" />
+                        <input type="number" id="splat-pos-y" value="0" step="0.1" />
+                        <input type="number" id="splat-pos-z" value="0" step="0.1" />
+                    </div>
+                </div>
+                <div class="position-inputs">
+                    <label>Rotation (deg):</label>
+                    <div class="xyz-inputs">
+                        <input type="number" id="splat-rot-x" value="0" step="1" />
+                        <input type="number" id="splat-rot-y" value="0" step="1" />
+                        <input type="number" id="splat-rot-z" value="0" step="1" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Model Settings</h3>
+                <div class="slider-group">
+                    <label for="model-scale">Scale: <span id="model-scale-value">1.0</span></label>
+                    <input type="range" id="model-scale" min="0.1" max="5" step="0.1" value="1" />
+                </div>
+                <div class="slider-group">
+                    <label for="model-opacity">Opacity: <span id="model-opacity-value">1.0</span></label>
+                    <input type="range" id="model-opacity" min="0" max="1" step="0.05" value="1" />
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="model-wireframe" />
+                    <label for="model-wireframe">Wireframe</label>
+                </div>
+                <div class="position-inputs">
+                    <label>Position:</label>
+                    <div class="xyz-inputs">
+                        <input type="number" id="model-pos-x" value="0" step="0.1" />
+                        <input type="number" id="model-pos-y" value="0" step="0.1" />
+                        <input type="number" id="model-pos-z" value="0" step="0.1" />
+                    </div>
+                </div>
+                <div class="position-inputs">
+                    <label>Rotation (deg):</label>
+                    <div class="xyz-inputs">
+                        <input type="number" id="model-rot-x" value="0" step="1" />
+                        <input type="number" id="model-rot-y" value="0" step="1" />
+                        <input type="number" id="model-rot-z" value="0" step="1" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Alignment</h3>
+                <button id="btn-save-alignment" class="action-btn">Save Alignment</button>
+                <button id="btn-load-alignment" class="action-btn">Load Alignment</button>
+                <input type="file" id="alignment-input" accept=".json" class="hidden" />
+                <button id="btn-reset-alignment" class="action-btn secondary">Reset All</button>
+            </div>
+
+            <div class="control-section">
+                <h3>Camera</h3>
+                <button id="btn-reset-camera" class="action-btn">Reset Camera</button>
+                <button id="btn-fit-view" class="action-btn">Fit to View</button>
+            </div>
+
+            <div class="control-section">
+                <h3>Info</h3>
+                <div id="info-panel">
+                    <p>Splat count: <span id="splat-vertices">-</span></p>
+                    <p>Model faces: <span id="model-faces">-</span></p>
+                    <p>FPS: <span id="fps-counter">-</span></p>
+                </div>
+            </div>
+        </div>
+
+        <div id="loading-overlay" class="hidden">
+            <div class="loading-spinner"></div>
+            <p id="loading-text">Loading...</p>
+        </div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+            "@sparkjsdev/spark": "https://sparkjs.dev/releases/spark/0.1.10/spark.module.js"
+        }
+    }
+    </script>
+    <script type="module" src="main.js"></script>
+</body>
+</html>
