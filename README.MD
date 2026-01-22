@@ -12,6 +12,7 @@ A simple web-based viewer for comparing Gaussian splat files with traditional 3D
 - Manual position and rotation input fields for precise alignment
 - Wireframe mode and adjustable opacity for models
 - Orbit camera controls (rotate, pan, zoom)
+- Hideable controls panel for fullscreen viewing
 - FPS counter and mesh statistics
 
 ## Quick Start
@@ -28,11 +29,56 @@ Then open http://localhost:8080 in your browser.
 npx serve .
 ```
 
-### Using the included server script
+### Using Docker
 ```bash
-npm install
-npm start
+# Build the image
+docker build -t splat-mesh-viewer .
+
+# Run with default settings
+docker run -p 8080:80 splat-mesh-viewer
+
+# Run with pre-loaded files and hidden controls
+docker run -p 8080:80 \
+  -e DEFAULT_SPLAT_URL="https://example.com/model.ply" \
+  -e DEFAULT_MODEL_URL="https://example.com/model.glb" \
+  -e SHOW_CONTROLS="false" \
+  splat-mesh-viewer
 ```
+
+## Docker Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DEFAULT_SPLAT_URL` | `""` | URL to a Gaussian splat file to load on startup |
+| `DEFAULT_MODEL_URL` | `""` | URL to a 3D model file to load on startup |
+| `SHOW_CONTROLS` | `true` | Show (`true`) or hide (`false`) the controls panel on startup |
+
+### Example Docker Compose
+```yaml
+version: '3.8'
+services:
+  viewer:
+    build: .
+    ports:
+      - "8080:80"
+    environment:
+      - DEFAULT_SPLAT_URL=https://sparkjs.dev/assets/splats/butterfly.spz
+      - DEFAULT_MODEL_URL=
+      - SHOW_CONTROLS=true
+```
+
+## GitHub Actions / CI
+
+This repository includes a GitHub Actions workflow (`.github/workflows/docker-push.yml`) that automatically builds and pushes Docker images to Docker Hub on every push.
+
+### Required Secrets
+Add these secrets to your GitHub repository:
+- `DOCKERHUB_USER` - Your Docker Hub username
+- `DOCKERHUB_TOKEN` - Your Docker Hub access token
+
+### Image Tags
+- Branch pushes create tags like `username/splat-mesh-compare:branch-name`
+- Pushes to `main` also create the `latest` tag
 
 ## Usage
 
@@ -68,6 +114,9 @@ npm start
 - **Reset Camera**: Return to default view
 - **Fit to View**: Auto-frame the loaded content
 
+### Toggle Controls Panel
+Click the settings icon in the top-right corner of the viewer to show/hide the controls panel.
+
 ## Supported Formats
 
 ### Gaussian Splats (via Spark)
@@ -86,6 +135,7 @@ npm start
 
 - [Spark](https://sparkjs.dev/) - Advanced 3D Gaussian Splatting renderer for Three.js
 - [Three.js](https://threejs.org/) - 3D rendering and model loading
+- [nginx](https://nginx.org/) - Web server (Docker)
 - Vanilla JavaScript (ES Modules)
 
 ## Browser Compatibility
@@ -95,10 +145,3 @@ Requires a modern browser with WebGL 2.0 support:
 - Firefox 72+
 - Safari 15+
 - Edge 79+
-
-## Future Plans
-
-- Docker containerization for easy deployment
-- URL-based file loading
-- Multiple splat/model comparison
-- Animation playback for glTF models

@@ -6,6 +6,13 @@ import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { SplatMesh } from '@sparkjsdev/spark';
 
+// Get configuration from window (set by config.js)
+const config = window.APP_CONFIG || {
+    defaultSplatUrl: '',
+    defaultModelUrl: '',
+    showControls: true
+};
+
 // Global state
 const state = {
     displayMode: 'both', // 'splat', 'model', 'both'
@@ -14,7 +21,8 @@ const state = {
     splatLoaded: false,
     modelLoaded: false,
     modelOpacity: 1,
-    modelWireframe: false
+    modelWireframe: false,
+    controlsVisible: config.showControls
 };
 
 // Three.js objects
@@ -99,6 +107,12 @@ function init() {
     // Setup UI events
     setupUIEvents();
 
+    // Apply initial controls visibility
+    applyControlsVisibility();
+
+    // Load default files if configured
+    loadDefaultFiles();
+
     // Start render loop
     animate();
 }
@@ -128,6 +142,9 @@ function onKeyDown(event) {
 }
 
 function setupUIEvents() {
+    // Controls panel toggle
+    document.getElementById('btn-toggle-controls').addEventListener('click', toggleControlsPanel);
+
     // Display mode toggles
     document.getElementById('btn-splat').addEventListener('click', () => setDisplayMode('splat'));
     document.getElementById('btn-model').addEventListener('click', () => setDisplayMode('model'));
@@ -681,6 +698,163 @@ function fitToView() {
     camera.lookAt(center);
     controls.target.copy(center);
     controls.update();
+}
+
+// Controls panel visibility
+function toggleControlsPanel() {
+    state.controlsVisible = !state.controlsVisible;
+    applyControlsVisibility();
+}
+
+function applyControlsVisibility() {
+    const controlsPanel = document.getElementById('controls-panel');
+    const toggleBtn = document.getElementById('btn-toggle-controls');
+
+    if (state.controlsVisible) {
+        controlsPanel.classList.remove('hidden');
+        toggleBtn.classList.remove('controls-hidden');
+    } else {
+        controlsPanel.classList.add('hidden');
+        toggleBtn.classList.add('controls-hidden');
+    }
+
+    // Trigger resize to adjust canvas
+    setTimeout(onWindowResize, 10);
+}
+
+// Load default files from configuration
+async function loadDefaultFiles() {
+    if (config.defaultSplatUrl) {
+        await loadSplatFromUrl(config.defaultSplatUrl);
+    }
+
+    if (config.defaultModelUrl) {
+        await loadModelFromUrl(config.defaultModelUrl);
+    }
+}
+
+async function loadSplatFromUrl(url) {
+    showLoading('Loading Gaussian Splat...');
+
+    try {
+        // Remove existing splat
+        if (splatMesh) {
+            scene.remove(splatMesh);
+            if (splatMesh.dispose) splatMesh.dispose();
+            splatMesh = null;
+        }
+
+        // Create SplatMesh using Spark
+        splatMesh = new SplatMesh({ url: url });
+
+        // Wait a moment for initialization
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        scene.add(splatMesh);
+
+        state.splatLoaded = true;
+        updateVisibility();
+        updateTransformInputs();
+
+        // Update UI
+        const filename = url.split('/').pop() || 'URL';
+        document.getElementById('splat-filename').textContent = filename;
+        document.getElementById('splat-vertices').textContent = 'Loaded';
+
+        hideLoading();
+    } catch (error) {
+        console.error('Error loading splat from URL:', error);
+        hideLoading();
+    }
+}
+
+async function loadModelFromUrl(url) {
+    showLoading('Loading 3D Model...');
+
+    try {
+        // Clear existing model
+        while (modelGroup.children.length > 0) {
+            const child = modelGroup.children[0];
+            disposeObject(child);
+            modelGroup.remove(child);
+        }
+
+        const extension = url.split('.').pop().toLowerCase().split('?')[0];
+        let loadedObject;
+
+        if (extension === 'glb' || extension === 'gltf') {
+            loadedObject = await loadGLTFFromUrl(url);
+        } else if (extension === 'obj') {
+            loadedObject = await loadOBJFromUrl(url);
+        }
+
+        if (loadedObject) {
+            modelGroup.add(loadedObject);
+            state.modelLoaded = true;
+            updateModelOpacity();
+            updateModelWireframe();
+            updateVisibility();
+            updateTransformInputs();
+
+            // Count faces
+            let faceCount = 0;
+            loadedObject.traverse((child) => {
+                if (child.isMesh && child.geometry) {
+                    const geo = child.geometry;
+                    if (geo.index) {
+                        faceCount += geo.index.count / 3;
+                    } else if (geo.attributes.position) {
+                        faceCount += geo.attributes.position.count / 3;
+                    }
+                }
+            });
+
+            // Update UI
+            const filename = url.split('/').pop() || 'URL';
+            document.getElementById('model-filename').textContent = filename;
+            document.getElementById('model-faces').textContent = Math.round(faceCount).toLocaleString();
+        }
+
+        hideLoading();
+    } catch (error) {
+        console.error('Error loading model from URL:', error);
+        hideLoading();
+    }
+}
+
+function loadGLTFFromUrl(url) {
+    return new Promise((resolve, reject) => {
+        const loader = new GLTFLoader();
+        loader.load(
+            url,
+            (gltf) => resolve(gltf.scene),
+            undefined,
+            (error) => reject(error)
+        );
+    });
+}
+
+function loadOBJFromUrl(url) {
+    return new Promise((resolve, reject) => {
+        const loader = new OBJLoader();
+        loader.load(
+            url,
+            (object) => {
+                object.traverse((child) => {
+                    if (child.isMesh && !child.material) {
+                        child.material = new THREE.MeshStandardMaterial({
+                            color: 0x888888,
+                            metalness: 0.1,
+                            roughness: 0.8
+                        });
+                    }
+                });
+                resolve(object);
+            },
+            undefined,
+            (error) => reject(error)
+        );
+    });
 }
 
 // FPS counter

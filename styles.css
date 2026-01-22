@@ -326,6 +326,44 @@ input[type="range"]::-webkit-slider-thumb:hover {
     font-size: 0.9rem;
 }
 
+/* Toggle controls button */
+.toggle-controls-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    width: 40px;
+    height: 40px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid #4a4a6a;
+    border-radius: 8px;
+    color: #aaa;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    z-index: 100;
+}
+
+.toggle-controls-btn:hover {
+    background: rgba(74, 74, 138, 0.6);
+    color: #fff;
+}
+
+.toggle-controls-btn.controls-hidden {
+    background: rgba(74, 74, 138, 0.8);
+    color: #fff;
+}
+
+/* Hidden controls panel */
+#controls-panel.hidden {
+    display: none;
+}
+
+.hidden {
+    display: none !important;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     #app {
