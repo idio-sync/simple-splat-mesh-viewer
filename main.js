@@ -1,24 +1,21 @@
-// Debug: Log at module start
-console.log('main.js module starting to load...');
-
-// Global error handler
-window.onerror = function(message, source, lineno, colno, error) {
-    console.error('Global error:', message, 'at', source, 'line', lineno);
-    return false;
-};
-
+// ES Module imports (these are hoisted - execute first before any other code)
 import * as THREE from 'three';
-console.log('THREE loaded:', !!THREE);
-
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
-console.log('Three.js addons loaded');
-
 import { SplatMesh } from '@sparkjsdev/spark';
-console.log('SplatMesh loaded:', !!SplatMesh);
+
+// Mark module as loaded (for pre-module error detection)
+window.moduleLoaded = true;
+console.log('[main.js] Module loaded successfully, THREE:', !!THREE, 'SplatMesh:', !!SplatMesh);
+
+// Global error handler for runtime errors
+window.onerror = function(message, source, lineno, colno, error) {
+    console.error('[main.js] Runtime error:', message, 'at', source, 'line', lineno);
+    return false;
+};
 
 // Get configuration from window (set by config.js)
 const config = window.APP_CONFIG || {
@@ -54,14 +51,33 @@ let controlsRight = null;
 // Group for synchronized movement
 let syncGroup = null;
 
-// DOM elements
+// DOM elements (with null checks for debugging)
 const canvas = document.getElementById('viewer-canvas');
 const canvasRight = document.getElementById('viewer-canvas-right');
 const loadingOverlay = document.getElementById('loading-overlay');
 const loadingText = document.getElementById('loading-text');
 
+console.log('[main.js] DOM elements found:', {
+    canvas: !!canvas,
+    canvasRight: !!canvasRight,
+    loadingOverlay: !!loadingOverlay,
+    loadingText: !!loadingText
+});
+
 // Initialize the scene
 function init() {
+    console.log('[main.js] init() starting...');
+
+    // Verify required DOM elements
+    if (!canvas) {
+        console.error('[main.js] FATAL: viewer-canvas not found!');
+        return;
+    }
+    if (!canvasRight) {
+        console.error('[main.js] FATAL: viewer-canvas-right not found!');
+        return;
+    }
+
     // Scene
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x1a1a2e);
@@ -176,6 +192,8 @@ function init() {
 
     // Start render loop
     animate();
+
+    console.log('[main.js] init() completed successfully');
 }
 
 function onWindowResize() {
@@ -211,13 +229,27 @@ function onKeyDown(event) {
     }
 }
 
+// Helper function to safely add event listeners with null checks
+function addListener(id, event, handler) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener(event, handler);
+        return true;
+    } else {
+        console.warn(`[main.js] Element not found: ${id}`);
+        return false;
+    }
+}
+
 function setupUIEvents() {
+    console.log('[main.js] Setting up UI events...');
+
     // Controls panel toggle
     const toggleBtn = document.getElementById('btn-toggle-controls');
-    console.log('Toggle button found:', toggleBtn);
+    console.log('[main.js] Toggle button found:', !!toggleBtn);
     if (toggleBtn) {
         toggleBtn.onclick = function(e) {
-            console.log('Toggle button clicked via onclick');
+            console.log('[main.js] Toggle button clicked');
             e.preventDefault();
             e.stopPropagation();
             toggleControlsPanel();
@@ -225,30 +257,31 @@ function setupUIEvents() {
     }
 
     // Display mode toggles
-    document.getElementById('btn-splat').addEventListener('click', () => setDisplayMode('splat'));
-    document.getElementById('btn-model').addEventListener('click', () => setDisplayMode('model'));
-    document.getElementById('btn-both').addEventListener('click', () => setDisplayMode('both'));
-    document.getElementById('btn-split').addEventListener('click', () => setDisplayMode('split'));
+    addListener('btn-splat', 'click', () => setDisplayMode('splat'));
+    addListener('btn-model', 'click', () => setDisplayMode('model'));
+    addListener('btn-both', 'click', () => setDisplayMode('both'));
+    addListener('btn-split', 'click', () => setDisplayMode('split'));
 
     // Selection toggles
-    document.getElementById('btn-select-splat').addEventListener('click', () => setSelectedObject('splat'));
-    document.getElementById('btn-select-model').addEventListener('click', () => setSelectedObject('model'));
-    document.getElementById('btn-select-both').addEventListener('click', () => setSelectedObject('both'));
-    document.getElementById('btn-select-none').addEventListener('click', () => setSelectedObject('none'));
+    addListener('btn-select-splat', 'click', () => setSelectedObject('splat'));
+    addListener('btn-select-model', 'click', () => setSelectedObject('model'));
+    addListener('btn-select-both', 'click', () => setSelectedObject('both'));
+    addListener('btn-select-none', 'click', () => setSelectedObject('none'));
 
     // Transform mode toggles
-    document.getElementById('btn-translate').addEventListener('click', () => setTransformMode('translate'));
-    document.getElementById('btn-rotate').addEventListener('click', () => setTransformMode('rotate'));
-    document.getElementById('btn-scale').addEventListener('click', () => setTransformMode('scale'));
+    addListener('btn-translate', 'click', () => setTransformMode('translate'));
+    addListener('btn-rotate', 'click', () => setTransformMode('rotate'));
+    addListener('btn-scale', 'click', () => setTransformMode('scale'));
 
     // File inputs
-    document.getElementById('splat-input').addEventListener('change', handleSplatFile);
-    document.getElementById('model-input').addEventListener('change', handleModelFile);
+    addListener('splat-input', 'change', handleSplatFile);
+    addListener('model-input', 'change', handleModelFile);
 
     // Splat settings
-    document.getElementById('splat-scale').addEventListener('input', (e) => {
+    addListener('splat-scale', 'input', (e) => {
         const scale = parseFloat(e.target.value);
-        document.getElementById('splat-scale-value').textContent = scale.toFixed(1);
+        const valueEl = document.getElementById('splat-scale-value');
+        if (valueEl) valueEl.textContent = scale.toFixed(1);
         if (splatMesh) {
             splatMesh.scale.setScalar(scale);
         }
@@ -256,12 +289,12 @@ function setupUIEvents() {
 
     // Splat position inputs
     ['x', 'y', 'z'].forEach(axis => {
-        document.getElementById(`splat-pos-${axis}`).addEventListener('change', (e) => {
+        addListener(`splat-pos-${axis}`, 'change', (e) => {
             if (splatMesh) {
                 splatMesh.position[axis] = parseFloat(e.target.value) || 0;
             }
         });
-        document.getElementById(`splat-rot-${axis}`).addEventListener('change', (e) => {
+        addListener(`splat-rot-${axis}`, 'change', (e) => {
             if (splatMesh) {
                 splatMesh.rotation[axis] = THREE.MathUtils.degToRad(parseFloat(e.target.value) || 0);
             }
@@ -269,33 +302,35 @@ function setupUIEvents() {
     });
 
     // Model settings
-    document.getElementById('model-scale').addEventListener('input', (e) => {
+    addListener('model-scale', 'input', (e) => {
         const scale = parseFloat(e.target.value);
-        document.getElementById('model-scale-value').textContent = scale.toFixed(1);
+        const valueEl = document.getElementById('model-scale-value');
+        if (valueEl) valueEl.textContent = scale.toFixed(1);
         if (modelGroup) {
             modelGroup.scale.setScalar(scale);
         }
     });
 
-    document.getElementById('model-opacity').addEventListener('input', (e) => {
+    addListener('model-opacity', 'input', (e) => {
         state.modelOpacity = parseFloat(e.target.value);
-        document.getElementById('model-opacity-value').textContent = state.modelOpacity.toFixed(2);
+        const valueEl = document.getElementById('model-opacity-value');
+        if (valueEl) valueEl.textContent = state.modelOpacity.toFixed(2);
         updateModelOpacity();
     });
 
-    document.getElementById('model-wireframe').addEventListener('change', (e) => {
+    addListener('model-wireframe', 'change', (e) => {
         state.modelWireframe = e.target.checked;
         updateModelWireframe();
     });
 
     // Model position inputs
     ['x', 'y', 'z'].forEach(axis => {
-        document.getElementById(`model-pos-${axis}`).addEventListener('change', (e) => {
+        addListener(`model-pos-${axis}`, 'change', (e) => {
             if (modelGroup) {
                 modelGroup.position[axis] = parseFloat(e.target.value) || 0;
             }
         });
-        document.getElementById(`model-rot-${axis}`).addEventListener('change', (e) => {
+        addListener(`model-rot-${axis}`, 'change', (e) => {
             if (modelGroup) {
                 modelGroup.rotation[axis] = THREE.MathUtils.degToRad(parseFloat(e.target.value) || 0);
             }
@@ -303,47 +338,54 @@ function setupUIEvents() {
     });
 
     // Alignment buttons
-    document.getElementById('btn-save-alignment').addEventListener('click', saveAlignment);
-    document.getElementById('btn-load-alignment').addEventListener('click', () => {
-        document.getElementById('alignment-input').click();
+    addListener('btn-save-alignment', 'click', saveAlignment);
+    addListener('btn-load-alignment', 'click', () => {
+        const input = document.getElementById('alignment-input');
+        if (input) input.click();
     });
-    document.getElementById('alignment-input').addEventListener('change', loadAlignment);
-    document.getElementById('btn-reset-alignment').addEventListener('click', resetAlignment);
+    addListener('alignment-input', 'change', loadAlignment);
+    addListener('btn-reset-alignment', 'click', resetAlignment);
 
     // Camera buttons
-    document.getElementById('btn-reset-camera').addEventListener('click', resetCamera);
-    document.getElementById('btn-fit-view').addEventListener('click', fitToView);
+    addListener('btn-reset-camera', 'click', resetCamera);
+    addListener('btn-fit-view', 'click', fitToView);
 
     // Lighting controls
-    document.getElementById('ambient-intensity').addEventListener('input', (e) => {
+    addListener('ambient-intensity', 'input', (e) => {
         const intensity = parseFloat(e.target.value);
-        document.getElementById('ambient-intensity-value').textContent = intensity.toFixed(1);
+        const valueEl = document.getElementById('ambient-intensity-value');
+        if (valueEl) valueEl.textContent = intensity.toFixed(1);
         if (ambientLight) ambientLight.intensity = intensity;
     });
 
-    document.getElementById('hemisphere-intensity').addEventListener('input', (e) => {
+    addListener('hemisphere-intensity', 'input', (e) => {
         const intensity = parseFloat(e.target.value);
-        document.getElementById('hemisphere-intensity-value').textContent = intensity.toFixed(1);
+        const valueEl = document.getElementById('hemisphere-intensity-value');
+        if (valueEl) valueEl.textContent = intensity.toFixed(1);
         if (hemisphereLight) hemisphereLight.intensity = intensity;
     });
 
-    document.getElementById('directional1-intensity').addEventListener('input', (e) => {
+    addListener('directional1-intensity', 'input', (e) => {
         const intensity = parseFloat(e.target.value);
-        document.getElementById('directional1-intensity-value').textContent = intensity.toFixed(1);
+        const valueEl = document.getElementById('directional1-intensity-value');
+        if (valueEl) valueEl.textContent = intensity.toFixed(1);
         if (directionalLight1) directionalLight1.intensity = intensity;
     });
 
-    document.getElementById('directional2-intensity').addEventListener('input', (e) => {
+    addListener('directional2-intensity', 'input', (e) => {
         const intensity = parseFloat(e.target.value);
-        document.getElementById('directional2-intensity-value').textContent = intensity.toFixed(1);
+        const valueEl = document.getElementById('directional2-intensity-value');
+        if (valueEl) valueEl.textContent = intensity.toFixed(1);
         if (directionalLight2) directionalLight2.intensity = intensity;
     });
 
     // Auto align button
-    document.getElementById('btn-auto-align').addEventListener('click', autoAlignObjects);
+    addListener('btn-auto-align', 'click', autoAlignObjects);
 
     // Setup collapsible sections
     setupCollapsibles();
+
+    console.log('[main.js] UI events setup complete');
 }
 
 function setDisplayMode(mode) {
@@ -1429,21 +1471,23 @@ function animate() {
 }
 
 // Initialize when DOM is ready
-console.log('Setting up initialization...');
+console.log('[main.js] Setting up initialization, readyState:', document.readyState);
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        console.log('DOMContentLoaded fired, calling init()');
+        console.log('[main.js] DOMContentLoaded fired, calling init()');
         try {
             init();
         } catch (e) {
-            console.error('Init error:', e);
+            console.error('[main.js] Init error:', e);
+            console.error('[main.js] Stack:', e.stack);
         }
     });
 } else {
-    console.log('DOM already ready, calling init()');
+    console.log('[main.js] DOM already ready, calling init()');
     try {
         init();
     } catch (e) {
-        console.error('Init error:', e);
+        console.error('[main.js] Init error:', e);
+        console.error('[main.js] Stack:', e.stack);
     }
 }
