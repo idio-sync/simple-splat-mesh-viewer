@@ -70,58 +70,84 @@
                 <p class="hint-text">W: Move | E: Rotate | R: Scale</p>
             </div>
 
-            <div class="control-section">
-                <h3>Splat Settings</h3>
-                <div class="slider-group">
-                    <label for="splat-scale">Scale: <span id="splat-scale-value">1.0</span></label>
-                    <input type="range" id="splat-scale" min="0.1" max="5" step="0.1" value="1" />
-                </div>
-                <div class="position-inputs">
-                    <label>Position:</label>
-                    <div class="xyz-inputs">
-                        <input type="number" id="splat-pos-x" value="0" step="0.1" />
-                        <input type="number" id="splat-pos-y" value="0" step="0.1" />
-                        <input type="number" id="splat-pos-z" value="0" step="0.1" />
+            <div class="control-section collapsible">
+                <h3 class="collapsible-header">Splat Settings <span class="collapse-icon">−</span></h3>
+                <div class="collapsible-content">
+                    <div class="slider-group">
+                        <label for="splat-scale">Scale: <span id="splat-scale-value">1.0</span></label>
+                        <input type="range" id="splat-scale" min="0.1" max="5" step="0.1" value="1" />
                     </div>
-                </div>
-                <div class="position-inputs">
-                    <label>Rotation (deg):</label>
-                    <div class="xyz-inputs">
-                        <input type="number" id="splat-rot-x" value="0" step="1" />
-                        <input type="number" id="splat-rot-y" value="0" step="1" />
-                        <input type="number" id="splat-rot-z" value="0" step="1" />
+                    <div class="position-inputs">
+                        <label>Position:</label>
+                        <div class="xyz-inputs">
+                            <input type="number" id="splat-pos-x" value="0" step="0.1" />
+                            <input type="number" id="splat-pos-y" value="0" step="0.1" />
+                            <input type="number" id="splat-pos-z" value="0" step="0.1" />
+                        </div>
+                    </div>
+                    <div class="position-inputs">
+                        <label>Rotation (deg):</label>
+                        <div class="xyz-inputs">
+                            <input type="number" id="splat-rot-x" value="0" step="1" />
+                            <input type="number" id="splat-rot-y" value="0" step="1" />
+                            <input type="number" id="splat-rot-z" value="0" step="1" />
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="control-section">
-                <h3>Model Settings</h3>
-                <div class="slider-group">
-                    <label for="model-scale">Scale: <span id="model-scale-value">1.0</span></label>
-                    <input type="range" id="model-scale" min="0.1" max="5" step="0.1" value="1" />
-                </div>
-                <div class="slider-group">
-                    <label for="model-opacity">Opacity: <span id="model-opacity-value">1.0</span></label>
-                    <input type="range" id="model-opacity" min="0" max="1" step="0.05" value="1" />
-                </div>
-                <div class="checkbox-group">
-                    <input type="checkbox" id="model-wireframe" />
-                    <label for="model-wireframe">Wireframe</label>
-                </div>
-                <div class="position-inputs">
-                    <label>Position:</label>
-                    <div class="xyz-inputs">
-                        <input type="number" id="model-pos-x" value="0" step="0.1" />
-                        <input type="number" id="model-pos-y" value="0" step="0.1" />
-                        <input type="number" id="model-pos-z" value="0" step="0.1" />
+            <div class="control-section collapsible">
+                <h3 class="collapsible-header">Model Settings <span class="collapse-icon">−</span></h3>
+                <div class="collapsible-content">
+                    <div class="slider-group">
+                        <label for="model-scale">Scale: <span id="model-scale-value">1.0</span></label>
+                        <input type="range" id="model-scale" min="0.1" max="5" step="0.1" value="1" />
+                    </div>
+                    <div class="slider-group">
+                        <label for="model-opacity">Opacity: <span id="model-opacity-value">1.0</span></label>
+                        <input type="range" id="model-opacity" min="0" max="1" step="0.05" value="1" />
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="model-wireframe" />
+                        <label for="model-wireframe">Wireframe</label>
+                    </div>
+                    <div class="position-inputs">
+                        <label>Position:</label>
+                        <div class="xyz-inputs">
+                            <input type="number" id="model-pos-x" value="0" step="0.1" />
+                            <input type="number" id="model-pos-y" value="0" step="0.1" />
+                            <input type="number" id="model-pos-z" value="0" step="0.1" />
+                        </div>
+                    </div>
+                    <div class="position-inputs">
+                        <label>Rotation (deg):</label>
+                        <div class="xyz-inputs">
+                            <input type="number" id="model-rot-x" value="0" step="1" />
+                            <input type="number" id="model-rot-y" value="0" step="1" />
+                            <input type="number" id="model-rot-z" value="0" step="1" />
+                        </div>
                     </div>
                 </div>
-                <div class="position-inputs">
-                    <label>Rotation (deg):</label>
-                    <div class="xyz-inputs">
-                        <input type="number" id="model-rot-x" value="0" step="1" />
-                        <input type="number" id="model-rot-y" value="0" step="1" />
-                        <input type="number" id="model-rot-z" value="0" step="1" />
+            </div>
+
+            <div class="control-section collapsible">
+                <h3 class="collapsible-header">Lighting <span class="collapse-icon">−</span></h3>
+                <div class="collapsible-content">
+                    <div class="slider-group">
+                        <label for="ambient-intensity">Ambient: <span id="ambient-intensity-value">0.8</span></label>
+                        <input type="range" id="ambient-intensity" min="0" max="2" step="0.1" value="0.8" />
+                    </div>
+                    <div class="slider-group">
+                        <label for="hemisphere-intensity">Hemisphere: <span id="hemisphere-intensity-value">0.6</span></label>
+                        <input type="range" id="hemisphere-intensity" min="0" max="2" step="0.1" value="0.6" />
+                    </div>
+                    <div class="slider-group">
+                        <label for="directional1-intensity">Directional 1: <span id="directional1-intensity-value">1.5</span></label>
+                        <input type="range" id="directional1-intensity" min="0" max="3" step="0.1" value="1.5" />
+                    </div>
+                    <div class="slider-group">
+                        <label for="directional2-intensity">Directional 2: <span id="directional2-intensity-value">0.5</span></label>
+                        <input type="range" id="directional2-intensity" min="0" max="3" step="0.1" value="0.5" />
                     </div>
                 </div>
             </div>
@@ -132,6 +158,7 @@
                 <button id="btn-load-alignment" class="action-btn">Load Alignment</button>
                 <input type="file" id="alignment-input" accept=".json" class="hidden" />
                 <button id="btn-reset-alignment" class="action-btn secondary">Reset All</button>
+                <button id="btn-auto-align" class="action-btn">Auto Align</button>
             </div>
 
             <div class="control-section">

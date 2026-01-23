@@ -64,6 +64,39 @@ body {
     margin-bottom: 10px;
 }
 
+.collapsible-header {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: color 0.2s;
+}
+
+.collapsible-header:hover {
+    color: #aaa;
+}
+
+.collapse-icon {
+    font-size: 1.2rem;
+    font-weight: bold;
+    transition: transform 0.2s;
+}
+
+.control-section.collapsible.collapsed .collapse-icon {
+    transform: rotate(90deg);
+}
+
+.collapsible-content {
+    max-height: 1000px;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+}
+
+.control-section.collapsible.collapsed .collapsible-content {
+    max-height: 0;
+}
+
 .toggle-group {
     display: flex;
     gap: 5px;

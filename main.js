@@ -29,6 +29,7 @@ const state = {
 let scene, camera, renderer, controls, transformControls;
 let splatMesh = null;
 let modelGroup = null;
+let ambientLight, hemisphereLight, directionalLight1, directionalLight2;
 
 // DOM elements
 const canvas = document.getElementById('viewer-canvas');
@@ -78,18 +79,18 @@ function init() {
     scene.add(transformControls);
 
     // Lighting - Enhanced for better mesh visibility
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
     scene.add(ambientLight);
 
     // Hemisphere light for better color graduation
-    const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+    hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
     scene.add(hemisphereLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
-    directionalLight.position.set(5, 5, 5);
-    scene.add(directionalLight);
+    directionalLight1 = new THREE.DirectionalLight(0xffffff, 1.5);
+    directionalLight1.position.set(5, 5, 5);
+    scene.add(directionalLight1);
 
-    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+    directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
     directionalLight2.position.set(-5, 3, -5);
     scene.add(directionalLight2);
 
@@ -236,6 +237,37 @@ function setupUIEvents() {
     // Camera buttons
     document.getElementById('btn-reset-camera').addEventListener('click', resetCamera);
     document.getElementById('btn-fit-view').addEventListener('click', fitToView);
+
+    // Lighting controls
+    document.getElementById('ambient-intensity').addEventListener('input', (e) => {
+        const intensity = parseFloat(e.target.value);
+        document.getElementById('ambient-intensity-value').textContent = intensity.toFixed(1);
+        if (ambientLight) ambientLight.intensity = intensity;
+    });
+
+    document.getElementById('hemisphere-intensity').addEventListener('input', (e) => {
+        const intensity = parseFloat(e.target.value);
+        document.getElementById('hemisphere-intensity-value').textContent = intensity.toFixed(1);
+        if (hemisphereLight) hemisphereLight.intensity = intensity;
+    });
+
+    document.getElementById('directional1-intensity').addEventListener('input', (e) => {
+        const intensity = parseFloat(e.target.value);
+        document.getElementById('directional1-intensity-value').textContent = intensity.toFixed(1);
+        if (directionalLight1) directionalLight1.intensity = intensity;
+    });
+
+    document.getElementById('directional2-intensity').addEventListener('input', (e) => {
+        const intensity = parseFloat(e.target.value);
+        document.getElementById('directional2-intensity-value').textContent = intensity.toFixed(1);
+        if (directionalLight2) directionalLight2.intensity = intensity;
+    });
+
+    // Auto align button
+    document.getElementById('btn-auto-align').addEventListener('click', autoAlignObjects);
+
+    // Setup collapsible sections
+    setupCollapsibles();
 }
 
 function setDisplayMode(mode) {
@@ -374,6 +406,11 @@ async function handleSplatFile(event) {
         // Update info - Spark doesn't expose count directly, show file name
         document.getElementById('splat-vertices').textContent = 'Loaded';
 
+        // Auto-align if model is already loaded
+        if (state.modelLoaded) {
+            setTimeout(() => autoAlignObjects(), 100);
+        }
+
         hideLoading();
     } catch (error) {
         console.error('Error loading splat:', error);
@@ -435,6 +472,11 @@ async function handleModelFile(event) {
                 }
             });
             document.getElementById('model-faces').textContent = Math.round(faceCount).toLocaleString();
+
+            // Auto-align if splat is already loaded
+            if (state.splatLoaded) {
+                setTimeout(() => autoAlignObjects(), 100);
+            }
         }
 
         hideLoading();
@@ -934,6 +976,67 @@ function loadOBJFromUrl(url) {
             (error) => reject(error)
         );
     });
+}
+
+// Setup collapsible sections
+function setupCollapsibles() {
+    const collapsibleHeaders = document.querySelectorAll('.collapsible-header');
+    collapsibleHeaders.forEach(header => {
+        header.addEventListener('click', () => {
+            const section = header.closest('.control-section');
+            section.classList.toggle('collapsed');
+        });
+    });
+}
+
+// Auto align objects
+function autoAlignObjects() {
+    if (!splatMesh && !modelGroup) {
+        alert('Load both a splat and a model first');
+        return;
+    }
+
+    const splatBox = new THREE.Box3();
+    const modelBox = new THREE.Box3();
+    let hasSplat = false;
+    let hasModel = false;
+
+    // Get splat bounds
+    if (splatMesh) {
+        const size = 2 * splatMesh.scale.x;
+        splatBox.setFromCenterAndSize(
+            splatMesh.position,
+            new THREE.Vector3(size, size, size)
+        );
+        hasSplat = true;
+    }
+
+    // Get model bounds
+    if (modelGroup && modelGroup.children.length > 0) {
+        modelGroup.traverse((child) => {
+            if (child.isMesh) {
+                modelBox.expandByObject(child);
+                hasModel = true;
+            }
+        });
+    }
+
+    if (!hasSplat || !hasModel) {
+        alert('Both splat and model must be loaded for auto-alignment');
+        return;
+    }
+
+    // Calculate centers
+    const splatCenter = splatBox.getCenter(new THREE.Vector3());
+    const modelCenter = modelBox.getCenter(new THREE.Vector3());
+
+    // Calculate offset needed to align centers
+    const offset = new THREE.Vector3().subVectors(splatCenter, modelCenter);
+
+    // Apply offset to model (keeping splat in place)
+    modelGroup.position.add(offset);
+
+    updateTransformInputs();
 }
 
 // FPS counter
