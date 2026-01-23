@@ -83,14 +83,11 @@ body {
 }
 
 .collapse-icon {
-    font-size: 1rem;
-    font-weight: bold;
-    transition: transform 0.3s ease-out;
+    font-size: 0.8rem;
+    font-weight: normal;
     display: inline-block;
-}
-
-.control-section.collapsible.collapsed .collapse-icon {
-    transform: rotate(-90deg);
+    width: 1em;
+    text-align: center;
 }
 
 .collapsible-content {

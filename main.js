@@ -406,9 +406,9 @@ async function handleSplatFile(event) {
         // Update info - Spark doesn't expose count directly, show file name
         document.getElementById('splat-vertices').textContent = 'Loaded';
 
-        // Auto-align if model is already loaded
+        // Auto-align if model is already loaded (wait for splat to fully initialize)
         if (state.modelLoaded) {
-            setTimeout(() => autoAlignObjects(), 100);
+            setTimeout(() => autoAlignObjects(), 500);
         }
 
         hideLoading();
@@ -475,7 +475,7 @@ async function handleModelFile(event) {
 
             // Auto-align if splat is already loaded
             if (state.splatLoaded) {
-                setTimeout(() => autoAlignObjects(), 100);
+                setTimeout(() => autoAlignObjects(), 500);
             }
         }
 
@@ -1017,9 +1017,18 @@ function loadOBJFromUrl(url) {
 function setupCollapsibles() {
     const collapsibleHeaders = document.querySelectorAll('.collapsible-header');
     collapsibleHeaders.forEach(header => {
-        header.addEventListener('click', () => {
-            const section = header.closest('.control-section');
-            section.classList.toggle('collapsed');
+        header.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const section = header.closest('.control-section.collapsible');
+            if (section) {
+                section.classList.toggle('collapsed');
+                // Update icon
+                const icon = header.querySelector('.collapse-icon');
+                if (icon) {
+                    icon.textContent = section.classList.contains('collapsed') ? '▶' : '▼';
+                }
+            }
         });
     });
 }
@@ -1034,89 +1043,120 @@ function autoAlignObjects() {
     const splatBox = new THREE.Box3();
     const modelBox = new THREE.Box3();
 
-    // Get splat bounds - try to use actual geometry bounds first
+    // Get splat bounds - try multiple methods
     let splatBoundsFound = false;
 
-    // Try expandByObject which works if splatMesh has proper bounding info
-    try {
-        splatBox.expandByObject(splatMesh);
-        // Check if we got valid bounds (not infinite/empty)
-        if (splatBox.isEmpty() || !isFinite(splatBox.min.x)) {
-            splatBoundsFound = false;
-        } else {
-            splatBoundsFound = true;
-        }
-    } catch (e) {
-        splatBoundsFound = false;
+    // Method 1: Check if splatMesh has a boundingBox property (some loaders set this)
+    if (splatMesh.boundingBox && !splatMesh.boundingBox.isEmpty()) {
+        splatBox.copy(splatMesh.boundingBox);
+        splatBox.applyMatrix4(splatMesh.matrixWorld);
+        splatBoundsFound = true;
     }
 
-    // Fallback: try to compute from geometry if available
+    // Method 2: Try to get from geometry
     if (!splatBoundsFound && splatMesh.geometry) {
         try {
-            splatMesh.geometry.computeBoundingBox();
-            if (splatMesh.geometry.boundingBox) {
+            if (!splatMesh.geometry.boundingBox) {
+                splatMesh.geometry.computeBoundingBox();
+            }
+            if (splatMesh.geometry.boundingBox && !splatMesh.geometry.boundingBox.isEmpty()) {
                 splatBox.copy(splatMesh.geometry.boundingBox);
+                splatMesh.updateMatrixWorld(true);
                 splatBox.applyMatrix4(splatMesh.matrixWorld);
                 splatBoundsFound = true;
             }
         } catch (e) {
-            splatBoundsFound = false;
+            console.log('Could not get splat bounds from geometry:', e);
         }
     }
 
-    // Final fallback: estimate based on position and scale
+    // Method 3: Try expandByObject (traverses children too)
+    if (!splatBoundsFound) {
+        try {
+            splatMesh.updateMatrixWorld(true);
+            splatBox.setFromObject(splatMesh);
+            if (!splatBox.isEmpty() && isFinite(splatBox.min.x) && isFinite(splatBox.max.x)) {
+                splatBoundsFound = true;
+            }
+        } catch (e) {
+            console.log('Could not get splat bounds from setFromObject:', e);
+        }
+    }
+
+    // Method 4: Check children of splatMesh
+    if (!splatBoundsFound) {
+        splatMesh.traverse((child) => {
+            if (child.geometry) {
+                try {
+                    if (!child.geometry.boundingBox) {
+                        child.geometry.computeBoundingBox();
+                    }
+                    if (child.geometry.boundingBox) {
+                        const childBox = child.geometry.boundingBox.clone();
+                        child.updateMatrixWorld(true);
+                        childBox.applyMatrix4(child.matrixWorld);
+                        splatBox.union(childBox);
+                        splatBoundsFound = true;
+                    }
+                } catch (e) {}
+            }
+        });
+    }
+
+    // Final fallback: use splat position as center with reasonable default size
     if (!splatBoundsFound || splatBox.isEmpty()) {
-        const size = 2 * splatMesh.scale.x;
+        console.log('Using fallback splat bounds estimation');
+        // Use a reasonable default size based on typical gaussian splat dimensions
+        const size = 2.0 * Math.max(splatMesh.scale.x, splatMesh.scale.y, splatMesh.scale.z);
         splatBox.setFromCenterAndSize(
-            splatMesh.position,
+            splatMesh.position.clone(),
             new THREE.Vector3(size, size, size)
         );
     }
 
-    // Get model bounds - reset modelGroup transform temporarily to get local bounds
-    const originalPosition = modelGroup.position.clone();
-    modelGroup.position.set(0, 0, 0);
+    // Get model bounds with world transforms
     modelGroup.updateMatrixWorld(true);
-
-    modelGroup.traverse((child) => {
-        if (child.isMesh) {
-            modelBox.expandByObject(child);
-        }
-    });
-
-    // Restore original position
-    modelGroup.position.copy(originalPosition);
-    modelGroup.updateMatrixWorld(true);
+    modelBox.setFromObject(modelGroup);
 
     if (modelBox.isEmpty()) {
         alert('Could not compute model bounds');
         return;
     }
 
-    // Get centers and bottoms of bounding boxes
+    // Get centers of bounding boxes
     const splatCenter = splatBox.getCenter(new THREE.Vector3());
     const modelCenter = modelBox.getCenter(new THREE.Vector3());
 
-    // Calculate offset to align centers in X and Z, and bottoms in Y
+    // Calculate the model's current world position offset
+    const modelSize = modelBox.getSize(new THREE.Vector3());
+    const splatSize = splatBox.getSize(new THREE.Vector3());
+
+    // Align centers horizontally (X, Z) and align bottoms vertically (Y)
     const splatBottom = splatBox.min.y;
     const modelBottom = modelBox.min.y;
 
-    const offset = new THREE.Vector3(
-        splatCenter.x - modelCenter.x,
-        splatBottom - modelBottom,  // Align bottoms instead of centers for Y
-        splatCenter.z - modelCenter.z
-    );
+    // Calculate where the model should be positioned
+    const targetX = splatCenter.x;
+    const targetY = modelGroup.position.y + (splatBottom - modelBottom);
+    const targetZ = splatCenter.z;
 
-    // Apply offset to model position
-    modelGroup.position.add(offset);
+    // Calculate offset from current model center to target position
+    const offsetX = targetX - modelCenter.x;
+    const offsetZ = targetZ - modelCenter.z;
+
+    // Apply the offset
+    modelGroup.position.x += offsetX;
+    modelGroup.position.y = targetY;
+    modelGroup.position.z += offsetZ;
     modelGroup.updateMatrixWorld(true);
 
     updateTransformInputs();
 
     console.log('Auto-align complete:', {
-        splatBounds: { min: splatBox.min.toArray(), max: splatBox.max.toArray() },
-        modelBounds: { min: modelBox.min.toArray(), max: modelBox.max.toArray() },
-        offset: offset.toArray()
+        splatBounds: { min: splatBox.min.toArray(), max: splatBox.max.toArray(), center: splatCenter.toArray() },
+        modelBounds: { min: modelBox.min.toArray(), max: modelBox.max.toArray(), center: modelCenter.toArray() },
+        modelPosition: modelGroup.position.toArray(),
+        splatBoundsFound: splatBoundsFound
     });
 }
 
