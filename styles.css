@@ -30,12 +30,61 @@ body {
     display: block;
 }
 
+/* Split view styles */
+#viewer-container.split-view {
+    display: flex;
+}
+
+#viewer-container.split-view #viewer-canvas {
+    width: 50%;
+    border-right: 2px solid #4a4a6a;
+}
+
+#viewer-container.split-view #viewer-canvas-right {
+    width: 50%;
+    display: block;
+}
+
+#split-labels {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    pointer-events: none;
+    z-index: 50;
+}
+
+#split-labels.hidden {
+    display: none;
+}
+
+.split-label {
+    flex: 1;
+    text-align: center;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.5);
+    color: #aaa;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.split-label.left {
+    border-right: 1px solid #4a4a6a;
+}
+
 #controls-panel {
     width: 280px;
     background: #0f0f1a;
     padding: 20px;
     overflow-y: auto;
     border-left: 1px solid #333;
+}
+
+/* Controls panel visibility - using specific class instead of .hidden */
+#controls-panel.panel-hidden {
+    display: none;
 }
 
 #controls-panel h2 {
@@ -103,6 +152,17 @@ body {
     padding-top: 0;
     opacity: 0;
     pointer-events: none;
+}
+
+.subsection-header {
+    font-size: 0.75rem;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 15px;
+    margin-bottom: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #2a2a3a;
 }
 
 .toggle-group {
@@ -396,12 +456,13 @@ input[type="range"]::-webkit-slider-thumb:hover {
     color: #fff;
 }
 
-/* Hidden controls panel */
-#controls-panel.hidden {
-    display: none;
+/* Generic hidden class */
+.hidden {
+    display: none !important;
 }
 
-.hidden {
+/* Canvas hidden state for split view toggle */
+#viewer-canvas-right.hidden {
     display: none !important;
 }
 

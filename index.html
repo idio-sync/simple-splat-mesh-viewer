@@ -11,6 +11,11 @@
     <div id="app">
         <div id="viewer-container">
             <canvas id="viewer-canvas"></canvas>
+            <canvas id="viewer-canvas-right" class="hidden"></canvas>
+            <div id="split-labels" class="hidden">
+                <span class="split-label left">Splat</span>
+                <span class="split-label right">Model</span>
+            </div>
             <button id="btn-toggle-controls" class="toggle-controls-btn" title="Toggle Controls">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="4" y1="21" x2="4" y2="14"></line>
@@ -38,6 +43,7 @@
                     <button id="btn-splat" class="toggle-btn">Splat</button>
                     <button id="btn-model" class="toggle-btn">Model</button>
                     <button id="btn-both" class="toggle-btn active">Both</button>
+                    <button id="btn-split" class="toggle-btn">Split</button>
                 </div>
             </div>
 
@@ -60,6 +66,7 @@
                 <div class="toggle-group">
                     <button id="btn-select-splat" class="toggle-btn small">Splat</button>
                     <button id="btn-select-model" class="toggle-btn small">Model</button>
+                    <button id="btn-select-both" class="toggle-btn small">Both</button>
                     <button id="btn-select-none" class="toggle-btn small active">None</button>
                 </div>
                 <div class="toggle-group" style="margin-top: 8px;">
@@ -70,8 +77,8 @@
                 <p class="hint-text">W: Move | E: Rotate | R: Scale</p>
             </div>
 
-            <div class="control-section collapsible">
-                <h3 class="collapsible-header">Splat Settings <span class="collapse-icon">▼</span></h3>
+            <div class="control-section collapsible collapsed">
+                <h3 class="collapsible-header">Splat Settings <span class="collapse-icon">▶</span></h3>
                 <div class="collapsible-content">
                     <div class="slider-group">
                         <label for="splat-scale">Scale: <span id="splat-scale-value">1.0</span></label>
@@ -96,8 +103,8 @@
                 </div>
             </div>
 
-            <div class="control-section collapsible">
-                <h3 class="collapsible-header">Model Settings <span class="collapse-icon">▼</span></h3>
+            <div class="control-section collapsible collapsed">
+                <h3 class="collapsible-header">Model Settings <span class="collapse-icon">▶</span></h3>
                 <div class="collapsible-content">
                     <div class="slider-group">
                         <label for="model-scale">Scale: <span id="model-scale-value">1.0</span></label>
@@ -127,12 +134,8 @@
                             <input type="number" id="model-rot-z" value="0" step="1" />
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <div class="control-section collapsible">
-                <h3 class="collapsible-header">Lighting <span class="collapse-icon">▼</span></h3>
-                <div class="collapsible-content">
+                    <div class="subsection-header">Lighting</div>
                     <div class="slider-group">
                         <label for="ambient-intensity">Ambient: <span id="ambient-intensity-value">0.8</span></label>
                         <input type="range" id="ambient-intensity" min="0" max="2" step="0.1" value="0.8" />
@@ -152,19 +155,23 @@
                 </div>
             </div>
 
-            <div class="control-section">
-                <h3>Alignment</h3>
-                <button id="btn-save-alignment" class="action-btn">Save Alignment</button>
-                <button id="btn-load-alignment" class="action-btn">Load Alignment</button>
-                <input type="file" id="alignment-input" accept=".json" class="hidden" />
-                <button id="btn-reset-alignment" class="action-btn secondary">Reset All</button>
-                <button id="btn-auto-align" class="action-btn">Auto Align</button>
+            <div class="control-section collapsible collapsed">
+                <h3 class="collapsible-header">Alignment <span class="collapse-icon">▶</span></h3>
+                <div class="collapsible-content">
+                    <button id="btn-auto-align" class="action-btn">Auto Align</button>
+                    <button id="btn-save-alignment" class="action-btn">Save Alignment</button>
+                    <button id="btn-load-alignment" class="action-btn">Load Alignment</button>
+                    <input type="file" id="alignment-input" accept=".json" class="hidden" />
+                    <button id="btn-reset-alignment" class="action-btn secondary">Reset All</button>
+                </div>
             </div>
 
-            <div class="control-section">
-                <h3>Camera</h3>
-                <button id="btn-reset-camera" class="action-btn">Reset Camera</button>
-                <button id="btn-fit-view" class="action-btn">Fit to View</button>
+            <div class="control-section collapsible collapsed">
+                <h3 class="collapsible-header">Camera <span class="collapse-icon">▶</span></h3>
+                <div class="collapsible-content">
+                    <button id="btn-reset-camera" class="action-btn">Reset Camera</button>
+                    <button id="btn-fit-view" class="action-btn">Fit to View</button>
+                </div>
             </div>
 
             <div class="control-section">
