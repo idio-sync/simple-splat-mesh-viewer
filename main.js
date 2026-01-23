@@ -15,8 +15,8 @@ const config = window.APP_CONFIG || {
 
 // Global state
 const state = {
-    displayMode: 'both', // 'splat', 'model', 'both'
-    selectedObject: 'none', // 'splat', 'model', 'none'
+    displayMode: 'both', // 'splat', 'model', 'both', 'split'
+    selectedObject: 'none', // 'splat', 'model', 'both', 'none'
     transformMode: 'translate', // 'translate', 'rotate', 'scale'
     splatLoaded: false,
     modelLoaded: false,
@@ -25,14 +25,22 @@ const state = {
     controlsVisible: config.showControls
 };
 
-// Three.js objects
+// Three.js objects - Main view
 let scene, camera, renderer, controls, transformControls;
 let splatMesh = null;
 let modelGroup = null;
 let ambientLight, hemisphereLight, directionalLight1, directionalLight2;
 
+// Three.js objects - Split view (right side)
+let rendererRight = null;
+let controlsRight = null;
+
+// Group for synchronized movement
+let syncGroup = null;
+
 // DOM elements
 const canvas = document.getElementById('viewer-canvas');
+const canvasRight = document.getElementById('viewer-canvas-right');
 const loadingOverlay = document.getElementById('loading-overlay');
 const loadingText = document.getElementById('loading-text');
 
@@ -51,7 +59,7 @@ function init() {
     );
     camera.position.set(0, 1, 3);
 
-    // Renderer
+    // Renderer - Main (left in split mode)
     renderer = new THREE.WebGLRenderer({
         canvas: canvas,
         antialias: true
@@ -60,7 +68,15 @@ function init() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-    // Orbit Controls
+    // Renderer - Right (for split view)
+    rendererRight = new THREE.WebGLRenderer({
+        canvas: canvasRight,
+        antialias: true
+    });
+    rendererRight.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    rendererRight.outputColorSpace = THREE.SRGBColorSpace;
+
+    // Orbit Controls - Main
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
@@ -68,13 +84,36 @@ function init() {
     controls.minDistance = 0.1;
     controls.maxDistance = 100;
 
+    // Orbit Controls - Right (synced with main)
+    controlsRight = new OrbitControls(camera, rendererRight.domElement);
+    controlsRight.enableDamping = true;
+    controlsRight.dampingFactor = 0.05;
+    controlsRight.screenSpacePanning = true;
+    controlsRight.minDistance = 0.1;
+    controlsRight.maxDistance = 100;
+
+    // Sync controls - when one moves, update the other
+    controls.addEventListener('change', () => {
+        controlsRight.target.copy(controls.target);
+        controlsRight.update();
+    });
+    controlsRight.addEventListener('change', () => {
+        controls.target.copy(controlsRight.target);
+        controls.update();
+    });
+
     // Transform Controls
     transformControls = new TransformControls(camera, renderer.domElement);
     transformControls.addEventListener('dragging-changed', (event) => {
         controls.enabled = !event.value;
+        controlsRight.enabled = !event.value;
     });
     transformControls.addEventListener('objectChange', () => {
         updateTransformInputs();
+        // If both selected, sync the other object
+        if (state.selectedObject === 'both') {
+            syncBothObjects();
+        }
     });
     scene.add(transformControls);
 
@@ -97,6 +136,11 @@ function init() {
     // Grid helper
     const gridHelper = new THREE.GridHelper(10, 10, 0x4a4a6a, 0x2a2a4a);
     scene.add(gridHelper);
+
+    // Sync group for moving both objects together
+    syncGroup = new THREE.Group();
+    syncGroup.name = 'syncGroup';
+    scene.add(syncGroup);
 
     // Model group
     modelGroup = new THREE.Group();
@@ -124,9 +168,18 @@ function init() {
 
 function onWindowResize() {
     const container = document.getElementById('viewer-container');
-    camera.aspect = container.clientWidth / container.clientHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(container.clientWidth, container.clientHeight);
+
+    if (state.displayMode === 'split') {
+        const halfWidth = container.clientWidth / 2;
+        camera.aspect = halfWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(halfWidth, container.clientHeight);
+        rendererRight.setSize(halfWidth, container.clientHeight);
+    } else {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    }
 }
 
 function onKeyDown(event) {
@@ -154,10 +207,12 @@ function setupUIEvents() {
     document.getElementById('btn-splat').addEventListener('click', () => setDisplayMode('splat'));
     document.getElementById('btn-model').addEventListener('click', () => setDisplayMode('model'));
     document.getElementById('btn-both').addEventListener('click', () => setDisplayMode('both'));
+    document.getElementById('btn-split').addEventListener('click', () => setDisplayMode('split'));
 
     // Selection toggles
     document.getElementById('btn-select-splat').addEventListener('click', () => setSelectedObject('splat'));
     document.getElementById('btn-select-model').addEventListener('click', () => setSelectedObject('model'));
+    document.getElementById('btn-select-both').addEventListener('click', () => setSelectedObject('both'));
     document.getElementById('btn-select-none').addEventListener('click', () => setSelectedObject('none'));
 
     // Transform mode toggles
@@ -274,9 +329,25 @@ function setDisplayMode(mode) {
     state.displayMode = mode;
 
     // Update button states
-    ['splat', 'model', 'both'].forEach(m => {
+    ['splat', 'model', 'both', 'split'].forEach(m => {
         document.getElementById(`btn-${m}`).classList.toggle('active', m === mode);
     });
+
+    // Handle split view
+    const container = document.getElementById('viewer-container');
+    const splitLabels = document.getElementById('split-labels');
+
+    if (mode === 'split') {
+        container.classList.add('split-view');
+        canvasRight.classList.remove('hidden');
+        splitLabels.classList.remove('hidden');
+        onWindowResize();
+    } else {
+        container.classList.remove('split-view');
+        canvasRight.classList.add('hidden');
+        splitLabels.classList.add('hidden');
+        onWindowResize();
+    }
 
     updateVisibility();
 }
@@ -285,16 +356,89 @@ function setSelectedObject(selection) {
     state.selectedObject = selection;
 
     // Update button states
-    ['splat', 'model', 'none'].forEach(s => {
+    ['splat', 'model', 'both', 'none'].forEach(s => {
         document.getElementById(`btn-select-${s}`).classList.toggle('active', s === selection);
     });
 
     // Attach transform controls
     transformControls.detach();
+
     if (selection === 'splat' && splatMesh) {
         transformControls.attach(splatMesh);
     } else if (selection === 'model' && modelGroup && modelGroup.children.length > 0) {
         transformControls.attach(modelGroup);
+    } else if (selection === 'both') {
+        // For both, attach to splat and sync model
+        if (splatMesh) {
+            transformControls.attach(splatMesh);
+        } else if (modelGroup && modelGroup.children.length > 0) {
+            transformControls.attach(modelGroup);
+        }
+    }
+}
+
+// Sync both objects when moving in "both" mode
+let lastSplatPosition = new THREE.Vector3();
+let lastSplatRotation = new THREE.Euler();
+let lastModelPosition = new THREE.Vector3();
+let lastModelRotation = new THREE.Euler();
+
+function syncBothObjects() {
+    if (!splatMesh || !modelGroup) return;
+
+    // Calculate the delta movement based on which object is attached
+    if (transformControls.object === splatMesh) {
+        const deltaPos = new THREE.Vector3().subVectors(splatMesh.position, lastSplatPosition);
+        const deltaRot = new THREE.Euler(
+            splatMesh.rotation.x - lastSplatRotation.x,
+            splatMesh.rotation.y - lastSplatRotation.y,
+            splatMesh.rotation.z - lastSplatRotation.z
+        );
+
+        modelGroup.position.add(deltaPos);
+        modelGroup.rotation.x += deltaRot.x;
+        modelGroup.rotation.y += deltaRot.y;
+        modelGroup.rotation.z += deltaRot.z;
+
+        // Match scale
+        modelGroup.scale.copy(splatMesh.scale);
+    } else if (transformControls.object === modelGroup) {
+        const deltaPos = new THREE.Vector3().subVectors(modelGroup.position, lastModelPosition);
+        const deltaRot = new THREE.Euler(
+            modelGroup.rotation.x - lastModelRotation.x,
+            modelGroup.rotation.y - lastModelRotation.y,
+            modelGroup.rotation.z - lastModelRotation.z
+        );
+
+        splatMesh.position.add(deltaPos);
+        splatMesh.rotation.x += deltaRot.x;
+        splatMesh.rotation.y += deltaRot.y;
+        splatMesh.rotation.z += deltaRot.z;
+
+        // Match scale
+        splatMesh.scale.copy(modelGroup.scale);
+    }
+
+    // Update last positions
+    if (splatMesh) {
+        lastSplatPosition.copy(splatMesh.position);
+        lastSplatRotation.copy(splatMesh.rotation);
+    }
+    if (modelGroup) {
+        lastModelPosition.copy(modelGroup.position);
+        lastModelRotation.copy(modelGroup.rotation);
+    }
+}
+
+// Store last positions when selection changes
+function storeLastPositions() {
+    if (splatMesh) {
+        lastSplatPosition.copy(splatMesh.position);
+        lastSplatRotation.copy(splatMesh.rotation);
+    }
+    if (modelGroup) {
+        lastModelPosition.copy(modelGroup.position);
+        lastModelRotation.copy(modelGroup.rotation);
     }
 }
 
@@ -307,18 +451,29 @@ function setTransformMode(mode) {
         const btnId = m === 'translate' ? 'btn-translate' : m === 'rotate' ? 'btn-rotate' : 'btn-scale';
         document.getElementById(btnId).classList.toggle('active', m === mode);
     });
+
+    // Store positions when changing mode
+    storeLastPositions();
 }
 
 function updateVisibility() {
-    const showSplat = state.displayMode === 'splat' || state.displayMode === 'both';
-    const showModel = state.displayMode === 'model' || state.displayMode === 'both';
+    const mode = state.displayMode;
 
-    if (splatMesh) {
-        splatMesh.visible = showSplat;
-    }
+    if (mode === 'split') {
+        // In split mode, both are visible but rendered in separate views
+        if (splatMesh) splatMesh.visible = true;
+        if (modelGroup) modelGroup.visible = true;
+    } else {
+        const showSplat = mode === 'splat' || mode === 'both';
+        const showModel = mode === 'model' || mode === 'both';
 
-    if (modelGroup) {
-        modelGroup.visible = showModel;
+        if (splatMesh) {
+            splatMesh.visible = showSplat;
+        }
+
+        if (modelGroup) {
+            modelGroup.visible = showModel;
+        }
     }
 }
 
@@ -402,6 +557,7 @@ async function handleSplatFile(event) {
         state.splatLoaded = true;
         updateVisibility();
         updateTransformInputs();
+        storeLastPositions();
 
         // Update info - Spark doesn't expose count directly, show file name
         document.getElementById('splat-vertices').textContent = 'Loaded';
@@ -458,6 +614,7 @@ async function handleModelFile(event) {
             updateModelWireframe();
             updateVisibility();
             updateTransformInputs();
+            storeLastPositions();
 
             // Count faces
             let faceCount = 0;
@@ -731,6 +888,7 @@ function loadAlignment(event) {
             }
 
             updateTransformInputs();
+            storeLastPositions();
         } catch (error) {
             alert('Error loading alignment file: ' + error.message);
         }
@@ -755,6 +913,7 @@ function resetAlignment() {
     }
 
     updateTransformInputs();
+    storeLastPositions();
 }
 
 function resetCamera() {
@@ -762,6 +921,8 @@ function resetCamera() {
     camera.lookAt(0, 0, 0);
     controls.target.set(0, 0, 0);
     controls.update();
+    controlsRight.target.set(0, 0, 0);
+    controlsRight.update();
 }
 
 function fitToView() {
@@ -808,6 +969,8 @@ function fitToView() {
     camera.lookAt(center);
     controls.target.copy(center);
     controls.update();
+    controlsRight.target.copy(center);
+    controlsRight.update();
 }
 
 // Controls panel visibility
@@ -821,10 +984,10 @@ function applyControlsVisibility() {
     const toggleBtn = document.getElementById('btn-toggle-controls');
 
     if (state.controlsVisible) {
-        controlsPanel.classList.remove('hidden');
+        controlsPanel.classList.remove('panel-hidden');
         toggleBtn.classList.remove('controls-hidden');
     } else {
-        controlsPanel.classList.add('hidden');
+        controlsPanel.classList.add('panel-hidden');
         toggleBtn.classList.add('controls-hidden');
     }
 
@@ -865,6 +1028,7 @@ async function loadSplatFromUrl(url) {
         state.splatLoaded = true;
         updateVisibility();
         updateTransformInputs();
+        storeLastPositions();
 
         // Update UI
         const filename = url.split('/').pop() || 'URL';
@@ -905,6 +1069,7 @@ async function loadModelFromUrl(url) {
             updateModelWireframe();
             updateVisibility();
             updateTransformInputs();
+            storeLastPositions();
 
             // Count faces
             let faceCount = 0;
@@ -1127,10 +1292,6 @@ function autoAlignObjects() {
     const splatCenter = splatBox.getCenter(new THREE.Vector3());
     const modelCenter = modelBox.getCenter(new THREE.Vector3());
 
-    // Calculate the model's current world position offset
-    const modelSize = modelBox.getSize(new THREE.Vector3());
-    const splatSize = splatBox.getSize(new THREE.Vector3());
-
     // Align centers horizontally (X, Z) and align bottoms vertically (Y)
     const splatBottom = splatBox.min.y;
     const modelBottom = modelBox.min.y;
@@ -1151,6 +1312,7 @@ function autoAlignObjects() {
     modelGroup.updateMatrixWorld(true);
 
     updateTransformInputs();
+    storeLastPositions();
 
     console.log('Auto-align complete:', {
         splatBounds: { min: splatBox.min.toArray(), max: splatBox.max.toArray(), center: splatCenter.toArray() },
@@ -1178,7 +1340,31 @@ function updateFPS() {
 function animate() {
     requestAnimationFrame(animate);
     controls.update();
-    renderer.render(scene, camera);
+    controlsRight.update();
+
+    if (state.displayMode === 'split') {
+        // Split view - render splat on left, model on right
+        const splatVisible = splatMesh ? splatMesh.visible : false;
+        const modelVisible = modelGroup ? modelGroup.visible : false;
+
+        // Left view - splat only
+        if (splatMesh) splatMesh.visible = true;
+        if (modelGroup) modelGroup.visible = false;
+        renderer.render(scene, camera);
+
+        // Right view - model only
+        if (splatMesh) splatMesh.visible = false;
+        if (modelGroup) modelGroup.visible = true;
+        rendererRight.render(scene, camera);
+
+        // Restore visibility
+        if (splatMesh) splatMesh.visible = splatVisible;
+        if (modelGroup) modelGroup.visible = modelVisible;
+    } else {
+        // Normal view
+        renderer.render(scene, camera);
+    }
+
     updateFPS();
 }
 
