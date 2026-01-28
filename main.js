@@ -1100,96 +1100,110 @@ function fitToView() {
 // Controls panel visibility
 function toggleControlsPanel() {
     console.log('[main.js] === TOGGLE CONTROLS PANEL ===');
-    console.log('[main.js] Current state.controlsVisible:', state.controlsVisible);
-    state.controlsVisible = !state.controlsVisible;
-    console.log('[main.js] New state.controlsVisible:', state.controlsVisible);
-    applyControlsVisibility();
-}
-
-function applyControlsVisibility() {
-    console.log('[main.js] === APPLY CONTROLS VISIBILITY ===');
 
     const controlsPanel = document.getElementById('controls-panel');
+    if (!controlsPanel) {
+        console.error('[main.js] controls-panel not found!');
+        return;
+    }
+
+    // Read current visibility from DOM, not from state object (more reliable)
+    const isCurrentlyHidden = controlsPanel.style.display === 'none' ||
+                              controlsPanel.classList.contains('panel-hidden') ||
+                              window.getComputedStyle(controlsPanel).display === 'none';
+
+    console.log('[main.js] isCurrentlyHidden (from DOM):', isCurrentlyHidden);
+
+    // Toggle: if hidden, show it; if visible, hide it
+    const shouldShow = isCurrentlyHidden;
+    console.log('[main.js] shouldShow:', shouldShow);
+
+    // Update state object (but don't rely on it)
+    try {
+        state.controlsVisible = shouldShow;
+    } catch (e) {
+        console.error('[main.js] Error updating state:', e);
+    }
+
+    // Apply visibility directly
+    applyControlsVisibilityDirect(controlsPanel, shouldShow);
+}
+
+function applyControlsVisibilityDirect(controlsPanel, shouldShow) {
+    console.log('[main.js] === APPLY VISIBILITY DIRECT ===');
+    console.log('[main.js] shouldShow:', shouldShow);
+
     const toggleBtn = document.getElementById('btn-toggle-controls');
 
-    console.log('[main.js] controlsPanel element:', controlsPanel);
-    console.log('[main.js] state.controlsVisible:', state.controlsVisible);
-
-    if (!controlsPanel) {
-        console.error('[main.js] FATAL: controls-panel element not found!');
-        return;
+    // Check controls mode
+    let mode = 'full';
+    try {
+        mode = config.controlsMode || 'full';
+    } catch (e) {
+        console.warn('[main.js] Could not read config.controlsMode:', e);
     }
 
-    // Log current state before changes
-    const computedStyle = window.getComputedStyle(controlsPanel);
-    console.log('[main.js] BEFORE - inline style.display:', controlsPanel.style.display);
-    console.log('[main.js] BEFORE - computed display:', computedStyle.display);
-    console.log('[main.js] BEFORE - classList:', Array.from(controlsPanel.classList));
-
-    // Check if controls mode is 'none' - if so, always hide
-    const mode = config.controlsMode || 'full';
     if (mode === 'none') {
-        console.log('[main.js] Controls mode is "none", keeping hidden');
-        controlsPanel.style.setProperty('display', 'none', 'important');
-        if (toggleBtn) toggleBtn.style.setProperty('display', 'none', 'important');
+        console.log('[main.js] Mode is none, hiding');
+        controlsPanel.style.cssText = 'display: none !important;';
+        if (toggleBtn) toggleBtn.style.cssText = 'display: none !important;';
         return;
     }
 
-    if (state.controlsVisible) {
-        console.log('[main.js] ACTION: Showing panel...');
+    if (shouldShow) {
+        console.log('[main.js] SHOWING panel...');
 
-        // 1. Remove ALL possible hidden classes
-        controlsPanel.classList.remove('panel-hidden');
-        controlsPanel.classList.remove('hidden');
-        controlsPanel.classList.remove('collapsed');
+        // Clear all hidden states
+        controlsPanel.classList.remove('panel-hidden', 'hidden', 'collapsed');
 
-        // 2. Force display with !important to override any CSS
-        controlsPanel.style.setProperty('display', 'block', 'important');
+        // Force show with cssText (nuclear option - replaces all inline styles)
+        controlsPanel.style.cssText = 'display: block !important; visibility: visible !important; opacity: 1 !important;';
 
-        // 3. Also ensure visibility and opacity
-        controlsPanel.style.setProperty('visibility', 'visible', 'important');
-        controlsPanel.style.setProperty('opacity', '1', 'important');
-
-        // Re-apply mode-specific styles if needed
+        // Add width for minimal mode
         if (mode === 'minimal') {
             controlsPanel.style.width = '200px';
-        } else {
-            controlsPanel.style.width = '';
         }
 
-        // Update toggle button icon state
         if (toggleBtn) toggleBtn.classList.remove('controls-hidden');
 
     } else {
-        console.log('[main.js] ACTION: Hiding panel...');
+        console.log('[main.js] HIDING panel...');
 
-        // 1. Add hidden class
+        // Add hidden class
         controlsPanel.classList.add('panel-hidden');
 
-        // 2. Force hide with !important
-        controlsPanel.style.setProperty('display', 'none', 'important');
+        // Force hide with cssText
+        controlsPanel.style.cssText = 'display: none !important;';
 
-        // Update toggle button icon state
         if (toggleBtn) toggleBtn.classList.add('controls-hidden');
     }
 
-    // Log state after changes
-    const computedStyleAfter = window.getComputedStyle(controlsPanel);
-    console.log('[main.js] AFTER - inline style.display:', controlsPanel.style.display);
-    console.log('[main.js] AFTER - computed display:', computedStyleAfter.display);
-    console.log('[main.js] AFTER - classList:', Array.from(controlsPanel.classList));
-    console.log('[main.js] === END APPLY CONTROLS VISIBILITY ===');
+    // Verify the change took effect
+    const computedDisplay = window.getComputedStyle(controlsPanel).display;
+    console.log('[main.js] Final computed display:', computedDisplay);
+    console.log('[main.js] === END APPLY VISIBILITY DIRECT ===');
 
-    // Trigger resize to adjust canvas (with error handling)
+    // Trigger resize
     setTimeout(() => {
         try {
-            if (typeof onWindowResize === 'function') {
-                onWindowResize();
-            }
-        } catch (e) {
-            console.error('[main.js] Error in onWindowResize:', e);
-        }
+            if (typeof onWindowResize === 'function') onWindowResize();
+        } catch (e) { /* ignore */ }
     }, 10);
+}
+
+// Legacy function for initial setup - calls the new direct function
+function applyControlsVisibility() {
+    const controlsPanel = document.getElementById('controls-panel');
+    if (!controlsPanel) return;
+
+    let shouldShow = true;
+    try {
+        shouldShow = state.controlsVisible;
+    } catch (e) {
+        console.warn('[main.js] Could not read state.controlsVisible:', e);
+    }
+
+    applyControlsVisibilityDirect(controlsPanel, shouldShow);
 }
 // Apply controls mode (full, minimal, none)
 function applyControlsMode() {
