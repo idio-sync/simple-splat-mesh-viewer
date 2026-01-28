@@ -143,7 +143,23 @@ function init() {
             syncBothObjects();
         }
     });
-    scene.add(transformControls);
+
+    // Add TransformControls to scene with instance check
+    console.log('[main.js] TransformControls instanceof THREE.Object3D:', transformControls instanceof THREE.Object3D);
+    if (!(transformControls instanceof THREE.Object3D)) {
+        console.error('[main.js] WARNING: TransformControls is NOT an instance of THREE.Object3D!');
+        console.error('[main.js] This indicates THREE.js is loaded multiple times (import map issue).');
+        console.error('[main.js] TransformControls constructor:', transformControls.constructor?.name);
+        console.error('[main.js] THREE.Object3D:', THREE.Object3D?.name);
+        // Try to add anyway - it may work partially
+    }
+    try {
+        scene.add(transformControls);
+        console.log('[main.js] TransformControls added to scene successfully');
+    } catch (tcError) {
+        console.error('[main.js] Failed to add TransformControls to scene:', tcError);
+        console.error('[main.js] Transform gizmos will not be visible, but app should still work');
+    }
 
     // Lighting - Enhanced for better mesh visibility
     ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
@@ -1083,69 +1099,86 @@ function fitToView() {
 
 // Controls panel visibility
 function toggleControlsPanel() {
-    console.log('[main.js] toggleControlsPanel called, current state:', state.controlsVisible);
+    console.log('[main.js] === TOGGLE CONTROLS PANEL ===');
+    console.log('[main.js] Current state.controlsVisible:', state.controlsVisible);
     state.controlsVisible = !state.controlsVisible;
-    console.log('[main.js] New state:', state.controlsVisible);
+    console.log('[main.js] New state.controlsVisible:', state.controlsVisible);
     applyControlsVisibility();
 }
 
 function applyControlsVisibility() {
+    console.log('[main.js] === APPLY CONTROLS VISIBILITY ===');
+
     const controlsPanel = document.getElementById('controls-panel');
     const toggleBtn = document.getElementById('btn-toggle-controls');
 
-    console.log('[main.js] applyControlsVisibility - State:', state.controlsVisible);
+    console.log('[main.js] controlsPanel element:', controlsPanel);
+    console.log('[main.js] state.controlsVisible:', state.controlsVisible);
 
     if (!controlsPanel) {
-        console.error('[main.js] Error: controls-panel element not found!');
+        console.error('[main.js] FATAL: controls-panel element not found!');
         return;
     }
+
+    // Log current state before changes
+    const computedStyle = window.getComputedStyle(controlsPanel);
+    console.log('[main.js] BEFORE - inline style.display:', controlsPanel.style.display);
+    console.log('[main.js] BEFORE - computed display:', computedStyle.display);
+    console.log('[main.js] BEFORE - classList:', Array.from(controlsPanel.classList));
 
     // Check if controls mode is 'none' - if so, always hide
     const mode = config.controlsMode || 'full';
     if (mode === 'none') {
         console.log('[main.js] Controls mode is "none", keeping hidden');
-        controlsPanel.style.display = 'none';
-        if (toggleBtn) toggleBtn.style.display = 'none';
+        controlsPanel.style.setProperty('display', 'none', 'important');
+        if (toggleBtn) toggleBtn.style.setProperty('display', 'none', 'important');
         return;
     }
 
     if (state.controlsVisible) {
-        console.log('[main.js] Showing panel...');
+        console.log('[main.js] ACTION: Showing panel...');
 
-        // Remove hidden classes
+        // 1. Remove ALL possible hidden classes
         controlsPanel.classList.remove('panel-hidden');
         controlsPanel.classList.remove('hidden');
+        controlsPanel.classList.remove('collapsed');
 
-        // Explicitly set display to flex/block (not just removing style)
-        // This ensures visibility regardless of any other inline styles
-        controlsPanel.style.display = 'block';
+        // 2. Force display with !important to override any CSS
+        controlsPanel.style.setProperty('display', 'block', 'important');
+
+        // 3. Also ensure visibility and opacity
+        controlsPanel.style.setProperty('visibility', 'visible', 'important');
+        controlsPanel.style.setProperty('opacity', '1', 'important');
 
         // Re-apply mode-specific styles if needed
         if (mode === 'minimal') {
             controlsPanel.style.width = '200px';
         } else {
-            controlsPanel.style.width = '';  // Use CSS default
+            controlsPanel.style.width = '';
         }
 
         // Update toggle button icon state
         if (toggleBtn) toggleBtn.classList.remove('controls-hidden');
 
-        console.log('[main.js] Panel shown. Display:', controlsPanel.style.display, 'Classes:', controlsPanel.className);
-
     } else {
-        console.log('[main.js] Hiding panel...');
+        console.log('[main.js] ACTION: Hiding panel...');
 
-        // Add hidden class
+        // 1. Add hidden class
         controlsPanel.classList.add('panel-hidden');
 
-        // Force inline style to hide
-        controlsPanel.style.display = 'none';
+        // 2. Force hide with !important
+        controlsPanel.style.setProperty('display', 'none', 'important');
 
         // Update toggle button icon state
         if (toggleBtn) toggleBtn.classList.add('controls-hidden');
-
-        console.log('[main.js] Panel hidden. Display:', controlsPanel.style.display, 'Classes:', controlsPanel.className);
     }
+
+    // Log state after changes
+    const computedStyleAfter = window.getComputedStyle(controlsPanel);
+    console.log('[main.js] AFTER - inline style.display:', controlsPanel.style.display);
+    console.log('[main.js] AFTER - computed display:', computedStyleAfter.display);
+    console.log('[main.js] AFTER - classList:', Array.from(controlsPanel.classList));
+    console.log('[main.js] === END APPLY CONTROLS VISIBILITY ===');
 
     // Trigger resize to adjust canvas (with error handling)
     setTimeout(() => {
