@@ -76,8 +76,9 @@ body {
 
 #controls-panel {
     width: 280px;
-    min-width: 280px;
+    min-width: 280px; 
     flex-shrink: 0;
+    position: relative;
     background: #0f0f1a;
     padding: 20px;
     overflow-y: auto;
