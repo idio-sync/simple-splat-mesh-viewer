@@ -1179,8 +1179,24 @@ function applyControlsVisibilityDirect(controlsPanel, shouldShow) {
     }
 
     // Verify the change took effect
-    const computedDisplay = window.getComputedStyle(controlsPanel).display;
-    console.log('[main.js] Final computed display:', computedDisplay);
+    const computedStyle = window.getComputedStyle(controlsPanel);
+    console.log('[main.js] Final computed display:', computedStyle.display);
+    console.log('[main.js] Final dimensions:', {
+        width: computedStyle.width,
+        height: computedStyle.height,
+        offsetWidth: controlsPanel.offsetWidth,
+        offsetHeight: controlsPanel.offsetHeight
+    });
+    console.log('[main.js] Final position:', {
+        position: computedStyle.position,
+        top: computedStyle.top,
+        left: computedStyle.left,
+        right: computedStyle.right,
+        zIndex: computedStyle.zIndex
+    });
+    console.log('[main.js] Bounding rect:', controlsPanel.getBoundingClientRect());
+    console.log('[main.js] Parent element:', controlsPanel.parentElement?.id || controlsPanel.parentElement?.tagName);
+    console.log('[main.js] Parent display:', controlsPanel.parentElement ? window.getComputedStyle(controlsPanel.parentElement).display : 'N/A');
     console.log('[main.js] === END APPLY VISIBILITY DIRECT ===');
 
     // Trigger resize
