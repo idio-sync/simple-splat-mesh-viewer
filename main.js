@@ -1047,17 +1047,23 @@ function applyControlsVisibility() {
     const controlsPanel = document.getElementById('controls-panel');
     const toggleBtn = document.getElementById('btn-toggle-controls');
 
-    console.log('Applying visibility:', state.controlsVisible, controlsPanel, toggleBtn);
+    console.log('[main.js] Applying visibility:', state.controlsVisible);
+    console.log('[main.js] Panel BEFORE:', controlsPanel.style.display, controlsPanel.className);
 
     if (state.controlsVisible) {
-        controlsPanel.style.display = '';
+        // Show the panel - remove all hiding mechanisms
+        controlsPanel.style.display = 'block';  // Explicitly set to block instead of empty
         controlsPanel.classList.remove('panel-hidden');
+        controlsPanel.classList.remove('hidden');
         toggleBtn.classList.remove('controls-hidden');
     } else {
+        // Hide the panel
         controlsPanel.style.display = 'none';
         controlsPanel.classList.add('panel-hidden');
         toggleBtn.classList.add('controls-hidden');
     }
+
+    console.log('[main.js] Panel AFTER:', controlsPanel.style.display, controlsPanel.className);
 
     // Trigger resize to adjust canvas
     setTimeout(onWindowResize, 10);
