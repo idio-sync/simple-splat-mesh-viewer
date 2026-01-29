@@ -25,6 +25,7 @@ window.onerror = function(message, source, lineno, colno, error) {
 const config = window.APP_CONFIG || {
     defaultSplatUrl: '',
     defaultModelUrl: '',
+    defaultAlignmentUrl: '',
     showControls: true,
     controlsMode: 'full', // full, minimal, none
     initialViewMode: 'both' // splat, model, both, split
@@ -982,6 +983,24 @@ function saveAlignment() {
     URL.revokeObjectURL(url);
 }
 
+// Apply alignment data to splat and model objects
+function applyAlignmentData(data) {
+    if (data.splat && splatMesh) {
+        splatMesh.position.fromArray(data.splat.position);
+        splatMesh.rotation.set(...data.splat.rotation);
+        splatMesh.scale.setScalar(data.splat.scale);
+    }
+
+    if (data.model && modelGroup) {
+        modelGroup.position.fromArray(data.model.position);
+        modelGroup.rotation.set(...data.model.rotation);
+        modelGroup.scale.setScalar(data.model.scale);
+    }
+
+    updateTransformInputs();
+    storeLastPositions();
+}
+
 function loadAlignment(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -990,21 +1009,7 @@ function loadAlignment(event) {
     reader.onload = (e) => {
         try {
             const alignment = JSON.parse(e.target.result);
-
-            if (alignment.splat && splatMesh) {
-                splatMesh.position.fromArray(alignment.splat.position);
-                splatMesh.rotation.set(...alignment.splat.rotation);
-                splatMesh.scale.setScalar(alignment.splat.scale);
-            }
-
-            if (alignment.model && modelGroup) {
-                modelGroup.position.fromArray(alignment.model.position);
-                modelGroup.rotation.set(...alignment.model.rotation);
-                modelGroup.scale.setScalar(alignment.model.scale);
-            }
-
-            updateTransformInputs();
-            storeLastPositions();
+            applyAlignmentData(alignment);
         } catch (error) {
             alert('Error loading alignment file: ' + error.message);
         }
@@ -1013,6 +1018,24 @@ function loadAlignment(event) {
 
     // Reset input so same file can be loaded again
     event.target.value = '';
+}
+
+// Load alignment from a URL
+async function loadAlignmentFromUrl(url) {
+    try {
+        console.log('[main.js] Loading alignment from URL:', url);
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const alignment = await response.json();
+        applyAlignmentData(alignment);
+        console.log('[main.js] Alignment loaded successfully from URL');
+        return true;
+    } catch (error) {
+        console.error('[main.js] Error loading alignment from URL:', error);
+        return false;
+    }
 }
 
 function resetAlignment() {
@@ -1251,10 +1274,22 @@ async function loadDefaultFiles() {
         await loadModelFromUrl(config.defaultModelUrl);
     }
 
-    // Align
+    // Handle alignment: either load from URL or run auto-align as fallback
     if (state.splatLoaded && state.modelLoaded) {
-        console.log('Both files loaded from URL, running auto-align...');
-        setTimeout(() => autoAlignObjects(), 500); 
+        if (config.defaultAlignmentUrl) {
+            // Wait a moment for objects to fully initialize before applying alignment
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const alignmentLoaded = await loadAlignmentFromUrl(config.defaultAlignmentUrl);
+            if (!alignmentLoaded) {
+                // Fallback to auto-align if alignment URL fetch failed
+                console.log('[main.js] Alignment URL failed, falling back to auto-align...');
+                autoAlignObjects();
+            }
+        } else {
+            // No alignment URL provided, run auto-align
+            console.log('Both files loaded from URL, running auto-align...');
+            setTimeout(() => autoAlignObjects(), 500);
+        }
     }
 }
 
@@ -1540,6 +1575,58 @@ function autoAlignObjects() {
             splatMesh.position.clone(),
             new THREE.Vector3(size, size, size)
         );
+    }
+
+    // Underground auto-correction: detect if splat is upside down and underground
+    if (splatBox.max.y < 0.1) {
+        console.log('[AutoAlign] Detected splat is underground. Flipping 180°...');
+        splatMesh.rotation.x += Math.PI;
+        splatMesh.updateMatrixWorld(true);
+
+        // Re-calculate splatBox with the new orientation
+        splatBox.makeEmpty();
+        splatBoundsFound = false;
+
+        // Re-try the bounds calculation methods after flipping
+        if (splatMesh.boundingBox && !splatMesh.boundingBox.isEmpty()) {
+            splatBox.copy(splatMesh.boundingBox);
+            splatBox.applyMatrix4(splatMesh.matrixWorld);
+            splatBoundsFound = true;
+        }
+
+        if (!splatBoundsFound && splatMesh.geometry) {
+            try {
+                if (!splatMesh.geometry.boundingBox) {
+                    splatMesh.geometry.computeBoundingBox();
+                }
+                if (splatMesh.geometry.boundingBox && !splatMesh.geometry.boundingBox.isEmpty()) {
+                    splatBox.copy(splatMesh.geometry.boundingBox);
+                    splatBox.applyMatrix4(splatMesh.matrixWorld);
+                    splatBoundsFound = true;
+                }
+            } catch (e) {
+                console.log('Could not get splat bounds from geometry after flip:', e);
+            }
+        }
+
+        if (!splatBoundsFound) {
+            try {
+                splatBox.setFromObject(splatMesh);
+                if (!splatBox.isEmpty() && isFinite(splatBox.min.x) && isFinite(splatBox.max.x)) {
+                    splatBoundsFound = true;
+                }
+            } catch (e) {
+                console.log('Could not get splat bounds from setFromObject after flip:', e);
+            }
+        }
+
+        if (!splatBoundsFound || splatBox.isEmpty()) {
+            const size = 2.0 * Math.max(splatMesh.scale.x, splatMesh.scale.y, splatMesh.scale.z);
+            splatBox.setFromCenterAndSize(
+                splatMesh.position.clone(),
+                new THREE.Vector3(size, size, size)
+            );
+        }
     }
 
     // Get model bounds with world transforms

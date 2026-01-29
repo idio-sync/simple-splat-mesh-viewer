@@ -5,6 +5,7 @@
     // 2. Get Server-Side Defaults (Injected by Docker)
     const envSplat = "${DEFAULT_SPLAT_URL}";
     const envModel = "${DEFAULT_MODEL_URL}";
+    const envAlignment = "${DEFAULT_ALIGNMENT_URL}";
     const envShowControls = ${SHOW_CONTROLS}; // This becomes true/false
 
     // 3. Get Client-Side Overrides
@@ -13,15 +14,16 @@
     window.APP_CONFIG = {
         defaultSplatUrl: params.get('splat') || envSplat || '',
         defaultModelUrl: params.get('model') || envModel || '',
-        
+        defaultAlignmentUrl: params.get('alignment') || envAlignment || '',
+
         // Logic: Show controls if Env says yes AND URL doesn't explicitly say 'none'
         showControls: (envShowControls && urlControls !== 'none'),
-        
+
         // Logic: Use URL mode, otherwise default to 'full'
         controlsMode: urlControls || 'full',
-        
+
         initialViewMode: params.get('mode') || 'both'
     };
-    
+
     console.log('[config.js] Generated Config:', window.APP_CONFIG);
 })();
