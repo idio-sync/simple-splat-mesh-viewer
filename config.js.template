@@ -1,24 +1,27 @@
 (function() {
-    // 1. Parse URL parameters (Client-Side)
+    // 1. Parse URL parameters
     const params = new URLSearchParams(window.location.search);
 
-    // 2. Get Defaults from Environment Variables (Server-Side Injection)
-    // These strings are replaced by docker-entrypoint.sh at startup
+    // 2. Get Server-Side Defaults (Injected by Docker)
     const envSplat = "${DEFAULT_SPLAT_URL}";
     const envModel = "${DEFAULT_MODEL_URL}";
-    const envShowControls = ${SHOW_CONTROLS}; 
+    const envShowControls = ${SHOW_CONTROLS}; // This becomes true/false
 
-    // 3. Determine final values (URL Params override Env Vars)
+    // 3. Get Client-Side Overrides
+    const urlControls = params.get('controls'); // 'full', 'minimal', 'none', or null
+
     window.APP_CONFIG = {
         defaultSplatUrl: params.get('splat') || envSplat || '',
         defaultModelUrl: params.get('model') || envModel || '',
         
-        // Show controls if Env says true AND URL doesn't say 'none'
-        showControls: (envShowControls && params.get('controls') !== 'none'),
+        // Logic: Show controls if Env says yes AND URL doesn't explicitly say 'none'
+        showControls: (envShowControls && urlControls !== 'none'),
         
-        controlsMode: params.get('controls') || 'full',
+        // Logic: Use URL mode, otherwise default to 'full'
+        controlsMode: urlControls || 'full',
+        
         initialViewMode: params.get('mode') || 'both'
     };
-
-    console.log('[config.js] Configuration loaded:', window.APP_CONFIG);
+    
+    console.log('[config.js] Generated Config:', window.APP_CONFIG);
 })();
