@@ -457,13 +457,16 @@ function setDisplayMode(mode) {
         if (container) container.classList.add('split-view');
         if (canvasRight) canvasRight.classList.remove('hidden');
         if (splitLabels) splitLabels.classList.remove('hidden');
-        onWindowResize();
     } else {
         if (container) container.classList.remove('split-view');
         if (canvasRight) canvasRight.classList.add('hidden');
         if (splitLabels) splitLabels.classList.add('hidden');
-        onWindowResize();
     }
+
+    // Use requestAnimationFrame to ensure CSS changes are applied before resize
+    requestAnimationFrame(() => {
+        onWindowResize();
+    });
 
     updateVisibility();
 }

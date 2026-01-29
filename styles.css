@@ -21,6 +21,8 @@ body {
 #viewer-container {
     flex: 1;
     position: relative;
+    display: block;
+    overflow: hidden;
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
 }
 
@@ -30,6 +32,10 @@ body {
     display: block;
 }
 
+#viewer-canvas-right {
+    display: none;
+}
+
 /* Split view styles */
 #viewer-container.split-view {
     display: flex;
@@ -37,11 +43,13 @@ body {
 
 #viewer-container.split-view #viewer-canvas {
     width: 50%;
+    flex: none;
     border-right: 2px solid #4a4a6a;
 }
 
 #viewer-container.split-view #viewer-canvas-right {
     width: 50%;
+    flex: none;
     display: block;
 }
 
