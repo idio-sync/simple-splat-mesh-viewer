@@ -268,15 +268,13 @@ function setupUIEvents() {
                 toggleControlsPanel();
             } catch (err) {
                 console.error('[main.js] Error in toggleControlsPanel:', err);
-                // Fallback: directly manipulate DOM if toggle function fails
+                // Fallback: use class-based toggle (no inline display styles)
                 const panel = document.getElementById('controls-panel');
                 if (panel) {
-                    const isHidden = panel.style.display === 'none' || panel.classList.contains('panel-hidden');
+                    const isHidden = panel.classList.contains('panel-hidden');
                     if (isHidden) {
-                        panel.style.display = 'block';
                         panel.classList.remove('panel-hidden');
                     } else {
-                        panel.style.display = 'none';
                         panel.classList.add('panel-hidden');
                     }
                     state.controlsVisible = !isHidden;
@@ -1093,39 +1091,25 @@ function fitToView() {
 
 // Controls panel visibility
 function toggleControlsPanel() {
-    console.log('[main.js] === TOGGLE CONTROLS PANEL ===');
-
     const controlsPanel = document.getElementById('controls-panel');
     if (!controlsPanel) {
         console.error('[main.js] controls-panel not found!');
         return;
     }
 
-    // Read current visibility from DOM, not from state object (more reliable)
-    const isCurrentlyHidden = controlsPanel.style.display === 'none' ||
-                              controlsPanel.classList.contains('panel-hidden') ||
-                              window.getComputedStyle(controlsPanel).display === 'none';
-
-    console.log('[main.js] isCurrentlyHidden (from DOM):', isCurrentlyHidden);
-
-    // Toggle: if hidden, show it; if visible, hide it
+    // Check hidden state via class (reliable with width-collapse approach)
+    const isCurrentlyHidden = controlsPanel.classList.contains('panel-hidden');
     const shouldShow = isCurrentlyHidden;
-    console.log('[main.js] shouldShow:', shouldShow);
 
-    // Update state object (but don't rely on it)
-    try {
-        state.controlsVisible = shouldShow;
-    } catch (e) {
-        console.error('[main.js] Error updating state:', e);
-    }
+    // Update state
+    state.controlsVisible = shouldShow;
 
-    // Apply visibility directly
+    // Apply visibility via class toggle
     applyControlsVisibilityDirect(controlsPanel, shouldShow);
 }
 
 function applyControlsVisibilityDirect(controlsPanel, shouldShow) {
-    console.log('[main.js] === APPLY VISIBILITY DIRECT ===');
-    console.log('[main.js] shouldShow:', shouldShow);
+    console.log('[main.js] applyControlsVisibilityDirect, shouldShow:', shouldShow);
 
     const toggleBtn = document.getElementById('btn-toggle-controls');
 
@@ -1138,67 +1122,45 @@ function applyControlsVisibilityDirect(controlsPanel, shouldShow) {
     }
 
     if (mode === 'none') {
-        console.log('[main.js] Mode is none, hiding');
-        controlsPanel.style.cssText = 'display: none !important;';
-        if (toggleBtn) toggleBtn.style.cssText = 'display: none !important;';
+        // For 'none' mode, use display:none since we never want to show it
+        controlsPanel.style.display = 'none';
+        if (toggleBtn) toggleBtn.style.display = 'none';
         return;
     }
 
+    // Clear any inline display styles - let CSS handle visibility via class
+    controlsPanel.style.display = '';
+    controlsPanel.style.visibility = '';
+    controlsPanel.style.opacity = '';
+
     if (shouldShow) {
-        console.log('[main.js] SHOWING panel...');
+        // Remove hidden class - CSS transition will animate width back
+        controlsPanel.classList.remove('panel-hidden', 'hidden');
 
-        // Clear all hidden states
-        controlsPanel.classList.remove('panel-hidden', 'hidden', 'collapsed');
-
-        // Force show with cssText (nuclear option - replaces all inline styles)
-        controlsPanel.style.cssText = 'display: block !important; visibility: visible !important; opacity: 1 !important;';
-
-        // Add width for minimal mode
+        // Set width for minimal mode
         if (mode === 'minimal') {
             controlsPanel.style.width = '200px';
+            controlsPanel.style.minWidth = '200px';
+        } else {
+            // Clear any inline width overrides, let CSS handle it
+            controlsPanel.style.width = '';
+            controlsPanel.style.minWidth = '';
         }
 
         if (toggleBtn) toggleBtn.classList.remove('controls-hidden');
-
     } else {
-        console.log('[main.js] HIDING panel...');
-
-        // Add hidden class
+        // Add hidden class - CSS will collapse width to 0
         controlsPanel.classList.add('panel-hidden');
-
-        // Force hide with cssText
-        controlsPanel.style.cssText = 'display: none !important;';
 
         if (toggleBtn) toggleBtn.classList.add('controls-hidden');
     }
 
-    // Verify the change took effect
-    const computedStyle = window.getComputedStyle(controlsPanel);
-    console.log('[main.js] Final computed display:', computedStyle.display);
-    console.log('[main.js] Final dimensions:', {
-        width: computedStyle.width,
-        height: computedStyle.height,
-        offsetWidth: controlsPanel.offsetWidth,
-        offsetHeight: controlsPanel.offsetHeight
-    });
-    console.log('[main.js] Final position:', {
-        position: computedStyle.position,
-        top: computedStyle.top,
-        left: computedStyle.left,
-        right: computedStyle.right,
-        zIndex: computedStyle.zIndex
-    });
-    console.log('[main.js] Bounding rect:', controlsPanel.getBoundingClientRect());
-    console.log('[main.js] Parent element:', controlsPanel.parentElement?.id || controlsPanel.parentElement?.tagName);
-    console.log('[main.js] Parent display:', controlsPanel.parentElement ? window.getComputedStyle(controlsPanel.parentElement).display : 'N/A');
-    console.log('[main.js] === END APPLY VISIBILITY DIRECT ===');
-
-    // Trigger resize
+    // Trigger resize after transition completes
     setTimeout(() => {
         try {
             if (typeof onWindowResize === 'function') onWindowResize();
         } catch (e) { /* ignore */ }
-    }, 10);
+    }, 250); // Match CSS transition duration
 }
 
 // Legacy function for initial setup - calls the new direct function
