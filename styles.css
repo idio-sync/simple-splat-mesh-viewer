@@ -95,6 +95,7 @@ body {
     padding: 0 !important;
     overflow: hidden !important;
     border-left-width: 0 !important;
+    pointer-events: none; /* Prevent capturing clicks when collapsed */
 }
 
 #controls-panel h2 {
