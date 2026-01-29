@@ -40,7 +40,9 @@ const state = {
     modelLoaded: false,
     modelOpacity: 1,
     modelWireframe: false,
-    controlsVisible: config.showControls
+    controlsVisible: config.showControls,
+    currentSplatUrl: config.defaultSplatUrl || null,
+    currentModelUrl: config.defaultModelUrl || null
 };
 
 // Three.js objects - Main view
@@ -374,6 +376,9 @@ function setupUIEvents() {
     addListener('alignment-input', 'change', loadAlignment);
     addListener('btn-reset-alignment', 'click', resetAlignment);
 
+    // Share button
+    addListener('btn-share', 'click', copyShareLink);
+
     // Camera buttons
     addListener('btn-reset-camera', 'click', resetCamera);
     addListener('btn-fit-view', 'click', fitToView);
@@ -677,6 +682,7 @@ async function handleSplatFile(event) {
         setTimeout(() => URL.revokeObjectURL(fileUrl), 5000);
 
         state.splatLoaded = true;
+        state.currentSplatUrl = null; // Local files cannot be shared
         updateVisibility();
         updateTransformInputs();
         storeLastPositions();
@@ -732,6 +738,7 @@ async function handleModelFile(event) {
         if (loadedObject) {
             modelGroup.add(loadedObject);
             state.modelLoaded = true;
+            state.currentModelUrl = null; // Local files cannot be shared
             updateModelOpacity();
             updateModelWireframe();
             updateVisibility();
@@ -1038,6 +1045,51 @@ async function loadAlignmentFromUrl(url) {
     }
 }
 
+// Copy a shareable link to the clipboard
+function copyShareLink() {
+    // Check if at least one URL is present
+    if (!state.currentSplatUrl && !state.currentModelUrl) {
+        alert('Cannot share: No files loaded from URL. Share links only work for files loaded via URL, not local uploads.');
+        return;
+    }
+
+    // Construct the base URL
+    const baseUrl = window.location.origin + window.location.pathname;
+    const params = new URLSearchParams();
+
+    // Add splat URL if present
+    if (state.currentSplatUrl) {
+        params.set('splat', state.currentSplatUrl);
+    }
+
+    // Add model URL if present
+    if (state.currentModelUrl) {
+        params.set('model', state.currentModelUrl);
+    }
+
+    // Add display mode
+    params.set('mode', state.displayMode);
+
+    // Add controls mode
+    if (!config.showControls) {
+        params.set('controls', 'none');
+    } else if (config.controlsMode && config.controlsMode !== 'full') {
+        params.set('controls', config.controlsMode);
+    }
+
+    // Build the full URL
+    const shareUrl = baseUrl + '?' + params.toString();
+
+    // Copy to clipboard
+    navigator.clipboard.writeText(shareUrl).then(() => {
+        alert('Share link copied to clipboard!');
+    }).catch((err) => {
+        console.error('[main.js] Failed to copy share link:', err);
+        // Fallback: show the URL in an alert
+        alert('Share link:\n' + shareUrl);
+    });
+}
+
 function resetAlignment() {
     if (splatMesh) {
         splatMesh.position.set(0, 0, 0);
@@ -1324,6 +1376,7 @@ async function loadSplatFromUrl(url) {
         }
 
         state.splatLoaded = true;
+        state.currentSplatUrl = url;
         updateVisibility();
         updateTransformInputs();
         storeLastPositions();
@@ -1363,6 +1416,7 @@ async function loadModelFromUrl(url) {
         if (loadedObject) {
             modelGroup.add(loadedObject);
             state.modelLoaded = true;
+            state.currentModelUrl = url;
             updateModelOpacity();
             updateModelWireframe();
             updateVisibility();
