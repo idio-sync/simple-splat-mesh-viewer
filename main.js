@@ -667,10 +667,9 @@ function handleLoadSplatFromUrlInput() {
         return;
     }
 
-    // Validate URL format
-    try {
-        new URL(url);
-    } catch (e) {
+    // Allow both absolute URLs and relative paths
+    // Only do basic validation - the fetch will fail if URL is invalid
+    if (url.includes(' ') || url.length < 2) {
         alert('Invalid URL format');
         return;
     }
@@ -690,10 +689,9 @@ function handleLoadModelFromUrlInput() {
         return;
     }
 
-    // Validate URL format
-    try {
-        new URL(url);
-    } catch (e) {
+    // Allow both absolute URLs and relative paths
+    // Only do basic validation - the fetch will fail if URL is invalid
+    if (url.includes(' ') || url.length < 2) {
         alert('Invalid URL format');
         return;
     }
