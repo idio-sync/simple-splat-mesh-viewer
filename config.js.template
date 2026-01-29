@@ -1,6 +1,24 @@
-// Runtime configuration - generated from environment variables
-window.APP_CONFIG = {
-    defaultSplatUrl: "${DEFAULT_SPLAT_URL}",
-    defaultModelUrl: "${DEFAULT_MODEL_URL}",
-    showControls: ${SHOW_CONTROLS}
-};
+(function() {
+    // 1. Parse URL parameters (Client-Side)
+    const params = new URLSearchParams(window.location.search);
+
+    // 2. Get Defaults from Environment Variables (Server-Side Injection)
+    // These strings are replaced by docker-entrypoint.sh at startup
+    const envSplat = "${DEFAULT_SPLAT_URL}";
+    const envModel = "${DEFAULT_MODEL_URL}";
+    const envShowControls = ${SHOW_CONTROLS}; 
+
+    // 3. Determine final values (URL Params override Env Vars)
+    window.APP_CONFIG = {
+        defaultSplatUrl: params.get('splat') || envSplat || '',
+        defaultModelUrl: params.get('model') || envModel || '',
+        
+        // Show controls if Env says true AND URL doesn't say 'none'
+        showControls: (envShowControls && params.get('controls') !== 'none'),
+        
+        controlsMode: params.get('controls') || 'full',
+        initialViewMode: params.get('mode') || 'both'
+    };
+
+    console.log('[config.js] Configuration loaded:', window.APP_CONFIG);
+})();
