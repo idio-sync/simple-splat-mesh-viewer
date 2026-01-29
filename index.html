@@ -51,6 +51,10 @@
                 <h3>Load Gaussian Splat</h3>
                 <input type="file" id="splat-input" accept=".ply,.splat,.ksplat,.spz,.sog" />
                 <label for="splat-input" class="file-label">Choose Splat File</label>
+                <div class="url-input-group" style="margin-top: 8px;">
+                    <input type="text" id="splat-url-input" placeholder="Or enter URL..." class="url-input" />
+                    <button id="btn-load-splat-url" class="action-btn small">Load</button>
+                </div>
                 <span id="splat-filename" class="filename">No file loaded</span>
             </div>
 
@@ -58,6 +62,10 @@
                 <h3>Load 3D Model</h3>
                 <input type="file" id="model-input" accept=".glb,.gltf,.obj" multiple />
                 <label for="model-input" class="file-label">Choose glTF/OBJ File</label>
+                <div class="url-input-group" style="margin-top: 8px;">
+                    <input type="text" id="model-url-input" placeholder="Or enter URL..." class="url-input" />
+                    <button id="btn-load-model-url" class="action-btn small">Load</button>
+                </div>
                 <span id="model-filename" class="filename">No file loaded</span>
             </div>
 

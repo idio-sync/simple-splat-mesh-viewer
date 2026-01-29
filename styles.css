@@ -233,6 +233,37 @@ input[type="file"] {
     word-break: break-all;
 }
 
+.url-input-group {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.url-input {
+    flex: 1;
+    padding: 8px 10px;
+    background: #2a2a4a;
+    border: 1px solid #4a4a6a;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 0.8rem;
+    min-width: 0;
+}
+
+.url-input:focus {
+    outline: none;
+    border-color: #6a6aba;
+}
+
+.url-input::placeholder {
+    color: #666;
+}
+
+.action-btn.small {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+}
+
 .slider-group {
     margin-bottom: 12px;
 }

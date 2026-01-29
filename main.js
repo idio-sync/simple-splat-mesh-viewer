@@ -26,6 +26,7 @@ const config = window.APP_CONFIG || {
     defaultSplatUrl: '',
     defaultModelUrl: '',
     defaultAlignmentUrl: '',
+    inlineAlignment: null,
     showControls: true,
     controlsMode: 'full', // full, minimal, none
     initialViewMode: 'both' // splat, model, both, split
@@ -306,6 +307,24 @@ function setupUIEvents() {
     // File inputs
     addListener('splat-input', 'change', handleSplatFile);
     addListener('model-input', 'change', handleModelFile);
+
+    // URL load buttons
+    addListener('btn-load-splat-url', 'click', handleLoadSplatFromUrlInput);
+    addListener('btn-load-model-url', 'click', handleLoadModelFromUrlInput);
+
+    // Allow Enter key to trigger URL load
+    const splatUrlInput = document.getElementById('splat-url-input');
+    if (splatUrlInput) {
+        splatUrlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleLoadSplatFromUrlInput();
+        });
+    }
+    const modelUrlInput = document.getElementById('model-url-input');
+    if (modelUrlInput) {
+        modelUrlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleLoadModelFromUrlInput();
+        });
+    }
 
     // Splat settings
     addListener('splat-scale', 'input', (e) => {
@@ -635,6 +654,52 @@ function showLoading(text = 'Loading...') {
 
 function hideLoading() {
     loadingOverlay.classList.add('hidden');
+}
+
+// Handle loading splat from URL input field
+function handleLoadSplatFromUrlInput() {
+    const input = document.getElementById('splat-url-input');
+    if (!input) return;
+
+    const url = input.value.trim();
+    if (!url) {
+        alert('Please enter a URL');
+        return;
+    }
+
+    // Validate URL format
+    try {
+        new URL(url);
+    } catch (e) {
+        alert('Invalid URL format');
+        return;
+    }
+
+    loadSplatFromUrl(url);
+    input.value = ''; // Clear input after loading
+}
+
+// Handle loading model from URL input field
+function handleLoadModelFromUrlInput() {
+    const input = document.getElementById('model-url-input');
+    if (!input) return;
+
+    const url = input.value.trim();
+    if (!url) {
+        alert('Please enter a URL');
+        return;
+    }
+
+    // Validate URL format
+    try {
+        new URL(url);
+    } catch (e) {
+        alert('Invalid URL format');
+        return;
+    }
+
+    loadModelFromUrl(url);
+    input.value = ''; // Clear input after loading
 }
 
 async function handleSplatFile(event) {
@@ -1077,6 +1142,43 @@ function copyShareLink() {
         params.set('controls', config.controlsMode);
     }
 
+    // Add inline alignment data (position, rotation, scale)
+    // Helper to format vec3 as comma-separated string with reasonable precision
+    const formatVec3 = (arr) => arr.map(n => parseFloat(n.toFixed(4))).join(',');
+
+    if (splatMesh) {
+        const pos = splatMesh.position;
+        const rot = splatMesh.rotation;
+        const scale = splatMesh.scale.x;
+
+        // Only add non-default values to keep URL shorter
+        if (pos.x !== 0 || pos.y !== 0 || pos.z !== 0) {
+            params.set('sp', formatVec3([pos.x, pos.y, pos.z]));
+        }
+        if (rot.x !== 0 || rot.y !== 0 || rot.z !== 0) {
+            params.set('sr', formatVec3([rot.x, rot.y, rot.z]));
+        }
+        if (scale !== 1) {
+            params.set('ss', parseFloat(scale.toFixed(4)));
+        }
+    }
+
+    if (modelGroup) {
+        const pos = modelGroup.position;
+        const rot = modelGroup.rotation;
+        const scale = modelGroup.scale.x;
+
+        if (pos.x !== 0 || pos.y !== 0 || pos.z !== 0) {
+            params.set('mp', formatVec3([pos.x, pos.y, pos.z]));
+        }
+        if (rot.x !== 0 || rot.y !== 0 || rot.z !== 0) {
+            params.set('mr', formatVec3([rot.x, rot.y, rot.z]));
+        }
+        if (scale !== 1) {
+            params.set('ms', parseFloat(scale.toFixed(4)));
+        }
+    }
+
     // Build the full URL
     const shareUrl = baseUrl + '?' + params.toString();
 
@@ -1326,21 +1428,30 @@ async function loadDefaultFiles() {
         await loadModelFromUrl(config.defaultModelUrl);
     }
 
-    // Handle alignment: either load from URL or run auto-align as fallback
-    if (state.splatLoaded && state.modelLoaded) {
-        if (config.defaultAlignmentUrl) {
-            // Wait a moment for objects to fully initialize before applying alignment
-            await new Promise(resolve => setTimeout(resolve, 500));
+    // Handle alignment priority:
+    // 1. Inline alignment params (highest priority - encoded in URL)
+    // 2. Alignment URL file
+    // 3. Auto-align (fallback)
+    if (state.splatLoaded || state.modelLoaded) {
+        // Wait a moment for objects to fully initialize
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        if (config.inlineAlignment) {
+            // Apply inline alignment from URL params
+            console.log('[main.js] Applying inline alignment from URL params...');
+            applyAlignmentData(config.inlineAlignment);
+        } else if (config.defaultAlignmentUrl) {
+            // Load alignment from URL file
             const alignmentLoaded = await loadAlignmentFromUrl(config.defaultAlignmentUrl);
-            if (!alignmentLoaded) {
+            if (!alignmentLoaded && state.splatLoaded && state.modelLoaded) {
                 // Fallback to auto-align if alignment URL fetch failed
                 console.log('[main.js] Alignment URL failed, falling back to auto-align...');
                 autoAlignObjects();
             }
-        } else {
-            // No alignment URL provided, run auto-align
+        } else if (state.splatLoaded && state.modelLoaded) {
+            // No alignment provided, run auto-align
             console.log('Both files loaded from URL, running auto-align...');
-            setTimeout(() => autoAlignObjects(), 500);
+            autoAlignObjects();
         }
     }
 }

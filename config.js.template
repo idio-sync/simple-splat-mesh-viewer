@@ -2,6 +2,16 @@
     // 1. Parse URL parameters
     const params = new URLSearchParams(window.location.search);
 
+    // Helper to parse comma-separated numbers
+    function parseVec3(str) {
+        if (!str) return null;
+        const parts = str.split(',').map(s => parseFloat(s.trim()));
+        if (parts.length === 3 && parts.every(n => !isNaN(n))) {
+            return parts;
+        }
+        return null;
+    }
+
     // 2. Get Server-Side Defaults (Injected by Docker)
     const envSplat = "${DEFAULT_SPLAT_URL}";
     const envModel = "${DEFAULT_MODEL_URL}";
@@ -11,10 +21,39 @@
     // 3. Get Client-Side Overrides
     const urlControls = params.get('controls'); // 'full', 'minimal', 'none', or null
 
+    // 4. Parse inline alignment params
+    const splatPos = parseVec3(params.get('sp'));
+    const splatRot = parseVec3(params.get('sr'));
+    const splatScale = params.get('ss') ? parseFloat(params.get('ss')) : null;
+    const modelPos = parseVec3(params.get('mp'));
+    const modelRot = parseVec3(params.get('mr'));
+    const modelScale = params.get('ms') ? parseFloat(params.get('ms')) : null;
+
+    // Build inline alignment object if any params are present
+    let inlineAlignment = null;
+    if (splatPos || splatRot || splatScale !== null || modelPos || modelRot || modelScale !== null) {
+        inlineAlignment = {};
+        if (splatPos || splatRot || splatScale !== null) {
+            inlineAlignment.splat = {
+                position: splatPos || [0, 0, 0],
+                rotation: splatRot || [0, 0, 0],
+                scale: splatScale !== null && !isNaN(splatScale) ? splatScale : 1
+            };
+        }
+        if (modelPos || modelRot || modelScale !== null) {
+            inlineAlignment.model = {
+                position: modelPos || [0, 0, 0],
+                rotation: modelRot || [0, 0, 0],
+                scale: modelScale !== null && !isNaN(modelScale) ? modelScale : 1
+            };
+        }
+    }
+
     window.APP_CONFIG = {
         defaultSplatUrl: params.get('splat') || envSplat || '',
         defaultModelUrl: params.get('model') || envModel || '',
         defaultAlignmentUrl: params.get('alignment') || envAlignment || '',
+        inlineAlignment: inlineAlignment,
 
         // Logic: Show controls if Env says yes AND URL doesn't explicitly say 'none'
         showControls: (envShowControls && urlControls !== 'none'),
