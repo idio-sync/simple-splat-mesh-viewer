@@ -1250,6 +1250,12 @@ async function loadDefaultFiles() {
     if (config.defaultModelUrl) {
         await loadModelFromUrl(config.defaultModelUrl);
     }
+
+    // Align
+    if (state.splatLoaded && state.modelLoaded) {
+        console.log('Both files loaded from URL, running auto-align...');
+        setTimeout(() => autoAlignObjects(), 500); 
+    }
 }
 
 async function loadSplatFromUrl(url) {
