@@ -1148,17 +1148,16 @@ function applyControlsVisibilityDirect(controlsPanel, shouldShow) {
         controlsPanel.classList.remove('panel-hidden', 'hidden');
         console.log('[DIAG] After classList.remove - className:', controlsPanel.className);
 
-        // Clear inline overrides
-        controlsPanel.style.width = '';
-        controlsPanel.style.minWidth = '';
-        controlsPanel.style.padding = '';
-        controlsPanel.style.overflow = '';
-        console.log('[DIAG] After clearing inline styles - style.cssText:', controlsPanel.style.cssText);
-
-        if (mode === 'minimal') {
-            controlsPanel.style.width = '200px';
-            controlsPanel.style.minWidth = '200px';
-        }
+        // Force explicit inline styles to override any CSS issues
+        const targetWidth = (mode === 'minimal') ? '200px' : '280px';
+        controlsPanel.style.width = targetWidth;
+        controlsPanel.style.minWidth = targetWidth;
+        controlsPanel.style.padding = '20px';
+        controlsPanel.style.overflow = 'visible';
+        controlsPanel.style.overflowY = 'auto';
+        controlsPanel.style.borderLeftWidth = '1px';
+        controlsPanel.style.pointerEvents = 'auto';
+        console.log('[DIAG] After setting inline styles - style.cssText:', controlsPanel.style.cssText);
 
         if (toggleBtn) toggleBtn.classList.remove('controls-hidden');
     } else {
