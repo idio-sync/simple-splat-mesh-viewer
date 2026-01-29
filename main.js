@@ -1111,6 +1111,16 @@ function toggleControlsPanel() {
 function applyControlsVisibilityDirect(controlsPanel, shouldShow) {
     const toggleBtn = document.getElementById('btn-toggle-controls');
 
+    // DIAGNOSTIC: Log state before changes
+    console.log('[DIAG] === applyControlsVisibilityDirect ===');
+    console.log('[DIAG] shouldShow:', shouldShow);
+    console.log('[DIAG] BEFORE - classList:', controlsPanel.className);
+    console.log('[DIAG] BEFORE - inline style:', controlsPanel.style.cssText);
+    const beforeComputed = window.getComputedStyle(controlsPanel);
+    console.log('[DIAG] BEFORE - computed width:', beforeComputed.width);
+    console.log('[DIAG] BEFORE - computed minWidth:', beforeComputed.minWidth);
+    console.log('[DIAG] BEFORE - computed padding:', beforeComputed.padding);
+
     // Check controls mode
     let mode = 'full';
     try {
@@ -1118,9 +1128,9 @@ function applyControlsVisibilityDirect(controlsPanel, shouldShow) {
     } catch (e) {
         console.warn('[main.js] Could not read config.controlsMode:', e);
     }
+    console.log('[DIAG] mode:', mode);
 
     if (mode === 'none') {
-        // For 'none' mode, use display:none since we never want to show it
         controlsPanel.style.display = 'none';
         if (toggleBtn) toggleBtn.style.display = 'none';
         return;
@@ -1132,16 +1142,19 @@ function applyControlsVisibilityDirect(controlsPanel, shouldShow) {
     controlsPanel.style.opacity = '';
 
     if (shouldShow) {
-        // Remove hidden class - CSS !important rules will release control
-        controlsPanel.classList.remove('panel-hidden', 'hidden');
+        console.log('[DIAG] Attempting to SHOW panel...');
 
-        // Clear inline overrides - let CSS base values take effect
+        // Remove hidden class
+        controlsPanel.classList.remove('panel-hidden', 'hidden');
+        console.log('[DIAG] After classList.remove - className:', controlsPanel.className);
+
+        // Clear inline overrides
         controlsPanel.style.width = '';
         controlsPanel.style.minWidth = '';
         controlsPanel.style.padding = '';
         controlsPanel.style.overflow = '';
+        console.log('[DIAG] After clearing inline styles - style.cssText:', controlsPanel.style.cssText);
 
-        // For minimal mode, set narrower width after clearing
         if (mode === 'minimal') {
             controlsPanel.style.width = '200px';
             controlsPanel.style.minWidth = '200px';
@@ -1149,14 +1162,30 @@ function applyControlsVisibilityDirect(controlsPanel, shouldShow) {
 
         if (toggleBtn) toggleBtn.classList.remove('controls-hidden');
     } else {
-        // Add hidden class - CSS !important rules will collapse the panel
+        console.log('[DIAG] Attempting to HIDE panel...');
         controlsPanel.classList.add('panel-hidden');
+        console.log('[DIAG] After classList.add - className:', controlsPanel.className);
 
         if (toggleBtn) toggleBtn.classList.add('controls-hidden');
     }
 
-    // Trigger resize after transition completes
+    // DIAGNOSTIC: Log state after changes (immediate)
+    console.log('[DIAG] AFTER (immediate) - classList:', controlsPanel.className);
+    console.log('[DIAG] AFTER (immediate) - inline style:', controlsPanel.style.cssText);
+    const afterComputed = window.getComputedStyle(controlsPanel);
+    console.log('[DIAG] AFTER (immediate) - computed width:', afterComputed.width);
+    console.log('[DIAG] AFTER (immediate) - computed minWidth:', afterComputed.minWidth);
+    console.log('[DIAG] AFTER (immediate) - computed padding:', afterComputed.padding);
+    console.log('[DIAG] AFTER (immediate) - offsetWidth:', controlsPanel.offsetWidth);
+
+    // DIAGNOSTIC: Check again after a delay (after potential transition)
     setTimeout(() => {
+        const delayedComputed = window.getComputedStyle(controlsPanel);
+        console.log('[DIAG] AFTER (200ms) - classList:', controlsPanel.className);
+        console.log('[DIAG] AFTER (200ms) - computed width:', delayedComputed.width);
+        console.log('[DIAG] AFTER (200ms) - offsetWidth:', controlsPanel.offsetWidth);
+        console.log('[DIAG] === END ===');
+
         try {
             if (typeof onWindowResize === 'function') onWindowResize();
         } catch (e) { /* ignore */ }
