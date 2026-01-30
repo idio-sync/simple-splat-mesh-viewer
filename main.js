@@ -309,8 +309,16 @@ function setupUIEvents() {
     addListener('model-input', 'change', handleModelFile);
 
     // URL load buttons (using prompt)
-    addListener('btn-load-splat-url', 'click', handleLoadSplatFromUrlPrompt);
-    addListener('btn-load-model-url', 'click', handleLoadModelFromUrlPrompt);
+    const splatUrlBtn = document.getElementById('btn-load-splat-url');
+    const modelUrlBtn = document.getElementById('btn-load-model-url');
+    console.log('[main.js] URL buttons found - splat:', !!splatUrlBtn, 'model:', !!modelUrlBtn);
+
+    if (splatUrlBtn) {
+        splatUrlBtn.addEventListener('click', handleLoadSplatFromUrlPrompt);
+    }
+    if (modelUrlBtn) {
+        modelUrlBtn.addEventListener('click', handleLoadModelFromUrlPrompt);
+    }
 
     // Splat settings
     addListener('splat-scale', 'input', (e) => {
@@ -647,7 +655,9 @@ function hideLoading() {
 
 // Handle loading splat from URL via prompt
 function handleLoadSplatFromUrlPrompt() {
+    console.log('[main.js] handleLoadSplatFromUrlPrompt called');
     const url = prompt('Enter Gaussian Splat URL:');
+    console.log('[main.js] User entered:', url);
     if (!url) return; // User cancelled or entered empty string
 
     const trimmedUrl = url.trim();
@@ -661,7 +671,9 @@ function handleLoadSplatFromUrlPrompt() {
 
 // Handle loading model from URL via prompt
 function handleLoadModelFromUrlPrompt() {
+    console.log('[main.js] handleLoadModelFromUrlPrompt called');
     const url = prompt('Enter 3D Model URL (.glb, .gltf, .obj):');
+    console.log('[main.js] User entered:', url);
     if (!url) return; // User cancelled or entered empty string
 
     const trimmedUrl = url.trim();
