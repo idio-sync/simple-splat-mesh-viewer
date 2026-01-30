@@ -1628,6 +1628,51 @@ function loadOBJFromUrl(url) {
 }
 
 // ============================================================
+// Helper function to compute splat bounds from actual positions
+// ============================================================
+
+function computeSplatBoundsFromPositions(splatMeshObj) {
+    const bounds = {
+        min: new THREE.Vector3(Infinity, Infinity, Infinity),
+        max: new THREE.Vector3(-Infinity, -Infinity, -Infinity),
+        center: new THREE.Vector3(),
+        found: false
+    };
+
+    // Get splat's world matrix
+    splatMeshObj.updateMatrixWorld(true);
+    const worldMatrix = splatMeshObj.matrixWorld;
+
+    // Try packedSplats API first
+    if (splatMeshObj.packedSplats && typeof splatMeshObj.packedSplats.forEachSplat === 'function') {
+        const splatCount = splatMeshObj.packedSplats.splatCount || 0;
+        if (splatCount > 0) {
+            let count = 0;
+            const maxSamples = Math.min(splatCount, 1000); // Sample up to 1000 points for speed
+            const stride = Math.max(1, Math.floor(splatCount / maxSamples));
+
+            splatMeshObj.packedSplats.forEachSplat((index, center) => {
+                if (index % stride === 0) {
+                    const worldPos = new THREE.Vector3(center.x, center.y, center.z);
+                    worldPos.applyMatrix4(worldMatrix);
+                    bounds.min.min(worldPos);
+                    bounds.max.max(worldPos);
+                    count++;
+                }
+            });
+
+            if (count > 0) {
+                bounds.center.addVectors(bounds.min, bounds.max).multiplyScalar(0.5);
+                bounds.found = true;
+                console.log(`[SplatBounds] Computed from ${count} sampled positions`);
+            }
+        }
+    }
+
+    return bounds;
+}
+
+// ============================================================
 // KD-Tree Implementation for efficient nearest neighbor search
 // ============================================================
 
@@ -1704,30 +1749,46 @@ function extractSplatPositions(splatMeshObj, maxPoints = 5000) {
     splatMeshObj.updateMatrixWorld(true);
     const worldMatrix = splatMeshObj.matrixWorld;
 
+    // Debug: log available properties
+    console.log('[extractSplatPositions] Checking available APIs...');
+    console.log('[extractSplatPositions] packedSplats:', !!splatMeshObj.packedSplats);
+    console.log('[extractSplatPositions] geometry:', !!splatMeshObj.geometry);
+
     // Try to access splat positions via Spark library's packedSplats API
     if (splatMeshObj.packedSplats && typeof splatMeshObj.packedSplats.forEachSplat === 'function') {
         let count = 0;
         const splatCount = splatMeshObj.packedSplats.splatCount || 0;
+        console.log('[extractSplatPositions] splatCount:', splatCount);
+
+        if (splatCount === 0) {
+            console.warn('[extractSplatPositions] splatCount is 0, splat may still be loading');
+        }
+
         const stride = Math.max(1, Math.floor(splatCount / maxPoints));
 
-        splatMeshObj.packedSplats.forEachSplat((index, center) => {
-            if (index % stride === 0 && count < maxPoints) {
-                // center is a reused Vector3, so clone and transform to world space
-                const worldPos = new THREE.Vector3(center.x, center.y, center.z);
-                worldPos.applyMatrix4(worldMatrix);
-                positions.push({
-                    x: worldPos.x,
-                    y: worldPos.y,
-                    z: worldPos.z,
-                    index: index
-                });
-                count++;
-            }
-        });
-        console.log(`[ICP] Extracted ${positions.length} splat positions via forEachSplat (world space)`);
+        try {
+            splatMeshObj.packedSplats.forEachSplat((index, center) => {
+                if (index % stride === 0 && count < maxPoints) {
+                    // center is a reused Vector3, so clone and transform to world space
+                    const worldPos = new THREE.Vector3(center.x, center.y, center.z);
+                    worldPos.applyMatrix4(worldMatrix);
+                    positions.push({
+                        x: worldPos.x,
+                        y: worldPos.y,
+                        z: worldPos.z,
+                        index: index
+                    });
+                    count++;
+                }
+            });
+        } catch (e) {
+            console.error('[extractSplatPositions] Error in forEachSplat:', e);
+        }
+        console.log(`[extractSplatPositions] Extracted ${positions.length} splat positions via forEachSplat (world space)`);
     } else if (splatMeshObj.geometry && splatMeshObj.geometry.attributes.position) {
         // Fallback: try to read from geometry
         const posAttr = splatMeshObj.geometry.attributes.position;
+        console.log('[extractSplatPositions] geometry.position.count:', posAttr.count);
         const stride = Math.max(1, Math.floor(posAttr.count / maxPoints));
         for (let i = 0; i < posAttr.count && positions.length < maxPoints; i += stride) {
             const worldPos = new THREE.Vector3(
@@ -1743,9 +1804,13 @@ function extractSplatPositions(splatMeshObj, maxPoints = 5000) {
                 index: i
             });
         }
-        console.log(`[ICP] Extracted ${positions.length} splat positions from geometry (world space)`);
+        console.log(`[extractSplatPositions] Extracted ${positions.length} splat positions from geometry (world space)`);
     } else {
-        console.warn('[ICP] Could not find splat position data');
+        console.warn('[extractSplatPositions] Could not find splat position data');
+        console.log('[extractSplatPositions] Available splatMesh properties:', Object.keys(splatMeshObj));
+        if (splatMeshObj.packedSplats) {
+            console.log('[extractSplatPositions] Available packedSplats properties:', Object.keys(splatMeshObj.packedSplats));
+        }
     }
 
     return positions;
@@ -1882,9 +1947,19 @@ function computeOptimalRotation(sourcePoints, targetPoints, sourceCentroid, targ
 
 // ICP alignment function
 async function icpAlignObjects() {
+    console.log('[ICP] icpAlignObjects called');
+
     if (!splatMesh || !modelGroup || modelGroup.children.length === 0) {
         alert('Both splat and model must be loaded for ICP alignment');
         return;
+    }
+
+    // Debug: Check splat state
+    console.log('[ICP] splatMesh exists:', !!splatMesh);
+    console.log('[ICP] splatMesh.packedSplats:', !!splatMesh.packedSplats);
+    if (splatMesh.packedSplats) {
+        console.log('[ICP] packedSplats.splatCount:', splatMesh.packedSplats.splatCount);
+        console.log('[ICP] packedSplats.forEachSplat:', typeof splatMesh.packedSplats.forEachSplat);
     }
 
     showLoading('Running ICP alignment...');
@@ -1894,18 +1969,25 @@ async function icpAlignObjects() {
 
     try {
         // Extract points
+        console.log('[ICP] Extracting splat positions...');
         const splatPoints = extractSplatPositions(splatMesh, 3000);
+        console.log('[ICP] Extracted splat points:', splatPoints.length);
+
+        console.log('[ICP] Extracting mesh vertices...');
         const meshPoints = extractMeshVertices(modelGroup, 8000);
+        console.log('[ICP] Extracted mesh points:', meshPoints.length);
 
         if (splatPoints.length < 10) {
             hideLoading();
-            alert('Could not extract enough splat positions for ICP. The splat may not support position extraction.');
+            console.error('[ICP] Not enough splat points:', splatPoints.length);
+            alert('Could not extract enough splat positions for ICP (' + splatPoints.length + ' found). The splat may not support position extraction or may still be loading.');
             return;
         }
 
         if (meshPoints.length < 10) {
             hideLoading();
-            alert('Could not extract enough mesh vertices for ICP.');
+            console.error('[ICP] Not enough mesh points:', meshPoints.length);
+            alert('Could not extract enough mesh vertices for ICP (' + meshPoints.length + ' found).');
             return;
         }
 
@@ -2060,94 +2142,28 @@ function autoAlignObjects() {
     const splatBox = new THREE.Box3();
     const modelBox = new THREE.Box3();
 
-    // Get splat bounds - try multiple methods
-    let splatBoundsFound = false;
+    // First, try to get accurate splat bounds from actual positions
+    const actualBounds = computeSplatBoundsFromPositions(splatMesh);
+    let splatBoundsFound = actualBounds.found;
 
-    // Method 1: Check if splatMesh has a boundingBox property (some loaders set this)
-    if (splatMesh.boundingBox && !splatMesh.boundingBox.isEmpty()) {
-        splatBox.copy(splatMesh.boundingBox);
-        splatBox.applyMatrix4(splatMesh.matrixWorld);
-        splatBoundsFound = true;
-    }
-
-    // Method 2: Try to get from geometry
-    if (!splatBoundsFound && splatMesh.geometry) {
-        try {
-            if (!splatMesh.geometry.boundingBox) {
-                splatMesh.geometry.computeBoundingBox();
-            }
-            if (splatMesh.geometry.boundingBox && !splatMesh.geometry.boundingBox.isEmpty()) {
-                splatBox.copy(splatMesh.geometry.boundingBox);
-                splatMesh.updateMatrixWorld(true);
-                splatBox.applyMatrix4(splatMesh.matrixWorld);
-                splatBoundsFound = true;
-            }
-        } catch (e) {
-            console.log('Could not get splat bounds from geometry:', e);
-        }
-    }
-
-    // Method 3: Try expandByObject (traverses children too)
-    if (!splatBoundsFound) {
-        try {
-            splatMesh.updateMatrixWorld(true);
-            splatBox.setFromObject(splatMesh);
-            if (!splatBox.isEmpty() && isFinite(splatBox.min.x) && isFinite(splatBox.max.x)) {
-                splatBoundsFound = true;
-            }
-        } catch (e) {
-            console.log('Could not get splat bounds from setFromObject:', e);
-        }
-    }
-
-    // Method 4: Check children of splatMesh
-    if (!splatBoundsFound) {
-        splatMesh.traverse((child) => {
-            if (child.geometry) {
-                try {
-                    if (!child.geometry.boundingBox) {
-                        child.geometry.computeBoundingBox();
-                    }
-                    if (child.geometry.boundingBox) {
-                        const childBox = child.geometry.boundingBox.clone();
-                        child.updateMatrixWorld(true);
-                        childBox.applyMatrix4(child.matrixWorld);
-                        splatBox.union(childBox);
-                        splatBoundsFound = true;
-                    }
-                } catch (e) {}
-            }
+    if (splatBoundsFound) {
+        splatBox.set(actualBounds.min, actualBounds.max);
+        console.log('[AutoAlign] Using bounds from actual splat positions:', {
+            min: actualBounds.min.toArray(),
+            max: actualBounds.max.toArray()
         });
     }
 
-    // Final fallback: use splat position as center with reasonable default size
-    if (!splatBoundsFound || splatBox.isEmpty()) {
-        console.log('Using fallback splat bounds estimation');
-        // Use a reasonable default size based on typical gaussian splat dimensions
-        const size = 2.0 * Math.max(splatMesh.scale.x, splatMesh.scale.y, splatMesh.scale.z);
-        splatBox.setFromCenterAndSize(
-            splatMesh.position.clone(),
-            new THREE.Vector3(size, size, size)
-        );
-    }
-
-    // Underground auto-correction: detect if splat is upside down and underground
-    if (splatBox.max.y < 0.1) {
-        console.log('[AutoAlign] Detected splat is underground. Flipping 180°...');
-        splatMesh.rotation.x += Math.PI;
-        splatMesh.updateMatrixWorld(true);
-
-        // Re-calculate splatBox with the new orientation
-        splatBox.makeEmpty();
-        splatBoundsFound = false;
-
-        // Re-try the bounds calculation methods after flipping
+    // Fallback methods if packedSplats not available
+    if (!splatBoundsFound) {
+        // Method 1: Check if splatMesh has a boundingBox property
         if (splatMesh.boundingBox && !splatMesh.boundingBox.isEmpty()) {
             splatBox.copy(splatMesh.boundingBox);
             splatBox.applyMatrix4(splatMesh.matrixWorld);
             splatBoundsFound = true;
         }
 
+        // Method 2: Try to get from geometry
         if (!splatBoundsFound && splatMesh.geometry) {
             try {
                 if (!splatMesh.geometry.boundingBox) {
@@ -2155,32 +2171,69 @@ function autoAlignObjects() {
                 }
                 if (splatMesh.geometry.boundingBox && !splatMesh.geometry.boundingBox.isEmpty()) {
                     splatBox.copy(splatMesh.geometry.boundingBox);
+                    splatMesh.updateMatrixWorld(true);
                     splatBox.applyMatrix4(splatMesh.matrixWorld);
                     splatBoundsFound = true;
                 }
             } catch (e) {
-                console.log('Could not get splat bounds from geometry after flip:', e);
+                console.log('Could not get splat bounds from geometry:', e);
             }
         }
 
+        // Method 3: Try setFromObject
         if (!splatBoundsFound) {
             try {
+                splatMesh.updateMatrixWorld(true);
                 splatBox.setFromObject(splatMesh);
                 if (!splatBox.isEmpty() && isFinite(splatBox.min.x) && isFinite(splatBox.max.x)) {
                     splatBoundsFound = true;
                 }
             } catch (e) {
-                console.log('Could not get splat bounds from setFromObject after flip:', e);
+                console.log('Could not get splat bounds from setFromObject:', e);
             }
         }
 
+        // Final fallback
         if (!splatBoundsFound || splatBox.isEmpty()) {
+            console.log('[AutoAlign] Using fallback splat bounds estimation');
             const size = 2.0 * Math.max(splatMesh.scale.x, splatMesh.scale.y, splatMesh.scale.z);
             splatBox.setFromCenterAndSize(
                 splatMesh.position.clone(),
                 new THREE.Vector3(size, size, size)
             );
         }
+    }
+
+    // Underground auto-correction: detect if splat is upside down and underground
+    // Check if splat is mostly below y=0 (max.y < 0.1 means entirely underground)
+    console.log('[AutoAlign] Splat bounds Y: min=' + splatBox.min.y.toFixed(2) + ', max=' + splatBox.max.y.toFixed(2));
+
+    if (splatBox.max.y < 0.1) {
+        console.log('[AutoAlign] Detected splat is underground (max.y=' + splatBox.max.y.toFixed(2) + '). Flipping 180° on X axis...');
+        splatMesh.rotation.x += Math.PI;
+        splatMesh.updateMatrixWorld(true);
+
+        // Re-calculate splatBox with the new orientation
+        const newBounds = computeSplatBoundsFromPositions(splatMesh);
+        if (newBounds.found) {
+            splatBox.set(newBounds.min, newBounds.max);
+            splatBoundsFound = true;
+        } else {
+            // Fallback recalculation
+            splatBox.makeEmpty();
+            if (splatMesh.boundingBox && !splatMesh.boundingBox.isEmpty()) {
+                splatBox.copy(splatMesh.boundingBox);
+                splatBox.applyMatrix4(splatMesh.matrixWorld);
+            } else {
+                try {
+                    splatBox.setFromObject(splatMesh);
+                } catch (e) {
+                    const size = 2.0 * Math.max(splatMesh.scale.x, splatMesh.scale.y, splatMesh.scale.z);
+                    splatBox.setFromCenterAndSize(splatMesh.position.clone(), new THREE.Vector3(size, size, size));
+                }
+            }
+        }
+        console.log('[AutoAlign] After flip - Splat bounds Y: min=' + splatBox.min.y.toFixed(2) + ', max=' + splatBox.max.y.toFixed(2));
     }
 
     // Get model bounds with world transforms
