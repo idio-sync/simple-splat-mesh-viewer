@@ -308,23 +308,9 @@ function setupUIEvents() {
     addListener('splat-input', 'change', handleSplatFile);
     addListener('model-input', 'change', handleModelFile);
 
-    // URL load buttons
-    addListener('btn-load-splat-url', 'click', handleLoadSplatFromUrlInput);
-    addListener('btn-load-model-url', 'click', handleLoadModelFromUrlInput);
-
-    // Allow Enter key to trigger URL load
-    const splatUrlInput = document.getElementById('splat-url-input');
-    if (splatUrlInput) {
-        splatUrlInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleLoadSplatFromUrlInput();
-        });
-    }
-    const modelUrlInput = document.getElementById('model-url-input');
-    if (modelUrlInput) {
-        modelUrlInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleLoadModelFromUrlInput();
-        });
-    }
+    // URL load buttons (using prompt)
+    addListener('btn-load-splat-url', 'click', handleLoadSplatFromUrlPrompt);
+    addListener('btn-load-model-url', 'click', handleLoadModelFromUrlPrompt);
 
     // Splat settings
     addListener('splat-scale', 'input', (e) => {
@@ -659,48 +645,32 @@ function hideLoading() {
     loadingOverlay.classList.add('hidden');
 }
 
-// Handle loading splat from URL input field
-function handleLoadSplatFromUrlInput() {
-    const input = document.getElementById('splat-url-input');
-    if (!input) return;
+// Handle loading splat from URL via prompt
+function handleLoadSplatFromUrlPrompt() {
+    const url = prompt('Enter Gaussian Splat URL:');
+    if (!url) return; // User cancelled or entered empty string
 
-    const url = input.value.trim();
-    if (!url) {
-        alert('Please enter a URL');
+    const trimmedUrl = url.trim();
+    if (trimmedUrl.length < 2) {
+        alert('Invalid URL');
         return;
     }
 
-    // Allow both absolute URLs and relative paths
-    // Only do basic validation - the fetch will fail if URL is invalid
-    if (url.includes(' ') || url.length < 2) {
-        alert('Invalid URL format');
-        return;
-    }
-
-    loadSplatFromUrl(url);
-    input.value = ''; // Clear input after loading
+    loadSplatFromUrl(trimmedUrl);
 }
 
-// Handle loading model from URL input field
-function handleLoadModelFromUrlInput() {
-    const input = document.getElementById('model-url-input');
-    if (!input) return;
+// Handle loading model from URL via prompt
+function handleLoadModelFromUrlPrompt() {
+    const url = prompt('Enter 3D Model URL (.glb, .gltf, .obj):');
+    if (!url) return; // User cancelled or entered empty string
 
-    const url = input.value.trim();
-    if (!url) {
-        alert('Please enter a URL');
+    const trimmedUrl = url.trim();
+    if (trimmedUrl.length < 2) {
+        alert('Invalid URL');
         return;
     }
 
-    // Allow both absolute URLs and relative paths
-    // Only do basic validation - the fetch will fail if URL is invalid
-    if (url.includes(' ') || url.length < 2) {
-        alert('Invalid URL format');
-        return;
-    }
-
-    loadModelFromUrl(url);
-    input.value = ''; // Clear input after loading
+    loadModelFromUrl(trimmedUrl);
 }
 
 async function handleSplatFile(event) {

@@ -241,35 +241,15 @@ input[type="file"] {
     word-break: break-all;
 }
 
-.url-input-group {
+.button-row {
     display: flex;
-    gap: 5px;
-    align-items: center;
+    gap: 8px;
 }
 
-.url-input {
+.button-row .file-label,
+.button-row .action-btn {
     flex: 1;
-    padding: 8px 10px;
-    background: #2a2a4a;
-    border: 1px solid #4a4a6a;
-    border-radius: 4px;
-    color: #fff;
-    font-size: 0.8rem;
-    min-width: 0;
-}
-
-.url-input:focus {
-    outline: none;
-    border-color: #6a6aba;
-}
-
-.url-input::placeholder {
-    color: #666;
-}
-
-.action-btn.small {
-    padding: 8px 12px;
-    font-size: 0.8rem;
+    text-align: center;
 }
 
 .slider-group {
