@@ -1,3 +1,26 @@
+// Runtime configuration template for Docker deployment
+// Environment variables are substituted by docker-entrypoint.sh at container startup
+//
+// Docker Environment Variables:
+//   DEFAULT_ARCHIVE_URL  - Archive container file (.a3d, .a3z) - takes priority
+//   DEFAULT_SPLAT_URL    - Default splat file to load
+//   DEFAULT_MODEL_URL    - Default model file to load
+//   DEFAULT_ALIGNMENT_URL - Default alignment JSON file to load
+//   SHOW_CONTROLS        - Show (true) or hide (false) the controls panel
+//
+// URL parameters can override environment defaults:
+//   ?archive=URL     - Archive container file (.a3d, .a3z) - takes priority
+//   ?splat=URL       - Splat file to load
+//   ?model=URL       - Model file to load
+//   ?alignment=URL   - Alignment JSON file to load
+//   ?controls=MODE   - Control panel mode: full, minimal, none
+//   ?mode=VIEW       - Initial view mode: splat, model, both, split
+//
+// Inline alignment params:
+//   ?sp=x,y,z  - Splat position    ?mp=x,y,z  - Model position
+//   ?sr=x,y,z  - Splat rotation    ?mr=x,y,z  - Model rotation
+//   ?ss=scale  - Splat scale       ?ms=scale  - Model scale
+
 (function() {
     // 1. Parse URL parameters
     const params = new URLSearchParams(window.location.search);
