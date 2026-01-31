@@ -1,5 +1,6 @@
 // Runtime configuration
 // Supports URL parameters for embedding:
+//   ?archive=URL     - Archive container file (.a3d, .a3z) - takes priority over splat/model
 //   ?splat=URL       - Default splat file to load
 //   ?model=URL       - Default model file to load
 //   ?alignment=URL   - Default alignment JSON file to load
@@ -15,6 +16,7 @@
 //   ?ms=scale        - Model scale
 //
 // Examples:
+//   viewer.website.com?archive=/assets/scene.a3d&controls=minimal
 //   viewer.website.com?splat=/assets/scene.ply&model=/assets/model.glb&controls=minimal
 //   viewer.website.com?splat=https://example.com/file.ply&controls=none&mode=split
 //   viewer.website.com?splat=/scene.ply&model=/model.glb&alignment=/alignment.json
@@ -35,6 +37,7 @@
     }
 
     // Get parameters with defaults
+    const archiveUrl = params.get('archive') || '';
     const splatUrl = params.get('splat') || '';
     const modelUrl = params.get('model') || '';
     const alignmentUrl = params.get('alignment') || '';
@@ -75,6 +78,7 @@
     // none: hide all controls (view only)
 
     window.APP_CONFIG = {
+        defaultArchiveUrl: archiveUrl,
         defaultSplatUrl: splatUrl,
         defaultModelUrl: modelUrl,
         defaultAlignmentUrl: alignmentUrl,

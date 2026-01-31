@@ -68,6 +68,16 @@
             </div>
 
             <div class="control-section">
+                <h3>Load Archive</h3>
+                <input type="file" id="archive-input" accept=".a3d,.a3z" />
+                <div class="button-row">
+                    <label for="archive-input" class="file-label">From File</label>
+                    <button id="btn-load-archive-url" class="action-btn">From URL</button>
+                </div>
+                <span id="archive-filename" class="filename">No archive loaded</span>
+            </div>
+
+            <div class="control-section">
                 <h3>Transform Controls</h3>
                 <div class="toggle-group">
                     <button id="btn-select-splat" class="toggle-btn small">Splat</button>
@@ -202,6 +212,18 @@
                     <p>FPS: <span id="fps-counter">-</span></p>
                 </div>
             </div>
+
+            <div class="control-section collapsible" id="archive-metadata-section" style="display: none;">
+                <h3 class="collapsible-header">Archive Info <span class="collapse-icon">▼</span></h3>
+                <div class="collapsible-content">
+                    <div id="archive-info-panel">
+                        <p>Version: <span id="archive-version">-</span></p>
+                        <p>Packer: <span id="archive-packer">-</span></p>
+                        <p>Created: <span id="archive-created">-</span></p>
+                        <div id="archive-entries-list"></div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="loading-overlay" class="hidden">
@@ -215,7 +237,8 @@
         "imports": {
             "three": "https://esm.sh/three@0.170.0",
             "three/addons/": "https://esm.sh/three@0.170.0/examples/jsm/",
-            "@sparkjsdev/spark": "https://sparkjs.dev/releases/spark/0.1.10/spark.module.js"
+            "@sparkjsdev/spark": "https://sparkjs.dev/releases/spark/0.1.10/spark.module.js",
+            "jszip": "https://esm.sh/jszip@3.10.1"
         }
     }
     </script>

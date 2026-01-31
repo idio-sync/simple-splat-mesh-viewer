@@ -6,6 +6,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { SplatMesh } from '@sparkjsdev/spark';
+import { ArchiveLoader, isArchiveFile } from './archive-loader.js';
 
 // Mark module as loaded (for pre-module error detection)
 window.moduleLoaded = true;
@@ -23,6 +24,7 @@ window.onerror = function(message, source, lineno, colno, error) {
 
 // Get configuration from window (set by config.js)
 const config = window.APP_CONFIG || {
+    defaultArchiveUrl: '',
     defaultSplatUrl: '',
     defaultModelUrl: '',
     defaultAlignmentUrl: '',
@@ -43,7 +45,13 @@ const state = {
     modelWireframe: false,
     controlsVisible: config.showControls,
     currentSplatUrl: config.defaultSplatUrl || null,
-    currentModelUrl: config.defaultModelUrl || null
+    currentModelUrl: config.defaultModelUrl || null,
+    // Archive state
+    archiveLoaded: false,
+    archiveManifest: null,
+    archiveFileName: null,
+    currentArchiveUrl: config.defaultArchiveUrl || null,
+    archiveLoader: null
 };
 
 // Three.js objects - Main view
@@ -307,6 +315,8 @@ function setupUIEvents() {
     // File inputs
     addListener('splat-input', 'change', handleSplatFile);
     addListener('model-input', 'change', handleModelFile);
+    addListener('archive-input', 'change', handleArchiveFile);
+    addListener('btn-load-archive-url', 'click', handleLoadArchiveFromUrlPrompt);
 
     // URL load buttons (using prompt)
     const splatUrlBtn = document.getElementById('btn-load-splat-url');
@@ -686,6 +696,403 @@ function handleLoadModelFromUrlPrompt() {
     }
 
     loadModelFromUrl(trimmedUrl);
+}
+
+// Handle loading archive from URL via prompt
+function handleLoadArchiveFromUrlPrompt() {
+    console.log('[main.js] handleLoadArchiveFromUrlPrompt called');
+    const url = prompt('Enter Archive URL (.a3d, .a3z):');
+    console.log('[main.js] User entered:', url);
+    if (!url) return;
+
+    const trimmedUrl = url.trim();
+    if (trimmedUrl.length < 2) {
+        alert('Invalid URL');
+        return;
+    }
+
+    loadArchiveFromUrl(trimmedUrl);
+}
+
+// Handle archive file input
+async function handleArchiveFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    document.getElementById('archive-filename').textContent = file.name;
+    showLoading('Loading archive...');
+
+    try {
+        // Clean up previous archive if any
+        if (state.archiveLoader) {
+            state.archiveLoader.dispose();
+        }
+
+        const archiveLoader = new ArchiveLoader();
+        await archiveLoader.loadFromFile(file);
+        await processArchive(archiveLoader, file.name);
+
+        state.currentArchiveUrl = null; // Local files cannot be shared
+    } catch (error) {
+        console.error('Error loading archive:', error);
+        hideLoading();
+        alert('Error loading archive: ' + error.message);
+    }
+}
+
+// Load archive from URL
+async function loadArchiveFromUrl(url) {
+    showLoading('Downloading archive...');
+
+    try {
+        // Clean up previous archive if any
+        if (state.archiveLoader) {
+            state.archiveLoader.dispose();
+        }
+
+        const archiveLoader = new ArchiveLoader();
+        await archiveLoader.loadFromUrl(url, (progress) => {
+            showLoading(`Downloading archive... ${Math.round(progress * 100)}%`);
+        });
+
+        const fileName = url.split('/').pop() || 'archive.a3d';
+        document.getElementById('archive-filename').textContent = fileName;
+
+        state.currentArchiveUrl = url;
+        await processArchive(archiveLoader, fileName);
+    } catch (error) {
+        console.error('Error loading archive from URL:', error);
+        hideLoading();
+        alert('Error loading archive from URL: ' + error.message);
+    }
+}
+
+// Process loaded archive - extract and load splat/mesh
+async function processArchive(archiveLoader, archiveName) {
+    showLoading('Parsing manifest...');
+
+    try {
+        const manifest = await archiveLoader.parseManifest();
+        console.log('[main.js] Archive manifest:', manifest);
+
+        state.archiveLoader = archiveLoader;
+        state.archiveManifest = manifest;
+        state.archiveFileName = archiveName;
+        state.archiveLoaded = true;
+
+        const contentInfo = archiveLoader.getContentInfo();
+        const errors = [];
+        let loadedSplat = false;
+        let loadedMesh = false;
+
+        // Load splat (scene_0) if present
+        const sceneEntry = archiveLoader.getSceneEntry();
+        if (sceneEntry && contentInfo.hasSplat) {
+            try {
+                showLoading('Loading splat from archive...');
+                const splatData = await archiveLoader.extractFile(sceneEntry.file_name);
+                if (splatData) {
+                    await loadSplatFromBlobUrl(splatData.url, sceneEntry.file_name);
+                    loadedSplat = true;
+
+                    // Apply transform from entry parameters if present
+                    const transform = archiveLoader.getEntryTransform(sceneEntry);
+                    if (splatMesh && (transform.position.some(v => v !== 0) ||
+                                      transform.rotation.some(v => v !== 0) ||
+                                      transform.scale !== 1)) {
+                        splatMesh.position.fromArray(transform.position);
+                        splatMesh.rotation.set(...transform.rotation);
+                        splatMesh.scale.setScalar(transform.scale);
+                    }
+                }
+            } catch (e) {
+                errors.push(`Failed to load splat: ${e.message}`);
+                console.error('[main.js] Error loading splat from archive:', e);
+            }
+        }
+
+        // Load mesh (mesh_0) if present
+        const meshEntry = archiveLoader.getMeshEntry();
+        if (meshEntry && contentInfo.hasMesh) {
+            try {
+                showLoading('Loading mesh from archive...');
+                const meshData = await archiveLoader.extractFile(meshEntry.file_name);
+                if (meshData) {
+                    await loadModelFromBlobUrl(meshData.url, meshEntry.file_name);
+                    loadedMesh = true;
+
+                    // Apply transform from entry parameters if present
+                    const transform = archiveLoader.getEntryTransform(meshEntry);
+                    if (modelGroup && (transform.position.some(v => v !== 0) ||
+                                       transform.rotation.some(v => v !== 0) ||
+                                       transform.scale !== 1)) {
+                        modelGroup.position.fromArray(transform.position);
+                        modelGroup.rotation.set(...transform.rotation);
+                        modelGroup.scale.setScalar(transform.scale);
+                    }
+                }
+            } catch (e) {
+                errors.push(`Failed to load mesh: ${e.message}`);
+                console.error('[main.js] Error loading mesh from archive:', e);
+            }
+        }
+
+        // Check for global alignment data
+        const globalAlignment = archiveLoader.getGlobalAlignment();
+        if (globalAlignment) {
+            applyAlignmentData(globalAlignment);
+        }
+
+        // Update UI
+        updateTransformInputs();
+        storeLastPositions();
+        updateArchiveMetadataUI(manifest, archiveLoader);
+
+        // Show warning if there were partial errors
+        if (errors.length > 0 && (loadedSplat || loadedMesh)) {
+            console.warn('[main.js] Archive loaded with warnings:', errors);
+        }
+
+        // Alert if no viewable content
+        if (!loadedSplat && !loadedMesh) {
+            hideLoading();
+            alert('Archive does not contain any viewable splat or mesh files.');
+            return;
+        }
+
+        hideLoading();
+    } catch (error) {
+        console.error('[main.js] Error processing archive:', error);
+        hideLoading();
+        alert('Error processing archive: ' + error.message);
+    }
+}
+
+// Load splat from a blob URL (used by archive loader)
+async function loadSplatFromBlobUrl(blobUrl, fileName) {
+    // Remove existing splat
+    if (splatMesh) {
+        scene.remove(splatMesh);
+        if (splatMesh.dispose) splatMesh.dispose();
+        splatMesh = null;
+    }
+
+    // Create SplatMesh using Spark
+    splatMesh = new SplatMesh({ url: blobUrl });
+
+    // Verify SplatMesh is a valid THREE.Object3D
+    if (!(splatMesh instanceof THREE.Object3D)) {
+        console.warn('[main.js] WARNING: SplatMesh is not an instance of THREE.Object3D!');
+    }
+
+    // Wait for initialization
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    try {
+        scene.add(splatMesh);
+    } catch (addError) {
+        console.error('[main.js] Error adding splatMesh to scene:', addError);
+        throw addError;
+    }
+
+    state.splatLoaded = true;
+    updateVisibility();
+
+    // Update UI
+    document.getElementById('splat-filename').textContent = fileName;
+    document.getElementById('splat-vertices').textContent = 'Loaded';
+}
+
+// Load model from a blob URL (used by archive loader)
+async function loadModelFromBlobUrl(blobUrl, fileName) {
+    // Clear existing model
+    while (modelGroup.children.length > 0) {
+        const child = modelGroup.children[0];
+        disposeObject(child);
+        modelGroup.remove(child);
+    }
+
+    const extension = fileName.split('.').pop().toLowerCase();
+    let loadedObject;
+
+    if (extension === 'glb' || extension === 'gltf') {
+        loadedObject = await loadGLTFFromBlobUrl(blobUrl);
+    } else if (extension === 'obj') {
+        loadedObject = await loadOBJFromBlobUrl(blobUrl);
+    }
+
+    if (loadedObject) {
+        modelGroup.add(loadedObject);
+        state.modelLoaded = true;
+        updateModelOpacity();
+        updateModelWireframe();
+        updateVisibility();
+
+        // Count faces
+        let faceCount = 0;
+        loadedObject.traverse((child) => {
+            if (child.isMesh && child.geometry) {
+                const geo = child.geometry;
+                if (geo.index) {
+                    faceCount += geo.index.count / 3;
+                } else if (geo.attributes.position) {
+                    faceCount += geo.attributes.position.count / 3;
+                }
+            }
+        });
+
+        // Update UI
+        document.getElementById('model-filename').textContent = fileName;
+        document.getElementById('model-faces').textContent = Math.round(faceCount).toLocaleString();
+    }
+}
+
+// Load GLTF from blob URL
+function loadGLTFFromBlobUrl(blobUrl) {
+    return new Promise((resolve, reject) => {
+        const loader = new GLTFLoader();
+
+        loader.load(
+            blobUrl,
+            (gltf) => {
+                // Process materials and normals for proper lighting
+                gltf.scene.traverse((child) => {
+                    if (child.isMesh) {
+                        if (child.geometry && !child.geometry.attributes.normal) {
+                            child.geometry.computeVertexNormals();
+                        }
+
+                        if (child.material) {
+                            const mat = child.material;
+                            if (mat.isMeshBasicMaterial || mat.isLineBasicMaterial || mat.isPointsMaterial) {
+                                const oldMaterial = mat;
+                                child.material = new THREE.MeshStandardMaterial({
+                                    color: oldMaterial.color || new THREE.Color(0x888888),
+                                    map: oldMaterial.map,
+                                    alphaMap: oldMaterial.alphaMap,
+                                    transparent: oldMaterial.transparent || false,
+                                    opacity: oldMaterial.opacity !== undefined ? oldMaterial.opacity : 1,
+                                    side: oldMaterial.side || THREE.FrontSide,
+                                    metalness: 0.1,
+                                    roughness: 0.8
+                                });
+                                oldMaterial.dispose();
+                            }
+                        }
+                    }
+                });
+
+                resolve(gltf.scene);
+            },
+            undefined,
+            (error) => {
+                reject(error);
+            }
+        );
+    });
+}
+
+// Load OBJ from blob URL
+function loadOBJFromBlobUrl(blobUrl) {
+    return new Promise((resolve, reject) => {
+        const loader = new OBJLoader();
+
+        loader.load(
+            blobUrl,
+            (object) => {
+                object.traverse((child) => {
+                    if (child.isMesh) {
+                        if (child.geometry && !child.geometry.attributes.normal) {
+                            child.geometry.computeVertexNormals();
+                        }
+
+                        child.material = new THREE.MeshStandardMaterial({
+                            color: 0x888888,
+                            metalness: 0.1,
+                            roughness: 0.8
+                        });
+                    }
+                });
+                resolve(object);
+            },
+            undefined,
+            (error) => {
+                reject(error);
+            }
+        );
+    });
+}
+
+// Update archive metadata UI panel
+function updateArchiveMetadataUI(manifest, archiveLoader) {
+    const section = document.getElementById('archive-metadata-section');
+    if (!section) return;
+
+    section.style.display = '';
+
+    const metadata = archiveLoader.getMetadata();
+
+    // Update basic info
+    document.getElementById('archive-version').textContent = metadata.version || '-';
+
+    const packerText = metadata.packerVersion
+        ? `${metadata.packer} v${metadata.packerVersion}`
+        : metadata.packer;
+    document.getElementById('archive-packer').textContent = packerText;
+
+    document.getElementById('archive-created').textContent =
+        metadata.createdAt ? new Date(metadata.createdAt).toLocaleString() : '-';
+
+    // Populate entries list
+    const entriesList = document.getElementById('archive-entries-list');
+    entriesList.innerHTML = '<p class="entries-header">Contents:</p>';
+
+    const entries = archiveLoader.getEntryList();
+    for (const entry of entries) {
+        const entryDiv = document.createElement('div');
+        entryDiv.className = 'archive-entry';
+
+        // Determine entry type for styling
+        let entryType = 'other';
+        if (entry.key.startsWith('scene_')) entryType = 'scene';
+        else if (entry.key.startsWith('mesh_')) entryType = 'mesh';
+        else if (entry.key.startsWith('thumbnail_')) entryType = 'thumbnail';
+
+        const typeSpan = document.createElement('span');
+        typeSpan.className = `archive-entry-type ${entryType}`;
+        typeSpan.textContent = entryType;
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'archive-entry-name';
+        nameSpan.textContent = entry.fileName;
+
+        const detailsDiv = document.createElement('div');
+        detailsDiv.className = 'archive-entry-details';
+        detailsDiv.textContent = entry.createdBy ? `Created by: ${entry.createdBy}` : '';
+
+        entryDiv.appendChild(typeSpan);
+        entryDiv.appendChild(nameSpan);
+        entryDiv.appendChild(detailsDiv);
+        entriesList.appendChild(entryDiv);
+    }
+}
+
+// Clear archive metadata when loading new files
+function clearArchiveMetadata() {
+    state.archiveLoaded = false;
+    state.archiveManifest = null;
+    state.archiveFileName = null;
+    state.currentArchiveUrl = null;
+
+    if (state.archiveLoader) {
+        state.archiveLoader.dispose();
+        state.archiveLoader = null;
+    }
+
+    const section = document.getElementById('archive-metadata-section');
+    if (section) section.style.display = 'none';
+
+    document.getElementById('archive-filename').textContent = 'No archive loaded';
 }
 
 async function handleSplatFile(event) {
@@ -1099,7 +1506,7 @@ async function loadAlignmentFromUrl(url) {
 // Copy a shareable link to the clipboard
 function copyShareLink() {
     // Check if at least one URL is present
-    if (!state.currentSplatUrl && !state.currentModelUrl) {
+    if (!state.currentArchiveUrl && !state.currentSplatUrl && !state.currentModelUrl) {
         alert('Cannot share: No files loaded from URL. Share links only work for files loaded via URL, not local uploads.');
         return;
     }
@@ -1107,6 +1514,30 @@ function copyShareLink() {
     // Construct the base URL
     const baseUrl = window.location.origin + window.location.pathname;
     const params = new URLSearchParams();
+
+    // If archive URL is present, use it (takes priority)
+    if (state.currentArchiveUrl) {
+        params.set('archive', state.currentArchiveUrl);
+        // Archive includes alignment data, so we don't need to add splat/model/alignment params
+        // Just add display mode and controls
+        params.set('mode', state.displayMode);
+
+        if (!config.showControls) {
+            params.set('controls', 'none');
+        } else if (config.controlsMode && config.controlsMode !== 'full') {
+            params.set('controls', config.controlsMode);
+        }
+
+        const shareUrl = baseUrl + '?' + params.toString();
+
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            alert('Share link copied to clipboard!');
+        }).catch((err) => {
+            console.error('[main.js] Failed to copy share link:', err);
+            alert('Share link:\n' + shareUrl);
+        });
+        return;
+    }
 
     // Add splat URL if present
     if (state.currentSplatUrl) {
@@ -1406,6 +1837,13 @@ function applyControlsMode() {
 
 // Load default files from configuration
 async function loadDefaultFiles() {
+    // Archive URL takes priority over splat/model URLs
+    if (config.defaultArchiveUrl) {
+        console.log('[main.js] Loading archive from URL:', config.defaultArchiveUrl);
+        await loadArchiveFromUrl(config.defaultArchiveUrl);
+        return; // Archive handles everything including alignment
+    }
+
     if (config.defaultSplatUrl) {
         await loadSplatFromUrl(config.defaultSplatUrl);
     }
