@@ -13,6 +13,7 @@
     }
 
     // 2. Get Server-Side Defaults (Injected by Docker)
+    const envArchive = "${DEFAULT_ARCHIVE_URL}";
     const envSplat = "${DEFAULT_SPLAT_URL}";
     const envModel = "${DEFAULT_MODEL_URL}";
     const envAlignment = "${DEFAULT_ALIGNMENT_URL}";
@@ -50,6 +51,8 @@
     }
 
     window.APP_CONFIG = {
+        // Archive URL takes priority over splat/model
+        defaultArchiveUrl: params.get('archive') || envArchive || '',
         defaultSplatUrl: params.get('splat') || envSplat || '',
         defaultModelUrl: params.get('model') || envModel || '',
         defaultAlignmentUrl: params.get('alignment') || envAlignment || '',
