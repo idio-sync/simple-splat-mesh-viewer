@@ -30,6 +30,8 @@ body {
     width: 100%;
     height: 100%;
     display: block;
+    position: relative;
+    z-index: 1;
 }
 
 #viewer-canvas-right {
@@ -582,7 +584,8 @@ input[type="range"]::-webkit-slider-thumb:hover {
     right: 65px;
     display: flex;
     gap: 8px;
-    z-index: 100;
+    z-index: 500;
+    pointer-events: auto;
 }
 
 .toolbar-btn {
