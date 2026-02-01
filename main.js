@@ -477,6 +477,13 @@ function setupUIEvents() {
     addListener('btn-export-cancel', 'click', hideExportPanel);
     addListener('btn-export-download', 'click', downloadArchive);
 
+    // Metadata panel controls
+    addListener('btn-open-metadata', 'click', showMetadataPanel);
+    addListener('btn-close-metadata', 'click', hideMetadataPanel);
+    addListener('btn-add-custom-field', 'click', addCustomField);
+    setupMetadataTabs();
+    setupLicenseField();
+
     // Keyboard shortcut for annotation mode
     window.addEventListener('keydown', (e) => {
         if (e.key.toLowerCase() === 'a' && !e.ctrlKey && !e.metaKey) {
@@ -826,6 +833,9 @@ async function processArchive(archiveLoader, archiveName) {
         state.archiveManifest = manifest;
         state.archiveFileName = archiveName;
         state.archiveLoaded = true;
+
+        // Prefill metadata panel from loaded archive
+        prefillMetadataFromArchive(manifest);
 
         const contentInfo = archiveLoader.getContentInfo();
         const errors = [];
@@ -1388,15 +1398,6 @@ function showExportPanel() {
     if (panel) {
         console.log('[main.js] export-panel found, removing hidden class');
         panel.classList.remove('hidden');
-
-        // Pre-fill from archive manifest if available
-        if (state.archiveManifest?.project) {
-            const proj = state.archiveManifest.project;
-            document.getElementById('export-title').value = proj.title || '';
-            document.getElementById('export-id').value = proj.id || '';
-            document.getElementById('export-description').value = proj.description || '';
-            document.getElementById('export-license').value = proj.license || 'CC0';
-        }
     }
 }
 
@@ -1413,17 +1414,32 @@ async function downloadArchive() {
     // Reset creator
     archiveCreator.reset();
 
-    // Get form values
-    const title = document.getElementById('export-title')?.value || 'Untitled';
-    const id = document.getElementById('export-id')?.value || 'project-' + Date.now();
-    const description = document.getElementById('export-description')?.value || '';
-    const license = document.getElementById('export-license')?.value || 'CC0';
+    // Get metadata from metadata panel
+    const metadata = collectMetadata();
+
+    // Get export options
     const formatRadio = document.querySelector('input[name="export-format"]:checked');
     const format = formatRadio?.value || 'a3d';
-    const includePreview = document.getElementById('export-include-preview')?.checked || false;
+    const includePreview = document.getElementById('export-include-preview')?.checked ?? true;
+    const includeHashes = document.getElementById('export-include-hashes')?.checked ?? true;
 
-    // Set project info
-    archiveCreator.setProjectInfo({ title, id, license, description });
+    // Validate title is set
+    if (!metadata.project.title) {
+        alert('Please enter a project title in the metadata panel before exporting.');
+        showMetadataPanel();
+        return;
+    }
+
+    // Apply project info
+    archiveCreator.setProjectInfo(metadata.project);
+
+    // Apply provenance
+    archiveCreator.setProvenance(metadata.provenance);
+
+    // Apply custom fields
+    if (Object.keys(metadata.customFields).length > 0) {
+        archiveCreator.setCustomFields(metadata.customFields);
+    }
 
     // Add splat if loaded
     if (currentSplatBlob && state.splatLoaded) {
@@ -1432,7 +1448,12 @@ async function downloadArchive() {
         const rotation = splatMesh ? [splatMesh.rotation.x, splatMesh.rotation.y, splatMesh.rotation.z] : [0, 0, 0];
         const scale = splatMesh ? splatMesh.scale.x : 1;
 
-        archiveCreator.addScene(currentSplatBlob, fileName, { position, rotation, scale });
+        archiveCreator.addScene(currentSplatBlob, fileName, {
+            position, rotation, scale,
+            created_by: metadata.splatMetadata.createdBy || 'unknown',
+            created_by_version: metadata.splatMetadata.version || '',
+            source_notes: metadata.splatMetadata.sourceNotes || ''
+        });
     }
 
     // Add mesh if loaded
@@ -1442,13 +1463,27 @@ async function downloadArchive() {
         const rotation = modelGroup ? [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z] : [0, 0, 0];
         const scale = modelGroup ? modelGroup.scale.x : 1;
 
-        archiveCreator.addMesh(currentMeshBlob, fileName, { position, rotation, scale });
+        archiveCreator.addMesh(currentMeshBlob, fileName, {
+            position, rotation, scale,
+            created_by: metadata.meshMetadata.createdBy || 'unknown',
+            created_by_version: metadata.meshMetadata.version || '',
+            source_notes: metadata.meshMetadata.sourceNotes || ''
+        });
     }
 
     // Add annotations
     if (annotationSystem && annotationSystem.hasAnnotations()) {
         archiveCreator.setAnnotations(annotationSystem.toJSON());
     }
+
+    // Set quality stats
+    archiveCreator.setQualityStats({
+        splatCount: state.splatLoaded ? parseInt(document.getElementById('splat-vertices')?.textContent) || 0 : 0,
+        meshPolys: state.modelLoaded ? parseInt(document.getElementById('model-faces')?.textContent) || 0 : 0,
+        meshVerts: state.modelLoaded ? (state.meshVertexCount || 0) : 0,
+        splatFileSize: currentSplatBlob?.size || 0,
+        meshFileSize: currentMeshBlob?.size || 0
+    });
 
     // Add preview/thumbnail
     if (includePreview && renderer) {
@@ -1474,8 +1509,9 @@ async function downloadArchive() {
     showLoading('Creating archive...');
     try {
         await archiveCreator.downloadArchive({
-            filename: id || 'archive',
-            format: format
+            filename: metadata.project.id || 'archive',
+            format: format,
+            includeHashes: includeHashes
         });
         hideLoading();
         hideExportPanel();
@@ -1483,6 +1519,335 @@ async function downloadArchive() {
         hideLoading();
         console.error('[main.js] Error creating archive:', e);
         alert('Error creating archive: ' + e.message);
+    }
+}
+
+// ==================== Metadata Panel Functions ====================
+
+// Show metadata panel
+function showMetadataPanel() {
+    const panel = document.getElementById('metadata-panel');
+    if (panel) {
+        panel.classList.remove('hidden');
+        updateMetadataStats();
+        updateAssetStatus();
+    }
+}
+
+// Hide metadata panel
+function hideMetadataPanel() {
+    const panel = document.getElementById('metadata-panel');
+    if (panel) {
+        panel.classList.add('hidden');
+    }
+}
+
+// Setup metadata tab switching
+function setupMetadataTabs() {
+    const tabs = document.querySelectorAll('.metadata-tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Update active tab
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // Update active content
+            const tabContents = document.querySelectorAll('.metadata-tab-content');
+            tabContents.forEach(content => content.classList.remove('active'));
+
+            const tabId = tab.dataset.tab;
+            const targetContent = document.getElementById(`tab-${tabId}`);
+            if (targetContent) {
+                targetContent.classList.add('active');
+            }
+        });
+    });
+}
+
+// Setup license dropdown custom field toggle
+function setupLicenseField() {
+    const licenseSelect = document.getElementById('meta-license');
+    const customLicenseField = document.getElementById('custom-license-field');
+
+    if (licenseSelect && customLicenseField) {
+        licenseSelect.addEventListener('change', () => {
+            if (licenseSelect.value === 'custom') {
+                customLicenseField.classList.remove('hidden');
+            } else {
+                customLicenseField.classList.add('hidden');
+            }
+        });
+    }
+}
+
+// Update quality stats display in metadata panel
+function updateMetadataStats() {
+    // Splat count
+    const splatCountEl = document.getElementById('meta-splat-count');
+    if (splatCountEl) {
+        splatCountEl.textContent = state.splatLoaded
+            ? (document.getElementById('splat-vertices')?.textContent || '-')
+            : '-';
+    }
+
+    // Mesh polygons and vertices
+    const meshPolysEl = document.getElementById('meta-mesh-polys');
+    const meshVertsEl = document.getElementById('meta-mesh-verts');
+    if (meshPolysEl) {
+        meshPolysEl.textContent = state.modelLoaded
+            ? (document.getElementById('model-faces')?.textContent || '-')
+            : '-';
+    }
+    if (meshVertsEl) {
+        meshVertsEl.textContent = state.modelLoaded
+            ? (state.meshVertexCount || '-')
+            : '-';
+    }
+
+    // Annotation count
+    const annoCountEl = document.getElementById('meta-anno-count');
+    if (annoCountEl && annotationSystem) {
+        annoCountEl.textContent = annotationSystem.getCount().toString();
+    }
+
+    // File sizes
+    const splatSizeEl = document.getElementById('meta-splat-size');
+    const meshSizeEl = document.getElementById('meta-mesh-size');
+    const archiveSizeEl = document.getElementById('meta-archive-size');
+
+    if (splatSizeEl && currentSplatBlob) {
+        splatSizeEl.textContent = formatFileSize(currentSplatBlob.size);
+    } else if (splatSizeEl) {
+        splatSizeEl.textContent = '-';
+    }
+
+    if (meshSizeEl && currentMeshBlob) {
+        meshSizeEl.textContent = formatFileSize(currentMeshBlob.size);
+    } else if (meshSizeEl) {
+        meshSizeEl.textContent = '-';
+    }
+
+    if (archiveSizeEl) {
+        let totalSize = 0;
+        if (currentSplatBlob) totalSize += currentSplatBlob.size;
+        if (currentMeshBlob) totalSize += currentMeshBlob.size;
+        archiveSizeEl.textContent = totalSize > 0 ? '~' + formatFileSize(totalSize) : '-';
+    }
+}
+
+// Format file size for display
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Update asset status in metadata panel
+function updateAssetStatus() {
+    // Splat asset
+    const splatStatus = document.getElementById('splat-asset-status');
+    const splatFields = document.getElementById('splat-asset-fields');
+    if (splatStatus) {
+        if (state.splatLoaded) {
+            const fileName = document.getElementById('splat-filename')?.textContent || 'Scene loaded';
+            splatStatus.textContent = fileName;
+            splatStatus.classList.add('loaded');
+            if (splatFields) splatFields.classList.remove('hidden');
+        } else {
+            splatStatus.textContent = 'No splat loaded';
+            splatStatus.classList.remove('loaded');
+            if (splatFields) splatFields.classList.add('hidden');
+        }
+    }
+
+    // Mesh asset
+    const meshStatus = document.getElementById('mesh-asset-status');
+    const meshFields = document.getElementById('mesh-asset-fields');
+    if (meshStatus) {
+        if (state.modelLoaded) {
+            const fileName = document.getElementById('model-filename')?.textContent || 'Mesh loaded';
+            meshStatus.textContent = fileName;
+            meshStatus.classList.add('loaded');
+            if (meshFields) meshFields.classList.remove('hidden');
+        } else {
+            meshStatus.textContent = 'No mesh loaded';
+            meshStatus.classList.remove('loaded');
+            if (meshFields) meshFields.classList.add('hidden');
+        }
+    }
+}
+
+// Add a custom field row
+function addCustomField() {
+    const container = document.getElementById('custom-fields-list');
+    if (!container) return;
+
+    const row = document.createElement('div');
+    row.className = 'custom-field-row';
+    row.innerHTML = `
+        <input type="text" class="custom-field-key" placeholder="Key">
+        <input type="text" class="custom-field-value" placeholder="Value">
+        <button class="custom-field-remove" title="Remove">&times;</button>
+    `;
+
+    const removeBtn = row.querySelector('.custom-field-remove');
+    removeBtn.addEventListener('click', () => row.remove());
+
+    container.appendChild(row);
+}
+
+// Collect all metadata from the panel
+function collectMetadata() {
+    const metadata = {
+        project: {
+            title: document.getElementById('meta-title')?.value || '',
+            id: document.getElementById('meta-id')?.value || '',
+            description: document.getElementById('meta-description')?.value || '',
+            license: document.getElementById('meta-license')?.value || 'CC0'
+        },
+        provenance: {
+            captureDate: document.getElementById('meta-capture-date')?.value || '',
+            captureDevice: document.getElementById('meta-capture-device')?.value || '',
+            operator: document.getElementById('meta-operator')?.value || '',
+            location: document.getElementById('meta-location')?.value || '',
+            conventions: document.getElementById('meta-conventions')?.value || ''
+        },
+        splatMetadata: {
+            createdBy: document.getElementById('meta-splat-created-by')?.value || '',
+            version: document.getElementById('meta-splat-version')?.value || '',
+            sourceNotes: document.getElementById('meta-splat-notes')?.value || ''
+        },
+        meshMetadata: {
+            createdBy: document.getElementById('meta-mesh-created-by')?.value || '',
+            version: document.getElementById('meta-mesh-version')?.value || '',
+            sourceNotes: document.getElementById('meta-mesh-notes')?.value || ''
+        },
+        customFields: {},
+        includeIntegrity: document.getElementById('meta-include-integrity')?.checked ?? true
+    };
+
+    // Handle custom license
+    if (metadata.project.license === 'custom') {
+        metadata.project.license = document.getElementById('meta-custom-license')?.value || 'Custom';
+    }
+
+    // Auto-generate ID from title if empty
+    if (!metadata.project.id && metadata.project.title) {
+        metadata.project.id = metadata.project.title
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '');
+    }
+
+    // Collect custom fields
+    const customFieldRows = document.querySelectorAll('.custom-field-row');
+    customFieldRows.forEach(row => {
+        const key = row.querySelector('.custom-field-key')?.value?.trim();
+        const value = row.querySelector('.custom-field-value')?.value?.trim();
+        if (key && value) {
+            metadata.customFields[key] = value;
+        }
+    });
+
+    return metadata;
+}
+
+// Prefill metadata panel from archive manifest
+function prefillMetadataFromArchive(manifest) {
+    if (!manifest) return;
+
+    // Project info
+    if (manifest.project) {
+        if (manifest.project.title) {
+            document.getElementById('meta-title').value = manifest.project.title;
+        }
+        if (manifest.project.id) {
+            document.getElementById('meta-id').value = manifest.project.id;
+        }
+        if (manifest.project.description) {
+            document.getElementById('meta-description').value = manifest.project.description;
+        }
+        if (manifest.project.license) {
+            const licenseSelect = document.getElementById('meta-license');
+            const standardLicenses = ['CC0', 'CC-BY 4.0', 'CC-BY-SA 4.0', 'CC-BY-NC 4.0', 'MIT', 'All Rights Reserved'];
+            if (standardLicenses.includes(manifest.project.license)) {
+                licenseSelect.value = manifest.project.license;
+            } else {
+                licenseSelect.value = 'custom';
+                document.getElementById('custom-license-field').classList.remove('hidden');
+                document.getElementById('meta-custom-license').value = manifest.project.license;
+            }
+        }
+    }
+
+    // Provenance
+    if (manifest.provenance) {
+        if (manifest.provenance.capture_date) {
+            document.getElementById('meta-capture-date').value = manifest.provenance.capture_date;
+        }
+        if (manifest.provenance.capture_device) {
+            document.getElementById('meta-capture-device').value = manifest.provenance.capture_device;
+        }
+        if (manifest.provenance.operator) {
+            document.getElementById('meta-operator').value = manifest.provenance.operator;
+        }
+        if (manifest.provenance.location) {
+            document.getElementById('meta-location').value = manifest.provenance.location;
+        }
+        if (manifest.provenance.convention_hints) {
+            const hints = Array.isArray(manifest.provenance.convention_hints)
+                ? manifest.provenance.convention_hints.join(', ')
+                : manifest.provenance.convention_hints;
+            document.getElementById('meta-conventions').value = hints;
+        }
+    }
+
+    // Asset metadata from data_entries
+    if (manifest.data_entries) {
+        // Find scene entry
+        const sceneKey = Object.keys(manifest.data_entries).find(k => k.startsWith('scene_'));
+        if (sceneKey) {
+            const scene = manifest.data_entries[sceneKey];
+            if (scene.created_by) {
+                document.getElementById('meta-splat-created-by').value = scene.created_by;
+            }
+            if (scene._created_by_version) {
+                document.getElementById('meta-splat-version').value = scene._created_by_version;
+            }
+            if (scene._source_notes) {
+                document.getElementById('meta-splat-notes').value = scene._source_notes;
+            }
+        }
+
+        // Find mesh entry
+        const meshKey = Object.keys(manifest.data_entries).find(k => k.startsWith('mesh_'));
+        if (meshKey) {
+            const mesh = manifest.data_entries[meshKey];
+            if (mesh.created_by) {
+                document.getElementById('meta-mesh-created-by').value = mesh.created_by;
+            }
+            if (mesh._created_by_version) {
+                document.getElementById('meta-mesh-version').value = mesh._created_by_version;
+            }
+            if (mesh._source_notes) {
+                document.getElementById('meta-mesh-notes').value = mesh._source_notes;
+            }
+        }
+    }
+
+    // Custom fields from _meta
+    if (manifest._meta?.custom_fields) {
+        const container = document.getElementById('custom-fields-list');
+        container.innerHTML = ''; // Clear existing
+        for (const [key, value] of Object.entries(manifest._meta.custom_fields)) {
+            addCustomField();
+            const rows = container.querySelectorAll('.custom-field-row');
+            const lastRow = rows[rows.length - 1];
+            lastRow.querySelector('.custom-field-key').value = key;
+            lastRow.querySelector('.custom-field-value').value = value;
+        }
     }
 }
 
