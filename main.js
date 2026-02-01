@@ -210,6 +210,7 @@ function init() {
     annotationSystem.onAnnotationCreated = onAnnotationPlaced;
     annotationSystem.onAnnotationSelected = onAnnotationSelected;
     annotationSystem.onPlacementModeChanged = onPlacementModeChanged;
+    console.log('[main.js] Annotation system initialized:', !!annotationSystem);
 
     // Initialize archive creator
     archiveCreator = new ArchiveCreator();
@@ -461,16 +462,18 @@ function setupUIEvents() {
     addListener('btn-icp-align', 'click', icpAlignObjects);
 
     // Annotation controls
-    addListener('btn-annotate', 'click', toggleAnnotationMode);
-    addListener('btn-add-annotation', 'click', toggleAnnotationMode);
+    const annoBtn = addListener('btn-annotate', 'click', toggleAnnotationMode);
+    const addAnnoBtn = addListener('btn-add-annotation', 'click', toggleAnnotationMode);
+    console.log('[main.js] Annotation buttons attached:', { annoBtn, addAnnoBtn });
     addListener('btn-anno-save', 'click', saveAnnotation);
     addListener('btn-anno-cancel', 'click', cancelAnnotation);
     addListener('btn-update-anno-camera', 'click', updateSelectedAnnotationCamera);
     addListener('btn-delete-anno', 'click', deleteSelectedAnnotation);
 
     // Export/archive creation controls
-    addListener('btn-export-archive', 'click', showExportPanel);
-    addListener('btn-open-export', 'click', showExportPanel);
+    const exportBtn = addListener('btn-export-archive', 'click', showExportPanel);
+    const openExportBtn = addListener('btn-open-export', 'click', showExportPanel);
+    console.log('[main.js] Export buttons attached:', { exportBtn, openExportBtn });
     addListener('btn-export-cancel', 'click', hideExportPanel);
     addListener('btn-export-download', 'click', downloadArchive);
 
@@ -1226,8 +1229,11 @@ function onPlacementModeChanged(active) {
 
 // Toggle annotation placement mode
 function toggleAnnotationMode() {
+    console.log('[main.js] toggleAnnotationMode called, annotationSystem:', !!annotationSystem);
     if (annotationSystem) {
         annotationSystem.togglePlacementMode();
+    } else {
+        console.error('[main.js] annotationSystem is not initialized!');
     }
 }
 
@@ -1377,8 +1383,10 @@ function loadAnnotationsFromArchive(annotations) {
 
 // Show export panel
 function showExportPanel() {
+    console.log('[main.js] showExportPanel called');
     const panel = document.getElementById('export-panel');
     if (panel) {
+        console.log('[main.js] export-panel found, removing hidden class');
         panel.classList.remove('hidden');
 
         // Pre-fill from archive manifest if available
