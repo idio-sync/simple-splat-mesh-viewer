@@ -276,6 +276,24 @@ export class ArchiveLoader {
     }
 
     /**
+     * Get annotations from manifest
+     * @returns {Array} Array of annotation objects
+     */
+    getAnnotations() {
+        if (!this.manifest) return [];
+        return this.manifest.annotations || [];
+    }
+
+    /**
+     * Get project info from manifest
+     * @returns {Object|null} Project info
+     */
+    getProjectInfo() {
+        if (!this.manifest) return null;
+        return this.manifest.project || null;
+    }
+
+    /**
      * Get all entries with their details for UI display
      * @returns {Array<Object>} Entry details
      */

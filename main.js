@@ -7,6 +7,8 @@ import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader, isArchiveFile } from './archive-loader.js';
+import { AnnotationSystem } from './annotation-system.js';
+import { ArchiveCreator, captureScreenshot } from './archive-creator.js';
 
 // Mark module as loaded (for pre-module error detection)
 window.moduleLoaded = true;
@@ -59,6 +61,14 @@ let scene, camera, renderer, controls, transformControls;
 let splatMesh = null;
 let modelGroup = null;
 let ambientLight, hemisphereLight, directionalLight1, directionalLight2;
+
+// Annotation and archive creation
+let annotationSystem = null;
+let archiveCreator = null;
+
+// Blob data for archive export (stored when loading files)
+let currentSplatBlob = null;
+let currentMeshBlob = null;
 
 // Three.js objects - Split view (right side)
 let rendererRight = null;
@@ -194,6 +204,15 @@ function init() {
     modelGroup = new THREE.Group();
     modelGroup.name = 'modelGroup';
     scene.add(modelGroup);
+
+    // Initialize annotation system
+    annotationSystem = new AnnotationSystem(scene, camera, renderer, controls);
+    annotationSystem.onAnnotationCreated = onAnnotationPlaced;
+    annotationSystem.onAnnotationSelected = onAnnotationSelected;
+    annotationSystem.onPlacementModeChanged = onPlacementModeChanged;
+
+    // Initialize archive creator
+    archiveCreator = new ArchiveCreator();
 
     // Handle resize
     window.addEventListener('resize', onWindowResize);
@@ -440,6 +459,31 @@ function setupUIEvents() {
 
     // ICP align button
     addListener('btn-icp-align', 'click', icpAlignObjects);
+
+    // Annotation controls
+    addListener('btn-annotate', 'click', toggleAnnotationMode);
+    addListener('btn-add-annotation', 'click', toggleAnnotationMode);
+    addListener('btn-anno-save', 'click', saveAnnotation);
+    addListener('btn-anno-cancel', 'click', cancelAnnotation);
+    addListener('btn-update-anno-camera', 'click', updateSelectedAnnotationCamera);
+    addListener('btn-delete-anno', 'click', deleteSelectedAnnotation);
+
+    // Export/archive creation controls
+    addListener('btn-export-archive', 'click', showExportPanel);
+    addListener('btn-open-export', 'click', showExportPanel);
+    addListener('btn-export-cancel', 'click', hideExportPanel);
+    addListener('btn-export-download', 'click', downloadArchive);
+
+    // Keyboard shortcut for annotation mode
+    window.addEventListener('keydown', (e) => {
+        if (e.key.toLowerCase() === 'a' && !e.ctrlKey && !e.metaKey) {
+            const activeEl = document.activeElement;
+            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+                return; // Don't trigger if typing in input
+            }
+            toggleAnnotationMode();
+        }
+    });
 
     // Setup collapsible sections
     setupCollapsibles();
@@ -848,6 +892,26 @@ async function processArchive(archiveLoader, archiveName) {
         storeLastPositions();
         updateArchiveMetadataUI(manifest, archiveLoader);
 
+        // Load annotations from archive
+        const annotations = archiveLoader.getAnnotations();
+        if (annotations && annotations.length > 0) {
+            loadAnnotationsFromArchive(annotations);
+        }
+
+        // Store blobs for potential export
+        if (loadedSplat && sceneEntry) {
+            const splatData = await archiveLoader.extractFile(sceneEntry.file_name);
+            if (splatData) {
+                currentSplatBlob = splatData.blob;
+            }
+        }
+        if (loadedMesh && meshEntry) {
+            const meshData = await archiveLoader.extractFile(meshEntry.file_name);
+            if (meshData) {
+                currentMeshBlob = meshData.blob;
+            }
+        }
+
         // Show warning if there were partial errors
         if (errors.length > 0 && (loadedSplat || loadedMesh)) {
             console.warn('[main.js] Archive loaded with warnings:', errors);
@@ -1095,6 +1159,327 @@ function clearArchiveMetadata() {
     document.getElementById('archive-filename').textContent = 'No archive loaded';
 }
 
+// ==================== Annotation Functions ====================
+
+// Called when user places an annotation (clicks on model in placement mode)
+function onAnnotationPlaced(position, cameraState) {
+    console.log('[main.js] Annotation placed at:', position);
+
+    // Show annotation panel for details entry
+    const panel = document.getElementById('annotation-panel');
+    if (panel) panel.classList.remove('hidden');
+
+    // Pre-fill position display
+    const posDisplay = document.getElementById('anno-pos-display');
+    if (posDisplay) {
+        posDisplay.textContent = `${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)}`;
+    }
+
+    // Generate auto-ID
+    const count = annotationSystem ? annotationSystem.getCount() + 1 : 1;
+    const idInput = document.getElementById('anno-id');
+    if (idInput) idInput.value = `anno_${count}`;
+
+    // Focus title input
+    const titleInput = document.getElementById('anno-title');
+    if (titleInput) titleInput.focus();
+}
+
+// Called when an annotation is selected
+function onAnnotationSelected(annotation) {
+    console.log('[main.js] Annotation selected:', annotation.id);
+
+    // Update annotations list highlighting
+    const items = document.querySelectorAll('.annotation-item');
+    items.forEach(item => {
+        item.classList.toggle('selected', item.dataset.annoId === annotation.id);
+    });
+
+    // Update annotation chips
+    const chips = document.querySelectorAll('.annotation-chip');
+    chips.forEach(chip => {
+        chip.classList.toggle('active', chip.dataset.annoId === annotation.id);
+    });
+
+    // Show editor panel
+    const editor = document.getElementById('selected-annotation-editor');
+    if (editor) {
+        editor.classList.remove('hidden');
+
+        const titleInput = document.getElementById('edit-anno-title');
+        const bodyInput = document.getElementById('edit-anno-body');
+        if (titleInput) titleInput.value = annotation.title || '';
+        if (bodyInput) bodyInput.value = annotation.body || '';
+    }
+}
+
+// Called when placement mode changes
+function onPlacementModeChanged(active) {
+    console.log('[main.js] Placement mode:', active);
+
+    const indicator = document.getElementById('annotation-mode-indicator');
+    const btn = document.getElementById('btn-annotate');
+
+    if (indicator) indicator.classList.toggle('hidden', !active);
+    if (btn) btn.classList.toggle('active', active);
+}
+
+// Toggle annotation placement mode
+function toggleAnnotationMode() {
+    if (annotationSystem) {
+        annotationSystem.togglePlacementMode();
+    }
+}
+
+// Save the pending annotation
+function saveAnnotation() {
+    if (!annotationSystem) return;
+
+    const id = document.getElementById('anno-id')?.value || '';
+    const title = document.getElementById('anno-title')?.value || '';
+    const body = document.getElementById('anno-body')?.value || '';
+
+    const annotation = annotationSystem.confirmAnnotation(id, title, body);
+    if (annotation) {
+        console.log('[main.js] Annotation saved:', annotation);
+        updateAnnotationsUI();
+    }
+
+    // Hide panel and clear inputs
+    const panel = document.getElementById('annotation-panel');
+    if (panel) panel.classList.add('hidden');
+
+    document.getElementById('anno-id').value = '';
+    document.getElementById('anno-title').value = '';
+    document.getElementById('anno-body').value = '';
+
+    // Disable placement mode after saving
+    annotationSystem.disablePlacementMode();
+}
+
+// Cancel annotation placement
+function cancelAnnotation() {
+    if (annotationSystem) {
+        annotationSystem.cancelAnnotation();
+    }
+
+    const panel = document.getElementById('annotation-panel');
+    if (panel) panel.classList.add('hidden');
+
+    document.getElementById('anno-id').value = '';
+    document.getElementById('anno-title').value = '';
+    document.getElementById('anno-body').value = '';
+}
+
+// Update camera for selected annotation
+function updateSelectedAnnotationCamera() {
+    if (!annotationSystem || !annotationSystem.selectedAnnotation) return;
+
+    annotationSystem.updateAnnotationCamera(annotationSystem.selectedAnnotation.id);
+    console.log('[main.js] Updated camera for annotation:', annotationSystem.selectedAnnotation.id);
+}
+
+// Delete selected annotation
+function deleteSelectedAnnotation() {
+    if (!annotationSystem || !annotationSystem.selectedAnnotation) return;
+
+    const id = annotationSystem.selectedAnnotation.id;
+    if (confirm(`Delete annotation "${annotationSystem.selectedAnnotation.title}"?`)) {
+        annotationSystem.deleteAnnotation(id);
+        updateAnnotationsUI();
+
+        // Hide editor
+        const editor = document.getElementById('selected-annotation-editor');
+        if (editor) editor.classList.add('hidden');
+    }
+}
+
+// Update annotations UI (list and bar)
+function updateAnnotationsUI() {
+    if (!annotationSystem) return;
+
+    const annotations = annotationSystem.getAnnotations();
+    const count = annotations.length;
+
+    // Update count badge
+    const badge = document.getElementById('annotation-count-badge');
+    if (badge) {
+        badge.textContent = count;
+        badge.classList.toggle('hidden', count === 0);
+    }
+
+    // Update annotations list
+    const list = document.getElementById('annotations-list');
+    if (list) {
+        list.innerHTML = '';
+
+        if (count === 0) {
+            list.innerHTML = '<p class="no-annotations">No annotations yet. Click "Add Annotation" to create one.</p>';
+        } else {
+            annotations.forEach((anno, index) => {
+                const item = document.createElement('div');
+                item.className = 'annotation-item';
+                item.dataset.annoId = anno.id;
+
+                const number = document.createElement('span');
+                number.className = 'annotation-number';
+                number.textContent = index + 1;
+
+                const title = document.createElement('span');
+                title.className = 'annotation-title';
+                title.textContent = anno.title || 'Untitled';
+
+                item.appendChild(number);
+                item.appendChild(title);
+
+                item.addEventListener('click', () => {
+                    annotationSystem.goToAnnotation(anno.id);
+                });
+
+                list.appendChild(item);
+            });
+        }
+    }
+
+    // Update annotation bar
+    const bar = document.getElementById('annotation-bar');
+    const chips = document.getElementById('annotation-chips');
+    if (bar && chips) {
+        bar.classList.toggle('hidden', count === 0);
+        chips.innerHTML = '';
+
+        annotations.forEach((anno, index) => {
+            const chip = document.createElement('button');
+            chip.className = 'annotation-chip';
+            chip.dataset.annoId = anno.id;
+            chip.textContent = index + 1;
+            chip.title = anno.title || 'Untitled';
+
+            chip.addEventListener('click', () => {
+                annotationSystem.goToAnnotation(anno.id);
+            });
+
+            chips.appendChild(chip);
+        });
+    }
+}
+
+// Load annotations from archive
+function loadAnnotationsFromArchive(annotations) {
+    if (!annotationSystem || !annotations || !Array.isArray(annotations)) return;
+
+    console.log('[main.js] Loading', annotations.length, 'annotations from archive');
+    annotationSystem.setAnnotations(annotations);
+    updateAnnotationsUI();
+}
+
+// ==================== Export/Archive Creation Functions ====================
+
+// Show export panel
+function showExportPanel() {
+    const panel = document.getElementById('export-panel');
+    if (panel) {
+        panel.classList.remove('hidden');
+
+        // Pre-fill from archive manifest if available
+        if (state.archiveManifest?.project) {
+            const proj = state.archiveManifest.project;
+            document.getElementById('export-title').value = proj.title || '';
+            document.getElementById('export-id').value = proj.id || '';
+            document.getElementById('export-description').value = proj.description || '';
+            document.getElementById('export-license').value = proj.license || 'CC0';
+        }
+    }
+}
+
+// Hide export panel
+function hideExportPanel() {
+    const panel = document.getElementById('export-panel');
+    if (panel) panel.classList.add('hidden');
+}
+
+// Download archive
+async function downloadArchive() {
+    if (!archiveCreator) return;
+
+    // Reset creator
+    archiveCreator.reset();
+
+    // Get form values
+    const title = document.getElementById('export-title')?.value || 'Untitled';
+    const id = document.getElementById('export-id')?.value || 'project-' + Date.now();
+    const description = document.getElementById('export-description')?.value || '';
+    const license = document.getElementById('export-license')?.value || 'CC0';
+    const formatRadio = document.querySelector('input[name="export-format"]:checked');
+    const format = formatRadio?.value || 'a3d';
+    const includePreview = document.getElementById('export-include-preview')?.checked || false;
+
+    // Set project info
+    archiveCreator.setProjectInfo({ title, id, license, description });
+
+    // Add splat if loaded
+    if (currentSplatBlob && state.splatLoaded) {
+        const fileName = document.getElementById('splat-filename')?.textContent || 'scene.ply';
+        const position = splatMesh ? [splatMesh.position.x, splatMesh.position.y, splatMesh.position.z] : [0, 0, 0];
+        const rotation = splatMesh ? [splatMesh.rotation.x, splatMesh.rotation.y, splatMesh.rotation.z] : [0, 0, 0];
+        const scale = splatMesh ? splatMesh.scale.x : 1;
+
+        archiveCreator.addScene(currentSplatBlob, fileName, { position, rotation, scale });
+    }
+
+    // Add mesh if loaded
+    if (currentMeshBlob && state.modelLoaded) {
+        const fileName = document.getElementById('model-filename')?.textContent || 'mesh.glb';
+        const position = modelGroup ? [modelGroup.position.x, modelGroup.position.y, modelGroup.position.z] : [0, 0, 0];
+        const rotation = modelGroup ? [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z] : [0, 0, 0];
+        const scale = modelGroup ? modelGroup.scale.x : 1;
+
+        archiveCreator.addMesh(currentMeshBlob, fileName, { position, rotation, scale });
+    }
+
+    // Add annotations
+    if (annotationSystem && annotationSystem.hasAnnotations()) {
+        archiveCreator.setAnnotations(annotationSystem.toJSON());
+    }
+
+    // Add preview/thumbnail
+    if (includePreview && renderer) {
+        try {
+            const canvas = renderer.domElement;
+            const previewBlob = await captureScreenshot(canvas, { width: 512, height: 512 });
+            if (previewBlob) {
+                archiveCreator.addThumbnail(previewBlob, 'preview.jpg');
+            }
+        } catch (e) {
+            console.warn('[main.js] Failed to capture preview:', e);
+        }
+    }
+
+    // Validate
+    const validation = archiveCreator.validate();
+    if (!validation.valid) {
+        alert('Cannot create archive:\n' + validation.errors.join('\n'));
+        return;
+    }
+
+    // Create and download
+    showLoading('Creating archive...');
+    try {
+        await archiveCreator.downloadArchive({
+            filename: id || 'archive',
+            format: format
+        });
+        hideLoading();
+        hideExportPanel();
+    } catch (e) {
+        hideLoading();
+        console.error('[main.js] Error creating archive:', e);
+        alert('Error creating archive: ' + e.message);
+    }
+}
+
+// ==================== End Annotation/Export Functions ====================
+
 async function handleSplatFile(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -1145,6 +1530,9 @@ async function handleSplatFile(event) {
         updateTransformInputs();
         storeLastPositions();
 
+        // Store blob for archive export
+        currentSplatBlob = file;
+
         // Update info - Spark doesn't expose count directly, show file name
         document.getElementById('splat-vertices').textContent = 'Loaded';
 
@@ -1152,6 +1540,9 @@ async function handleSplatFile(event) {
         if (state.modelLoaded) {
             setTimeout(() => autoAlignObjects(), 500);
         }
+
+        // Clear existing archive state since we're loading individual files
+        clearArchiveMetadata();
 
         hideLoading();
     } catch (error) {
@@ -1203,6 +1594,9 @@ async function handleModelFile(event) {
             updateTransformInputs();
             storeLastPositions();
 
+            // Store blob for archive export
+            currentMeshBlob = mainFile;
+
             // Count faces
             let faceCount = 0;
             loadedObject.traverse((child) => {
@@ -1221,6 +1615,9 @@ async function handleModelFile(event) {
             if (state.splatLoaded) {
                 setTimeout(() => autoAlignObjects(), 500);
             }
+
+            // Clear existing archive state since we're loading individual files
+            clearArchiveMetadata();
         }
 
         hideLoading();
@@ -2763,6 +3160,11 @@ function animate() {
         } else {
             // Normal view
             renderer.render(scene, camera);
+        }
+
+        // Update annotation marker positions
+        if (annotationSystem) {
+            annotationSystem.updateMarkerPositions();
         }
 
         updateFPS();

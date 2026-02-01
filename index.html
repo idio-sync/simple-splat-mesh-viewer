@@ -29,8 +29,84 @@
                     <line x1="17" y1="16" x2="23" y2="16"></line>
                 </svg>
             </button>
+            <div id="annotation-toolbar">
+                <button id="btn-annotate" class="toolbar-btn" title="Place Annotation (A)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                        <circle cx="12" cy="10" r="3"></circle>
+                    </svg>
+                </button>
+                <button id="btn-export-archive" class="toolbar-btn" title="Export Archive">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                </button>
+            </div>
             <div id="transform-hint" class="hidden">
                 <span id="hint-text">Click on splat or model to select</span>
+            </div>
+            <div id="annotation-mode-indicator" class="hidden">
+                Click on model to place annotation
+            </div>
+        </div>
+
+        <!-- Annotation markers container -->
+        <div id="annotation-markers"></div>
+
+        <!-- Annotation bar at bottom -->
+        <div id="annotation-bar" class="hidden">
+            <div id="annotation-chips"></div>
+        </div>
+
+        <!-- Annotation panel popup -->
+        <div id="annotation-panel" class="hidden">
+            <h3>New Annotation</h3>
+            <div class="coords-display">
+                Position: <span id="anno-pos-display">-</span>
+            </div>
+            <label for="anno-id">ID</label>
+            <input type="text" id="anno-id" placeholder="anno_1">
+            <label for="anno-title">Title</label>
+            <input type="text" id="anno-title" placeholder="Feature name">
+            <label for="anno-body">Description</label>
+            <textarea id="anno-body" placeholder="Describe this point of interest..."></textarea>
+            <div class="btn-group">
+                <button id="btn-anno-cancel" class="action-btn secondary">Cancel</button>
+                <button id="btn-anno-save" class="action-btn">Save</button>
+            </div>
+        </div>
+
+        <!-- Export archive panel popup -->
+        <div id="export-panel" class="hidden">
+            <h3>Export Archive</h3>
+            <label for="export-title">Title</label>
+            <input type="text" id="export-title" placeholder="My 3D Scene">
+            <label for="export-id">Project ID</label>
+            <input type="text" id="export-id" placeholder="project-id">
+            <label for="export-description">Description</label>
+            <textarea id="export-description" placeholder="Describe this archive..."></textarea>
+            <label for="export-license">License</label>
+            <select id="export-license">
+                <option value="CC0">CC0 Public Domain</option>
+                <option value="CC-BY 4.0">CC-BY 4.0</option>
+                <option value="CC-BY-SA 4.0">CC-BY-SA 4.0</option>
+                <option value="CC-BY-NC 4.0">CC-BY-NC 4.0</option>
+                <option value="All Rights Reserved">All Rights Reserved</option>
+            </select>
+            <label for="export-format">Format</label>
+            <div class="radio-group">
+                <label><input type="radio" name="export-format" value="a3d" checked> .a3d (Standard)</label>
+                <label><input type="radio" name="export-format" value="a3z"> .a3z (Compressed)</label>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="export-include-preview" checked>
+                <label for="export-include-preview">Include preview image</label>
+            </div>
+            <div class="btn-group">
+                <button id="btn-export-cancel" class="action-btn secondary">Cancel</button>
+                <button id="btn-export-download" class="action-btn">Download</button>
             </div>
         </div>
 
@@ -222,6 +298,35 @@
                         <p>Created: <span id="archive-created">-</span></p>
                         <div id="archive-entries-list"></div>
                     </div>
+                </div>
+            </div>
+
+            <div class="control-section collapsible collapsed" id="annotations-section">
+                <h3 class="collapsible-header">Annotations <span id="annotation-count-badge" class="count-badge hidden">0</span> <span class="collapse-icon">▶</span></h3>
+                <div class="collapsible-content">
+                    <div id="annotations-list"></div>
+                    <div class="button-row" style="margin-top: 10px;">
+                        <button id="btn-add-annotation" class="action-btn">Add Annotation</button>
+                    </div>
+                    <div id="selected-annotation-editor" class="hidden">
+                        <div class="subsection-header">Edit Selected</div>
+                        <input type="text" id="edit-anno-title" placeholder="Title">
+                        <textarea id="edit-anno-body" placeholder="Description" rows="2"></textarea>
+                        <div class="button-row">
+                            <button id="btn-update-anno-camera" class="action-btn small">Update Camera</button>
+                            <button id="btn-delete-anno" class="action-btn small secondary">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-section collapsible collapsed" id="creator-section">
+                <h3 class="collapsible-header">Create Archive <span class="collapse-icon">▶</span></h3>
+                <div class="collapsible-content">
+                    <p class="hint-text">Create an archive from currently loaded files with annotations.</p>
+                    <button id="btn-open-export" class="action-btn" style="width: 100%; margin-top: 10px;">
+                        Export as .a3d / .a3z
+                    </button>
                 </div>
             </div>
         </div>
