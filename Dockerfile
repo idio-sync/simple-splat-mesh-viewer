@@ -7,6 +7,8 @@ RUN apk add --no-cache gettext
 COPY index.html /usr/share/nginx/html/
 COPY main.js /usr/share/nginx/html/
 COPY archive-loader.js /usr/share/nginx/html/
+COPY annotation-system.js /usr/share/nginx/html/
+COPY archive-creator.js /usr/share/nginx/html/
 COPY styles.css /usr/share/nginx/html/
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
