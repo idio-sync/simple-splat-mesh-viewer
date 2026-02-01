@@ -47,6 +47,13 @@ export class ArchiveCreator {
                 license: "CC0",
                 description: ""
             },
+            provenance: {
+                capture_date: "",
+                capture_device: "",
+                operator: "",
+                location: "",
+                convention_hints: []
+            },
             data_entries: {},
             annotations: [],
             _meta: {}
@@ -71,6 +78,42 @@ export class ArchiveCreator {
         if (id !== undefined) this.manifest.project.id = id;
         if (license !== undefined) this.manifest.project.license = license;
         if (description !== undefined) this.manifest.project.description = description;
+    }
+
+    /**
+     * Set provenance information
+     * @param {Object} info - Provenance info
+     */
+    setProvenance({ captureDate, captureDevice, operator, location, conventions }) {
+        if (captureDate !== undefined) this.manifest.provenance.capture_date = captureDate;
+        if (captureDevice !== undefined) this.manifest.provenance.capture_device = captureDevice;
+        if (operator !== undefined) this.manifest.provenance.operator = operator;
+        if (location !== undefined) this.manifest.provenance.location = location;
+        if (conventions !== undefined) {
+            this.manifest.provenance.convention_hints = Array.isArray(conventions)
+                ? conventions
+                : conventions.split(',').map(c => c.trim()).filter(c => c);
+        }
+    }
+
+    /**
+     * Set custom fields in _meta
+     * @param {Object} customFields - Key-value pairs
+     */
+    setCustomFields(customFields) {
+        this.manifest._meta.custom_fields = { ...customFields };
+    }
+
+    /**
+     * Add a custom field
+     * @param {string} key - Field key
+     * @param {string} value - Field value
+     */
+    addCustomField(key, value) {
+        if (!this.manifest._meta.custom_fields) {
+            this.manifest._meta.custom_fields = {};
+        }
+        this.manifest._meta.custom_fields[key] = value;
     }
 
     /**
@@ -107,6 +150,7 @@ export class ArchiveCreator {
             file_name: archivePath,
             created_by: options.created_by || "unknown",
             _created_by_version: options.created_by_version || "",
+            _source_notes: options.source_notes || "",
             _parameters: {
                 position: options.position || [0, 0, 0],
                 rotation: options.rotation || [0, 0, 0],
@@ -116,6 +160,21 @@ export class ArchiveCreator {
         };
 
         return entryKey;
+    }
+
+    /**
+     * Update an existing scene entry's metadata
+     * @param {number} index - Scene index (0-based)
+     * @param {Object} metadata - Metadata to update
+     */
+    updateSceneMetadata(index, { createdBy, version, sourceNotes }) {
+        const entryKey = `scene_${index}`;
+        if (!this.manifest.data_entries[entryKey]) return false;
+
+        if (createdBy !== undefined) this.manifest.data_entries[entryKey].created_by = createdBy;
+        if (version !== undefined) this.manifest.data_entries[entryKey]._created_by_version = version;
+        if (sourceNotes !== undefined) this.manifest.data_entries[entryKey]._source_notes = sourceNotes;
+        return true;
     }
 
     /**
@@ -136,6 +195,7 @@ export class ArchiveCreator {
             file_name: archivePath,
             created_by: options.created_by || "unknown",
             _created_by_version: options.created_by_version || "",
+            _source_notes: options.source_notes || "",
             _parameters: {
                 position: options.position || [0, 0, 0],
                 rotation: options.rotation || [0, 0, 0],
@@ -145,6 +205,21 @@ export class ArchiveCreator {
         };
 
         return entryKey;
+    }
+
+    /**
+     * Update an existing mesh entry's metadata
+     * @param {number} index - Mesh index (0-based)
+     * @param {Object} metadata - Metadata to update
+     */
+    updateMeshMetadata(index, { createdBy, version, sourceNotes }) {
+        const entryKey = `mesh_${index}`;
+        if (!this.manifest.data_entries[entryKey]) return false;
+
+        if (createdBy !== undefined) this.manifest.data_entries[entryKey].created_by = createdBy;
+        if (version !== undefined) this.manifest.data_entries[entryKey]._created_by_version = version;
+        if (sourceNotes !== undefined) this.manifest.data_entries[entryKey]._source_notes = sourceNotes;
+        return true;
     }
 
     /**
@@ -178,6 +253,37 @@ export class ArchiveCreator {
     }
 
     /**
+     * Set quality statistics in _meta
+     * @param {Object} stats - Quality statistics
+     */
+    setQualityStats({ splatCount, meshPolys, meshVerts, splatFileSize, meshFileSize }) {
+        if (!this.manifest._meta.quality) {
+            this.manifest._meta.quality = {};
+        }
+        if (splatCount !== undefined) this.manifest._meta.quality.splat_count = splatCount;
+        if (meshPolys !== undefined) this.manifest._meta.quality.mesh_polygons = meshPolys;
+        if (meshVerts !== undefined) this.manifest._meta.quality.mesh_vertices = meshVerts;
+        if (splatFileSize !== undefined) this.manifest._meta.quality.splat_file_size = splatFileSize;
+        if (meshFileSize !== undefined) this.manifest._meta.quality.mesh_file_size = meshFileSize;
+    }
+
+    /**
+     * Get current quality stats from _meta
+     * @returns {Object} Quality stats
+     */
+    getQualityStats() {
+        return this.manifest._meta.quality || {};
+    }
+
+    /**
+     * Get integrity data (hashes)
+     * @returns {Object|null} Integrity data or null if not calculated
+     */
+    getIntegrity() {
+        return this.manifest.integrity || null;
+    }
+
+    /**
      * Set annotations
      * @param {Array} annotations - Array of annotation objects
      */
@@ -200,15 +306,18 @@ export class ArchiveCreator {
      * @param {Object} viewerState - State from the viewer
      */
     captureFromViewer(viewerState) {
-        const { splatBlob, splatFileName, splatTransform,
-                meshBlob, meshFileName, meshTransform,
-                annotations } = viewerState;
+        const { splatBlob, splatFileName, splatTransform, splatMetadata,
+                meshBlob, meshFileName, meshTransform, meshMetadata,
+                annotations, qualityStats } = viewerState;
 
         if (splatBlob && splatFileName) {
             this.addScene(splatBlob, splatFileName, {
                 position: splatTransform?.position || [0, 0, 0],
                 rotation: splatTransform?.rotation || [0, 0, 0],
-                scale: splatTransform?.scale || 1
+                scale: splatTransform?.scale || 1,
+                created_by: splatMetadata?.createdBy || "unknown",
+                created_by_version: splatMetadata?.version || "",
+                source_notes: splatMetadata?.sourceNotes || ""
             });
         }
 
@@ -216,13 +325,70 @@ export class ArchiveCreator {
             this.addMesh(meshBlob, meshFileName, {
                 position: meshTransform?.position || [0, 0, 0],
                 rotation: meshTransform?.rotation || [0, 0, 0],
-                scale: meshTransform?.scale || 1
+                scale: meshTransform?.scale || 1,
+                created_by: meshMetadata?.createdBy || "unknown",
+                created_by_version: meshMetadata?.version || "",
+                source_notes: meshMetadata?.sourceNotes || ""
             });
         }
 
         if (annotations && annotations.length > 0) {
             this.setAnnotations(annotations);
         }
+
+        if (qualityStats) {
+            this.setQualityStats(qualityStats);
+        }
+    }
+
+    /**
+     * Apply all metadata from a metadata panel form
+     * @param {Object} metadata - Collected metadata from form
+     */
+    applyMetadata(metadata) {
+        // Project info
+        if (metadata.project) {
+            this.setProjectInfo(metadata.project);
+        }
+
+        // Provenance
+        if (metadata.provenance) {
+            this.setProvenance(metadata.provenance);
+        }
+
+        // Asset metadata
+        if (metadata.splatMetadata) {
+            this.updateSceneMetadata(0, metadata.splatMetadata);
+        }
+        if (metadata.meshMetadata) {
+            this.updateMeshMetadata(0, metadata.meshMetadata);
+        }
+
+        // Custom fields
+        if (metadata.customFields && Object.keys(metadata.customFields).length > 0) {
+            this.setCustomFields(metadata.customFields);
+        }
+
+        // Quality stats
+        if (metadata.qualityStats) {
+            this.setQualityStats(metadata.qualityStats);
+        }
+    }
+
+    /**
+     * Get a summary of current metadata for display
+     * @returns {Object} Metadata summary
+     */
+    getMetadataSummary() {
+        return {
+            project: { ...this.manifest.project },
+            provenance: { ...this.manifest.provenance },
+            annotationCount: this.annotations.length,
+            fileCount: this.files.size,
+            hasIntegrity: !!this.manifest.integrity,
+            customFields: this.manifest._meta.custom_fields || {},
+            quality: this.manifest._meta.quality || {}
+        };
     }
 
     /**

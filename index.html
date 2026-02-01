@@ -81,20 +81,7 @@
         <!-- Export archive panel popup -->
         <div id="export-panel" class="hidden">
             <h3>Export Archive</h3>
-            <label for="export-title">Title</label>
-            <input type="text" id="export-title" placeholder="My 3D Scene">
-            <label for="export-id">Project ID</label>
-            <input type="text" id="export-id" placeholder="project-id">
-            <label for="export-description">Description</label>
-            <textarea id="export-description" placeholder="Describe this archive..."></textarea>
-            <label for="export-license">License</label>
-            <select id="export-license">
-                <option value="CC0">CC0 Public Domain</option>
-                <option value="CC-BY 4.0">CC-BY 4.0</option>
-                <option value="CC-BY-SA 4.0">CC-BY-SA 4.0</option>
-                <option value="CC-BY-NC 4.0">CC-BY-NC 4.0</option>
-                <option value="All Rights Reserved">All Rights Reserved</option>
-            </select>
+            <p class="hint-text" style="margin-bottom: 15px;">Configure metadata before exporting for a complete archive.</p>
             <label for="export-format">Format</label>
             <div class="radio-group">
                 <label><input type="radio" name="export-format" value="a3d" checked> .a3d (Standard)</label>
@@ -104,9 +91,192 @@
                 <input type="checkbox" id="export-include-preview" checked>
                 <label for="export-include-preview">Include preview image</label>
             </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="export-include-hashes" checked>
+                <label for="export-include-hashes">Include integrity hashes</label>
+            </div>
             <div class="btn-group">
                 <button id="btn-export-cancel" class="action-btn secondary">Cancel</button>
                 <button id="btn-export-download" class="action-btn">Download</button>
+            </div>
+        </div>
+
+        <!-- Metadata panel (slides out to the left of controls) -->
+        <div id="metadata-panel" class="hidden">
+            <div class="metadata-header">
+                <h3>Archive Metadata</h3>
+                <button id="btn-close-metadata" class="close-btn" title="Close">&times;</button>
+            </div>
+
+            <div class="metadata-tabs">
+                <button class="metadata-tab active" data-tab="project">Project</button>
+                <button class="metadata-tab" data-tab="assets">Assets</button>
+                <button class="metadata-tab" data-tab="quality">Quality</button>
+                <button class="metadata-tab" data-tab="provenance">Provenance</button>
+                <button class="metadata-tab" data-tab="integrity">Integrity</button>
+            </div>
+
+            <!-- Project Tab -->
+            <div class="metadata-tab-content active" id="tab-project">
+                <div class="metadata-field">
+                    <label for="meta-title">Title <span class="required">*</span></label>
+                    <input type="text" id="meta-title" placeholder="My 3D Scene">
+                </div>
+                <div class="metadata-field">
+                    <label for="meta-id">Project ID</label>
+                    <input type="text" id="meta-id" placeholder="my-3d-scene">
+                    <span class="field-hint">Auto-generated from title if empty</span>
+                </div>
+                <div class="metadata-field">
+                    <label for="meta-description">Description</label>
+                    <textarea id="meta-description" rows="3" placeholder="Describe this 3D scene..."></textarea>
+                </div>
+                <div class="metadata-field">
+                    <label for="meta-license">License</label>
+                    <select id="meta-license">
+                        <option value="CC0">CC0 Public Domain</option>
+                        <option value="CC-BY 4.0">CC-BY 4.0</option>
+                        <option value="CC-BY-SA 4.0">CC-BY-SA 4.0</option>
+                        <option value="CC-BY-NC 4.0">CC-BY-NC 4.0</option>
+                        <option value="MIT">MIT License</option>
+                        <option value="All Rights Reserved">All Rights Reserved</option>
+                        <option value="custom">Custom...</option>
+                    </select>
+                </div>
+                <div class="metadata-field hidden" id="custom-license-field">
+                    <label for="meta-custom-license">Custom License</label>
+                    <input type="text" id="meta-custom-license" placeholder="Enter custom license">
+                </div>
+            </div>
+
+            <!-- Assets Tab -->
+            <div class="metadata-tab-content" id="tab-assets">
+                <div class="asset-section" id="splat-asset-section">
+                    <h4>Scene (Gaussian Splat)</h4>
+                    <div class="asset-status" id="splat-asset-status">No splat loaded</div>
+                    <div class="asset-fields hidden" id="splat-asset-fields">
+                        <div class="metadata-field">
+                            <label for="meta-splat-created-by">Created By</label>
+                            <input type="text" id="meta-splat-created-by" placeholder="e.g., nerfstudio, 3DGS">
+                        </div>
+                        <div class="metadata-field">
+                            <label for="meta-splat-version">Tool Version</label>
+                            <input type="text" id="meta-splat-version" placeholder="e.g., 0.3.4">
+                        </div>
+                        <div class="metadata-field">
+                            <label for="meta-splat-notes">Source Notes</label>
+                            <textarea id="meta-splat-notes" rows="2" placeholder="Additional notes about this asset..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="asset-section" id="mesh-asset-section">
+                    <h4>Mesh (3D Model)</h4>
+                    <div class="asset-status" id="mesh-asset-status">No mesh loaded</div>
+                    <div class="asset-fields hidden" id="mesh-asset-fields">
+                        <div class="metadata-field">
+                            <label for="meta-mesh-created-by">Created By</label>
+                            <input type="text" id="meta-mesh-created-by" placeholder="e.g., Blender, Reality Capture">
+                        </div>
+                        <div class="metadata-field">
+                            <label for="meta-mesh-version">Tool Version</label>
+                            <input type="text" id="meta-mesh-version" placeholder="e.g., 3.4.0">
+                        </div>
+                        <div class="metadata-field">
+                            <label for="meta-mesh-notes">Source Notes</label>
+                            <textarea id="meta-mesh-notes" rows="2" placeholder="Additional notes about this asset..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quality Tab -->
+            <div class="metadata-tab-content" id="tab-quality">
+                <div class="quality-stats">
+                    <div class="stat-row">
+                        <span class="stat-label">Splat Count</span>
+                        <span class="stat-value" id="meta-splat-count">-</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Mesh Polygons</span>
+                        <span class="stat-value" id="meta-mesh-polys">-</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Mesh Vertices</span>
+                        <span class="stat-value" id="meta-mesh-verts">-</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Annotation Count</span>
+                        <span class="stat-value" id="meta-anno-count">0</span>
+                    </div>
+                </div>
+                <div class="subsection-header">File Sizes</div>
+                <div class="quality-stats">
+                    <div class="stat-row">
+                        <span class="stat-label">Splat File</span>
+                        <span class="stat-value" id="meta-splat-size">-</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Mesh File</span>
+                        <span class="stat-value" id="meta-mesh-size">-</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Est. Archive Size</span>
+                        <span class="stat-value" id="meta-archive-size">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Provenance Tab -->
+            <div class="metadata-tab-content" id="tab-provenance">
+                <div class="metadata-field">
+                    <label for="meta-capture-date">Capture Date</label>
+                    <input type="date" id="meta-capture-date">
+                </div>
+                <div class="metadata-field">
+                    <label for="meta-capture-device">Capture Device</label>
+                    <input type="text" id="meta-capture-device" placeholder="e.g., iPhone 15 Pro, Faro Focus">
+                </div>
+                <div class="metadata-field">
+                    <label for="meta-operator">Operator / Creator</label>
+                    <input type="text" id="meta-operator" placeholder="Name or organization">
+                </div>
+                <div class="metadata-field">
+                    <label for="meta-location">Location</label>
+                    <input type="text" id="meta-location" placeholder="Where the capture was made">
+                </div>
+                <div class="subsection-header">Convention Hints</div>
+                <div class="metadata-field">
+                    <label for="meta-conventions">References</label>
+                    <input type="text" id="meta-conventions" placeholder="e.g., arxiv:2312.13299">
+                    <span class="field-hint">Comma-separated list of convention references</span>
+                </div>
+                <div class="subsection-header">Custom Fields</div>
+                <div id="custom-fields-list"></div>
+                <button id="btn-add-custom-field" class="action-btn secondary" style="width: 100%; margin-top: 10px;">
+                    + Add Custom Field
+                </button>
+            </div>
+
+            <!-- Integrity Tab -->
+            <div class="metadata-tab-content" id="tab-integrity">
+                <div class="integrity-info">
+                    <div class="stat-row">
+                        <span class="stat-label">Hash Algorithm</span>
+                        <span class="stat-value">SHA-256</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Manifest Hash</span>
+                        <span class="stat-value hash-preview" id="meta-manifest-hash">Calculated on export</span>
+                    </div>
+                </div>
+                <div class="subsection-header">Asset Hashes</div>
+                <div id="asset-hashes-list" class="hash-list">
+                    <p class="hash-placeholder">Hashes will be calculated when you export the archive.</p>
+                </div>
+                <div class="checkbox-group" style="margin-top: 15px;">
+                    <input type="checkbox" id="meta-include-integrity" checked>
+                    <label for="meta-include-integrity">Include integrity data in manifest</label>
+                </div>
             </div>
         </div>
 
@@ -324,7 +494,10 @@
                 <h3 class="collapsible-header">Create Archive <span class="collapse-icon">▶</span></h3>
                 <div class="collapsible-content">
                     <p class="hint-text">Create an archive from currently loaded files with annotations.</p>
-                    <button id="btn-open-export" class="action-btn" style="width: 100%; margin-top: 10px;">
+                    <button id="btn-open-metadata" class="action-btn" style="width: 100%; margin-top: 10px;">
+                        Enter Metadata
+                    </button>
+                    <button id="btn-open-export" class="action-btn" style="width: 100%; margin-top: 8px;">
                         Export as .a3d / .a3z
                     </button>
                 </div>
