@@ -1409,45 +1409,59 @@ function hideExportPanel() {
 
 // Download archive
 async function downloadArchive() {
-    if (!archiveCreator) return;
+    console.log('[main.js] downloadArchive called');
+    if (!archiveCreator) {
+        console.error('[main.js] archiveCreator is null');
+        return;
+    }
 
     // Reset creator
+    console.log('[main.js] Resetting archive creator');
     archiveCreator.reset();
 
     // Get metadata from metadata panel
+    console.log('[main.js] Collecting metadata');
     const metadata = collectMetadata();
+    console.log('[main.js] Metadata collected:', metadata);
 
     // Get export options
     const formatRadio = document.querySelector('input[name="export-format"]:checked');
     const format = formatRadio?.value || 'a3d';
     const includePreview = document.getElementById('export-include-preview')?.checked ?? true;
     const includeHashes = document.getElementById('export-include-hashes')?.checked ?? true;
+    console.log('[main.js] Export options:', { format, includePreview, includeHashes });
 
     // Validate title is set
     if (!metadata.project.title) {
+        console.log('[main.js] No title set, showing metadata panel');
         alert('Please enter a project title in the metadata panel before exporting.');
         showMetadataPanel();
         return;
     }
 
     // Apply project info
+    console.log('[main.js] Setting project info');
     archiveCreator.setProjectInfo(metadata.project);
 
     // Apply provenance
+    console.log('[main.js] Setting provenance');
     archiveCreator.setProvenance(metadata.provenance);
 
     // Apply custom fields
     if (Object.keys(metadata.customFields).length > 0) {
+        console.log('[main.js] Setting custom fields');
         archiveCreator.setCustomFields(metadata.customFields);
     }
 
     // Add splat if loaded
+    console.log('[main.js] Checking splat:', { currentSplatBlob: !!currentSplatBlob, splatLoaded: state.splatLoaded });
     if (currentSplatBlob && state.splatLoaded) {
         const fileName = document.getElementById('splat-filename')?.textContent || 'scene.ply';
         const position = splatMesh ? [splatMesh.position.x, splatMesh.position.y, splatMesh.position.z] : [0, 0, 0];
         const rotation = splatMesh ? [splatMesh.rotation.x, splatMesh.rotation.y, splatMesh.rotation.z] : [0, 0, 0];
         const scale = splatMesh ? splatMesh.scale.x : 1;
 
+        console.log('[main.js] Adding scene:', { fileName, position, rotation, scale });
         archiveCreator.addScene(currentSplatBlob, fileName, {
             position, rotation, scale,
             created_by: metadata.splatMetadata.createdBy || 'unknown',
@@ -1457,12 +1471,14 @@ async function downloadArchive() {
     }
 
     // Add mesh if loaded
+    console.log('[main.js] Checking mesh:', { currentMeshBlob: !!currentMeshBlob, modelLoaded: state.modelLoaded });
     if (currentMeshBlob && state.modelLoaded) {
         const fileName = document.getElementById('model-filename')?.textContent || 'mesh.glb';
         const position = modelGroup ? [modelGroup.position.x, modelGroup.position.y, modelGroup.position.z] : [0, 0, 0];
         const rotation = modelGroup ? [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z] : [0, 0, 0];
         const scale = modelGroup ? modelGroup.scale.x : 1;
 
+        console.log('[main.js] Adding mesh:', { fileName, position, rotation, scale });
         archiveCreator.addMesh(currentMeshBlob, fileName, {
             position, rotation, scale,
             created_by: metadata.meshMetadata.createdBy || 'unknown',
@@ -1473,10 +1489,12 @@ async function downloadArchive() {
 
     // Add annotations
     if (annotationSystem && annotationSystem.hasAnnotations()) {
+        console.log('[main.js] Adding annotations');
         archiveCreator.setAnnotations(annotationSystem.toJSON());
     }
 
     // Set quality stats
+    console.log('[main.js] Setting quality stats');
     archiveCreator.setQualityStats({
         splatCount: state.splatLoaded ? parseInt(document.getElementById('splat-vertices')?.textContent) || 0 : 0,
         meshPolys: state.modelLoaded ? parseInt(document.getElementById('model-faces')?.textContent) || 0 : 0,
@@ -1487,10 +1505,12 @@ async function downloadArchive() {
 
     // Add preview/thumbnail
     if (includePreview && renderer) {
+        console.log('[main.js] Capturing preview screenshot');
         try {
             const canvas = renderer.domElement;
             const previewBlob = await captureScreenshot(canvas, { width: 512, height: 512 });
             if (previewBlob) {
+                console.log('[main.js] Preview captured, adding thumbnail');
                 archiveCreator.addThumbnail(previewBlob, 'preview.jpg');
             }
         } catch (e) {
@@ -1499,20 +1519,25 @@ async function downloadArchive() {
     }
 
     // Validate
+    console.log('[main.js] Validating archive');
     const validation = archiveCreator.validate();
+    console.log('[main.js] Validation result:', validation);
     if (!validation.valid) {
         alert('Cannot create archive:\n' + validation.errors.join('\n'));
         return;
     }
 
     // Create and download
+    console.log('[main.js] Starting archive creation');
     showLoading('Creating archive...');
     try {
+        console.log('[main.js] Calling archiveCreator.downloadArchive');
         await archiveCreator.downloadArchive({
             filename: metadata.project.id || 'archive',
             format: format,
             includeHashes: includeHashes
         });
+        console.log('[main.js] Archive download complete');
         hideLoading();
         hideExportPanel();
     } catch (e) {

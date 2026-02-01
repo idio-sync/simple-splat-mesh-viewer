@@ -396,13 +396,17 @@ export class ArchiveCreator {
      * @returns {Promise<Object>} Hash mapping
      */
     async calculateHashes() {
+        console.log('[archive-creator] calculateHashes started, files:', this.files.size);
         const hashes = {};
 
         for (const [path, { blob }] of this.files.entries()) {
+            console.log('[archive-creator] Hashing file:', path, 'size:', blob.size);
             hashes[path] = await calculateSHA256(blob);
+            console.log('[archive-creator] Hash complete for:', path);
         }
 
         // Calculate manifest hash from all asset hashes
+        console.log('[archive-creator] Calculating manifest hash');
         const allHashes = Object.values(hashes).sort().join('');
         const manifestHash = await calculateSHA256(new TextEncoder().encode(allHashes));
 
@@ -412,6 +416,7 @@ export class ArchiveCreator {
             assets: hashes
         };
 
+        console.log('[archive-creator] All hashes calculated');
         return hashes;
     }
 
@@ -440,43 +445,55 @@ export class ArchiveCreator {
      * @returns {Promise<Blob>} The archive blob
      */
     async createArchive(options = {}) {
+        console.log('[archive-creator] createArchive called with options:', options);
         const {
             format = 'a3d',
             includeHashes = true,
             compression = format === 'a3z' ? 'DEFLATE' : 'STORE'
         } = options;
 
+        console.log('[archive-creator] Using compression:', compression);
+
         // Calculate hashes if requested
         if (includeHashes) {
+            console.log('[archive-creator] Calculating hashes...');
             await this.calculateHashes();
+            console.log('[archive-creator] Hashes calculated');
         }
 
+        console.log('[archive-creator] Creating JSZip instance');
         const zip = new JSZip();
 
         // Add manifest
+        console.log('[archive-creator] Generating manifest');
         const manifestJson = this.generateManifest();
+        console.log('[archive-creator] Adding manifest to zip');
         zip.file('manifest.json', manifestJson, {
             compression: 'DEFLATE'
         });
 
         // Add all files
+        console.log('[archive-creator] Adding files, count:', this.files.size);
         for (const [path, { blob }] of this.files.entries()) {
             // Use STORE for already-compressed formats, DEFLATE for others
             const ext = path.split('.').pop().toLowerCase();
             const alreadyCompressed = ['glb', 'spz', 'sog', 'jpg', 'jpeg', 'png', 'webp'].includes(ext);
 
+            console.log('[archive-creator] Adding file:', path, 'size:', blob.size, 'compression:', alreadyCompressed ? 'STORE' : compression);
             zip.file(path, blob, {
                 compression: alreadyCompressed ? 'STORE' : compression
             });
         }
 
         // Generate the archive
+        console.log('[archive-creator] Generating zip archive...');
         const archiveBlob = await zip.generateAsync({
             type: 'blob',
             compression: compression,
             compressionOptions: compression === 'DEFLATE' ? { level: 6 } : undefined
         });
 
+        console.log('[archive-creator] Archive generated, size:', archiveBlob.size);
         return archiveBlob;
     }
 
@@ -485,23 +502,30 @@ export class ArchiveCreator {
      * @param {Object} options - Creation options plus filename
      */
     async downloadArchive(options = {}) {
+        console.log('[archive-creator] downloadArchive called with options:', options);
         const {
             filename = 'archive',
             format = 'a3d',
             ...createOptions
         } = options;
 
+        console.log('[archive-creator] Creating archive blob...');
         const blob = await this.createArchive({ format, ...createOptions });
+        console.log('[archive-creator] Archive blob created, size:', blob.size);
+
         const url = URL.createObjectURL(blob);
+        console.log('[archive-creator] Blob URL created:', url);
 
         const a = document.createElement('a');
         a.href = url;
         a.download = `${filename}.${format}`;
         document.body.appendChild(a);
+        console.log('[archive-creator] Triggering download:', a.download);
         a.click();
         document.body.removeChild(a);
 
         URL.revokeObjectURL(url);
+        console.log('[archive-creator] Download triggered, URL revoked');
     }
 
     /**
