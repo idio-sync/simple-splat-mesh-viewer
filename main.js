@@ -9,6 +9,7 @@ import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader, isArchiveFile } from './archive-loader.js';
 import { AnnotationSystem } from './annotation-system.js';
 import { ArchiveCreator, captureScreenshot } from './archive-creator.js';
+import { CAMERA, ORBIT_CONTROLS, RENDERER, LIGHTING, GRID, COLORS, TIMING, MATERIAL } from './constants.js';
 
 // Mark module as loaded (for pre-module error detection)
 window.moduleLoaded = true;
@@ -184,16 +185,16 @@ function init() {
 
     // Scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a1a2e);
+    scene.background = new THREE.Color(COLORS.SCENE_BACKGROUND);
 
     // Camera
     camera = new THREE.PerspectiveCamera(
-        60,
+        CAMERA.FOV,
         canvas.clientWidth / canvas.clientHeight,
-        0.1,
-        1000
+        CAMERA.NEAR,
+        CAMERA.FAR
     );
-    camera.position.set(0, 1, 3);
+    camera.position.set(CAMERA.INITIAL_POSITION.x, CAMERA.INITIAL_POSITION.y, CAMERA.INITIAL_POSITION.z);
 
     // Renderer - Main (left in split mode)
     renderer = new THREE.WebGLRenderer({
@@ -201,7 +202,7 @@ function init() {
         antialias: true
     });
     renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, RENDERER.MAX_PIXEL_RATIO));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     // Renderer - Right (for split view)
@@ -209,26 +210,26 @@ function init() {
         canvas: canvasRight,
         antialias: true
     });
-    rendererRight.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    rendererRight.setPixelRatio(Math.min(window.devicePixelRatio, RENDERER.MAX_PIXEL_RATIO));
     rendererRight.outputColorSpace = THREE.SRGBColorSpace;
 
     // Orbit Controls - Main
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
+    controls.dampingFactor = ORBIT_CONTROLS.DAMPING_FACTOR;
     controls.screenSpacePanning = true;
-    controls.minDistance = 0.1;
-    controls.maxDistance = 100;
+    controls.minDistance = ORBIT_CONTROLS.MIN_DISTANCE;
+    controls.maxDistance = ORBIT_CONTROLS.MAX_DISTANCE;
 
     // Orbit Controls - Right (synced with main)
     // Note: Both controls share the same camera, so they naturally stay in sync
     // We just need both to be able to receive input
     controlsRight = new OrbitControls(camera, rendererRight.domElement);
     controlsRight.enableDamping = true;
-    controlsRight.dampingFactor = 0.05;
+    controlsRight.dampingFactor = ORBIT_CONTROLS.DAMPING_FACTOR;
     controlsRight.screenSpacePanning = true;
-    controlsRight.minDistance = 0.1;
-    controlsRight.maxDistance = 100;
+    controlsRight.minDistance = ORBIT_CONTROLS.MIN_DISTANCE;
+    controlsRight.maxDistance = ORBIT_CONTROLS.MAX_DISTANCE;
 
     // Transform Controls
     transformControls = new TransformControls(camera, renderer.domElement);
@@ -262,19 +263,31 @@ function init() {
     }
 
     // Lighting - Enhanced for better mesh visibility
-    ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    ambientLight = new THREE.AmbientLight(LIGHTING.AMBIENT.COLOR, LIGHTING.AMBIENT.INTENSITY);
     scene.add(ambientLight);
 
     // Hemisphere light for better color graduation
-    hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+    hemisphereLight = new THREE.HemisphereLight(
+        LIGHTING.HEMISPHERE.SKY_COLOR,
+        LIGHTING.HEMISPHERE.GROUND_COLOR,
+        LIGHTING.HEMISPHERE.INTENSITY
+    );
     scene.add(hemisphereLight);
 
-    directionalLight1 = new THREE.DirectionalLight(0xffffff, 1.5);
-    directionalLight1.position.set(5, 5, 5);
+    directionalLight1 = new THREE.DirectionalLight(LIGHTING.DIRECTIONAL_1.COLOR, LIGHTING.DIRECTIONAL_1.INTENSITY);
+    directionalLight1.position.set(
+        LIGHTING.DIRECTIONAL_1.POSITION.x,
+        LIGHTING.DIRECTIONAL_1.POSITION.y,
+        LIGHTING.DIRECTIONAL_1.POSITION.z
+    );
     scene.add(directionalLight1);
 
-    directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
-    directionalLight2.position.set(-5, 3, -5);
+    directionalLight2 = new THREE.DirectionalLight(LIGHTING.DIRECTIONAL_2.COLOR, LIGHTING.DIRECTIONAL_2.INTENSITY);
+    directionalLight2.position.set(
+        LIGHTING.DIRECTIONAL_2.POSITION.x,
+        LIGHTING.DIRECTIONAL_2.POSITION.y,
+        LIGHTING.DIRECTIONAL_2.POSITION.z
+    );
     scene.add(directionalLight2);
 
     // Grid helper - not shown by default, controlled by toggle
@@ -669,9 +682,9 @@ function setDisplayMode(mode) {
 // Toggle gridlines visibility
 function toggleGridlines(show) {
     if (show && !gridHelper) {
-        // Create grid - 20 units, 20 divisions
-        gridHelper = new THREE.GridHelper(20, 20, 0x4a4a6a, 0x2a2a3a);
-        gridHelper.position.y = -0.01; // Slightly below origin to avoid z-fighting
+        // Create grid using constants
+        gridHelper = new THREE.GridHelper(GRID.SIZE, GRID.DIVISIONS, GRID.COLOR_PRIMARY, GRID.COLOR_SECONDARY);
+        gridHelper.position.y = GRID.Y_OFFSET; // Slightly below origin to avoid z-fighting
         scene.add(gridHelper);
     } else if (!show && gridHelper) {
         scene.remove(gridHelper);
@@ -1164,7 +1177,7 @@ async function loadSplatFromBlobUrl(blobUrl, fileName) {
     }
 
     // Wait for initialization
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, TIMING.SPLAT_LOAD_DELAY));
 
     try {
         scene.add(splatMesh);
@@ -1245,7 +1258,7 @@ function loadGLTFFromBlobUrl(blobUrl) {
                             if (mat.isMeshBasicMaterial || mat.isLineBasicMaterial || mat.isPointsMaterial) {
                                 const oldMaterial = mat;
                                 child.material = new THREE.MeshStandardMaterial({
-                                    color: oldMaterial.color || new THREE.Color(0x888888),
+                                    color: oldMaterial.color || new THREE.Color(COLORS.DEFAULT_MATERIAL),
                                     map: oldMaterial.map,
                                     alphaMap: oldMaterial.alphaMap,
                                     transparent: oldMaterial.transparent || false,
@@ -1285,7 +1298,7 @@ function loadOBJFromBlobUrl(blobUrl) {
                         }
 
                         child.material = new THREE.MeshStandardMaterial({
-                            color: 0x888888,
+                            color: COLORS.DEFAULT_MATERIAL,
                             metalness: 0.1,
                             roughness: 0.8
                         });
@@ -2631,7 +2644,7 @@ async function handleSplatFile(event) {
 
         // Brief delay to allow SplatMesh initialization
         // Note: Spark library doesn't expose a ready callback, so we use a short delay
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, TIMING.SPLAT_LOAD_DELAY));
 
         try {
             scene.add(splatMesh);
@@ -2642,7 +2655,7 @@ async function handleSplatFile(event) {
         }
 
         // Clean up URL after a delay
-        setTimeout(() => URL.revokeObjectURL(fileUrl), 5000);
+        setTimeout(() => URL.revokeObjectURL(fileUrl), TIMING.BLOB_REVOKE_DELAY);
 
         state.splatLoaded = true;
         state.currentSplatUrl = null; // Local files cannot be shared
@@ -2665,7 +2678,7 @@ async function handleSplatFile(event) {
 
         // Auto-align if model is already loaded (wait for splat to fully initialize)
         if (state.modelLoaded) {
-            setTimeout(() => autoAlignObjects(), 500);
+            setTimeout(() => autoAlignObjects(), TIMING.AUTO_ALIGN_DELAY);
         }
 
         // Clear existing archive state since we're loading individual files
@@ -2747,7 +2760,7 @@ async function handleModelFile(event) {
 
             // Auto-align if splat is already loaded
             if (state.splatLoaded) {
-                setTimeout(() => autoAlignObjects(), 500);
+                setTimeout(() => autoAlignObjects(), TIMING.AUTO_ALIGN_DELAY);
             }
 
             // Clear existing archive state since we're loading individual files
@@ -2799,7 +2812,7 @@ function loadGLTF(file) {
                             if (mat.isMeshBasicMaterial || mat.isLineBasicMaterial || mat.isPointsMaterial) {
                                 const oldMaterial = mat;
                                 child.material = new THREE.MeshStandardMaterial({
-                                    color: oldMaterial.color || new THREE.Color(0x888888),
+                                    color: oldMaterial.color || new THREE.Color(COLORS.DEFAULT_MATERIAL),
                                     map: oldMaterial.map,
                                     alphaMap: oldMaterial.alphaMap,
                                     transparent: oldMaterial.transparent || false,
@@ -2858,7 +2871,7 @@ function loadOBJ(objFile, mtlFile) {
                                     // Convert to MeshStandardMaterial for consistent PBR lighting
                                     if (child.material) {
                                         const oldMaterial = child.material;
-                                        const color = oldMaterial.color?.clone() || new THREE.Color(0x888888);
+                                        const color = oldMaterial.color?.clone() || new THREE.Color(COLORS.DEFAULT_MATERIAL);
                                         const map = oldMaterial.map || null;
 
                                         child.material = new THREE.MeshStandardMaterial({
@@ -2910,7 +2923,7 @@ function loadOBJWithoutMaterials(loader, url, resolve, reject) {
                     }
 
                     child.material = new THREE.MeshStandardMaterial({
-                        color: 0x888888,
+                        color: COLORS.DEFAULT_MATERIAL,
                         metalness: 0.1,
                         roughness: 0.8
                     });
@@ -3401,7 +3414,7 @@ async function loadDefaultFiles() {
     // 3. Auto-align (fallback)
     if (state.splatLoaded || state.modelLoaded) {
         // Wait a moment for objects to fully initialize
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, TIMING.URL_MODEL_LOAD_DELAY));
 
         if (config.inlineAlignment) {
             // Apply inline alignment from URL params
@@ -3468,7 +3481,7 @@ async function loadSplatFromUrl(url) {
         }
 
         // Wait a moment for initialization
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, TIMING.SPLAT_LOAD_DELAY));
 
         try {
             scene.add(splatMesh);
@@ -3596,7 +3609,7 @@ function loadGLTFFromUrl(url) {
                             if (mat.isMeshBasicMaterial || mat.isLineBasicMaterial || mat.isPointsMaterial) {
                                 const oldMaterial = mat;
                                 child.material = new THREE.MeshStandardMaterial({
-                                    color: oldMaterial.color || new THREE.Color(0x888888),
+                                    color: oldMaterial.color || new THREE.Color(COLORS.DEFAULT_MATERIAL),
                                     map: oldMaterial.map,
                                     alphaMap: oldMaterial.alphaMap,
                                     transparent: oldMaterial.transparent || false,
@@ -3634,7 +3647,7 @@ function loadOBJFromUrl(url) {
 
                         // Convert any material to MeshStandardMaterial for consistent lighting
                         const oldMaterial = child.material;
-                        const color = oldMaterial?.color?.clone() || new THREE.Color(0x888888);
+                        const color = oldMaterial?.color?.clone() || new THREE.Color(COLORS.DEFAULT_MATERIAL);
                         const map = oldMaterial?.map || null;
 
                         child.material = new THREE.MeshStandardMaterial({

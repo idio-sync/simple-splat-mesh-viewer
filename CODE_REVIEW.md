@@ -139,37 +139,32 @@ controlsPanel.style.pointerEvents = 'auto';
 }
 ```
 
-### 2.2 Magic Numbers and Strings (MEDIUM Priority)
+### ~~2.2 Magic Numbers and Strings (MEDIUM Priority)~~ ✅ FIXED
 
-**Issue:** Hardcoded values scattered throughout the code.
+> **Status:** Resolved on 2026-02-04
+>
+> **Fix implemented in:**
+> - `constants.js` - New module with organized configuration categories
+> - `main.js` - Updated to import and use constants
+>
+> **Constants categories created:**
+> - `CAMERA` - FOV, clipping planes, initial position
+> - `ORBIT_CONTROLS` - Damping, distance limits
+> - `RENDERER` - Pixel ratio limits
+> - `LIGHTING` - Ambient, hemisphere, directional light configs
+> - `GRID` - Size, divisions, colors
+> - `COLORS` - Scene background, default material color
+> - `TIMING` - Load delays, cleanup delays
+> - `MATERIAL` - Default material properties
 
-**Location:** Multiple files
+~~**Issue:** Hardcoded values scattered throughout the code.~~
 
 ```javascript
-// main.js:111-116
+// OLD:
 camera = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
-camera.position.set(0, 1, 3);
 
-// main.js:594
-gridHelper = new THREE.GridHelper(20, 20, 0x4a4a6a, 0x2a2a3a);
-```
-
-**Recommendation:** Create a constants/config module:
-```javascript
-// constants.js
-export const CAMERA = {
-    FOV: 60,
-    NEAR: 0.1,
-    FAR: 1000,
-    INITIAL_POSITION: { x: 0, y: 1, z: 3 }
-};
-
-export const GRID = {
-    SIZE: 20,
-    DIVISIONS: 20,
-    COLOR_PRIMARY: 0x4a4a6a,
-    COLOR_SECONDARY: 0x2a2a3a
-};
+// NEW:
+camera = new THREE.PerspectiveCamera(CAMERA.FOV, ..., CAMERA.NEAR, CAMERA.FAR);
 ```
 
 ### 2.3 Inconsistent Error Handling (MEDIUM Priority)
@@ -442,7 +437,7 @@ if (!CRYPTO_AVAILABLE) {
 ### Short-term (Next Sprint):
 
 1. **Implement centralized error handling** with user-friendly messages
-2. **Create a constants module** for magic values
+2. ~~**Create a constants module** for magic values~~ ✅ DONE
 3. **Extract duplicate code** into utility functions
 4. **Add file size limits** for uploaded/downloaded files
 
