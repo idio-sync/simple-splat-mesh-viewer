@@ -11,14 +11,22 @@ for (let i = 0; i < 256; i++) {
     HEX_TABLE[i] = HEX_CHARS[i >> 4] + HEX_CHARS[i & 0x0f];
 }
 
+// Check if Web Crypto API is available (requires secure context)
+const CRYPTO_AVAILABLE = typeof crypto !== 'undefined' && crypto.subtle;
+
 /**
  * Calculate SHA-256 hash of a Blob or ArrayBuffer
  * Uses streaming for large blobs to reduce memory pressure
  * @param {Blob|ArrayBuffer} data - The data to hash
  * @param {Function} onProgress - Optional progress callback
- * @returns {Promise<string>} Hex string of hash
+ * @returns {Promise<string>} Hex string of hash, or null if crypto unavailable
  */
 async function calculateSHA256(data, onProgress = null) {
+    if (!CRYPTO_AVAILABLE) {
+        console.warn('[archive-creator] crypto.subtle not available (requires HTTPS). Skipping hash.');
+        return null;
+    }
+
     let buffer;
     if (data instanceof Blob) {
         // For large blobs, read in chunks to reduce memory pressure
@@ -47,6 +55,11 @@ async function calculateSHA256(data, onProgress = null) {
  * This reduces peak memory usage
  */
 async function calculateSHA256Streaming(blob, onProgress = null) {
+    if (!CRYPTO_AVAILABLE) {
+        console.warn('[archive-creator] crypto.subtle not available (requires HTTPS). Skipping hash.');
+        return null;
+    }
+
     const CHUNK_SIZE = 4 * 1024 * 1024; // 4MB chunks
     const totalSize = blob.size;
     let processedSize = 0;
@@ -151,16 +164,21 @@ export class ArchiveCreator {
      * Pre-compute and cache a hash for a blob
      * Call this when loading files to speed up later export
      * @param {Blob} blob - The blob to hash
-     * @returns {Promise<string>} The hash
+     * @returns {Promise<string|null>} The hash, or null if crypto unavailable
      */
     async precomputeHash(blob) {
+        if (!CRYPTO_AVAILABLE) {
+            return null;
+        }
         if (this.hashCache.has(blob)) {
             return this.hashCache.get(blob);
         }
         console.log('[archive-creator] Pre-computing hash for blob, size:', blob.size);
         const hash = await calculateSHA256(blob);
-        this.hashCache.set(blob, hash);
-        console.log('[archive-creator] Hash pre-computed and cached');
+        if (hash) {
+            this.hashCache.set(blob, hash);
+            console.log('[archive-creator] Hash pre-computed and cached');
+        }
         return hash;
     }
 
@@ -499,10 +517,17 @@ export class ArchiveCreator {
      * Calculate integrity hashes for all files
      * Runs hashes in parallel for better performance
      * @param {Function} onProgress - Optional progress callback
-     * @returns {Promise<Object>} Hash mapping
+     * @returns {Promise<Object|null>} Hash mapping, or null if crypto unavailable
      */
     async calculateHashes(onProgress = null) {
         console.log('[archive-creator] calculateHashes started, files:', this.files.size);
+
+        // Check if crypto is available
+        if (!CRYPTO_AVAILABLE) {
+            console.warn('[archive-creator] crypto.subtle not available - skipping integrity hashes');
+            console.warn('[archive-creator] Archive will be created without integrity verification');
+            return null;
+        }
 
         const entries = Array.from(this.files.entries());
         const totalSize = entries.reduce((sum, [, { blob }]) => sum + blob.size, 0);
@@ -533,8 +558,10 @@ export class ArchiveCreator {
                 // Individual file progress (for streaming)
             });
 
-            // Cache the computed hash
-            this.hashCache.set(blob, hash);
+            // Cache the computed hash (only if valid)
+            if (hash) {
+                this.hashCache.set(blob, hash);
+            }
 
             processedSize += blob.size;
             if (onProgress) {
@@ -548,7 +575,9 @@ export class ArchiveCreator {
 
         const hashes = {};
         for (const { path, hash } of results) {
-            hashes[path] = hash;
+            if (hash) {
+                hashes[path] = hash;
+            }
         }
 
         const elapsed = performance.now() - startTime;
