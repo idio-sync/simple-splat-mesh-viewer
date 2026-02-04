@@ -428,17 +428,6 @@ function setupUIEvents() {
     addListener('btn-both', 'click', () => setDisplayMode('both'));
     addListener('btn-split', 'click', () => setDisplayMode('split'));
 
-    // Selection toggles
-    addListener('btn-select-splat', 'click', () => setSelectedObject('splat'));
-    addListener('btn-select-model', 'click', () => setSelectedObject('model'));
-    addListener('btn-select-both', 'click', () => setSelectedObject('both'));
-    addListener('btn-select-none', 'click', () => setSelectedObject('none'));
-
-    // Transform mode toggles
-    addListener('btn-translate', 'click', () => setTransformMode('translate'));
-    addListener('btn-rotate', 'click', () => setTransformMode('rotate'));
-    addListener('btn-scale', 'click', () => setTransformMode('scale'));
-
     // File inputs
     addListener('splat-input', 'change', handleSplatFile);
     addListener('model-input', 'change', handleModelFile);
@@ -518,12 +507,6 @@ function setupUIEvents() {
     });
 
     // Alignment buttons
-    addListener('btn-save-alignment', 'click', saveAlignment);
-    addListener('btn-load-alignment', 'click', () => {
-        const input = document.getElementById('alignment-input');
-        if (input) input.click();
-    });
-    addListener('alignment-input', 'change', loadAlignment);
     addListener('btn-reset-alignment', 'click', resetAlignment);
 
     // Share button
@@ -570,12 +553,12 @@ function setupUIEvents() {
 
     // Annotation controls
     const annoBtn = addListener('btn-annotate', 'click', toggleAnnotationMode);
-    const addAnnoBtn = addListener('btn-add-annotation', 'click', toggleAnnotationMode);
+    const addAnnoBtn = addListener('btn-sidebar-add-annotation', 'click', toggleAnnotationMode);
     log.info(' Annotation buttons attached:', { annoBtn, addAnnoBtn });
     addListener('btn-anno-save', 'click', saveAnnotation);
     addListener('btn-anno-cancel', 'click', cancelAnnotation);
-    addListener('btn-update-anno-camera', 'click', updateSelectedAnnotationCamera);
-    addListener('btn-delete-anno', 'click', deleteSelectedAnnotation);
+    addListener('btn-sidebar-update-anno-camera', 'click', updateSelectedAnnotationCamera);
+    addListener('btn-sidebar-delete-anno', 'click', deleteSelectedAnnotation);
 
     // Export/archive creation controls
     const exportBtn = addListener('btn-export-archive', 'click', showExportPanel);
@@ -586,18 +569,13 @@ function setupUIEvents() {
 
     // Metadata panel controls
     addListener('btn-open-metadata', 'click', showMetadataPanel);
-    addListener('btn-close-metadata', 'click', hideMetadataPanel);
+    addListener('btn-close-sidebar', 'click', hideMetadataPanel);
     addListener('btn-add-custom-field', 'click', addCustomField);
     setupMetadataTabs();
     setupLicenseField();
 
-    // Metadata display (museum-style) controls
+    // Metadata display toggle (toolbar button)
     addListener('btn-metadata', 'click', toggleMetadataDisplay);
-    addListener('btn-close-display', 'click', hideMetadataDisplay);
-    addListener('btn-edit-metadata', 'click', () => {
-        hideMetadataDisplay();
-        showMetadataPanel();
-    });
 
     // Scene settings - Gridlines
     addListener('toggle-gridlines', 'change', (e) => {
