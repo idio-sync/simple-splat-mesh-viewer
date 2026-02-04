@@ -6,9 +6,10 @@
     <title>Gaussian Splat & Mesh Viewer</title>
 
     <!-- Content Security Policy - Defense in depth against XSS -->
+    <!-- Note: frame-ancestors must be set via HTTP headers (see nginx.conf), not meta tags -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self';
-        script-src 'self' https://esm.sh https://*.esm.sh;
+        script-src 'self' https://esm.sh https://*.esm.sh https://sparkjs.dev 'sha256-nH2CN3/vDPF45UQyVYtDdP1Ge+x7gm4RuV4BHgCaa5s=';
         style-src 'self' 'unsafe-inline';
         img-src 'self' blob: data:;
         connect-src 'self' https: blob:;
@@ -16,7 +17,6 @@
         font-src 'self';
         media-src 'self' blob:;
         object-src 'none';
-        frame-ancestors 'self';
         base-uri 'self';
         form-action 'self';
     ">
@@ -621,23 +621,7 @@
         }
     }
     </script>
-    <script>
-        // Pre-module error detection (regular script, not module)
-        console.log('[Pre-module] Page loading, checking for errors...');
-        window.addEventListener('error', function(e) {
-            console.error('[Pre-module] Error caught:', e.message, e.filename, e.lineno);
-        });
-        // Track unhandled promise rejections (often from module loading issues)
-        window.addEventListener('unhandledrejection', function(e) {
-            console.error('[Pre-module] Unhandled promise rejection:', e.reason);
-        });
-        window.moduleLoaded = false;
-        setTimeout(function() {
-            if (!window.moduleLoaded) {
-                console.error('[Pre-module] Module failed to load within 5 seconds');
-            }
-        }, 5000);
-    </script>
+    <script src="pre-module.js"></script>
     <script type="module" src="main.js"></script>
 </body>
 </html>
