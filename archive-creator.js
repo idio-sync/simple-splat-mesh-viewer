@@ -3,6 +3,10 @@
 // Based on the U3DP Creator Python tool manifest schema
 
 import { zip, strToU8 } from 'fflate';
+import { Logger } from './utilities.js';
+
+// Create logger for this module
+const log = Logger.getLogger('archive-creator');
 
 // Pre-computed hex lookup table for faster conversion
 const HEX_CHARS = '0123456789abcdef';
@@ -23,7 +27,7 @@ const CRYPTO_AVAILABLE = typeof crypto !== 'undefined' && crypto.subtle;
  */
 async function calculateSHA256(data, onProgress = null) {
     if (!CRYPTO_AVAILABLE) {
-        console.warn('[archive-creator] crypto.subtle not available (requires HTTPS). Skipping hash.');
+        log.warn(' crypto.subtle not available (requires HTTPS). Skipping hash.');
         return null;
     }
 
@@ -56,7 +60,7 @@ async function calculateSHA256(data, onProgress = null) {
  */
 async function calculateSHA256Streaming(blob, onProgress = null) {
     if (!CRYPTO_AVAILABLE) {
-        console.warn('[archive-creator] crypto.subtle not available (requires HTTPS). Skipping hash.');
+        log.warn(' crypto.subtle not available (requires HTTPS). Skipping hash.');
         return null;
     }
 
@@ -173,11 +177,11 @@ export class ArchiveCreator {
         if (this.hashCache.has(blob)) {
             return this.hashCache.get(blob);
         }
-        console.log('[archive-creator] Pre-computing hash for blob, size:', blob.size);
+        log.debug(' Pre-computing hash for blob, size:', blob.size);
         const hash = await calculateSHA256(blob);
         if (hash) {
             this.hashCache.set(blob, hash);
-            console.log('[archive-creator] Hash pre-computed and cached');
+            log.debug(' Hash pre-computed and cached');
         }
         return hash;
     }
@@ -520,12 +524,12 @@ export class ArchiveCreator {
      * @returns {Promise<Object|null>} Hash mapping, or null if crypto unavailable
      */
     async calculateHashes(onProgress = null) {
-        console.log('[archive-creator] calculateHashes started, files:', this.files.size);
+        log.debug(' calculateHashes started, files:', this.files.size);
 
         // Check if crypto is available
         if (!CRYPTO_AVAILABLE) {
-            console.warn('[archive-creator] crypto.subtle not available - skipping integrity hashes');
-            console.warn('[archive-creator] Archive will be created without integrity verification');
+            log.warn(' crypto.subtle not available - skipping integrity hashes');
+            log.warn(' Archive will be created without integrity verification');
             return null;
         }
 
@@ -535,17 +539,17 @@ export class ArchiveCreator {
 
         // Check which files have cached hashes
         const cachedCount = entries.filter(([, { blob }]) => this.hashCache.has(blob)).length;
-        console.log('[archive-creator] Cached hashes available:', cachedCount, '/', entries.length);
+        log.debug(' Cached hashes available:', cachedCount, '/', entries.length);
 
         // Calculate all hashes in parallel (using cache when available)
-        console.log('[archive-creator] Starting hash calculations, total size:', totalSize);
+        log.debug(' Starting hash calculations, total size:', totalSize);
         const startTime = performance.now();
 
         const hashPromises = entries.map(async ([path, { blob }]) => {
             // Check cache first
             const cachedHash = this.hashCache.get(blob);
             if (cachedHash) {
-                console.log('[archive-creator] Using cached hash for:', path);
+                log.debug(' Using cached hash for:', path);
                 processedSize += blob.size;
                 if (onProgress) {
                     onProgress(processedSize / totalSize);
@@ -553,7 +557,7 @@ export class ArchiveCreator {
                 return { path, hash: cachedHash };
             }
 
-            console.log('[archive-creator] Computing hash for:', path, 'size:', blob.size);
+            log.debug(' Computing hash for:', path, 'size:', blob.size);
             const hash = await calculateSHA256(blob, (progress) => {
                 // Individual file progress (for streaming)
             });
@@ -567,7 +571,7 @@ export class ArchiveCreator {
             if (onProgress) {
                 onProgress(processedSize / totalSize);
             }
-            console.log('[archive-creator] Hash complete for:', path);
+            log.debug(' Hash complete for:', path);
             return { path, hash };
         });
 
@@ -581,10 +585,10 @@ export class ArchiveCreator {
         }
 
         const elapsed = performance.now() - startTime;
-        console.log(`[archive-creator] All file hashes calculated in ${elapsed.toFixed(0)}ms`);
+        log.debug(` All file hashes calculated in ${elapsed.toFixed(0)}ms`);
 
         // Calculate manifest hash from all asset hashes
-        console.log('[archive-creator] Calculating manifest hash');
+        log.debug(' Calculating manifest hash');
         const allHashes = Object.values(hashes).sort().join('');
         const manifestHash = await calculateSHA256(new TextEncoder().encode(allHashes));
 
@@ -594,7 +598,7 @@ export class ArchiveCreator {
             assets: hashes
         };
 
-        console.log('[archive-creator] All hashes calculated');
+        log.debug(' All hashes calculated');
         return hashes;
     }
 
@@ -624,7 +628,7 @@ export class ArchiveCreator {
      * @returns {Promise<Blob>} The archive blob
      */
     async createArchive(options = {}, onProgress = null) {
-        console.log('[archive-creator] createArchive called with options:', options);
+        log.debug(' createArchive called with options:', options);
         const {
             format = 'a3d',
             includeHashes = true,
@@ -633,30 +637,30 @@ export class ArchiveCreator {
 
         // Compression level: 0 = STORE, 6 = good balance for DEFLATE
         const defaultLevel = compression === 'DEFLATE' ? 6 : 0;
-        console.log('[archive-creator] Using compression:', compression, 'level:', defaultLevel);
+        log.debug(' Using compression:', compression, 'level:', defaultLevel);
 
         // Calculate hashes if requested (0-20% of progress)
         if (includeHashes) {
-            console.log('[archive-creator] Calculating hashes...');
+            log.debug(' Calculating hashes...');
             if (onProgress) onProgress(0, 'Calculating hashes...');
             await this.calculateHashes();
-            console.log('[archive-creator] Hashes calculated');
+            log.debug(' Hashes calculated');
             if (onProgress) onProgress(20, 'Hashes complete');
         }
 
         // Build the fflate file structure
-        console.log('[archive-creator] Preparing files for fflate');
+        log.debug(' Preparing files for fflate');
         if (onProgress) onProgress(includeHashes ? 20 : 0, 'Preparing archive...');
 
         const zipData = {};
 
         // Add manifest (always use light compression for JSON)
-        console.log('[archive-creator] Generating manifest');
+        log.debug(' Generating manifest');
         const manifestJson = this.generateManifest();
         zipData['manifest.json'] = [strToU8(manifestJson), { level: 6 }];
 
         // Convert blobs to Uint8Array and add to structure
-        console.log('[archive-creator] Converting files, count:', this.files.size);
+        log.debug(' Converting files, count:', this.files.size);
         const entries = Array.from(this.files.entries());
         const totalSize = entries.reduce((sum, [, { blob }]) => sum + blob.size, 0);
         let convertedSize = 0;
@@ -670,7 +674,7 @@ export class ArchiveCreator {
             const alreadyCompressed = ['glb', 'spz', 'sog', 'jpg', 'jpeg', 'png', 'webp'].includes(ext);
             const fileLevel = alreadyCompressed ? 0 : defaultLevel;
 
-            console.log('[archive-creator] Converting file:', path, 'size:', blob.size, 'level:', fileLevel);
+            log.debug(' Converting file:', path, 'size:', blob.size, 'level:', fileLevel);
 
             // Convert blob to Uint8Array
             const arrayBuffer = await blob.arrayBuffer();
@@ -686,7 +690,7 @@ export class ArchiveCreator {
         }
 
         // Generate the archive using fflate (40-100% of progress)
-        console.log('[archive-creator] Generating zip archive with fflate...');
+        log.debug(' Generating zip archive with fflate...');
         if (onProgress) onProgress(baseProgress + conversionRange, 'Generating archive...');
 
         const startZipTime = performance.now();
@@ -695,7 +699,7 @@ export class ArchiveCreator {
         const zipResult = await new Promise((resolve, reject) => {
             zip(zipData, { level: defaultLevel }, (err, data) => {
                 if (err) {
-                    console.error('[archive-creator] fflate error:', err);
+                    log.error(' fflate error:', err);
                     reject(err);
                 } else {
                     resolve(data);
@@ -704,12 +708,12 @@ export class ArchiveCreator {
         });
 
         const zipElapsed = performance.now() - startZipTime;
-        console.log(`[archive-creator] fflate ZIP generation took ${zipElapsed.toFixed(0)}ms`);
+        log.debug(` fflate ZIP generation took ${zipElapsed.toFixed(0)}ms`);
 
         // Convert Uint8Array to Blob
         const archiveBlob = new Blob([zipResult], { type: 'application/zip' });
 
-        console.log('[archive-creator] Archive generated, size:', archiveBlob.size);
+        log.debug(' Archive generated, size:', archiveBlob.size);
         if (onProgress) onProgress(100, 'Complete');
         return archiveBlob;
     }
@@ -720,30 +724,30 @@ export class ArchiveCreator {
      * @param {Function} onProgress - Progress callback (percent, stage)
      */
     async downloadArchive(options = {}, onProgress = null) {
-        console.log('[archive-creator] downloadArchive called with options:', options);
+        log.debug(' downloadArchive called with options:', options);
         const {
             filename = 'archive',
             format = 'a3d',
             ...createOptions
         } = options;
 
-        console.log('[archive-creator] Creating archive blob...');
+        log.debug(' Creating archive blob...');
         const blob = await this.createArchive({ format, ...createOptions }, onProgress);
-        console.log('[archive-creator] Archive blob created, size:', blob.size);
+        log.debug(' Archive blob created, size:', blob.size);
 
         const url = URL.createObjectURL(blob);
-        console.log('[archive-creator] Blob URL created:', url);
+        log.debug(' Blob URL created:', url);
 
         const a = document.createElement('a');
         a.href = url;
         a.download = `${filename}.${format}`;
         document.body.appendChild(a);
-        console.log('[archive-creator] Triggering download:', a.download);
+        log.debug(' Triggering download:', a.download);
         a.click();
         document.body.removeChild(a);
 
         URL.revokeObjectURL(url);
-        console.log('[archive-creator] Download triggered, URL revoked');
+        log.debug(' Download triggered, URL revoked');
     }
 
     /**

@@ -4,6 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gaussian Splat & Mesh Viewer</title>
+
+    <!-- Content Security Policy - Defense in depth against XSS -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self';
+        script-src 'self' https://esm.sh https://*.esm.sh;
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' blob: data:;
+        connect-src 'self' https: blob:;
+        worker-src 'self' blob:;
+        font-src 'self';
+        media-src 'self' blob:;
+        object-src 'none';
+        frame-ancestors 'self';
+        base-uri 'self';
+        form-action 'self';
+    ">
+
     <link rel="stylesheet" href="styles.css">
     <script src="config.js"></script>
 </head>
