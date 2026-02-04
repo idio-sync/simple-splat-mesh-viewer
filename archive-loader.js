@@ -2,7 +2,7 @@
 // Handles loading and parsing of .a3d/.a3z archive containers
 // These are ZIP-based containers with a manifest.json for 3D gaussian splats and meshes
 
-import JSZip from 'jszip';
+import { unzip } from 'fflate';
 
 // Supported archive extensions
 const ARCHIVE_EXTENSIONS = ['a3d', 'a3z'];
@@ -50,7 +50,7 @@ function isFormatSupported(filename, type) {
  */
 export class ArchiveLoader {
     constructor() {
-        this.zip = null;
+        this.files = null; // Object with path -> Uint8Array from fflate
         this.manifest = null;
         this.blobUrls = []; // Track blob URLs for cleanup
     }
@@ -117,7 +117,17 @@ export class ArchiveLoader {
             throw new Error('Invalid archive: Not a valid ZIP file');
         }
 
-        this.zip = await JSZip.loadAsync(arrayBuffer);
+        // Use fflate to unzip - returns object with path -> Uint8Array
+        const uint8Array = new Uint8Array(arrayBuffer);
+        this.files = await new Promise((resolve, reject) => {
+            unzip(uint8Array, (err, data) => {
+                if (err) {
+                    reject(new Error(`Failed to unzip archive: ${err.message}`));
+                } else {
+                    resolve(data);
+                }
+            });
+        });
     }
 
     /**
@@ -125,16 +135,17 @@ export class ArchiveLoader {
      * @returns {Promise<Object>} The parsed manifest
      */
     async parseManifest() {
-        if (!this.zip) {
+        if (!this.files) {
             throw new Error('No archive loaded');
         }
 
-        const manifestFile = this.zip.file('manifest.json');
-        if (!manifestFile) {
+        const manifestData = this.files['manifest.json'];
+        if (!manifestData) {
             throw new Error('Invalid archive: manifest.json not found');
         }
 
-        const manifestText = await manifestFile.async('text');
+        // Decode Uint8Array to string
+        const manifestText = new TextDecoder().decode(manifestData);
 
         try {
             this.manifest = JSON.parse(manifestText);
@@ -215,17 +226,18 @@ export class ArchiveLoader {
      * @returns {Promise<{blob: Blob, url: string, name: string}|null>}
      */
     async extractFile(filename) {
-        if (!this.zip) {
+        if (!this.files) {
             throw new Error('No archive loaded');
         }
 
-        const file = this.zip.file(filename);
-        if (!file) {
+        const fileData = this.files[filename];
+        if (!fileData) {
             console.warn(`[ArchiveLoader] File not found in archive: ${filename}`);
             return null;
         }
 
-        const blob = await file.async('blob');
+        // Convert Uint8Array to Blob
+        const blob = new Blob([fileData]);
         const url = URL.createObjectURL(blob);
         this.blobUrls.push(url);
 
@@ -341,11 +353,11 @@ export class ArchiveLoader {
     }
 
     /**
-     * Full cleanup including zip reference
+     * Full cleanup including files reference
      */
     dispose() {
         this.cleanup();
-        this.zip = null;
+        this.files = null;
         this.manifest = null;
     }
 }
