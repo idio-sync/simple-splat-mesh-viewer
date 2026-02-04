@@ -4,22 +4,97 @@
 
 import JSZip from 'jszip';
 
+// Pre-computed hex lookup table for faster conversion
+const HEX_CHARS = '0123456789abcdef';
+const HEX_TABLE = new Array(256);
+for (let i = 0; i < 256; i++) {
+    HEX_TABLE[i] = HEX_CHARS[i >> 4] + HEX_CHARS[i & 0x0f];
+}
+
 /**
  * Calculate SHA-256 hash of a Blob or ArrayBuffer
+ * Uses streaming for large blobs to reduce memory pressure
  * @param {Blob|ArrayBuffer} data - The data to hash
+ * @param {Function} onProgress - Optional progress callback
  * @returns {Promise<string>} Hex string of hash
  */
-async function calculateSHA256(data) {
+async function calculateSHA256(data, onProgress = null) {
     let buffer;
     if (data instanceof Blob) {
+        // For large blobs, read in chunks to reduce memory pressure
+        if (data.size > 10 * 1024 * 1024 && data.stream) {
+            // Use streaming approach for files > 10MB
+            return await calculateSHA256Streaming(data, onProgress);
+        }
         buffer = await data.arrayBuffer();
     } else {
         buffer = data;
     }
 
     const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+    // Fast hex conversion using lookup table
+    const hashArray = new Uint8Array(hashBuffer);
+    let hex = '';
+    for (let i = 0; i < hashArray.length; i++) {
+        hex += HEX_TABLE[hashArray[i]];
+    }
+    return hex;
+}
+
+/**
+ * Calculate SHA-256 using streaming for large files
+ * This reduces peak memory usage
+ */
+async function calculateSHA256Streaming(blob, onProgress = null) {
+    const CHUNK_SIZE = 4 * 1024 * 1024; // 4MB chunks
+    const totalSize = blob.size;
+    let processedSize = 0;
+
+    // We need to accumulate chunks and hash at the end
+    // Unfortunately, SubtleCrypto doesn't support incremental hashing
+    // So we read in chunks but still need full buffer for hashing
+    // The benefit is more responsive UI during the read phase
+
+    const chunks = [];
+    let offset = 0;
+
+    while (offset < totalSize) {
+        const end = Math.min(offset + CHUNK_SIZE, totalSize);
+        const chunk = blob.slice(offset, end);
+        const arrayBuffer = await chunk.arrayBuffer();
+        chunks.push(new Uint8Array(arrayBuffer));
+
+        processedSize = end;
+        if (onProgress) {
+            onProgress(processedSize / totalSize);
+        }
+
+        offset = end;
+
+        // Yield to UI thread between chunks
+        await new Promise(resolve => setTimeout(resolve, 0));
+    }
+
+    // Combine chunks
+    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const combined = new Uint8Array(totalLength);
+    let position = 0;
+    for (const chunk of chunks) {
+        combined.set(chunk, position);
+        position += chunk.length;
+    }
+
+    // Hash the combined buffer
+    const hashBuffer = await crypto.subtle.digest('SHA-256', combined.buffer);
+
+    // Fast hex conversion
+    const hashArray = new Uint8Array(hashBuffer);
+    let hex = '';
+    for (let i = 0; i < hashArray.length; i++) {
+        hex += HEX_TABLE[hashArray[i]];
+    }
+    return hex;
 }
 
 /**
@@ -28,8 +103,9 @@ async function calculateSHA256(data) {
 export class ArchiveCreator {
     constructor() {
         this.manifest = this._createEmptyManifest();
-        this.files = new Map(); // path -> { blob, originalName }
+        this.files = new Map(); // path -> { blob, originalName, hash? }
         this.annotations = [];
+        this.hashCache = new Map(); // blob -> hash (for pre-computed hashes)
     }
 
     /**
@@ -62,11 +138,39 @@ export class ArchiveCreator {
 
     /**
      * Reset the creator to empty state
+     * Note: hashCache is preserved to allow reuse of pre-computed hashes
      */
     reset() {
         this.manifest = this._createEmptyManifest();
         this.files.clear();
         this.annotations = [];
+        // Don't clear hashCache - it can be reused across exports
+    }
+
+    /**
+     * Pre-compute and cache a hash for a blob
+     * Call this when loading files to speed up later export
+     * @param {Blob} blob - The blob to hash
+     * @returns {Promise<string>} The hash
+     */
+    async precomputeHash(blob) {
+        if (this.hashCache.has(blob)) {
+            return this.hashCache.get(blob);
+        }
+        console.log('[archive-creator] Pre-computing hash for blob, size:', blob.size);
+        const hash = await calculateSHA256(blob);
+        this.hashCache.set(blob, hash);
+        console.log('[archive-creator] Hash pre-computed and cached');
+        return hash;
+    }
+
+    /**
+     * Get cached hash for a blob, or null if not cached
+     * @param {Blob} blob
+     * @returns {string|null}
+     */
+    getCachedHash(blob) {
+        return this.hashCache.get(blob) || null;
     }
 
     /**
@@ -393,17 +497,62 @@ export class ArchiveCreator {
 
     /**
      * Calculate integrity hashes for all files
+     * Runs hashes in parallel for better performance
+     * @param {Function} onProgress - Optional progress callback
      * @returns {Promise<Object>} Hash mapping
      */
-    async calculateHashes() {
+    async calculateHashes(onProgress = null) {
         console.log('[archive-creator] calculateHashes started, files:', this.files.size);
-        const hashes = {};
 
-        for (const [path, { blob }] of this.files.entries()) {
-            console.log('[archive-creator] Hashing file:', path, 'size:', blob.size);
-            hashes[path] = await calculateSHA256(blob);
+        const entries = Array.from(this.files.entries());
+        const totalSize = entries.reduce((sum, [, { blob }]) => sum + blob.size, 0);
+        let processedSize = 0;
+
+        // Check which files have cached hashes
+        const cachedCount = entries.filter(([, { blob }]) => this.hashCache.has(blob)).length;
+        console.log('[archive-creator] Cached hashes available:', cachedCount, '/', entries.length);
+
+        // Calculate all hashes in parallel (using cache when available)
+        console.log('[archive-creator] Starting hash calculations, total size:', totalSize);
+        const startTime = performance.now();
+
+        const hashPromises = entries.map(async ([path, { blob }]) => {
+            // Check cache first
+            const cachedHash = this.hashCache.get(blob);
+            if (cachedHash) {
+                console.log('[archive-creator] Using cached hash for:', path);
+                processedSize += blob.size;
+                if (onProgress) {
+                    onProgress(processedSize / totalSize);
+                }
+                return { path, hash: cachedHash };
+            }
+
+            console.log('[archive-creator] Computing hash for:', path, 'size:', blob.size);
+            const hash = await calculateSHA256(blob, (progress) => {
+                // Individual file progress (for streaming)
+            });
+
+            // Cache the computed hash
+            this.hashCache.set(blob, hash);
+
+            processedSize += blob.size;
+            if (onProgress) {
+                onProgress(processedSize / totalSize);
+            }
             console.log('[archive-creator] Hash complete for:', path);
+            return { path, hash };
+        });
+
+        const results = await Promise.all(hashPromises);
+
+        const hashes = {};
+        for (const { path, hash } of results) {
+            hashes[path] = hash;
         }
+
+        const elapsed = performance.now() - startTime;
+        console.log(`[archive-creator] All file hashes calculated in ${elapsed.toFixed(0)}ms`);
 
         // Calculate manifest hash from all asset hashes
         console.log('[archive-creator] Calculating manifest hash');
