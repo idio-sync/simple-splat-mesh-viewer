@@ -259,46 +259,37 @@ window.addEventListener('keydown', onKeyDown);
 
 ## 3. Security Issues
 
-### 3.1 URL Parameter Injection (HIGH Priority)
+### ~~3.1 URL Parameter Injection (HIGH Priority)~~ ✅ FIXED
 
-**Issue:** URL parameters are used directly without proper validation or sanitization.
+> **Status:** Resolved on 2026-02-04
+>
+> **Fix implemented in:**
+> - `config.js:44-100` - Added `validateUrl()` function with domain allowlist
+> - `main.js:39-116` - Added `validateUserUrl()` function for prompt-based URL input
+>
+> **Changes made:**
+> - All URL parameters are now validated before use
+> - Blocks dangerous protocols (javascript:, data:, etc.)
+> - Restricts to same-origin by default with configurable `ALLOWED_EXTERNAL_DOMAINS`
+> - Enforces HTTPS for external URLs when page is served over HTTPS
+> - User-friendly error messages for blocked URLs
 
-**Location:** `config.js:40-45`
+~~**Issue:** URL parameters are used directly without proper validation or sanitization.~~
+
+~~**Location:** `config.js:40-45`~~
 
 ```javascript
+// OLD (vulnerable):
 const archiveUrl = params.get('archive') || '';
-const splatUrl = params.get('splat') || '';
-const modelUrl = params.get('model') || '';
-const alignmentUrl = params.get('alignment') || '';
+
+// NEW (secure):
+const archiveUrl = validateUrl(params.get('archive'), 'archive');
 ```
 
-These URLs are then passed to `fetch()` without validation, potentially enabling:
-- SSRF (Server-Side Request Forgery) if server-side rendering is added
-- Open redirect if URLs are displayed to users
-- Data exfiltration via malicious archive files
-
-**Recommendation:**
-```javascript
-function validateUrl(url) {
-    if (!url) return null;
-    try {
-        const parsed = new URL(url, window.location.origin);
-        // Only allow same-origin or explicitly whitelisted domains
-        const allowedHosts = ['trusted-cdn.example.com', window.location.host];
-        if (!allowedHosts.includes(parsed.host)) {
-            console.warn('Blocked external URL:', url);
-            return null;
-        }
-        // Only allow https in production
-        if (location.protocol === 'https:' && parsed.protocol !== 'https:') {
-            return null;
-        }
-        return parsed.href;
-    } catch {
-        return null;
-    }
-}
-```
+~~These URLs are then passed to `fetch()` without validation, potentially enabling:~~
+- ~~SSRF (Server-Side Request Forgery) if server-side rendering is added~~
+- ~~Open redirect if URLs are displayed to users~~
+- ~~Data exfiltration via malicious archive files~~
 
 ### 3.2 Arbitrary File Loading via Archive (HIGH Priority)
 
@@ -440,7 +431,7 @@ if (!CRYPTO_AVAILABLE) {
 
 ### Immediate (Before Production):
 
-1. **Implement URL validation** for all externally-loaded resources
+1. ~~**Implement URL validation** for all externally-loaded resources~~ ✅ DONE
 2. **Sanitize archive filenames** before extraction
 3. **Add file size limits** for uploaded/downloaded files
 4. **Replace `innerHTML`** with safe DOM methods where possible
@@ -497,29 +488,24 @@ async function handleArchiveFile(event) {
 }
 ```
 
-### config.js - Add URL validation
-```javascript
-function validateAndParseUrl(urlString, paramName) {
-    if (!urlString) return null;
-    try {
-        const url = new URL(urlString, window.location.origin);
-        // Log for security monitoring
-        console.info(`[config] Loading ${paramName} from:`, url.hostname);
-        return url.href;
-    } catch (e) {
-        console.warn(`[config] Invalid ${paramName} URL:`, urlString);
-        return null;
-    }
-}
+### ~~config.js - Add URL validation~~ ✅ IMPLEMENTED
 
-const archiveUrl = validateAndParseUrl(params.get('archive'), 'archive');
+```javascript
+// Implemented in config.js:44-100 with additional features:
+// - Configurable ALLOWED_EXTERNAL_DOMAINS allowlist
+// - Wildcard subdomain support (*.example.com)
+// - Protocol validation (blocks javascript:, data:, etc.)
+// - HTTPS enforcement for external URLs in production
+// - Detailed console logging for security monitoring
+
+const archiveUrl = validateUrl(params.get('archive'), 'archive');
 ```
 
 ---
 
 ## Conclusion
 
-The codebase shows solid foundational work with good 3D visualization capabilities. However, before production deployment, the security issues (particularly URL validation and archive filename sanitization) must be addressed. The application would also benefit from better modularization and the addition of a testing framework for long-term maintainability.
+The codebase shows solid foundational work with good 3D visualization capabilities. ~~Before production deployment, the security issues (particularly URL validation and archive filename sanitization) must be addressed.~~ URL validation has been implemented. Archive filename sanitization remains to be addressed. The application would also benefit from better modularization and the addition of a testing framework for long-term maintainability.
 
-**Estimated Effort for Critical Fixes:** 2-3 developer days
+**Estimated Effort for Critical Fixes:** ~~2-3 developer days~~ 1-2 developer days (URL validation complete)
 **Estimated Effort for All Recommendations:** 2-3 developer weeks

@@ -36,6 +36,85 @@ const config = window.APP_CONFIG || {
     initialViewMode: 'both' // splat, model, both, split
 };
 
+// =============================================================================
+// URL VALIDATION - Security measure for user-provided URLs
+// =============================================================================
+
+// Allowed external domains for URL loading (same as config.js)
+// Add trusted CDN/API domains here
+const ALLOWED_EXTERNAL_DOMAINS = [
+    // 'trusted-cdn.example.com',
+    // 'assets.mycompany.com',
+];
+
+/**
+ * Validates a URL to prevent loading from untrusted sources.
+ * Used for URLs entered by users via prompt dialogs.
+ *
+ * @param {string} urlString - The URL string to validate
+ * @param {string} resourceType - Type of resource (for error messages)
+ * @returns {{valid: boolean, url: string, error: string}} - Validation result
+ */
+function validateUserUrl(urlString, resourceType) {
+    if (!urlString || urlString.trim() === '') {
+        return { valid: false, url: '', error: 'URL is empty' };
+    }
+
+    try {
+        // Parse the URL (relative URLs resolved against current origin)
+        const url = new URL(urlString.trim(), window.location.origin);
+
+        // Block dangerous protocols
+        const allowedProtocols = ['http:', 'https:'];
+        if (!allowedProtocols.includes(url.protocol)) {
+            return {
+                valid: false,
+                url: '',
+                error: `Unsafe protocol "${url.protocol}" is not allowed. Use http: or https:`
+            };
+        }
+
+        // Check if same-origin
+        const isSameOrigin = url.origin === window.location.origin;
+
+        // Check if domain is in allowed list
+        const isAllowedExternal = ALLOWED_EXTERNAL_DOMAINS.some(domain => {
+            if (domain.startsWith('*.')) {
+                const baseDomain = domain.slice(2);
+                return url.hostname === baseDomain || url.hostname.endsWith('.' + baseDomain);
+            }
+            return url.hostname === domain;
+        });
+
+        if (!isSameOrigin && !isAllowedExternal) {
+            return {
+                valid: false,
+                url: '',
+                error: `External domain "${url.hostname}" is not allowed.\n\nOnly same-origin URLs are permitted by default. Contact the administrator to allow this domain.`
+            };
+        }
+
+        // Enforce HTTPS for external URLs when page is served over HTTPS
+        if (!isSameOrigin && window.location.protocol === 'https:' && url.protocol !== 'https:') {
+            return {
+                valid: false,
+                url: '',
+                error: 'External URLs must use HTTPS when the viewer is served over HTTPS.'
+            };
+        }
+
+        console.info(`[main.js] Validated ${resourceType} URL:`, url.href);
+        return { valid: true, url: url.href, error: '' };
+
+    } catch (e) {
+        return {
+            valid: false,
+            url: '',
+            error: `Invalid URL format: ${e.message}`
+        };
+    }
+}
+
 // Global state
 const state = {
     displayMode: config.initialViewMode || 'both', // 'splat', 'model', 'both', 'split'
@@ -843,13 +922,14 @@ function handleLoadSplatFromUrlPrompt() {
     console.log('[main.js] User entered:', url);
     if (!url) return; // User cancelled or entered empty string
 
-    const trimmedUrl = url.trim();
-    if (trimmedUrl.length < 2) {
-        alert('Invalid URL');
+    // Validate URL before loading
+    const validation = validateUserUrl(url, 'splat');
+    if (!validation.valid) {
+        alert('Cannot load splat:\n\n' + validation.error);
         return;
     }
 
-    loadSplatFromUrl(trimmedUrl);
+    loadSplatFromUrl(validation.url);
 }
 
 // Handle loading model from URL via prompt
@@ -859,13 +939,14 @@ function handleLoadModelFromUrlPrompt() {
     console.log('[main.js] User entered:', url);
     if (!url) return; // User cancelled or entered empty string
 
-    const trimmedUrl = url.trim();
-    if (trimmedUrl.length < 2) {
-        alert('Invalid URL');
+    // Validate URL before loading
+    const validation = validateUserUrl(url, 'model');
+    if (!validation.valid) {
+        alert('Cannot load model:\n\n' + validation.error);
         return;
     }
 
-    loadModelFromUrl(trimmedUrl);
+    loadModelFromUrl(validation.url);
 }
 
 // Handle loading archive from URL via prompt
@@ -875,13 +956,14 @@ function handleLoadArchiveFromUrlPrompt() {
     console.log('[main.js] User entered:', url);
     if (!url) return;
 
-    const trimmedUrl = url.trim();
-    if (trimmedUrl.length < 2) {
-        alert('Invalid URL');
+    // Validate URL before loading
+    const validation = validateUserUrl(url, 'archive');
+    if (!validation.valid) {
+        alert('Cannot load archive:\n\n' + validation.error);
         return;
     }
 
-    loadArchiveFromUrl(trimmedUrl);
+    loadArchiveFromUrl(validation.url);
 }
 
 // Handle archive file input

@@ -15,6 +15,10 @@
 //   ?mr=x,y,z        - Model rotation (radians)
 //   ?ms=scale        - Model scale
 //
+// Security:
+//   By default, only same-origin URLs are allowed. To allow external domains,
+//   add them to the ALLOWED_EXTERNAL_DOMAINS array below.
+//
 // Examples:
 //   viewer.website.com?archive=/assets/scene.a3d&controls=minimal
 //   viewer.website.com?splat=/assets/scene.ply&model=/assets/model.glb&controls=minimal
@@ -26,6 +30,75 @@
     // Parse URL parameters
     const params = new URLSearchParams(window.location.search);
 
+    // =========================================================================
+    // URL VALIDATION - Security measure to prevent loading from untrusted sources
+    // =========================================================================
+
+    // Add trusted external domains here (e.g., CDN hosts, trusted APIs)
+    // Same-origin URLs are always allowed
+    const ALLOWED_EXTERNAL_DOMAINS = [
+        // 'trusted-cdn.example.com',
+        // 'assets.mycompany.com',
+    ];
+
+    /**
+     * Validates a URL parameter to prevent SSRF and malicious URL injection.
+     *
+     * @param {string} urlString - The URL string to validate
+     * @param {string} paramName - Name of the parameter (for logging)
+     * @returns {string} - Validated URL string, or empty string if invalid
+     */
+    function validateUrl(urlString, paramName) {
+        if (!urlString || urlString.trim() === '') {
+            return '';
+        }
+
+        try {
+            // Parse the URL (relative URLs resolved against current origin)
+            const url = new URL(urlString, window.location.origin);
+
+            // Block dangerous protocols (javascript:, data:, vbscript:, etc.)
+            const allowedProtocols = ['http:', 'https:'];
+            if (!allowedProtocols.includes(url.protocol)) {
+                console.warn(`[config] Blocked unsafe protocol for ${paramName}:`, url.protocol);
+                return '';
+            }
+
+            // Check if same-origin
+            const isSameOrigin = url.origin === window.location.origin;
+
+            // Check if domain is in allowed list
+            const isAllowedExternal = ALLOWED_EXTERNAL_DOMAINS.some(domain => {
+                // Support wildcard subdomains (*.example.com)
+                if (domain.startsWith('*.')) {
+                    const baseDomain = domain.slice(2);
+                    return url.hostname === baseDomain || url.hostname.endsWith('.' + baseDomain);
+                }
+                return url.hostname === domain;
+            });
+
+            if (!isSameOrigin && !isAllowedExternal) {
+                console.warn(`[config] Blocked external URL for ${paramName}:`, url.hostname);
+                console.info(`[config] To allow this domain, add '${url.hostname}' to ALLOWED_EXTERNAL_DOMAINS in config.js`);
+                return '';
+            }
+
+            // Enforce HTTPS for external URLs in production (when page is served over HTTPS)
+            if (!isSameOrigin && window.location.protocol === 'https:' && url.protocol !== 'https:') {
+                console.warn(`[config] Blocked insecure external URL for ${paramName} (HTTPS required):`, urlString);
+                return '';
+            }
+
+            // URL is valid
+            console.info(`[config] Validated ${paramName}:`, url.href);
+            return url.href;
+
+        } catch (e) {
+            console.warn(`[config] Invalid URL for ${paramName}:`, urlString, e.message);
+            return '';
+        }
+    }
+
     // Helper to parse comma-separated numbers
     function parseVec3(str) {
         if (!str) return null;
@@ -36,11 +109,11 @@
         return null;
     }
 
-    // Get parameters with defaults
-    const archiveUrl = params.get('archive') || '';
-    const splatUrl = params.get('splat') || '';
-    const modelUrl = params.get('model') || '';
-    const alignmentUrl = params.get('alignment') || '';
+    // Get and validate URL parameters
+    const archiveUrl = validateUrl(params.get('archive'), 'archive');
+    const splatUrl = validateUrl(params.get('splat'), 'splat');
+    const modelUrl = validateUrl(params.get('model'), 'model');
+    const alignmentUrl = validateUrl(params.get('alignment'), 'alignment');
     const controlsMode = params.get('controls') || 'full'; // full, minimal, none
     const viewMode = params.get('mode') || 'both'; // splat, model, both, split
 
