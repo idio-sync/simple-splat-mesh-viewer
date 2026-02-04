@@ -60,6 +60,7 @@ const state = {
 let scene, camera, renderer, controls, transformControls;
 let splatMesh = null;
 let modelGroup = null;
+let gridHelper = null;
 let ambientLight, hemisphereLight, directionalLight1, directionalLight2;
 
 // Annotation and archive creation
@@ -493,6 +494,32 @@ function setupUIEvents() {
         showMetadataPanel();
     });
 
+    // Scene settings - Gridlines
+    addListener('toggle-gridlines', 'change', (e) => {
+        toggleGridlines(e.target.checked);
+    });
+
+    // Scene settings - Background color presets
+    document.querySelectorAll('.color-preset').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const color = btn.dataset.color;
+            setBackgroundColor(color);
+            // Update active state
+            document.querySelectorAll('.color-preset').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            // Update color picker
+            const picker = document.getElementById('bg-color-picker');
+            if (picker) picker.value = color;
+        });
+    });
+
+    // Scene settings - Custom background color
+    addListener('bg-color-picker', 'input', (e) => {
+        setBackgroundColor(e.target.value);
+        // Remove active from presets
+        document.querySelectorAll('.color-preset').forEach(b => b.classList.remove('active'));
+    });
+
     // Close annotation popup when clicking outside
     document.addEventListener('click', (e) => {
         const popup = document.getElementById('annotation-info-popup');
@@ -523,6 +550,9 @@ function setupUIEvents() {
 
     // Setup collapsible sections
     setupCollapsibles();
+
+    // Metadata sidebar event handlers
+    setupMetadataSidebar();
 
     console.log('[main.js] UI events setup complete');
 }
@@ -556,6 +586,29 @@ function setDisplayMode(mode) {
     });
 
     updateVisibility();
+}
+
+// Toggle gridlines visibility
+function toggleGridlines(show) {
+    if (show && !gridHelper) {
+        // Create grid - 20 units, 20 divisions
+        gridHelper = new THREE.GridHelper(20, 20, 0x4a4a6a, 0x2a2a3a);
+        gridHelper.position.y = -0.01; // Slightly below origin to avoid z-fighting
+        scene.add(gridHelper);
+    } else if (!show && gridHelper) {
+        scene.remove(gridHelper);
+        gridHelper.dispose();
+        gridHelper = null;
+    }
+}
+
+// Set background color
+function setBackgroundColor(hexColor) {
+    const color = new THREE.Color(hexColor);
+    scene.background = color;
+
+    // Also update the CSS variable for UI elements that might need it
+    document.documentElement.style.setProperty('--scene-bg-color', hexColor);
 }
 
 function setSelectedObject(selection) {
@@ -1281,7 +1334,7 @@ function onAnnotationSelected(annotation) {
         chip.classList.toggle('active', chip.dataset.annoId === annotation.id);
     });
 
-    // Show editor panel (in controls)
+    // Show editor panel (in controls - legacy)
     const editor = document.getElementById('selected-annotation-editor');
     if (editor) {
         editor.classList.remove('hidden');
@@ -1291,6 +1344,15 @@ function onAnnotationSelected(annotation) {
         if (titleInput) titleInput.value = annotation.title || '';
         if (bodyInput) bodyInput.value = annotation.body || '';
     }
+
+    // Update sidebar annotation editor
+    showSidebarAnnotationEditor(annotation);
+
+    // Update sidebar list selection
+    const sidebarItems = document.querySelectorAll('#sidebar-annotations-list .annotation-item');
+    sidebarItems.forEach(item => {
+        item.classList.toggle('selected', item.dataset.annoId === annotation.id);
+    });
 
     // Show annotation info popup near the marker
     showAnnotationPopup(annotation);
@@ -1374,9 +1436,13 @@ function deleteSelectedAnnotation() {
         annotationSystem.deleteAnnotation(id);
         updateAnnotationsUI();
 
-        // Hide editor
+        // Hide editor (legacy)
         const editor = document.getElementById('selected-annotation-editor');
         if (editor) editor.classList.add('hidden');
+
+        // Hide sidebar editor
+        const sidebarEditor = document.getElementById('sidebar-annotation-editor');
+        if (sidebarEditor) sidebarEditor.classList.add('hidden');
     }
 }
 
@@ -1448,6 +1514,81 @@ function updateAnnotationsUI() {
             chips.appendChild(chip);
         });
     }
+
+    // Also update sidebar annotations list
+    updateSidebarAnnotationsList();
+}
+
+// Update sidebar annotations list
+function updateSidebarAnnotationsList() {
+    if (!annotationSystem) return;
+
+    const annotations = annotationSystem.getAnnotations();
+    const list = document.getElementById('sidebar-annotations-list');
+    const editor = document.getElementById('sidebar-annotation-editor');
+    const selectedAnno = annotationSystem.getSelectedAnnotation();
+
+    if (!list) return;
+
+    list.innerHTML = '';
+
+    if (annotations.length === 0) {
+        list.innerHTML = '<p class="no-annotations">No annotations yet. Click "Add Annotation" to place a new marker.</p>';
+        if (editor) editor.classList.add('hidden');
+    } else {
+        annotations.forEach((anno, index) => {
+            const item = document.createElement('div');
+            item.className = 'annotation-item';
+            item.dataset.annoId = anno.id;
+
+            if (selectedAnno && selectedAnno.id === anno.id) {
+                item.classList.add('selected');
+            }
+
+            const number = document.createElement('span');
+            number.className = 'annotation-number';
+            number.textContent = index + 1;
+
+            const title = document.createElement('span');
+            title.className = 'annotation-title';
+            title.textContent = anno.title || 'Untitled';
+
+            item.appendChild(number);
+            item.appendChild(title);
+
+            item.addEventListener('click', () => {
+                annotationSystem.goToAnnotation(anno.id);
+                // Update selection state
+                list.querySelectorAll('.annotation-item').forEach(el => el.classList.remove('selected'));
+                item.classList.add('selected');
+                // Show editor with selected annotation data
+                showSidebarAnnotationEditor(anno);
+            });
+
+            list.appendChild(item);
+        });
+
+        // Show editor if there's a selection
+        if (selectedAnno) {
+            showSidebarAnnotationEditor(selectedAnno);
+        } else if (editor) {
+            editor.classList.add('hidden');
+        }
+    }
+}
+
+// Show sidebar annotation editor with annotation data
+function showSidebarAnnotationEditor(annotation) {
+    const editor = document.getElementById('sidebar-annotation-editor');
+    const titleInput = document.getElementById('sidebar-edit-anno-title');
+    const bodyInput = document.getElementById('sidebar-edit-anno-body');
+
+    if (!editor) return;
+
+    if (titleInput) titleInput.value = annotation.title || '';
+    if (bodyInput) bodyInput.value = annotation.body || '';
+
+    editor.classList.remove('hidden');
 }
 
 // Load annotations from archive
@@ -1457,6 +1598,7 @@ function loadAnnotationsFromArchive(annotations) {
     console.log('[main.js] Loading', annotations.length, 'annotations from archive');
     annotationSystem.setAnnotations(annotations);
     updateAnnotationsUI();
+    updateSidebarAnnotationsList();
 }
 
 // ==================== Export/Archive Creation Functions ====================
@@ -1627,27 +1769,91 @@ async function downloadArchive() {
     }
 }
 
-// ==================== Metadata Panel Functions ====================
+// ==================== Metadata Sidebar Functions ====================
 
-// Show metadata panel
-function showMetadataPanel() {
-    const panel = document.getElementById('metadata-panel');
-    if (panel) {
-        panel.classList.remove('hidden');
+// Show metadata sidebar
+function showMetadataSidebar(mode = 'view') {
+    const sidebar = document.getElementById('metadata-sidebar');
+    if (!sidebar) return;
+
+    sidebar.classList.remove('hidden');
+
+    // Switch to the requested mode
+    switchSidebarMode(mode);
+
+    // Update displays
+    if (mode === 'view') {
+        populateMetadataDisplay();
+    } else if (mode === 'edit') {
         updateMetadataStats();
         updateAssetStatus();
+    } else if (mode === 'annotations') {
+        updateSidebarAnnotationsList();
+    }
+
+    // Update toolbar button state
+    const btn = document.getElementById('btn-metadata');
+    if (btn) btn.classList.add('active');
+}
+
+// Hide metadata sidebar
+function hideMetadataSidebar() {
+    const sidebar = document.getElementById('metadata-sidebar');
+    if (sidebar) {
+        sidebar.classList.add('hidden');
+    }
+
+    const btn = document.getElementById('btn-metadata');
+    if (btn) btn.classList.remove('active');
+}
+
+// Switch sidebar mode (view/edit/annotations)
+function switchSidebarMode(mode) {
+    // Update tab buttons
+    const tabs = document.querySelectorAll('.sidebar-mode-tab');
+    tabs.forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.mode === mode);
+    });
+
+    // Update content sections
+    const contents = document.querySelectorAll('.sidebar-mode-content');
+    contents.forEach(content => {
+        content.classList.toggle('active', content.id === `sidebar-${mode}`);
+    });
+
+    // Refresh content for the selected mode
+    if (mode === 'view') {
+        populateMetadataDisplay();
+    } else if (mode === 'annotations') {
+        updateSidebarAnnotationsList();
     }
 }
 
-// Hide metadata panel
+// Switch edit sub-tab
+function switchEditTab(tabName) {
+    // Update tab buttons
+    const tabs = document.querySelectorAll('.edit-tab');
+    tabs.forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+
+    // Update content sections
+    const contents = document.querySelectorAll('.edit-tab-content');
+    contents.forEach(content => {
+        content.classList.toggle('active', content.id === `edit-tab-${tabName}`);
+    });
+}
+
+// Legacy function names for compatibility
+function showMetadataPanel() {
+    showMetadataSidebar('edit');
+}
+
 function hideMetadataPanel() {
-    const panel = document.getElementById('metadata-panel');
-    if (panel) {
-        panel.classList.add('hidden');
-    }
+    hideMetadataSidebar();
 }
 
-// Setup metadata tab switching
+// Setup metadata tab switching (legacy - kept for compatibility)
 function setupMetadataTabs() {
     const tabs = document.querySelectorAll('.metadata-tab');
     tabs.forEach(tab => {
@@ -1667,6 +1873,68 @@ function setupMetadataTabs() {
             }
         });
     });
+}
+
+// Setup metadata sidebar event handlers
+function setupMetadataSidebar() {
+    // Mode tabs (View/Edit/Annotations)
+    const modeTabs = document.querySelectorAll('.sidebar-mode-tab');
+    modeTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const mode = tab.dataset.mode;
+            switchSidebarMode(mode);
+        });
+    });
+
+    // Edit sub-tabs
+    const editTabs = document.querySelectorAll('.edit-tab');
+    editTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.tab;
+            switchEditTab(tabName);
+        });
+    });
+
+    // Close button
+    addListener('btn-close-sidebar', 'click', hideMetadataSidebar);
+
+    // Sidebar Add Annotation button
+    addListener('btn-sidebar-add-annotation', 'click', () => {
+        hideMetadataSidebar();
+        toggleAnnotationMode();
+    });
+
+    // Sidebar annotation editor buttons
+    addListener('btn-sidebar-update-anno-camera', 'click', updateSelectedAnnotationCamera);
+    addListener('btn-sidebar-delete-anno', 'click', deleteSelectedAnnotation);
+
+    // Sidebar annotation title/body change handlers
+    const annoTitleInput = document.getElementById('sidebar-edit-anno-title');
+    const annoBodyInput = document.getElementById('sidebar-edit-anno-body');
+
+    if (annoTitleInput) {
+        annoTitleInput.addEventListener('change', () => {
+            const selectedAnno = annotationSystem?.getSelectedAnnotation();
+            if (selectedAnno) {
+                annotationSystem.updateAnnotation(selectedAnno.id, {
+                    title: annoTitleInput.value
+                });
+                updateAnnotationsUI();
+                updateSidebarAnnotationsList();
+            }
+        });
+    }
+
+    if (annoBodyInput) {
+        annoBodyInput.addEventListener('change', () => {
+            const selectedAnno = annotationSystem?.getSelectedAnnotation();
+            if (selectedAnno) {
+                annotationSystem.updateAnnotation(selectedAnno.id, {
+                    body: annoBodyInput.value
+                });
+            }
+        });
+    }
 }
 
 // Setup license dropdown custom field toggle
@@ -1960,37 +2228,24 @@ function prefillMetadataFromArchive(manifest) {
 
 // Toggle metadata display visibility
 function toggleMetadataDisplay() {
-    const display = document.getElementById('metadata-display');
-    if (!display) return;
+    const sidebar = document.getElementById('metadata-sidebar');
+    if (!sidebar) return;
 
-    if (display.classList.contains('hidden')) {
+    if (sidebar.classList.contains('hidden')) {
         showMetadataDisplay();
     } else {
         hideMetadataDisplay();
     }
 }
 
-// Show museum-style metadata display
+// Show museum-style metadata display (view mode in sidebar)
 function showMetadataDisplay() {
-    const display = document.getElementById('metadata-display');
-    if (!display) return;
-
-    // Populate the display with current metadata
-    populateMetadataDisplay();
-    display.classList.remove('hidden');
-
-    // Update toolbar button state
-    const btn = document.getElementById('btn-metadata');
-    if (btn) btn.classList.add('active');
+    showMetadataSidebar('view');
 }
 
 // Hide museum-style metadata display
 function hideMetadataDisplay() {
-    const display = document.getElementById('metadata-display');
-    if (display) display.classList.add('hidden');
-
-    const btn = document.getElementById('btn-metadata');
-    if (btn) btn.classList.remove('active');
+    hideMetadataSidebar();
 }
 
 // Populate the museum-style metadata display
@@ -2076,8 +2331,8 @@ function populateMetadataDisplay() {
     }
 
     // Hide the details section and divider if no details
-    const detailsSection = document.querySelector('#metadata-display .display-details');
-    const divider = document.querySelector('#metadata-display .display-divider');
+    const detailsSection = document.querySelector('#sidebar-view .display-details');
+    const divider = document.querySelector('#sidebar-view .display-divider');
     if (detailsSection) {
         detailsSection.style.display = hasDetails ? '' : 'none';
     }
@@ -2942,6 +3197,12 @@ function applyControlsVisibilityDirect(controlsPanel, shouldShow) {
     console.log('[DIAG] AFTER (immediate) - computed minWidth:', afterComputed.minWidth);
     console.log('[DIAG] AFTER (immediate) - computed padding:', afterComputed.padding);
     console.log('[DIAG] AFTER (immediate) - offsetWidth:', controlsPanel.offsetWidth);
+
+    // Update annotation bar position based on panel visibility
+    const annotationBar = document.getElementById('annotation-bar');
+    if (annotationBar) {
+        annotationBar.style.left = shouldShow ? '280px' : '0';
+    }
 
     // DIAGNOSTIC: Check again after a delay (after potential transition)
     setTimeout(() => {
