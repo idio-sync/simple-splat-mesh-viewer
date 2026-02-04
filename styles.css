@@ -1373,6 +1373,249 @@ input[type="range"]::-webkit-slider-thumb:hover {
     letter-spacing: 0.5px;
 }
 
+/* ============================================
+   Annotation Info Popup
+   ============================================ */
+#annotation-info-popup {
+    position: fixed;
+    z-index: 300;
+    background: rgba(15, 15, 26, 0.95);
+    border: 1px solid #4ecdc4;
+    border-radius: 12px;
+    padding: 16px 20px;
+    max-width: 320px;
+    min-width: 200px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+    pointer-events: auto;
+    transform: translateY(-10px);
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+#annotation-info-popup:not(.hidden) {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.annotation-info-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.annotation-info-number {
+    width: 24px;
+    height: 24px;
+    background: #4ecdc4;
+    color: #0f0f1a;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.annotation-info-title {
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+    line-height: 1.3;
+}
+
+.annotation-info-body {
+    color: #aaa;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.annotation-info-body:empty {
+    display: none;
+}
+
+/* ============================================
+   Museum-Style Metadata Display
+   ============================================ */
+#metadata-display {
+    position: fixed;
+    bottom: 30px;
+    left: 30px;
+    z-index: 200;
+    background: rgba(10, 10, 18, 0.92);
+    border: 1px solid rgba(78, 205, 196, 0.3);
+    border-radius: 16px;
+    padding: 28px 32px;
+    max-width: 380px;
+    min-width: 300px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(12px);
+    font-family: 'Georgia', 'Times New Roman', serif;
+}
+
+.display-close-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    color: #666;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.display-close-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.display-content {
+    text-align: left;
+}
+
+.display-title {
+    font-size: 1.5rem;
+    font-weight: 400;
+    color: #fff;
+    margin: 0 0 8px 0;
+    letter-spacing: 0.02em;
+    line-height: 1.3;
+}
+
+.display-description {
+    font-size: 0.95rem;
+    color: #999;
+    margin: 0 0 16px 0;
+    line-height: 1.6;
+    font-style: italic;
+}
+
+.display-description:empty {
+    display: none;
+}
+
+.display-divider {
+    height: 1px;
+    background: linear-gradient(90deg, rgba(78, 205, 196, 0.4), transparent);
+    margin: 16px 0;
+}
+
+.display-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.display-detail {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+}
+
+.display-detail .display-label {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 0.7rem;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+}
+
+.display-detail .display-value {
+    font-size: 0.9rem;
+    color: #ccc;
+    text-align: right;
+}
+
+.display-detail[style*="display: none"],
+.display-detail.hidden {
+    display: none !important;
+}
+
+.display-license {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 0.75rem;
+    color: #4ecdc4;
+    margin-bottom: 20px;
+    padding: 8px 12px;
+    background: rgba(78, 205, 196, 0.08);
+    border-radius: 6px;
+    text-align: center;
+}
+
+.display-license.hidden,
+.display-license:empty {
+    display: none;
+}
+
+.display-stats {
+    display: flex;
+    justify-content: space-around;
+    gap: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.display-stat {
+    text-align: center;
+}
+
+.display-stat .stat-number {
+    display: block;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #4ecdc4;
+    line-height: 1;
+}
+
+.display-stat .stat-label {
+    display: block;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 0.65rem;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 4px;
+}
+
+.display-stat.hidden {
+    display: none;
+}
+
+.display-edit-btn {
+    width: 100%;
+    margin-top: 16px;
+    padding: 10px 16px;
+    background: transparent;
+    border: 1px solid rgba(78, 205, 196, 0.4);
+    border-radius: 8px;
+    color: #4ecdc4;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.display-edit-btn:hover {
+    background: rgba(78, 205, 196, 0.1);
+    border-color: #4ecdc4;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     #app {
@@ -1388,5 +1631,13 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
     #viewer-container {
         height: 60%;
+    }
+
+    #metadata-display {
+        bottom: 10px;
+        left: 10px;
+        right: 10px;
+        max-width: none;
+        min-width: auto;
     }
 }

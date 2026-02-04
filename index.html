@@ -36,6 +36,15 @@
                         <circle cx="12" cy="10" r="3"></circle>
                     </svg>
                 </button>
+                <button id="btn-metadata" class="toolbar-btn" title="View Metadata (M)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                </button>
                 <button id="btn-export-archive" class="toolbar-btn" title="Export Archive">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -54,6 +63,15 @@
 
         <!-- Annotation markers container -->
         <div id="annotation-markers"></div>
+
+        <!-- Annotation info popup (appears when clicking markers) -->
+        <div id="annotation-info-popup" class="hidden">
+            <div class="annotation-info-header">
+                <span class="annotation-info-number"></span>
+                <h4 class="annotation-info-title"></h4>
+            </div>
+            <p class="annotation-info-body"></p>
+        </div>
 
         <!-- Annotation bar at bottom -->
         <div id="annotation-bar" class="hidden">
@@ -79,6 +97,56 @@
         </div>
 
         <!-- Export archive panel popup -->
+        <!-- Museum-style metadata display (read-only, elegant presentation) -->
+        <div id="metadata-display" class="hidden">
+            <button id="btn-close-display" class="display-close-btn" title="Close">&times;</button>
+            <div class="display-content">
+                <h1 class="display-title" id="display-title">Untitled</h1>
+                <p class="display-description" id="display-description"></p>
+
+                <div class="display-divider"></div>
+
+                <div class="display-details">
+                    <div class="display-detail" id="display-creator-row">
+                        <span class="display-label">Creator</span>
+                        <span class="display-value" id="display-creator"></span>
+                    </div>
+                    <div class="display-detail" id="display-date-row">
+                        <span class="display-label">Date</span>
+                        <span class="display-value" id="display-date"></span>
+                    </div>
+                    <div class="display-detail" id="display-location-row">
+                        <span class="display-label">Location</span>
+                        <span class="display-value" id="display-location"></span>
+                    </div>
+                    <div class="display-detail" id="display-device-row">
+                        <span class="display-label">Captured with</span>
+                        <span class="display-value" id="display-device"></span>
+                    </div>
+                </div>
+
+                <div class="display-license" id="display-license-row">
+                    <span id="display-license"></span>
+                </div>
+
+                <div class="display-stats" id="display-stats">
+                    <div class="display-stat" id="display-splat-stat">
+                        <span class="stat-number" id="display-splat-count">-</span>
+                        <span class="stat-label">Gaussians</span>
+                    </div>
+                    <div class="display-stat" id="display-mesh-stat">
+                        <span class="stat-number" id="display-mesh-count">-</span>
+                        <span class="stat-label">Polygons</span>
+                    </div>
+                    <div class="display-stat" id="display-anno-stat">
+                        <span class="stat-number" id="display-anno-count">0</span>
+                        <span class="stat-label">Annotations</span>
+                    </div>
+                </div>
+            </div>
+            <button id="btn-edit-metadata" class="display-edit-btn">Edit Metadata</button>
+        </div>
+
         <div id="export-panel" class="hidden">
             <h3>Export Archive</h3>
             <p class="hint-text" style="margin-bottom: 15px;">Configure metadata before exporting for a complete archive.</p>

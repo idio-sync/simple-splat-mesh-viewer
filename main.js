@@ -484,14 +484,39 @@ function setupUIEvents() {
     setupMetadataTabs();
     setupLicenseField();
 
-    // Keyboard shortcut for annotation mode
-    window.addEventListener('keydown', (e) => {
-        if (e.key.toLowerCase() === 'a' && !e.ctrlKey && !e.metaKey) {
-            const activeEl = document.activeElement;
-            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
-                return; // Don't trigger if typing in input
+    // Metadata display (museum-style) controls
+    addListener('btn-metadata', 'click', toggleMetadataDisplay);
+    addListener('btn-close-display', 'click', hideMetadataDisplay);
+    addListener('btn-edit-metadata', 'click', () => {
+        hideMetadataDisplay();
+        showMetadataPanel();
+    });
+
+    // Close annotation popup when clicking outside
+    document.addEventListener('click', (e) => {
+        const popup = document.getElementById('annotation-info-popup');
+        if (popup && !popup.classList.contains('hidden')) {
+            // Check if click was outside popup and not on an annotation marker
+            if (!popup.contains(e.target) && !e.target.closest('.annotation-marker')) {
+                hideAnnotationPopup();
             }
+        }
+    });
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (e) => {
+        const activeEl = document.activeElement;
+        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+            return; // Don't trigger if typing in input
+        }
+
+        if (e.key.toLowerCase() === 'a' && !e.ctrlKey && !e.metaKey) {
             toggleAnnotationMode();
+        } else if (e.key.toLowerCase() === 'm' && !e.ctrlKey && !e.metaKey) {
+            toggleMetadataDisplay();
+        } else if (e.key === 'Escape') {
+            hideAnnotationPopup();
+            hideMetadataDisplay();
         }
     });
 
@@ -1255,7 +1280,7 @@ function onAnnotationSelected(annotation) {
         chip.classList.toggle('active', chip.dataset.annoId === annotation.id);
     });
 
-    // Show editor panel
+    // Show editor panel (in controls)
     const editor = document.getElementById('selected-annotation-editor');
     if (editor) {
         editor.classList.remove('hidden');
@@ -1265,6 +1290,9 @@ function onAnnotationSelected(annotation) {
         if (titleInput) titleInput.value = annotation.title || '';
         if (bodyInput) bodyInput.value = annotation.body || '';
     }
+
+    // Show annotation info popup near the marker
+    showAnnotationPopup(annotation);
 }
 
 // Called when placement mode changes
@@ -1925,6 +1953,224 @@ function prefillMetadataFromArchive(manifest) {
             lastRow.querySelector('.custom-field-value').value = value;
         }
     }
+}
+
+// ==================== Museum-Style Metadata Display ====================
+
+// Toggle metadata display visibility
+function toggleMetadataDisplay() {
+    const display = document.getElementById('metadata-display');
+    if (!display) return;
+
+    if (display.classList.contains('hidden')) {
+        showMetadataDisplay();
+    } else {
+        hideMetadataDisplay();
+    }
+}
+
+// Show museum-style metadata display
+function showMetadataDisplay() {
+    const display = document.getElementById('metadata-display');
+    if (!display) return;
+
+    // Populate the display with current metadata
+    populateMetadataDisplay();
+    display.classList.remove('hidden');
+
+    // Update toolbar button state
+    const btn = document.getElementById('btn-metadata');
+    if (btn) btn.classList.add('active');
+}
+
+// Hide museum-style metadata display
+function hideMetadataDisplay() {
+    const display = document.getElementById('metadata-display');
+    if (display) display.classList.add('hidden');
+
+    const btn = document.getElementById('btn-metadata');
+    if (btn) btn.classList.remove('active');
+}
+
+// Populate the museum-style metadata display
+function populateMetadataDisplay() {
+    // Get metadata from form or archive
+    const metadata = collectMetadata();
+
+    // Title
+    const titleEl = document.getElementById('display-title');
+    if (titleEl) {
+        titleEl.textContent = metadata.project.title || 'Untitled';
+    }
+
+    // Description
+    const descEl = document.getElementById('display-description');
+    if (descEl) {
+        descEl.textContent = metadata.project.description || '';
+    }
+
+    // Creator/Operator
+    const creatorRow = document.getElementById('display-creator-row');
+    const creatorEl = document.getElementById('display-creator');
+    if (creatorRow && creatorEl) {
+        if (metadata.provenance.operator) {
+            creatorEl.textContent = metadata.provenance.operator;
+            creatorRow.style.display = '';
+        } else {
+            creatorRow.style.display = 'none';
+        }
+    }
+
+    // Capture Date
+    const dateRow = document.getElementById('display-date-row');
+    const dateEl = document.getElementById('display-date');
+    if (dateRow && dateEl) {
+        if (metadata.provenance.captureDate) {
+            // Format date nicely
+            const date = new Date(metadata.provenance.captureDate);
+            dateEl.textContent = date.toLocaleDateString('en-US', {
+                year: 'numeric', month: 'long', day: 'numeric'
+            });
+            dateRow.style.display = '';
+        } else {
+            dateRow.style.display = 'none';
+        }
+    }
+
+    // Location
+    const locationRow = document.getElementById('display-location-row');
+    const locationEl = document.getElementById('display-location');
+    if (locationRow && locationEl) {
+        if (metadata.provenance.location) {
+            locationEl.textContent = metadata.provenance.location;
+            locationRow.style.display = '';
+        } else {
+            locationRow.style.display = 'none';
+        }
+    }
+
+    // Device
+    const deviceRow = document.getElementById('display-device-row');
+    const deviceEl = document.getElementById('display-device');
+    if (deviceRow && deviceEl) {
+        if (metadata.provenance.captureDevice) {
+            deviceEl.textContent = metadata.provenance.captureDevice;
+            deviceRow.style.display = '';
+        } else {
+            deviceRow.style.display = 'none';
+        }
+    }
+
+    // License
+    const licenseRow = document.getElementById('display-license-row');
+    const licenseEl = document.getElementById('display-license');
+    if (licenseRow && licenseEl) {
+        const license = metadata.project.license;
+        if (license && license !== 'custom') {
+            licenseEl.textContent = license;
+            licenseRow.classList.remove('hidden');
+        } else if (license === 'custom') {
+            const customLicense = document.getElementById('meta-custom-license')?.value;
+            licenseEl.textContent = customLicense || 'Custom License';
+            licenseRow.classList.remove('hidden');
+        } else {
+            licenseRow.classList.add('hidden');
+        }
+    }
+
+    // Stats - Splat count
+    const splatStat = document.getElementById('display-splat-stat');
+    const splatCountEl = document.getElementById('display-splat-count');
+    if (splatStat && splatCountEl) {
+        if (state.splatLoaded) {
+            const count = document.getElementById('splat-vertices')?.textContent || '-';
+            splatCountEl.textContent = count;
+            splatStat.classList.remove('hidden');
+        } else {
+            splatStat.classList.add('hidden');
+        }
+    }
+
+    // Stats - Mesh polygons
+    const meshStat = document.getElementById('display-mesh-stat');
+    const meshCountEl = document.getElementById('display-mesh-count');
+    if (meshStat && meshCountEl) {
+        if (state.modelLoaded) {
+            const count = document.getElementById('model-faces')?.textContent || '-';
+            meshCountEl.textContent = count;
+            meshStat.classList.remove('hidden');
+        } else {
+            meshStat.classList.add('hidden');
+        }
+    }
+
+    // Stats - Annotation count
+    const annoStat = document.getElementById('display-anno-stat');
+    const annoCountEl = document.getElementById('display-anno-count');
+    if (annoStat && annoCountEl && annotationSystem) {
+        const count = annotationSystem.getCount();
+        annoCountEl.textContent = count.toString();
+        if (count > 0) {
+            annoStat.classList.remove('hidden');
+        } else {
+            annoStat.classList.add('hidden');
+        }
+    }
+}
+
+// ==================== Annotation Info Popup ====================
+
+// Show annotation popup near the selected marker
+function showAnnotationPopup(annotation) {
+    const popup = document.getElementById('annotation-info-popup');
+    if (!popup) return;
+
+    // Find the marker element
+    const marker = document.querySelector(`.annotation-marker[data-annotation-id="${annotation.id}"]`);
+    if (!marker) return;
+
+    // Get annotation number from marker
+    const number = marker.textContent;
+
+    // Populate popup
+    const numberEl = popup.querySelector('.annotation-info-number');
+    const titleEl = popup.querySelector('.annotation-info-title');
+    const bodyEl = popup.querySelector('.annotation-info-body');
+
+    if (numberEl) numberEl.textContent = number;
+    if (titleEl) titleEl.textContent = annotation.title || 'Untitled';
+    if (bodyEl) bodyEl.textContent = annotation.body || '';
+
+    // Position popup near the marker
+    const markerRect = marker.getBoundingClientRect();
+    const popupWidth = 320;
+    const padding = 15;
+
+    // Try to position to the right of the marker
+    let left = markerRect.right + padding;
+    let top = markerRect.top - 10;
+
+    // If it would go off the right edge, position to the left instead
+    if (left + popupWidth > window.innerWidth - padding) {
+        left = markerRect.left - popupWidth - padding;
+    }
+
+    // Keep it on screen vertically
+    if (top < padding) top = padding;
+    if (top + 200 > window.innerHeight) {
+        top = window.innerHeight - 200 - padding;
+    }
+
+    popup.style.left = left + 'px';
+    popup.style.top = top + 'px';
+
+    popup.classList.remove('hidden');
+}
+
+// Hide annotation popup
+function hideAnnotationPopup() {
+    const popup = document.getElementById('annotation-info-popup');
+    if (popup) popup.classList.add('hidden');
 }
 
 // ==================== End Annotation/Export Functions ====================
