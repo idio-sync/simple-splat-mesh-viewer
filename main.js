@@ -33,6 +33,14 @@ import {
     updateProgress,
     addListener
 } from './ui-controller.js';
+import {
+    formatFileSize,
+    switchEditTab,
+    addCustomField,
+    collectMetadata,
+    setupLicenseField,
+    hideMetadataSidebar
+} from './metadata-manager.js';
 
 // Create logger for this module
 const log = Logger.getLogger('main.js');
@@ -1820,17 +1828,6 @@ function showMetadataSidebar(mode = 'view') {
     if (btn) btn.classList.add('active');
 }
 
-// Hide metadata sidebar
-function hideMetadataSidebar() {
-    const sidebar = document.getElementById('metadata-sidebar');
-    if (sidebar) {
-        sidebar.classList.add('hidden');
-    }
-
-    const btn = document.getElementById('btn-metadata');
-    if (btn) btn.classList.remove('active');
-}
-
 // Switch sidebar mode (view/edit/annotations)
 function switchSidebarMode(mode) {
     // Update tab buttons
@@ -1851,21 +1848,6 @@ function switchSidebarMode(mode) {
     } else if (mode === 'annotations') {
         updateSidebarAnnotationsList();
     }
-}
-
-// Switch edit sub-tab
-function switchEditTab(tabName) {
-    // Update tab buttons
-    const tabs = document.querySelectorAll('.edit-tab');
-    tabs.forEach(tab => {
-        tab.classList.toggle('active', tab.dataset.tab === tabName);
-    });
-
-    // Update content sections
-    const contents = document.querySelectorAll('.edit-tab-content');
-    contents.forEach(content => {
-        content.classList.toggle('active', content.id === `edit-tab-${tabName}`);
-    });
 }
 
 // Legacy function names for compatibility
@@ -1961,22 +1943,6 @@ function setupMetadataSidebar() {
     }
 }
 
-// Setup license dropdown custom field toggle
-function setupLicenseField() {
-    const licenseSelect = document.getElementById('meta-license');
-    const customLicenseField = document.getElementById('custom-license-field');
-
-    if (licenseSelect && customLicenseField) {
-        licenseSelect.addEventListener('change', () => {
-            if (licenseSelect.value === 'custom') {
-                customLicenseField.classList.remove('hidden');
-            } else {
-                customLicenseField.classList.add('hidden');
-            }
-        });
-    }
-}
-
 // Update quality stats display in metadata panel
 function updateMetadataStats() {
     // Splat count
@@ -2032,15 +1998,6 @@ function updateMetadataStats() {
     }
 }
 
-// Format file size for display
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
 // Update asset status in metadata panel
 function updateAssetStatus() {
     // Splat asset
@@ -2074,93 +2031,6 @@ function updateAssetStatus() {
             if (meshFields) meshFields.classList.add('hidden');
         }
     }
-}
-
-// Add a custom field row
-function addCustomField() {
-    const container = document.getElementById('custom-fields-list');
-    if (!container) return;
-
-    const row = document.createElement('div');
-    row.className = 'custom-field-row';
-
-    // Create elements using safe DOM methods (avoid innerHTML for security)
-    const keyInput = document.createElement('input');
-    keyInput.type = 'text';
-    keyInput.className = 'custom-field-key';
-    keyInput.placeholder = 'Key';
-
-    const valueInput = document.createElement('input');
-    valueInput.type = 'text';
-    valueInput.className = 'custom-field-value';
-    valueInput.placeholder = 'Value';
-
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'custom-field-remove';
-    removeBtn.title = 'Remove';
-    removeBtn.textContent = '\u00D7'; // × character
-    removeBtn.addEventListener('click', () => row.remove());
-
-    row.appendChild(keyInput);
-    row.appendChild(valueInput);
-    row.appendChild(removeBtn);
-    container.appendChild(row);
-}
-
-// Collect all metadata from the panel
-function collectMetadata() {
-    const metadata = {
-        project: {
-            title: document.getElementById('meta-title')?.value || '',
-            id: document.getElementById('meta-id')?.value || '',
-            description: document.getElementById('meta-description')?.value || '',
-            license: document.getElementById('meta-license')?.value || 'CC0'
-        },
-        provenance: {
-            captureDate: document.getElementById('meta-capture-date')?.value || '',
-            captureDevice: document.getElementById('meta-capture-device')?.value || '',
-            operator: document.getElementById('meta-operator')?.value || '',
-            location: document.getElementById('meta-location')?.value || '',
-            conventions: document.getElementById('meta-conventions')?.value || ''
-        },
-        splatMetadata: {
-            createdBy: document.getElementById('meta-splat-created-by')?.value || '',
-            version: document.getElementById('meta-splat-version')?.value || '',
-            sourceNotes: document.getElementById('meta-splat-notes')?.value || ''
-        },
-        meshMetadata: {
-            createdBy: document.getElementById('meta-mesh-created-by')?.value || '',
-            version: document.getElementById('meta-mesh-version')?.value || '',
-            sourceNotes: document.getElementById('meta-mesh-notes')?.value || ''
-        },
-        customFields: {},
-        includeIntegrity: document.getElementById('meta-include-integrity')?.checked ?? true
-    };
-
-    // Handle custom license
-    if (metadata.project.license === 'custom') {
-        metadata.project.license = document.getElementById('meta-custom-license')?.value || 'Custom';
-    }
-
-    // Auto-generate ID from title if empty
-    if (!metadata.project.id && metadata.project.title) {
-        metadata.project.id = metadata.project.title
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-|-$/g, '');
-    }
-
-    // Collect custom fields
-    const customFieldRows = document.querySelectorAll('.custom-field-row');
-    customFieldRows.forEach(row => {
-        const key = row.querySelector('.custom-field-key')?.value?.trim();
-        const value = row.querySelector('.custom-field-value')?.value?.trim();
-        if (key && value) {
-            metadata.customFields[key] = value;
-        }
-    });
-
-    return metadata;
 }
 
 // Prefill metadata panel from archive manifest
