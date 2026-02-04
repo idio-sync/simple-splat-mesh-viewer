@@ -271,6 +271,11 @@ function createAlignmentDeps() {
 function init() {
     log.info(' init() starting...');
 
+    // Debug config
+    console.log('[INIT] Config object:', config);
+    console.log('[INIT] showToolbar:', config.showToolbar);
+    console.log('[INIT] window.APP_CONFIG:', window.APP_CONFIG);
+
     // Verify required DOM elements
     if (!canvas) {
         log.error(' FATAL: viewer-canvas not found!');
@@ -2707,40 +2712,58 @@ function applyControlsMode() {
 
 // Ensure toolbar visibility is maintained (safeguard against race conditions)
 function ensureToolbarVisibility() {
-    // Only ensure visibility if toolbar should be shown
-    if (!config.showToolbar) {
+    console.log('[TOOLBAR] ensureToolbarVisibility called, config.showToolbar:', config.showToolbar);
+
+    // Only hide toolbar if explicitly set to false (not undefined)
+    if (config.showToolbar === false) {
+        console.log('[TOOLBAR] Toolbar intentionally hidden via URL parameter');
         return; // Toolbar intentionally hidden via URL parameter
     }
 
     const toolbar = document.getElementById('left-toolbar');
+    console.log('[TOOLBAR] Toolbar element:', toolbar);
+
     if (!toolbar) {
+        console.error('[TOOLBAR] Toolbar element not found!');
         return;
     }
 
-    // Ensure toolbar is visible
+    // Get current styles
     const computedDisplay = window.getComputedStyle(toolbar).display;
-    if (computedDisplay === 'none' || toolbar.style.display === 'none') {
-        log.info('Restoring toolbar visibility');
-        toolbar.style.display = 'flex';
-    }
+    const inlineDisplay = toolbar.style.display;
+    console.log('[TOOLBAR] Current state - computed:', computedDisplay, 'inline:', inlineDisplay);
+
+    // Force toolbar to be visible
+    toolbar.style.display = 'flex';
+    toolbar.style.visibility = 'visible';
+    toolbar.style.opacity = '1';
+    toolbar.style.zIndex = '10000'; // Very high z-index
+    console.log('[TOOLBAR] Forced toolbar visible');
 
     // Re-check after file loading completes (delayed checks)
     setTimeout(() => {
-        if (config.showToolbar) {
-            const tb = document.getElementById('left-toolbar');
-            if (tb && (window.getComputedStyle(tb).display === 'none' || tb.style.display === 'none')) {
-                log.info('Restoring toolbar visibility (after 1s)');
+        const tb = document.getElementById('left-toolbar');
+        if (tb) {
+            const display = window.getComputedStyle(tb).display;
+            console.log('[TOOLBAR] After 1s - display:', display, 'boundingRect:', tb.getBoundingClientRect());
+            if (config.showToolbar !== false) {
                 tb.style.display = 'flex';
+                tb.style.visibility = 'visible';
+                tb.style.zIndex = '10000';
             }
         }
     }, 1000);
 
     setTimeout(() => {
-        if (config.showToolbar) {
-            const tb = document.getElementById('left-toolbar');
-            if (tb && (window.getComputedStyle(tb).display === 'none' || tb.style.display === 'none')) {
-                log.info('Restoring toolbar visibility (after 3s)');
+        const tb = document.getElementById('left-toolbar');
+        if (tb) {
+            const display = window.getComputedStyle(tb).display;
+            const rect = tb.getBoundingClientRect();
+            console.log('[TOOLBAR] After 3s - display:', display, 'rect:', rect);
+            if (config.showToolbar !== false) {
                 tb.style.display = 'flex';
+                tb.style.visibility = 'visible';
+                tb.style.zIndex = '10000';
             }
         }
     }, 3000);
@@ -2748,13 +2771,17 @@ function ensureToolbarVisibility() {
 
 // Apply viewer mode settings (toolbar visibility, sidebar state)
 function applyViewerModeSettings() {
-    // Apply toolbar visibility
-    if (!config.showToolbar) {
+    console.log('[TOOLBAR] applyViewerModeSettings called, config.showToolbar:', config.showToolbar);
+
+    // Apply toolbar visibility - only hide if explicitly set to false
+    if (config.showToolbar === false) {
         const toolbar = document.getElementById('left-toolbar');
         if (toolbar) {
             toolbar.style.display = 'none';
             log.info('Toolbar hidden via URL parameter');
         }
+    } else {
+        console.log('[TOOLBAR] Toolbar should be visible (showToolbar is not explicitly false)');
     }
 
     // Apply sidebar state (after a short delay to ensure DOM is ready)
