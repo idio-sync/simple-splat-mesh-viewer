@@ -198,9 +198,8 @@ function init() {
     directionalLight2.position.set(-5, 3, -5);
     scene.add(directionalLight2);
 
-    // Grid helper
-    const gridHelper = new THREE.GridHelper(10, 10, 0x4a4a6a, 0x2a2a4a);
-    scene.add(gridHelper);
+    // Grid helper - not shown by default, controlled by toggle
+    // gridHelper is declared globally and managed by toggleGridlines()
 
     // Model group
     modelGroup = new THREE.Group();
@@ -1639,8 +1638,9 @@ async function downloadArchive() {
     // Get export options
     const formatRadio = document.querySelector('input[name="export-format"]:checked');
     const format = formatRadio?.value || 'a3d';
-    const includePreview = document.getElementById('export-include-preview')?.checked ?? true;
-    const includeHashes = document.getElementById('export-include-hashes')?.checked ?? true;
+    // Preview image and integrity hashes are always included
+    const includePreview = true;
+    const includeHashes = true;
     console.log('[main.js] Export options:', { format, includePreview, includeHashes });
 
     // Validate title is set
@@ -3202,6 +3202,12 @@ function applyControlsVisibilityDirect(controlsPanel, shouldShow) {
     const annotationBar = document.getElementById('annotation-bar');
     if (annotationBar) {
         annotationBar.style.left = shouldShow ? '280px' : '0';
+    }
+
+    // Update left toolbar position based on panel visibility
+    const leftToolbar = document.getElementById('left-toolbar');
+    if (leftToolbar) {
+        leftToolbar.style.left = shouldShow ? '295px' : '15px';
     }
 
     // DIAGNOSTIC: Check again after a delay (after potential transition)
