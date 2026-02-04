@@ -560,6 +560,11 @@ The application is now ready for production from both a security and code qualit
 
 Remaining items are longer-term maintainability improvements: adding a testing framework and adding file size limits for uploads.
 
+**Bug fix: Toolbar visibility safeguard:**
+- ✅ Added `ensureToolbarVisibility()` function to prevent race conditions during file loading
+- ✅ Toolbar visibility is re-checked at multiple intervals (immediate, 1s, 3s) to catch async issues
+- ✅ Only applies when toolbar should be visible (respects `?toolbar=hide` URL parameter)
+
 **Estimated Effort for Security Fixes:** ~~2-3 developer days~~ ✅ Complete
 **Estimated Effort for Short-term Code Quality:** ~~1 developer week~~ ✅ Complete
 **Estimated Effort for Modularization Integration:** ~~1-2 developer days~~ ✅ Complete
