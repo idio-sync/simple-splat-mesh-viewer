@@ -15,7 +15,8 @@ import {
     autoAlignObjects as autoAlignObjectsHandler,
     fitToView as fitToViewHandler,
     resetAlignment as resetAlignmentHandler,
-    resetCamera as resetCameraHandler
+    resetCamera as resetCameraHandler,
+    centerModelOnGrid
 } from './modules/alignment.js';
 import {
     showLoading,
@@ -241,9 +242,12 @@ function createFileHandlerDeps() {
                 storeLastPositions();
                 currentMeshBlob = file;
                 document.getElementById('model-faces').textContent = (faceCount || 0).toLocaleString();
-                // Auto-align if splat is already loaded
+                // Auto-align if splat is already loaded, otherwise center on grid
                 if (state.splatLoaded) {
                     setTimeout(() => autoAlignObjects(), TIMING.AUTO_ALIGN_DELAY);
+                } else {
+                    // Center model on grid when loaded standalone
+                    setTimeout(() => centerModelOnGrid(modelGroup), TIMING.AUTO_ALIGN_DELAY);
                 }
                 clearArchiveMetadata();
             }
@@ -1140,6 +1144,12 @@ async function loadModelFromBlobUrl(blobUrl, fileName) {
         updateModelOpacity();
         updateModelWireframe();
         updateVisibility();
+
+        // Center model on grid if no splat is loaded
+        // (Archives with alignment data will override this later)
+        if (!state.splatLoaded) {
+            centerModelOnGrid(modelGroup);
+        }
 
         // Count faces and update UI
         const faceCount = computeMeshFaceCount(loadedObject);
@@ -2956,6 +2966,12 @@ async function loadModelFromUrl(url) {
             updateVisibility();
             updateTransformInputs();
             storeLastPositions();
+
+            // Center model on grid if no splat is loaded
+            // (loadDefaultFiles will handle alignment if both are loaded)
+            if (!state.splatLoaded) {
+                centerModelOnGrid(modelGroup);
+            }
 
             // Count faces and vertices using utilities
             const faceCount = computeMeshFaceCount(loadedObject);

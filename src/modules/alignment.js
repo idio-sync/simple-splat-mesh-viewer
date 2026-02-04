@@ -875,3 +875,51 @@ export function generateShareParams(deps) {
 
     return params;
 }
+
+/**
+ * Center a model on the grid (y=0) when loaded standalone (without a splat).
+ * Positions the model so its bottom is on the grid and it's centered horizontally.
+ * @param {THREE.Group} modelGroup - The model group to center
+ */
+export function centerModelOnGrid(modelGroup) {
+    if (!modelGroup || modelGroup.children.length === 0) {
+        log.warn('[centerModelOnGrid] No model to center');
+        return;
+    }
+
+    // Calculate the bounding box of the model
+    const box = new THREE.Box3().setFromObject(modelGroup);
+
+    if (box.isEmpty()) {
+        log.warn('[centerModelOnGrid] Model bounding box is empty');
+        return;
+    }
+
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+
+    log.debug('[centerModelOnGrid] Model bounds:', {
+        min: box.min.toArray(),
+        max: box.max.toArray(),
+        center: center.toArray(),
+        size: size.toArray()
+    });
+
+    // Calculate offset to center the model horizontally (X, Z) and place bottom on grid (Y)
+    // The model's current world position affects where the bounding box is
+    // We need to offset the modelGroup position to achieve the desired placement
+
+    // Target: center.x = 0, center.z = 0, box.min.y = 0
+    const offsetX = -center.x;
+    const offsetY = -box.min.y;  // Move bottom to y=0
+    const offsetZ = -center.z;
+
+    modelGroup.position.x += offsetX;
+    modelGroup.position.y += offsetY;
+    modelGroup.position.z += offsetZ;
+
+    log.info('[centerModelOnGrid] Model centered on grid:', {
+        newPosition: modelGroup.position.toArray(),
+        offset: [offsetX, offsetY, offsetZ]
+    });
+}
