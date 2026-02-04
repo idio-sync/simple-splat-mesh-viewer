@@ -10,6 +10,7 @@ import { ArchiveLoader, isArchiveFile } from './archive-loader.js';
 import { AnnotationSystem } from './annotation-system.js';
 import { ArchiveCreator, captureScreenshot } from './archive-creator.js';
 import { CAMERA, ORBIT_CONTROLS, RENDERER, LIGHTING, GRID, COLORS, TIMING, MATERIAL } from './constants.js';
+import { notify, processMeshMaterials, computeMeshFaceCount, computeMeshVertexCount, disposeObject } from './utilities.js';
 
 // Mark module as loaded (for pre-module error detection)
 window.moduleLoaded = true;
@@ -938,7 +939,7 @@ function handleLoadSplatFromUrlPrompt() {
     // Validate URL before loading
     const validation = validateUserUrl(url, 'splat');
     if (!validation.valid) {
-        alert('Cannot load splat:\n\n' + validation.error);
+        notify.error('Cannot load splat: ' + validation.error);
         return;
     }
 
@@ -955,7 +956,7 @@ function handleLoadModelFromUrlPrompt() {
     // Validate URL before loading
     const validation = validateUserUrl(url, 'model');
     if (!validation.valid) {
-        alert('Cannot load model:\n\n' + validation.error);
+        notify.error('Cannot load model: ' + validation.error);
         return;
     }
 
@@ -972,7 +973,7 @@ function handleLoadArchiveFromUrlPrompt() {
     // Validate URL before loading
     const validation = validateUserUrl(url, 'archive');
     if (!validation.valid) {
-        alert('Cannot load archive:\n\n' + validation.error);
+        notify.error('Cannot load archive: ' + validation.error);
         return;
     }
 
@@ -1001,7 +1002,7 @@ async function handleArchiveFile(event) {
     } catch (error) {
         console.error('Error loading archive:', error);
         hideLoading();
-        alert('Error loading archive: ' + error.message);
+        notify.error('Error loading archive: ' + error.message);
     }
 }
 
@@ -1028,7 +1029,7 @@ async function loadArchiveFromUrl(url) {
     } catch (error) {
         console.error('Error loading archive from URL:', error);
         hideLoading();
-        alert('Error loading archive from URL: ' + error.message);
+        notify.error('Error loading archive from URL: ' + error.message);
     }
 }
 
@@ -1144,7 +1145,7 @@ async function processArchive(archiveLoader, archiveName) {
         // Alert if no viewable content
         if (!loadedSplat && !loadedMesh) {
             hideLoading();
-            alert('Archive does not contain any viewable splat or mesh files.');
+            notify.warning('Archive does not contain any viewable splat or mesh files.');
             return;
         }
 
@@ -1152,7 +1153,7 @@ async function processArchive(archiveLoader, archiveName) {
     } catch (error) {
         console.error('[main.js] Error processing archive:', error);
         hideLoading();
-        alert('Error processing archive: ' + error.message);
+        notify.error('Error processing archive: ' + error.message);
     }
 }
 
@@ -1219,22 +1220,10 @@ async function loadModelFromBlobUrl(blobUrl, fileName) {
         updateModelWireframe();
         updateVisibility();
 
-        // Count faces
-        let faceCount = 0;
-        loadedObject.traverse((child) => {
-            if (child.isMesh && child.geometry) {
-                const geo = child.geometry;
-                if (geo.index) {
-                    faceCount += geo.index.count / 3;
-                } else if (geo.attributes.position) {
-                    faceCount += geo.attributes.position.count / 3;
-                }
-            }
-        });
-
-        // Update UI
+        // Count faces and update UI
+        const faceCount = computeMeshFaceCount(loadedObject);
         document.getElementById('model-filename').textContent = fileName;
-        document.getElementById('model-faces').textContent = Math.round(faceCount).toLocaleString();
+        document.getElementById('model-faces').textContent = faceCount.toLocaleString();
     }
 }
 
@@ -1247,32 +1236,7 @@ function loadGLTFFromBlobUrl(blobUrl) {
             blobUrl,
             (gltf) => {
                 // Process materials and normals for proper lighting
-                gltf.scene.traverse((child) => {
-                    if (child.isMesh) {
-                        if (child.geometry && !child.geometry.attributes.normal) {
-                            child.geometry.computeVertexNormals();
-                        }
-
-                        if (child.material) {
-                            const mat = child.material;
-                            if (mat.isMeshBasicMaterial || mat.isLineBasicMaterial || mat.isPointsMaterial) {
-                                const oldMaterial = mat;
-                                child.material = new THREE.MeshStandardMaterial({
-                                    color: oldMaterial.color || new THREE.Color(COLORS.DEFAULT_MATERIAL),
-                                    map: oldMaterial.map,
-                                    alphaMap: oldMaterial.alphaMap,
-                                    transparent: oldMaterial.transparent || false,
-                                    opacity: oldMaterial.opacity !== undefined ? oldMaterial.opacity : 1,
-                                    side: oldMaterial.side || THREE.FrontSide,
-                                    metalness: 0.1,
-                                    roughness: 0.8
-                                });
-                                oldMaterial.dispose();
-                            }
-                        }
-                    }
-                });
-
+                processMeshMaterials(gltf.scene);
                 resolve(gltf.scene);
             },
             undefined,
@@ -1291,19 +1255,8 @@ function loadOBJFromBlobUrl(blobUrl) {
         loader.load(
             blobUrl,
             (object) => {
-                object.traverse((child) => {
-                    if (child.isMesh) {
-                        if (child.geometry && !child.geometry.attributes.normal) {
-                            child.geometry.computeVertexNormals();
-                        }
-
-                        child.material = new THREE.MeshStandardMaterial({
-                            color: COLORS.DEFAULT_MATERIAL,
-                            metalness: 0.1,
-                            roughness: 0.8
-                        });
-                    }
-                });
+                // OBJ without MTL - use default material
+                processMeshMaterials(object, { forceDefaultMaterial: true });
                 resolve(object);
             },
             undefined,
@@ -1751,7 +1704,7 @@ async function downloadArchive() {
     // Validate title is set
     if (!metadata.project.title) {
         console.log('[main.js] No title set, showing metadata panel');
-        alert('Please enter a project title in the metadata panel before exporting.');
+        notify.warning('Please enter a project title in the metadata panel before exporting.');
         showMetadataPanel();
         return;
     }
@@ -1844,7 +1797,7 @@ async function downloadArchive() {
     const validation = archiveCreator.validate();
     console.log('[main.js] Validation result:', validation);
     if (!validation.valid) {
-        alert('Cannot create archive:\n' + validation.errors.join('\n'));
+        notify.error('Cannot create archive: ' + validation.errors.join('; '));
         return;
     }
 
@@ -1870,7 +1823,7 @@ async function downloadArchive() {
     } catch (e) {
         hideLoading();
         console.error('[main.js] Error creating archive:', e);
-        alert('Error creating archive: ' + e.message);
+        notify.error('Error creating archive: ' + e.message);
     }
 }
 
@@ -2688,7 +2641,7 @@ async function handleSplatFile(event) {
     } catch (error) {
         console.error('Error loading splat:', error);
         hideLoading();
-        alert('Error loading Gaussian Splat: ' + error.message);
+        notify.error('Error loading Gaussian Splat: ' + error.message);
     }
 }
 
@@ -2744,19 +2697,9 @@ async function handleModelFile(event) {
                 });
             }
 
-            // Count faces
-            let faceCount = 0;
-            loadedObject.traverse((child) => {
-                if (child.isMesh && child.geometry) {
-                    const geo = child.geometry;
-                    if (geo.index) {
-                        faceCount += geo.index.count / 3;
-                    } else if (geo.attributes.position) {
-                        faceCount += geo.attributes.position.count / 3;
-                    }
-                }
-            });
-            document.getElementById('model-faces').textContent = Math.round(faceCount).toLocaleString();
+            // Count faces and update UI
+            const faceCount = computeMeshFaceCount(loadedObject);
+            document.getElementById('model-faces').textContent = faceCount.toLocaleString();
 
             // Auto-align if splat is already loaded
             if (state.splatLoaded) {
@@ -2771,22 +2714,11 @@ async function handleModelFile(event) {
     } catch (error) {
         console.error('Error loading model:', error);
         hideLoading();
-        alert('Error loading model: ' + error.message);
+        notify.error('Error loading model: ' + error.message);
     }
 }
 
-function disposeObject(obj) {
-    obj.traverse((child) => {
-        if (child.geometry) child.geometry.dispose();
-        if (child.material) {
-            if (Array.isArray(child.material)) {
-                child.material.forEach(m => m.dispose());
-            } else {
-                child.material.dispose();
-            }
-        }
-    });
-}
+// disposeObject is now imported from utilities.js
 
 function loadGLTF(file) {
     return new Promise((resolve, reject) => {
@@ -2797,36 +2729,8 @@ function loadGLTF(file) {
             url,
             (gltf) => {
                 URL.revokeObjectURL(url);
-
                 // Process materials and normals for proper lighting
-                gltf.scene.traverse((child) => {
-                    if (child.isMesh) {
-                        // Ensure normals exist for proper lighting
-                        if (child.geometry && !child.geometry.attributes.normal) {
-                            child.geometry.computeVertexNormals();
-                        }
-
-                        // Convert non-PBR materials to MeshStandardMaterial for lighting support
-                        if (child.material) {
-                            const mat = child.material;
-                            if (mat.isMeshBasicMaterial || mat.isLineBasicMaterial || mat.isPointsMaterial) {
-                                const oldMaterial = mat;
-                                child.material = new THREE.MeshStandardMaterial({
-                                    color: oldMaterial.color || new THREE.Color(COLORS.DEFAULT_MATERIAL),
-                                    map: oldMaterial.map,
-                                    alphaMap: oldMaterial.alphaMap,
-                                    transparent: oldMaterial.transparent || false,
-                                    opacity: oldMaterial.opacity !== undefined ? oldMaterial.opacity : 1,
-                                    side: oldMaterial.side || THREE.FrontSide,
-                                    metalness: 0.1,
-                                    roughness: 0.8
-                                });
-                                oldMaterial.dispose();
-                            }
-                        }
-                    }
-                });
-
+                processMeshMaterials(gltf.scene);
                 resolve(gltf.scene);
             },
             undefined,
@@ -2859,35 +2763,8 @@ function loadOBJ(objFile, mtlFile) {
                         (object) => {
                             URL.revokeObjectURL(objUrl);
                             URL.revokeObjectURL(mtlUrl);
-
-                            // Process materials and normals for proper lighting
-                            object.traverse((child) => {
-                                if (child.isMesh) {
-                                    // Ensure normals exist for proper lighting
-                                    if (child.geometry && !child.geometry.attributes.normal) {
-                                        child.geometry.computeVertexNormals();
-                                    }
-
-                                    // Convert to MeshStandardMaterial for consistent PBR lighting
-                                    if (child.material) {
-                                        const oldMaterial = child.material;
-                                        const color = oldMaterial.color?.clone() || new THREE.Color(COLORS.DEFAULT_MATERIAL);
-                                        const map = oldMaterial.map || null;
-
-                                        child.material = new THREE.MeshStandardMaterial({
-                                            color: color,
-                                            map: map,
-                                            metalness: 0.1,
-                                            roughness: 0.8
-                                        });
-
-                                        if (oldMaterial.dispose) {
-                                            oldMaterial.dispose();
-                                        }
-                                    }
-                                }
-                            });
-
+                            // OBJ with MTL - upgrade materials to standard for consistent lighting
+                            processMeshMaterials(object, { forceDefaultMaterial: true, preserveTextures: true });
                             resolve(object);
                         },
                         undefined,
@@ -2915,20 +2792,8 @@ function loadOBJWithoutMaterials(loader, url, resolve, reject) {
         url,
         (object) => {
             URL.revokeObjectURL(url);
-            object.traverse((child) => {
-                if (child.isMesh) {
-                    // Ensure normals exist for proper lighting
-                    if (child.geometry && !child.geometry.attributes.normal) {
-                        child.geometry.computeVertexNormals();
-                    }
-
-                    child.material = new THREE.MeshStandardMaterial({
-                        color: COLORS.DEFAULT_MATERIAL,
-                        metalness: 0.1,
-                        roughness: 0.8
-                    });
-                }
-            });
+            // OBJ without MTL - use default material
+            processMeshMaterials(object, { forceDefaultMaterial: true });
             resolve(object);
         },
         undefined,
@@ -3020,7 +2885,7 @@ function loadAlignment(event) {
             const alignment = JSON.parse(e.target.result);
             applyAlignmentData(alignment);
         } catch (error) {
-            alert('Error loading alignment file: ' + error.message);
+            notify.error('Error loading alignment file: ' + error.message);
         }
     };
     reader.readAsText(file);
@@ -3051,7 +2916,7 @@ async function loadAlignmentFromUrl(url) {
 function copyShareLink() {
     // Check if at least one URL is present
     if (!state.currentArchiveUrl && !state.currentSplatUrl && !state.currentModelUrl) {
-        alert('Cannot share: No files loaded from URL. Share links only work for files loaded via URL, not local uploads.');
+        notify.warning('Cannot share: No files loaded from URL. Share links only work for files loaded via URL, not local uploads.');
         return;
     }
 
@@ -3075,10 +2940,10 @@ function copyShareLink() {
         const shareUrl = baseUrl + '?' + params.toString();
 
         navigator.clipboard.writeText(shareUrl).then(() => {
-            alert('Share link copied to clipboard!');
+            notify.success('Share link copied to clipboard!');
         }).catch((err) => {
             console.error('[main.js] Failed to copy share link:', err);
-            alert('Share link:\n' + shareUrl);
+            notify.info('Share link: ' + shareUrl, { duration: 10000 });
         });
         return;
     }
@@ -3145,11 +3010,11 @@ function copyShareLink() {
 
     // Copy to clipboard
     navigator.clipboard.writeText(shareUrl).then(() => {
-        alert('Share link copied to clipboard!');
+        notify.success('Share link copied to clipboard!');
     }).catch((err) => {
         console.error('[main.js] Failed to copy share link:', err);
-        // Fallback: show the URL in an alert
-        alert('Share link:\n' + shareUrl);
+        // Fallback: show the URL in a notification
+        notify.info('Share link: ' + shareUrl, { duration: 10000 });
     });
 }
 
@@ -3558,28 +3423,14 @@ async function loadModelFromUrl(url) {
             updateTransformInputs();
             storeLastPositions();
 
-            // Count faces and vertices
-            let faceCount = 0;
-            let vertexCount = 0;
-            loadedObject.traverse((child) => {
-                if (child.isMesh && child.geometry) {
-                    const geo = child.geometry;
-                    if (geo.index) {
-                        faceCount += geo.index.count / 3;
-                    } else if (geo.attributes.position) {
-                        faceCount += geo.attributes.position.count / 3;
-                    }
-                    if (geo.attributes.position) {
-                        vertexCount += geo.attributes.position.count;
-                    }
-                }
-            });
-            state.meshVertexCount = vertexCount;
+            // Count faces and vertices using utilities
+            const faceCount = computeMeshFaceCount(loadedObject);
+            state.meshVertexCount = computeMeshVertexCount(loadedObject);
 
             // Update UI
             const filename = url.split('/').pop() || 'URL';
             document.getElementById('model-filename').textContent = filename;
-            document.getElementById('model-faces').textContent = Math.round(faceCount).toLocaleString();
+            document.getElementById('model-faces').textContent = faceCount.toLocaleString();
         }
 
         hideLoading();
@@ -3596,34 +3447,7 @@ function loadGLTFFromUrl(url) {
             url,
             (gltf) => {
                 // Process materials and normals for proper lighting
-                gltf.scene.traverse((child) => {
-                    if (child.isMesh) {
-                        // Ensure normals exist for proper lighting
-                        if (child.geometry && !child.geometry.attributes.normal) {
-                            child.geometry.computeVertexNormals();
-                        }
-
-                        // Convert non-PBR materials to MeshStandardMaterial for lighting support
-                        if (child.material) {
-                            const mat = child.material;
-                            if (mat.isMeshBasicMaterial || mat.isLineBasicMaterial || mat.isPointsMaterial) {
-                                const oldMaterial = mat;
-                                child.material = new THREE.MeshStandardMaterial({
-                                    color: oldMaterial.color || new THREE.Color(COLORS.DEFAULT_MATERIAL),
-                                    map: oldMaterial.map,
-                                    alphaMap: oldMaterial.alphaMap,
-                                    transparent: oldMaterial.transparent || false,
-                                    opacity: oldMaterial.opacity !== undefined ? oldMaterial.opacity : 1,
-                                    side: oldMaterial.side || THREE.FrontSide,
-                                    metalness: 0.1,
-                                    roughness: 0.8
-                                });
-                                oldMaterial.dispose();
-                            }
-                        }
-                    }
-                });
-
+                processMeshMaterials(gltf.scene);
                 resolve(gltf.scene);
             },
             undefined,
@@ -3638,30 +3462,8 @@ function loadOBJFromUrl(url) {
         loader.load(
             url,
             (object) => {
-                object.traverse((child) => {
-                    if (child.isMesh) {
-                        // Ensure normals exist for proper lighting
-                        if (child.geometry && !child.geometry.attributes.normal) {
-                            child.geometry.computeVertexNormals();
-                        }
-
-                        // Convert any material to MeshStandardMaterial for consistent lighting
-                        const oldMaterial = child.material;
-                        const color = oldMaterial?.color?.clone() || new THREE.Color(COLORS.DEFAULT_MATERIAL);
-                        const map = oldMaterial?.map || null;
-
-                        child.material = new THREE.MeshStandardMaterial({
-                            color: color,
-                            map: map,
-                            metalness: 0.1,
-                            roughness: 0.8
-                        });
-
-                        if (oldMaterial && oldMaterial.dispose) {
-                            oldMaterial.dispose();
-                        }
-                    }
-                });
+                // OBJ without MTL - use default material
+                processMeshMaterials(object, { forceDefaultMaterial: true, preserveTextures: true });
                 resolve(object);
             },
             undefined,
@@ -3993,7 +3795,7 @@ async function icpAlignObjects() {
     console.log('[ICP] icpAlignObjects called');
 
     if (!splatMesh || !modelGroup || modelGroup.children.length === 0) {
-        alert('Both splat and model must be loaded for ICP alignment');
+        notify.warning('Both splat and model must be loaded for ICP alignment');
         return;
     }
 
@@ -4023,14 +3825,14 @@ async function icpAlignObjects() {
         if (splatPoints.length < 10) {
             hideLoading();
             console.error('[ICP] Not enough splat points:', splatPoints.length);
-            alert('Could not extract enough splat positions for ICP (' + splatPoints.length + ' found). The splat may not support position extraction or may still be loading.');
+            notify.warning('Could not extract enough splat positions for ICP (' + splatPoints.length + ' found). The splat may not support position extraction or may still be loading.');
             return;
         }
 
         if (meshPoints.length < 10) {
             hideLoading();
             console.error('[ICP] Not enough mesh points:', meshPoints.length);
-            alert('Could not extract enough mesh vertices for ICP (' + meshPoints.length + ' found).');
+            notify.warning('Could not extract enough mesh vertices for ICP (' + meshPoints.length + ' found).');
             return;
         }
 
@@ -4151,7 +3953,7 @@ async function icpAlignObjects() {
     } catch (error) {
         console.error('[ICP] Error during ICP alignment:', error);
         hideLoading();
-        alert('Error during ICP alignment: ' + error.message);
+        notify.error('Error during ICP alignment: ' + error.message);
     }
 }
 
@@ -4178,7 +3980,7 @@ function setupCollapsibles() {
 // Auto align objects - aligns model to splat by matching bounding box centers
 function autoAlignObjects() {
     if (!splatMesh || !modelGroup || modelGroup.children.length === 0) {
-        alert('Both splat and model must be loaded for auto-alignment');
+        notify.warning('Both splat and model must be loaded for auto-alignment');
         return;
     }
 
@@ -4284,7 +4086,7 @@ function autoAlignObjects() {
     modelBox.setFromObject(modelGroup);
 
     if (modelBox.isEmpty()) {
-        alert('Could not compute model bounds');
+        notify.warning('Could not compute model bounds');
         return;
     }
 

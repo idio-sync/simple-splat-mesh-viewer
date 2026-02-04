@@ -167,25 +167,30 @@ camera = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeigh
 camera = new THREE.PerspectiveCamera(CAMERA.FOV, ..., CAMERA.NEAR, CAMERA.FAR);
 ```
 
-### 2.3 Inconsistent Error Handling (MEDIUM Priority)
+### ~~2.3 Inconsistent Error Handling (MEDIUM Priority)~~ ✅ FIXED
 
-**Issue:** Mix of try-catch, alert(), and console.error() for error handling.
+> **Status:** Resolved on 2026-02-04
+>
+> **Fix implemented in:**
+> - `utilities.js` - New module with `NotificationManager` class
+> - `main.js` - All 25+ `alert()` calls replaced with `notify.error/warning/success/info`
+>
+> **Changes made:**
+> - Created centralized notification system with toast-style UI
+> - Supports error, warning, success, and info notification types
+> - Auto-dismissing notifications with configurable duration
+> - Consistent styling and user experience across all error/success messages
+> - Console logging preserved alongside user notifications
 
-**Location:** Throughout `main.js`
+~~**Issue:** Mix of try-catch, alert(), and console.error() for error handling.~~
 
 ```javascript
-// main.js:2571-2575
-} catch (error) {
-    console.error('Error loading splat:', error);
-    hideLoading();
-    alert('Error loading Gaussian Splat: ' + error.message);
-}
-```
+// OLD:
+alert('Error loading Gaussian Splat: ' + error.message);
 
-**Recommendation:**
-- Create a centralized error handling service
-- Use a toast/notification system instead of `alert()`
-- Log errors to a monitoring service in production
+// NEW:
+notify.error('Error loading Gaussian Splat: ' + error.message);
+```
 
 ### 2.4 Promise Handling Anti-patterns (LOW Priority)
 
@@ -203,34 +208,33 @@ await new Promise(resolve => setTimeout(resolve, 100));
 - Add ready callbacks to the Spark library integration
 - Use MutationObserver or ResizeObserver where appropriate
 
-### 2.5 Code Duplication (MEDIUM Priority)
+### ~~2.5 Code Duplication (MEDIUM Priority)~~ ✅ FIXED
 
-**Issue:** GLTF and OBJ loading logic is duplicated across multiple functions.
+> **Status:** Resolved on 2026-02-04
+>
+> **Fix implemented in:**
+> - `utilities.js` - New module with mesh processing utilities
+> - `main.js` - All 6 duplicate mesh processing patterns replaced with utility calls
+>
+> **Utility functions created:**
+> - `processMeshMaterials(object, options)` - Main function to process all meshes
+> - `ensureMeshNormals(mesh)` - Computes vertex normals if missing
+> - `convertToStandardMaterial(material, options)` - Upgrades basic materials to PBR
+> - `createDefaultMaterial(options)` - Creates consistent default materials
+> - `computeMeshFaceCount(object)` - Counts faces (replaced 3 duplicate patterns)
+> - `computeMeshVertexCount(object)` - Counts vertices
+> - `disposeObject(object)` - Disposes geometries and materials
 
-**Location:** `main.js:1147-1220, 2674-2822, 3475-3553`
+~~**Issue:** GLTF and OBJ loading logic is duplicated across multiple functions.~~
 
-The following pattern appears 3 times:
 ```javascript
+// OLD (appeared 6 times):
 gltf.scene.traverse((child) => {
-    if (child.isMesh) {
-        if (child.geometry && !child.geometry.attributes.normal) {
-            child.geometry.computeVertexNormals();
-        }
-        // Material conversion logic...
-    }
+    if (child.isMesh) { /* 20+ lines of processing */ }
 });
-```
 
-**Recommendation:** Extract to a shared utility function:
-```javascript
-function processMeshMaterials(object3D) {
-    object3D.traverse((child) => {
-        if (child.isMesh) {
-            ensureNormals(child);
-            upgradeToStandardMaterial(child);
-        }
-    });
-}
+// NEW (single utility call):
+processMeshMaterials(gltf.scene);
 ```
 
 ### 2.6 Event Listener Memory Leaks (LOW Priority)
@@ -436,9 +440,9 @@ if (!CRYPTO_AVAILABLE) {
 
 ### Short-term (Next Sprint):
 
-1. **Implement centralized error handling** with user-friendly messages
+1. ~~**Implement centralized error handling** with user-friendly messages~~ ✅ DONE
 2. ~~**Create a constants module** for magic values~~ ✅ DONE
-3. **Extract duplicate code** into utility functions
+3. ~~**Extract duplicate code** into utility functions~~ ✅ DONE
 4. **Add file size limits** for uploaded/downloaded files
 
 ### Medium-term (Next Quarter):
@@ -508,7 +512,17 @@ The codebase shows solid foundational work with good 3D visualization capabiliti
 - ✅ innerHTML replaced with safe DOM methods (main.js)
 - ✅ Content Security Policy headers added (index.html)
 
-The application is now ready for production from a security standpoint. Remaining items are code quality improvements that can be addressed in subsequent sprints. The application would benefit from better modularization and the addition of a testing framework for long-term maintainability.
+**Short-term code quality improvements completed:**
+
+- ✅ Constants module created (constants.js)
+- ✅ Centralized error handling with toast notifications (utilities.js)
+- ✅ Duplicate code extracted into utility functions (utilities.js)
+  - Mesh material processing consolidated
+  - Face/vertex counting utilities added
+  - Object disposal utility added
+
+The application is now ready for production from both a security and code quality standpoint. Remaining items are longer-term maintainability improvements: better modularization of main.js and the addition of a testing framework.
 
 **Estimated Effort for Security Fixes:** ~~2-3 developer days~~ ✅ Complete
-**Estimated Effort for Remaining Recommendations:** 2 developer weeks
+**Estimated Effort for Short-term Code Quality:** ~~1 developer week~~ ✅ Complete
+**Estimated Effort for Remaining Recommendations:** 1-2 developer weeks
