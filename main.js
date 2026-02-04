@@ -1,7 +1,5 @@
 // ES Module imports (these are hoisted - execute first before any other code)
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
@@ -9,15 +7,15 @@ import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader, isArchiveFile } from './archive-loader.js';
 import { AnnotationSystem } from './annotation-system.js';
 import { ArchiveCreator, captureScreenshot } from './archive-creator.js';
-import { CAMERA, ORBIT_CONTROLS, RENDERER, LIGHTING, GRID, COLORS, TIMING, MATERIAL } from './constants.js';
+import { CAMERA, TIMING } from './constants.js';
 import { Logger, notify, processMeshMaterials, computeMeshFaceCount, computeMeshVertexCount, disposeObject } from './utilities.js';
+import { SceneManager } from './scene-manager.js';
 import {
-    KDTree,
-    extractSplatPositions,
-    extractMeshVertices,
-    computeCentroid,
-    computeOptimalRotation,
-    computeSplatBoundsFromPositions
+    icpAlignObjects as icpAlignObjectsHandler,
+    autoAlignObjects as autoAlignObjectsHandler,
+    fitToView as fitToViewHandler,
+    resetAlignment as resetAlignmentHandler,
+    resetCamera as resetCameraHandler
 } from './alignment.js';
 import {
     showLoading,
@@ -33,6 +31,12 @@ import {
     setupLicenseField,
     hideMetadataSidebar
 } from './metadata-manager.js';
+import {
+    loadSplatFromFile as loadSplatFromFileHandler,
+    loadSplatFromUrl as loadSplatFromUrlHandler,
+    loadModelFromFile as loadModelFromFileHandler,
+    loadModelFromUrl as loadModelFromUrlHandler
+} from './file-handlers.js';
 import {
     initShareDialog,
     showShareDialog
@@ -169,7 +173,10 @@ const state = {
     archiveLoader: null
 };
 
-// Three.js objects - Main view
+// Scene manager instance (handles scene, camera, renderer, controls, lighting)
+let sceneManager = null;
+
+// Three.js objects - Main view (references extracted from SceneManager for backward compatibility)
 let scene, camera, renderer, controls, transformControls;
 let splatMesh = null;
 let modelGroup = null;
@@ -202,6 +209,63 @@ log.info(' DOM elements found:', {
     loadingText: !!loadingText
 });
 
+// Helper function to create dependencies object for file-handlers.js
+function createFileHandlerDeps() {
+    return {
+        scene,
+        modelGroup,
+        getSplatMesh: () => splatMesh,
+        setSplatMesh: (mesh) => { splatMesh = mesh; },
+        getModelGroup: () => modelGroup,
+        state,
+        archiveCreator,
+        callbacks: {
+            onSplatLoaded: (mesh, file) => {
+                updateVisibility();
+                updateTransformInputs();
+                storeLastPositions();
+                currentSplatBlob = file;
+                document.getElementById('splat-vertices').textContent = 'Loaded';
+                // Auto-align if model is already loaded
+                if (state.modelLoaded) {
+                    setTimeout(() => autoAlignObjects(), TIMING.AUTO_ALIGN_DELAY);
+                }
+                clearArchiveMetadata();
+            },
+            onModelLoaded: (object, file, faceCount) => {
+                updateModelOpacity();
+                updateModelWireframe();
+                updateVisibility();
+                updateTransformInputs();
+                storeLastPositions();
+                currentMeshBlob = file;
+                document.getElementById('model-faces').textContent = (faceCount || 0).toLocaleString();
+                // Auto-align if splat is already loaded
+                if (state.splatLoaded) {
+                    setTimeout(() => autoAlignObjects(), TIMING.AUTO_ALIGN_DELAY);
+                }
+                clearArchiveMetadata();
+            }
+        }
+    };
+}
+
+// Helper function to create dependencies object for alignment.js
+function createAlignmentDeps() {
+    return {
+        splatMesh,
+        modelGroup,
+        camera,
+        controls,
+        state,
+        showLoading,
+        hideLoading,
+        updateTransformInputs,
+        storeLastPositions,
+        initialPosition: CAMERA.INITIAL_POSITION
+    };
+}
+
 // Initialize the scene
 function init() {
     log.info(' init() starting...');
@@ -216,120 +280,35 @@ function init() {
         return;
     }
 
-    // Scene
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(COLORS.SCENE_BACKGROUND);
+    // Create and initialize SceneManager
+    sceneManager = new SceneManager();
+    if (!sceneManager.init(canvas, canvasRight)) {
+        log.error(' FATAL: SceneManager initialization failed!');
+        return;
+    }
 
-    // Camera
-    camera = new THREE.PerspectiveCamera(
-        CAMERA.FOV,
-        canvas.clientWidth / canvas.clientHeight,
-        CAMERA.NEAR,
-        CAMERA.FAR
-    );
-    camera.position.set(CAMERA.INITIAL_POSITION.x, CAMERA.INITIAL_POSITION.y, CAMERA.INITIAL_POSITION.z);
+    // Extract objects to global variables for backward compatibility
+    scene = sceneManager.scene;
+    camera = sceneManager.camera;
+    renderer = sceneManager.renderer;
+    rendererRight = sceneManager.rendererRight;
+    controls = sceneManager.controls;
+    controlsRight = sceneManager.controlsRight;
+    transformControls = sceneManager.transformControls;
+    ambientLight = sceneManager.ambientLight;
+    hemisphereLight = sceneManager.hemisphereLight;
+    directionalLight1 = sceneManager.directionalLight1;
+    directionalLight2 = sceneManager.directionalLight2;
+    modelGroup = sceneManager.modelGroup;
 
-    // Renderer - Main (left in split mode)
-    renderer = new THREE.WebGLRenderer({
-        canvas: canvas,
-        antialias: true
-    });
-    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, RENDERER.MAX_PIXEL_RATIO));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-
-    // Renderer - Right (for split view)
-    rendererRight = new THREE.WebGLRenderer({
-        canvas: canvasRight,
-        antialias: true
-    });
-    rendererRight.setPixelRatio(Math.min(window.devicePixelRatio, RENDERER.MAX_PIXEL_RATIO));
-    rendererRight.outputColorSpace = THREE.SRGBColorSpace;
-
-    // Orbit Controls - Main
-    controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = ORBIT_CONTROLS.DAMPING_FACTOR;
-    controls.screenSpacePanning = true;
-    controls.minDistance = ORBIT_CONTROLS.MIN_DISTANCE;
-    controls.maxDistance = ORBIT_CONTROLS.MAX_DISTANCE;
-
-    // Orbit Controls - Right (synced with main)
-    // Note: Both controls share the same camera, so they naturally stay in sync
-    // We just need both to be able to receive input
-    controlsRight = new OrbitControls(camera, rendererRight.domElement);
-    controlsRight.enableDamping = true;
-    controlsRight.dampingFactor = ORBIT_CONTROLS.DAMPING_FACTOR;
-    controlsRight.screenSpacePanning = true;
-    controlsRight.minDistance = ORBIT_CONTROLS.MIN_DISTANCE;
-    controlsRight.maxDistance = ORBIT_CONTROLS.MAX_DISTANCE;
-
-    // Transform Controls
-    transformControls = new TransformControls(camera, renderer.domElement);
-    transformControls.addEventListener('dragging-changed', (event) => {
-        controls.enabled = !event.value;
-        controlsRight.enabled = !event.value;
-    });
-    transformControls.addEventListener('objectChange', () => {
+    // Set up SceneManager callbacks for transform controls
+    sceneManager.onTransformChange = () => {
         updateTransformInputs();
         // If both selected, sync the other object
         if (state.selectedObject === 'both') {
             syncBothObjects();
         }
-    });
-
-    // Add TransformControls to scene with instance check
-    log.info(' TransformControls instanceof THREE.Object3D:', transformControls instanceof THREE.Object3D);
-    if (!(transformControls instanceof THREE.Object3D)) {
-        log.error(' WARNING: TransformControls is NOT an instance of THREE.Object3D!');
-        log.error(' This indicates THREE.js is loaded multiple times (import map issue).');
-        log.error(' TransformControls constructor:', transformControls.constructor?.name);
-        log.error(' THREE.Object3D:', THREE.Object3D?.name);
-        // Try to add anyway - it may work partially
-    }
-    try {
-        scene.add(transformControls);
-        log.info(' TransformControls added to scene successfully');
-    } catch (tcError) {
-        log.error(' Failed to add TransformControls to scene:', tcError);
-        log.error(' Transform gizmos will not be visible, but app should still work');
-    }
-
-    // Lighting - Enhanced for better mesh visibility
-    ambientLight = new THREE.AmbientLight(LIGHTING.AMBIENT.COLOR, LIGHTING.AMBIENT.INTENSITY);
-    scene.add(ambientLight);
-
-    // Hemisphere light for better color graduation
-    hemisphereLight = new THREE.HemisphereLight(
-        LIGHTING.HEMISPHERE.SKY_COLOR,
-        LIGHTING.HEMISPHERE.GROUND_COLOR,
-        LIGHTING.HEMISPHERE.INTENSITY
-    );
-    scene.add(hemisphereLight);
-
-    directionalLight1 = new THREE.DirectionalLight(LIGHTING.DIRECTIONAL_1.COLOR, LIGHTING.DIRECTIONAL_1.INTENSITY);
-    directionalLight1.position.set(
-        LIGHTING.DIRECTIONAL_1.POSITION.x,
-        LIGHTING.DIRECTIONAL_1.POSITION.y,
-        LIGHTING.DIRECTIONAL_1.POSITION.z
-    );
-    scene.add(directionalLight1);
-
-    directionalLight2 = new THREE.DirectionalLight(LIGHTING.DIRECTIONAL_2.COLOR, LIGHTING.DIRECTIONAL_2.INTENSITY);
-    directionalLight2.position.set(
-        LIGHTING.DIRECTIONAL_2.POSITION.x,
-        LIGHTING.DIRECTIONAL_2.POSITION.y,
-        LIGHTING.DIRECTIONAL_2.POSITION.z
-    );
-    scene.add(directionalLight2);
-
-    // Grid helper - not shown by default, controlled by toggle
-    // gridHelper is declared globally and managed by toggleGridlines()
-
-    // Model group
-    modelGroup = new THREE.Group();
-    modelGroup.name = 'modelGroup';
-    scene.add(modelGroup);
+    };
 
     // Initialize annotation system
     annotationSystem = new AnnotationSystem(scene, camera, renderer, controls);
@@ -374,17 +353,8 @@ function init() {
 
 function onWindowResize() {
     const container = document.getElementById('viewer-container');
-
-    if (state.displayMode === 'split') {
-        const halfWidth = container.clientWidth / 2;
-        camera.aspect = halfWidth / container.clientHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(halfWidth, container.clientHeight);
-        rendererRight.setSize(halfWidth, container.clientHeight);
-    } else {
-        camera.aspect = container.clientWidth / container.clientHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(container.clientWidth, container.clientHeight);
+    if (sceneManager) {
+        sceneManager.onWindowResize(state.displayMode, container);
     }
 }
 
@@ -686,25 +656,17 @@ function setDisplayMode(mode) {
 
 // Toggle gridlines visibility
 function toggleGridlines(show) {
-    if (show && !gridHelper) {
-        // Create grid using constants
-        gridHelper = new THREE.GridHelper(GRID.SIZE, GRID.DIVISIONS, GRID.COLOR_PRIMARY, GRID.COLOR_SECONDARY);
-        gridHelper.position.y = GRID.Y_OFFSET; // Slightly below origin to avoid z-fighting
-        scene.add(gridHelper);
-    } else if (!show && gridHelper) {
-        scene.remove(gridHelper);
-        gridHelper.dispose();
-        gridHelper = null;
+    if (sceneManager) {
+        sceneManager.toggleGrid(show);
+        gridHelper = sceneManager.gridHelper; // Keep reference in sync
     }
 }
 
 // Set background color
 function setBackgroundColor(hexColor) {
-    const color = new THREE.Color(hexColor);
-    scene.background = color;
-
-    // Also update the CSS variable for UI elements that might need it
-    document.documentElement.style.setProperty('--scene-bg-color', hexColor);
+    if (sceneManager) {
+        sceneManager.setBackgroundColor(hexColor);
+    }
 }
 
 function setSelectedObject(selection) {
@@ -2390,72 +2352,7 @@ async function handleSplatFile(event) {
     showLoading('Loading Gaussian Splat...');
 
     try {
-        // Remove existing splat
-        if (splatMesh) {
-            scene.remove(splatMesh);
-            if (splatMesh.dispose) splatMesh.dispose();
-            splatMesh = null;
-        }
-
-        // Create object URL for the file
-        const fileUrl = URL.createObjectURL(file);
-
-        // Create SplatMesh using Spark
-        splatMesh = new SplatMesh({ url: fileUrl });
-
-        // Apply default rotation to correct upside-down orientation
-        splatMesh.rotation.x = Math.PI;
-
-        // Verify SplatMesh is a valid THREE.Object3D (detect instance conflicts)
-        if (!(splatMesh instanceof THREE.Object3D)) {
-            log.warn(' WARNING: SplatMesh is not an instance of THREE.Object3D!');
-            log.warn(' This may indicate multiple THREE.js instances are loaded.');
-            log.warn(' SplatMesh constructor:', splatMesh.constructor?.name);
-            // Try to proceed anyway - some operations may still work
-        }
-
-        // Brief delay to allow SplatMesh initialization
-        // Note: Spark library doesn't expose a ready callback, so we use a short delay
-        await new Promise(resolve => setTimeout(resolve, TIMING.SPLAT_LOAD_DELAY));
-
-        try {
-            scene.add(splatMesh);
-        } catch (addError) {
-            log.error(' Error adding splatMesh to scene:', addError);
-            log.error(' This is likely due to THREE.js instance mismatch with Spark library.');
-            throw addError;
-        }
-
-        // Clean up URL after a delay
-        setTimeout(() => URL.revokeObjectURL(fileUrl), TIMING.BLOB_REVOKE_DELAY);
-
-        state.splatLoaded = true;
-        state.currentSplatUrl = null; // Local files cannot be shared
-        updateVisibility();
-        updateTransformInputs();
-        storeLastPositions();
-
-        // Store blob for archive export
-        currentSplatBlob = file;
-
-        // Pre-compute hash in background for faster export later
-        if (archiveCreator) {
-            archiveCreator.precomputeHash(file).catch(e => {
-                log.warn(' Background hash precompute failed:', e);
-            });
-        }
-
-        // Update info - Spark doesn't expose count directly, show file name
-        document.getElementById('splat-vertices').textContent = 'Loaded';
-
-        // Auto-align if model is already loaded (wait for splat to fully initialize)
-        if (state.modelLoaded) {
-            setTimeout(() => autoAlignObjects(), TIMING.AUTO_ALIGN_DELAY);
-        }
-
-        // Clear existing archive state since we're loading individual files
-        clearArchiveMetadata();
-
+        await loadSplatFromFileHandler(file, createFileHandlerDeps());
         hideLoading();
     } catch (error) {
         log.error('Error loading splat:', error);
@@ -2473,62 +2370,7 @@ async function handleModelFile(event) {
     showLoading('Loading 3D Model...');
 
     try {
-        // Clear existing model
-        while (modelGroup.children.length > 0) {
-            const child = modelGroup.children[0];
-            disposeObject(child);
-            modelGroup.remove(child);
-        }
-
-        const extension = mainFile.name.split('.').pop().toLowerCase();
-        let loadedObject;
-
-        if (extension === 'glb' || extension === 'gltf') {
-            loadedObject = await loadGLTF(mainFile);
-        } else if (extension === 'obj') {
-            let mtlFile = null;
-            for (const f of files) {
-                if (f.name.toLowerCase().endsWith('.mtl')) {
-                    mtlFile = f;
-                    break;
-                }
-            }
-            loadedObject = await loadOBJ(mainFile, mtlFile);
-        }
-
-        if (loadedObject) {
-            modelGroup.add(loadedObject);
-            state.modelLoaded = true;
-            state.currentModelUrl = null; // Local files cannot be shared
-            updateModelOpacity();
-            updateModelWireframe();
-            updateVisibility();
-            updateTransformInputs();
-            storeLastPositions();
-
-            // Store blob for archive export
-            currentMeshBlob = mainFile;
-
-            // Pre-compute hash in background for faster export later
-            if (archiveCreator) {
-                archiveCreator.precomputeHash(mainFile).catch(e => {
-                    log.warn(' Background hash precompute failed:', e);
-                });
-            }
-
-            // Count faces and update UI
-            const faceCount = computeMeshFaceCount(loadedObject);
-            document.getElementById('model-faces').textContent = faceCount.toLocaleString();
-
-            // Auto-align if splat is already loaded
-            if (state.splatLoaded) {
-                setTimeout(() => autoAlignObjects(), TIMING.AUTO_ALIGN_DELAY);
-            }
-
-            // Clear existing archive state since we're loading individual files
-            clearArchiveMetadata();
-        }
-
+        await loadModelFromFileHandler(files, createFileHandlerDeps());
         hideLoading();
     } catch (error) {
         log.error('Error loading model:', error);
@@ -2537,91 +2379,7 @@ async function handleModelFile(event) {
     }
 }
 
-// disposeObject is now imported from utilities.js
-
-function loadGLTF(file) {
-    return new Promise((resolve, reject) => {
-        const loader = new GLTFLoader();
-        const url = URL.createObjectURL(file);
-
-        loader.load(
-            url,
-            (gltf) => {
-                URL.revokeObjectURL(url);
-                // Process materials and normals for proper lighting
-                processMeshMaterials(gltf.scene);
-                resolve(gltf.scene);
-            },
-            undefined,
-            (error) => {
-                URL.revokeObjectURL(url);
-                reject(error);
-            }
-        );
-    });
-}
-
-function loadOBJ(objFile, mtlFile) {
-    const objUrl = URL.createObjectURL(objFile);
-
-    return new Promise((resolve, reject) => {
-        const objLoader = new OBJLoader();
-
-        if (mtlFile) {
-            const mtlUrl = URL.createObjectURL(mtlFile);
-            const mtlLoader = new MTLLoader();
-
-            mtlLoader.load(
-                mtlUrl,
-                (materials) => {
-                    materials.preload();
-                    objLoader.setMaterials(materials);
-
-                    objLoader.load(
-                        objUrl,
-                        (object) => {
-                            URL.revokeObjectURL(objUrl);
-                            URL.revokeObjectURL(mtlUrl);
-                            // OBJ with MTL - upgrade materials to standard for consistent lighting
-                            processMeshMaterials(object, { forceDefaultMaterial: true, preserveTextures: true });
-                            resolve(object);
-                        },
-                        undefined,
-                        (error) => {
-                            URL.revokeObjectURL(objUrl);
-                            URL.revokeObjectURL(mtlUrl);
-                            reject(error);
-                        }
-                    );
-                },
-                undefined,
-                () => {
-                    URL.revokeObjectURL(mtlUrl);
-                    loadOBJWithoutMaterials(objLoader, objUrl, resolve, reject);
-                }
-            );
-        } else {
-            loadOBJWithoutMaterials(objLoader, objUrl, resolve, reject);
-        }
-    });
-}
-
-function loadOBJWithoutMaterials(loader, url, resolve, reject) {
-    loader.load(
-        url,
-        (object) => {
-            URL.revokeObjectURL(url);
-            // OBJ without MTL - use default material
-            processMeshMaterials(object, { forceDefaultMaterial: true });
-            resolve(object);
-        },
-        undefined,
-        (error) => {
-            URL.revokeObjectURL(url);
-            reject(error);
-        }
-    );
-}
+// loadGLTF, loadOBJ, and loadOBJWithoutMaterials moved to file-handlers.js
 
 function updateModelOpacity() {
     if (modelGroup) {
@@ -2766,77 +2524,25 @@ function copyShareLink() {
 }
 
 function resetAlignment() {
-    if (splatMesh) {
-        splatMesh.position.set(0, 0, 0);
-        splatMesh.rotation.set(0, 0, 0);
-        splatMesh.scale.setScalar(1);
-    }
-
-    if (modelGroup) {
-        modelGroup.position.set(0, 0, 0);
-        modelGroup.rotation.set(0, 0, 0);
-        modelGroup.scale.setScalar(1);
-    }
-
-    updateTransformInputs();
-    storeLastPositions();
+    resetAlignmentHandler(createAlignmentDeps());
 }
 
 function resetCamera() {
-    camera.position.set(0, 1, 3);
-    camera.lookAt(0, 0, 0);
-    controls.target.set(0, 0, 0);
-    controls.update();
-    controlsRight.target.set(0, 0, 0);
-    controlsRight.update();
+    resetCameraHandler(createAlignmentDeps());
+    // Also update right controls for split view
+    if (controlsRight) {
+        controlsRight.target.set(0, 0, 0);
+        controlsRight.update();
+    }
 }
 
 function fitToView() {
-    const box = new THREE.Box3();
-    let hasContent = false;
-
-    if (modelGroup && modelGroup.children.length > 0 && modelGroup.visible) {
-        modelGroup.traverse((child) => {
-            if (child.isMesh) {
-                box.expandByObject(child);
-                hasContent = true;
-            }
-        });
+    fitToViewHandler(createAlignmentDeps());
+    // Also update right controls for split view
+    if (controlsRight) {
+        controlsRight.target.copy(controls.target);
+        controlsRight.update();
     }
-
-    // For splat, estimate bounds from position and scale
-    if (splatMesh && splatMesh.visible) {
-        const splatBounds = new THREE.Box3();
-        const size = 2 * splatMesh.scale.x; // Estimate
-        splatBounds.setFromCenterAndSize(
-            splatMesh.position,
-            new THREE.Vector3(size, size, size)
-        );
-        box.union(splatBounds);
-        hasContent = true;
-    }
-
-    if (!hasContent) {
-        box.setFromCenterAndSize(new THREE.Vector3(0, 0, 0), new THREE.Vector3(2, 2, 2));
-    }
-
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const fov = camera.fov * (Math.PI / 180);
-    let cameraDistance = maxDim / (2 * Math.tan(fov / 2));
-    cameraDistance *= 1.5;
-
-    camera.position.set(
-        center.x + cameraDistance * 0.5,
-        center.y + cameraDistance * 0.3,
-        center.z + cameraDistance
-    );
-    camera.lookAt(center);
-    controls.target.copy(center);
-    controls.update();
-    controlsRight.target.copy(center);
-    controlsRight.update();
 }
 
 // Controls panel visibility
@@ -3262,178 +2968,12 @@ function loadOBJFromUrl(url) {
 }
 
 // ============================================================
-// Alignment utilities imported from alignment.js:
-// - KDTree (class)
-// - extractSplatPositions, extractMeshVertices
-// - computeCentroid, computeOptimalRotation
-// - computeSplatBoundsFromPositions
+// Alignment functions - wrappers for alignment.js module
 // ============================================================
 
-// ICP alignment function
+// ICP alignment function - wrapper for alignment.js
 async function icpAlignObjects() {
-    log.debug('[ICP] icpAlignObjects called');
-
-    if (!splatMesh || !modelGroup || modelGroup.children.length === 0) {
-        notify.warning('Both splat and model must be loaded for ICP alignment');
-        return;
-    }
-
-    // Debug: Check splat state
-    log.debug('[ICP] splatMesh exists:', !!splatMesh);
-    log.debug('[ICP] splatMesh.packedSplats:', !!splatMesh.packedSplats);
-    if (splatMesh.packedSplats) {
-        log.debug('[ICP] packedSplats.splatCount:', splatMesh.packedSplats.splatCount);
-        log.debug('[ICP] packedSplats.forEachSplat:', typeof splatMesh.packedSplats.forEachSplat);
-    }
-
-    showLoading('Running ICP alignment...');
-
-    // Allow UI to update
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    try {
-        // Extract points
-        log.debug('[ICP] Extracting splat positions...');
-        const splatPoints = extractSplatPositions(splatMesh, 3000);
-        log.debug('[ICP] Extracted splat points:', splatPoints.length);
-
-        log.debug('[ICP] Extracting mesh vertices...');
-        const meshPoints = extractMeshVertices(modelGroup, 8000);
-        log.debug('[ICP] Extracted mesh points:', meshPoints.length);
-
-        if (splatPoints.length < 10) {
-            hideLoading();
-            log.error('[ICP] Not enough splat points:', splatPoints.length);
-            notify.warning('Could not extract enough splat positions for ICP (' + splatPoints.length + ' found). The splat may not support position extraction or may still be loading.');
-            return;
-        }
-
-        if (meshPoints.length < 10) {
-            hideLoading();
-            log.error('[ICP] Not enough mesh points:', meshPoints.length);
-            notify.warning('Could not extract enough mesh vertices for ICP (' + meshPoints.length + ' found).');
-            return;
-        }
-
-        log.debug(`[ICP] Starting ICP with ${splatPoints.length} splat points and ${meshPoints.length} mesh points`);
-
-        // Build KD-tree from mesh points for fast nearest neighbor search
-        const kdTree = new KDTree([...meshPoints]);
-
-        // ICP parameters
-        const maxIterations = 50;
-        const convergenceThreshold = 1e-6;
-        let prevMeanError = Infinity;
-
-        // Working copy of splat points (we transform these during iteration)
-        let currentPoints = splatPoints.map(p => ({ x: p.x, y: p.y, z: p.z, index: p.index }));
-
-        // Cumulative transformation
-        let cumulativeMatrix = new THREE.Matrix4();
-
-        for (let iter = 0; iter < maxIterations; iter++) {
-            // Step 1: Find correspondences (nearest neighbors)
-            const correspondences = [];
-            let totalError = 0;
-
-            for (const srcPt of currentPoints) {
-                const nearest = kdTree.nearestNeighbor(srcPt);
-                if (nearest.point) {
-                    correspondences.push({
-                        source: srcPt,
-                        target: nearest.point,
-                        distSq: nearest.distSq
-                    });
-                    totalError += nearest.distSq;
-                }
-            }
-
-            const meanError = totalError / correspondences.length;
-            log.debug(`[ICP] Iteration ${iter + 1}: Mean squared error = ${meanError.toFixed(6)}`);
-
-            // Check convergence
-            if (Math.abs(prevMeanError - meanError) < convergenceThreshold) {
-                log.debug(`[ICP] Converged after ${iter + 1} iterations`);
-                break;
-            }
-            prevMeanError = meanError;
-
-            // Step 2: Compute optimal transformation
-            const sourceForAlign = correspondences.map(c => c.source);
-            const targetForAlign = correspondences.map(c => c.target);
-
-            const sourceCentroid = computeCentroid(sourceForAlign);
-            const targetCentroid = computeCentroid(targetForAlign);
-
-            // Compute rotation
-            const rotMatrix = computeOptimalRotation(sourceForAlign, targetForAlign, sourceCentroid, targetCentroid);
-
-            // Compute translation: t = targetCentroid - R * sourceCentroid
-            const rotatedSourceCentroid = new THREE.Vector3(sourceCentroid.x, sourceCentroid.y, sourceCentroid.z);
-            rotatedSourceCentroid.applyMatrix4(rotMatrix);
-
-            const translation = new THREE.Vector3(
-                targetCentroid.x - rotatedSourceCentroid.x,
-                targetCentroid.y - rotatedSourceCentroid.y,
-                targetCentroid.z - rotatedSourceCentroid.z
-            );
-
-            // Build transformation matrix: T = translate * rotate
-            const iterMatrix = new THREE.Matrix4();
-            iterMatrix.makeTranslation(translation.x, translation.y, translation.z);
-            iterMatrix.multiply(rotMatrix);
-
-            // Update cumulative transformation
-            cumulativeMatrix.premultiply(iterMatrix);
-
-            // Apply transformation to current points
-            for (const pt of currentPoints) {
-                const v = new THREE.Vector3(pt.x, pt.y, pt.z);
-                v.applyMatrix4(iterMatrix);
-                pt.x = v.x;
-                pt.y = v.y;
-                pt.z = v.z;
-            }
-
-            // Update loading text
-            updateProgress((iter + 1) / maxIterations * 100, `ICP iteration ${iter + 1}/${maxIterations}...`);
-            await new Promise(resolve => setTimeout(resolve, 10)); // Allow UI update
-        }
-
-        // Apply cumulative transformation to the splat mesh
-        // We need to apply this as changes to position and rotation
-        const position = new THREE.Vector3();
-        const quaternion = new THREE.Quaternion();
-        const scale = new THREE.Vector3();
-
-        // Get current splat transform
-        splatMesh.updateMatrixWorld(true);
-
-        // Combine: newMatrix = cumulativeMatrix * currentMatrix
-        const newMatrix = new THREE.Matrix4();
-        newMatrix.copy(cumulativeMatrix);
-        newMatrix.multiply(splatMesh.matrix);
-
-        // Decompose the new matrix
-        newMatrix.decompose(position, quaternion, scale);
-
-        // Apply to splat mesh
-        splatMesh.position.copy(position);
-        splatMesh.quaternion.copy(quaternion);
-        splatMesh.scale.copy(scale);
-        splatMesh.updateMatrixWorld(true);
-
-        updateTransformInputs();
-        storeLastPositions();
-
-        log.debug('[ICP] Alignment complete');
-        hideLoading();
-
-    } catch (error) {
-        log.error('[ICP] Error during ICP alignment:', error);
-        hideLoading();
-        notify.error('Error during ICP alignment: ' + error.message);
-    }
+    await icpAlignObjectsHandler(createAlignmentDeps());
 }
 
 // Setup collapsible sections
@@ -3456,151 +2996,9 @@ function setupCollapsibles() {
     });
 }
 
-// Auto align objects - aligns model to splat by matching bounding box centers
+// Auto align objects - wrapper for alignment.js
 function autoAlignObjects() {
-    if (!splatMesh || !modelGroup || modelGroup.children.length === 0) {
-        notify.warning('Both splat and model must be loaded for auto-alignment');
-        return;
-    }
-
-    const splatBox = new THREE.Box3();
-    const modelBox = new THREE.Box3();
-
-    // First, try to get accurate splat bounds from actual positions
-    const actualBounds = computeSplatBoundsFromPositions(splatMesh);
-    let splatBoundsFound = actualBounds.found;
-
-    if (splatBoundsFound) {
-        splatBox.set(actualBounds.min, actualBounds.max);
-        log.debug('[AutoAlign] Using bounds from actual splat positions:', {
-            min: actualBounds.min.toArray(),
-            max: actualBounds.max.toArray()
-        });
-    }
-
-    // Fallback methods if packedSplats not available
-    if (!splatBoundsFound) {
-        // Method 1: Check if splatMesh has a boundingBox property
-        if (splatMesh.boundingBox && !splatMesh.boundingBox.isEmpty()) {
-            splatBox.copy(splatMesh.boundingBox);
-            splatBox.applyMatrix4(splatMesh.matrixWorld);
-            splatBoundsFound = true;
-        }
-
-        // Method 2: Try to get from geometry
-        if (!splatBoundsFound && splatMesh.geometry) {
-            try {
-                if (!splatMesh.geometry.boundingBox) {
-                    splatMesh.geometry.computeBoundingBox();
-                }
-                if (splatMesh.geometry.boundingBox && !splatMesh.geometry.boundingBox.isEmpty()) {
-                    splatBox.copy(splatMesh.geometry.boundingBox);
-                    splatMesh.updateMatrixWorld(true);
-                    splatBox.applyMatrix4(splatMesh.matrixWorld);
-                    splatBoundsFound = true;
-                }
-            } catch (e) {
-                log.debug('Could not get splat bounds from geometry:', e);
-            }
-        }
-
-        // Method 3: Try setFromObject
-        if (!splatBoundsFound) {
-            try {
-                splatMesh.updateMatrixWorld(true);
-                splatBox.setFromObject(splatMesh);
-                if (!splatBox.isEmpty() && isFinite(splatBox.min.x) && isFinite(splatBox.max.x)) {
-                    splatBoundsFound = true;
-                }
-            } catch (e) {
-                log.debug('Could not get splat bounds from setFromObject:', e);
-            }
-        }
-
-        // Final fallback
-        if (!splatBoundsFound || splatBox.isEmpty()) {
-            log.debug('[AutoAlign] Using fallback splat bounds estimation');
-            const size = 2.0 * Math.max(splatMesh.scale.x, splatMesh.scale.y, splatMesh.scale.z);
-            splatBox.setFromCenterAndSize(
-                splatMesh.position.clone(),
-                new THREE.Vector3(size, size, size)
-            );
-        }
-    }
-
-    // Underground auto-correction: detect if splat is upside down and underground
-    // Check if splat is mostly below y=0 (max.y < 0.1 means entirely underground)
-    log.debug('[AutoAlign] Splat bounds Y: min=' + splatBox.min.y.toFixed(2) + ', max=' + splatBox.max.y.toFixed(2));
-
-    if (splatBox.max.y < 0.1) {
-        log.debug('[AutoAlign] Detected splat is underground (max.y=' + splatBox.max.y.toFixed(2) + '). Flipping 180° on X axis...');
-        splatMesh.rotation.x += Math.PI;
-        splatMesh.updateMatrixWorld(true);
-
-        // Re-calculate splatBox with the new orientation
-        const newBounds = computeSplatBoundsFromPositions(splatMesh);
-        if (newBounds.found) {
-            splatBox.set(newBounds.min, newBounds.max);
-            splatBoundsFound = true;
-        } else {
-            // Fallback recalculation
-            splatBox.makeEmpty();
-            if (splatMesh.boundingBox && !splatMesh.boundingBox.isEmpty()) {
-                splatBox.copy(splatMesh.boundingBox);
-                splatBox.applyMatrix4(splatMesh.matrixWorld);
-            } else {
-                try {
-                    splatBox.setFromObject(splatMesh);
-                } catch (e) {
-                    const size = 2.0 * Math.max(splatMesh.scale.x, splatMesh.scale.y, splatMesh.scale.z);
-                    splatBox.setFromCenterAndSize(splatMesh.position.clone(), new THREE.Vector3(size, size, size));
-                }
-            }
-        }
-        log.debug('[AutoAlign] After flip - Splat bounds Y: min=' + splatBox.min.y.toFixed(2) + ', max=' + splatBox.max.y.toFixed(2));
-    }
-
-    // Get model bounds with world transforms
-    modelGroup.updateMatrixWorld(true);
-    modelBox.setFromObject(modelGroup);
-
-    if (modelBox.isEmpty()) {
-        notify.warning('Could not compute model bounds');
-        return;
-    }
-
-    // Get centers of bounding boxes
-    const splatCenter = splatBox.getCenter(new THREE.Vector3());
-    const modelCenter = modelBox.getCenter(new THREE.Vector3());
-
-    // Align centers horizontally (X, Z) and align bottoms vertically (Y)
-    const splatBottom = splatBox.min.y;
-    const modelBottom = modelBox.min.y;
-
-    // Calculate where the model should be positioned
-    const targetX = splatCenter.x;
-    const targetY = modelGroup.position.y + (splatBottom - modelBottom);
-    const targetZ = splatCenter.z;
-
-    // Calculate offset from current model center to target position
-    const offsetX = targetX - modelCenter.x;
-    const offsetZ = targetZ - modelCenter.z;
-
-    // Apply the offset
-    modelGroup.position.x += offsetX;
-    modelGroup.position.y = targetY;
-    modelGroup.position.z += offsetZ;
-    modelGroup.updateMatrixWorld(true);
-
-    updateTransformInputs();
-    storeLastPositions();
-
-    log.debug('Auto-align complete:', {
-        splatBounds: { min: splatBox.min.toArray(), max: splatBox.max.toArray(), center: splatCenter.toArray() },
-        modelBounds: { min: modelBox.min.toArray(), max: modelBox.max.toArray(), center: modelCenter.toArray() },
-        modelPosition: modelGroup.position.toArray(),
-        splatBoundsFound: splatBoundsFound
-    });
+    autoAlignObjectsHandler(createAlignmentDeps());
 }
 
 // FPS counter
