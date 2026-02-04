@@ -15,6 +15,8 @@
 //   ?alignment=URL   - Alignment JSON file to load
 //   ?controls=MODE   - Control panel mode: full, minimal, none
 //   ?mode=VIEW       - Initial view mode: splat, model, both, split
+//   ?toolbar=MODE    - Toolbar mode: show, hide
+//   ?sidebar=MODE    - Sidebar mode: closed, view, edit
 //
 // Inline alignment params:
 //   ?sp=x,y,z  - Splat position    ?mp=x,y,z  - Model position
@@ -44,6 +46,8 @@
 
     // 3. Get Client-Side Overrides
     const urlControls = params.get('controls'); // 'full', 'minimal', 'none', or null
+    const toolbarMode = params.get('toolbar') || 'show'; // show, hide
+    const sidebarMode = params.get('sidebar') || 'closed'; // closed, view, edit
 
     // 4. Parse inline alignment params
     const splatPos = parseVec3(params.get('sp'));
@@ -87,7 +91,11 @@
         // Logic: Use URL mode, otherwise default to 'full'
         controlsMode: urlControls || 'full',
 
-        initialViewMode: params.get('mode') || 'both'
+        initialViewMode: params.get('mode') || 'both',
+
+        // Viewer mode settings
+        showToolbar: toolbarMode !== 'hide',
+        sidebarMode: sidebarMode // closed, view, edit
     };
 
     console.log('[config.js] Generated Config:', window.APP_CONFIG);
