@@ -16,24 +16,18 @@
                 <span class="split-label left">Splat</span>
                 <span class="split-label right">Model</span>
             </div>
-            <button id="btn-toggle-controls" class="toggle-controls-btn" title="Toggle Controls">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="4" y1="21" x2="4" y2="14"></line>
-                    <line x1="4" y1="10" x2="4" y2="3"></line>
-                    <line x1="12" y1="21" x2="12" y2="12"></line>
-                    <line x1="12" y1="8" x2="12" y2="3"></line>
-                    <line x1="20" y1="21" x2="20" y2="16"></line>
-                    <line x1="20" y1="12" x2="20" y2="3"></line>
-                    <line x1="1" y1="14" x2="7" y2="14"></line>
-                    <line x1="9" y1="8" x2="15" y2="8"></line>
-                    <line x1="17" y1="16" x2="23" y2="16"></line>
-                </svg>
-            </button>
-            <div id="annotation-toolbar">
-                <button id="btn-annotate" class="toolbar-btn" title="Place Annotation (A)">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                        <circle cx="12" cy="10" r="3"></circle>
+            <div id="left-toolbar">
+                <button id="btn-toggle-controls" class="toggle-controls-btn" title="Toggle Controls">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="4" y1="21" x2="4" y2="14"></line>
+                        <line x1="4" y1="10" x2="4" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12" y2="3"></line>
+                        <line x1="20" y1="21" x2="20" y2="16"></line>
+                        <line x1="20" y1="12" x2="20" y2="3"></line>
+                        <line x1="1" y1="14" x2="7" y2="14"></line>
+                        <line x1="9" y1="8" x2="15" y2="8"></line>
+                        <line x1="17" y1="16" x2="23" y2="16"></line>
                     </svg>
                 </button>
                 <button id="btn-metadata" class="toolbar-btn" title="View Metadata (M)">
@@ -43,6 +37,12 @@
                         <line x1="16" y1="13" x2="8" y2="13"></line>
                         <line x1="16" y1="17" x2="8" y2="17"></line>
                         <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                </button>
+                <button id="btn-annotate" class="toolbar-btn" title="Place Annotation (A)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                        <circle cx="12" cy="10" r="3"></circle>
                     </svg>
                 </button>
                 <button id="btn-export-archive" class="toolbar-btn" title="Export Archive">
@@ -157,9 +157,9 @@
             <div class="sidebar-mode-content" id="sidebar-edit">
                 <div class="edit-tabs">
                     <button class="edit-tab active" data-tab="project">Project</button>
+                    <button class="edit-tab" data-tab="provenance">Provenance</button>
                     <button class="edit-tab" data-tab="assets">Assets</button>
                     <button class="edit-tab" data-tab="quality">Quality</button>
-                    <button class="edit-tab" data-tab="provenance">Provenance</button>
                     <button class="edit-tab" data-tab="integrity">Integrity</button>
                 </div>
 
@@ -194,6 +194,37 @@
                         <label for="meta-custom-license">Custom License</label>
                         <input type="text" id="meta-custom-license" placeholder="Enter custom license">
                     </div>
+                </div>
+
+                <!-- Provenance Tab -->
+                <div class="edit-tab-content" id="edit-tab-provenance">
+                    <div class="metadata-field">
+                        <label for="meta-capture-date">Capture Date</label>
+                        <input type="date" id="meta-capture-date">
+                    </div>
+                    <div class="metadata-field">
+                        <label for="meta-capture-device">Capture Device</label>
+                        <input type="text" id="meta-capture-device" placeholder="e.g., iPhone 15 Pro, Faro Focus">
+                    </div>
+                    <div class="metadata-field">
+                        <label for="meta-operator">Operator / Creator</label>
+                        <input type="text" id="meta-operator" placeholder="Name or organization">
+                    </div>
+                    <div class="metadata-field">
+                        <label for="meta-location">Location</label>
+                        <input type="text" id="meta-location" placeholder="Where the capture was made">
+                    </div>
+                    <div class="subsection-header">Convention Hints</div>
+                    <div class="metadata-field">
+                        <label for="meta-conventions">References</label>
+                        <input type="text" id="meta-conventions" placeholder="e.g., arxiv:2312.13299">
+                        <span class="field-hint">Comma-separated list of convention references</span>
+                    </div>
+                    <div class="subsection-header">Custom Fields</div>
+                    <div id="custom-fields-list"></div>
+                    <button id="btn-add-custom-field" class="action-btn secondary" style="width: 100%; margin-top: 10px;">
+                        + Add Custom Field
+                    </button>
                 </div>
 
                 <!-- Assets Tab -->
@@ -273,37 +304,6 @@
                     </div>
                 </div>
 
-                <!-- Provenance Tab -->
-                <div class="edit-tab-content" id="edit-tab-provenance">
-                    <div class="metadata-field">
-                        <label for="meta-capture-date">Capture Date</label>
-                        <input type="date" id="meta-capture-date">
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-capture-device">Capture Device</label>
-                        <input type="text" id="meta-capture-device" placeholder="e.g., iPhone 15 Pro, Faro Focus">
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-operator">Operator / Creator</label>
-                        <input type="text" id="meta-operator" placeholder="Name or organization">
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-location">Location</label>
-                        <input type="text" id="meta-location" placeholder="Where the capture was made">
-                    </div>
-                    <div class="subsection-header">Convention Hints</div>
-                    <div class="metadata-field">
-                        <label for="meta-conventions">References</label>
-                        <input type="text" id="meta-conventions" placeholder="e.g., arxiv:2312.13299">
-                        <span class="field-hint">Comma-separated list of convention references</span>
-                    </div>
-                    <div class="subsection-header">Custom Fields</div>
-                    <div id="custom-fields-list"></div>
-                    <button id="btn-add-custom-field" class="action-btn secondary" style="width: 100%; margin-top: 10px;">
-                        + Add Custom Field
-                    </button>
-                </div>
-
                 <!-- Integrity Tab -->
                 <div class="edit-tab-content" id="edit-tab-integrity">
                     <div class="integrity-info">
@@ -363,14 +363,6 @@
             <div class="radio-group">
                 <label><input type="radio" name="export-format" value="a3d" checked> .a3d (Standard)</label>
                 <label><input type="radio" name="export-format" value="a3z"> .a3z (Compressed)</label>
-            </div>
-            <div class="checkbox-group">
-                <input type="checkbox" id="export-include-preview" checked>
-                <label for="export-include-preview">Include preview image</label>
-            </div>
-            <div class="checkbox-group">
-                <input type="checkbox" id="export-include-hashes">
-                <label for="export-include-hashes">Include integrity hashes (slower)</label>
             </div>
             <div class="btn-group">
                 <button id="btn-export-cancel" class="action-btn secondary">Cancel</button>
@@ -447,22 +439,6 @@
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div class="control-section">
-                <h3>Transform Controls</h3>
-                <div class="toggle-group">
-                    <button id="btn-select-splat" class="toggle-btn small">Splat</button>
-                    <button id="btn-select-model" class="toggle-btn small">Model</button>
-                    <button id="btn-select-both" class="toggle-btn small">Both</button>
-                    <button id="btn-select-none" class="toggle-btn small active">None</button>
-                </div>
-                <div class="toggle-group" style="margin-top: 8px;">
-                    <button id="btn-translate" class="toggle-btn small active">Move</button>
-                    <button id="btn-rotate" class="toggle-btn small">Rotate</button>
-                    <button id="btn-scale" class="toggle-btn small">Scale</button>
-                </div>
-                <p class="hint-text">W: Move | E: Rotate | R: Scale</p>
             </div>
 
             <div class="control-section collapsible collapsed">
@@ -551,9 +527,6 @@
                     <p class="hint-text" style="margin: 5px 0; font-size: 0.75em; opacity: 0.7;">
                         ICP provides precise alignment using point-to-point matching
                     </p>
-                    <button id="btn-save-alignment" class="action-btn">Save Alignment</button>
-                    <button id="btn-load-alignment" class="action-btn">Load Alignment</button>
-                    <input type="file" id="alignment-input" accept=".json" class="hidden" />
                     <button id="btn-reset-alignment" class="action-btn secondary">Reset All</button>
                 </div>
             </div>

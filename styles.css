@@ -580,11 +580,27 @@ input[type="range"]::-webkit-slider-thumb:hover {
     display: none;
 }
 
-/* Toggle controls button - positioned on left since controls panel is on left */
-.toggle-controls-btn {
+/* Left toolbar - contains settings toggle and action buttons */
+#left-toolbar {
     position: absolute;
     top: 15px;
     left: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 1000;
+    pointer-events: auto;
+    transition: left 0.3s ease;
+}
+
+/* Move toolbar when controls panel is open */
+#controls-panel:not(.panel-hidden) ~ #viewer-container #left-toolbar,
+body:has(#controls-panel:not(.panel-hidden)) #left-toolbar {
+    left: 295px;
+}
+
+/* Toggle controls button */
+.toggle-controls-btn {
     width: 40px;
     height: 40px;
     background: rgba(0, 0, 0, 0.6);
@@ -596,7 +612,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
-    z-index: 1000;
     pointer-events: auto;
 }
 
@@ -698,18 +713,8 @@ input[type="range"]::-webkit-slider-thumb:hover {
     color: #888;
 }
 
-/* Annotation toolbar */
-#annotation-toolbar {
-    position: absolute;
-    top: 15px;
-    right: 65px;
-    display: flex;
-    gap: 8px;
-    z-index: 500;
-    pointer-events: auto;
-}
-
-.toolbar-btn {
+/* Toolbar buttons (in left toolbar) */
+#left-toolbar .toolbar-btn {
     width: 40px;
     height: 40px;
     background: rgba(0, 0, 0, 0.6);
@@ -723,12 +728,12 @@ input[type="range"]::-webkit-slider-thumb:hover {
     transition: all 0.2s;
 }
 
-.toolbar-btn:hover {
+#left-toolbar .toolbar-btn:hover {
     background: rgba(74, 74, 138, 0.6);
     color: #fff;
 }
 
-.toolbar-btn.active {
+#left-toolbar .toolbar-btn.active {
     background: rgba(78, 205, 196, 0.3);
     border-color: #4ecdc4;
     color: #4ecdc4;
