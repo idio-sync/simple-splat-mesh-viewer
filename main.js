@@ -349,6 +349,78 @@ function init() {
     // Start render loop
     animate();
 
+    // DEBUG: Track toolbar visibility changes (using console.log to bypass log level)
+    const toolbar = document.getElementById('left-toolbar');
+    if (toolbar) {
+        console.log('[TOOLBAR DEBUG] Initial state:', {
+            display: toolbar.style.display,
+            visibility: toolbar.style.visibility,
+            className: toolbar.className,
+            computedDisplay: window.getComputedStyle(toolbar).display,
+            computedVisibility: window.getComputedStyle(toolbar).visibility,
+            offsetWidth: toolbar.offsetWidth,
+            offsetHeight: toolbar.offsetHeight,
+            parentElement: toolbar.parentElement?.id
+        });
+
+        // Watch for style/class changes
+        const observer = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                console.warn('[TOOLBAR DEBUG] Mutation detected!', {
+                    type: mutation.type,
+                    attributeName: mutation.attributeName,
+                    oldValue: mutation.oldValue,
+                    newDisplay: toolbar.style.display,
+                    newClassName: toolbar.className,
+                    computedDisplay: window.getComputedStyle(toolbar).display
+                });
+            }
+        });
+        observer.observe(toolbar, {
+            attributes: true,
+            attributeOldValue: true,
+            attributeFilter: ['style', 'class']
+        });
+
+        // Also watch parent for changes
+        if (toolbar.parentElement) {
+            const parentObserver = new MutationObserver((mutations) => {
+                for (const mutation of mutations) {
+                    console.warn('[TOOLBAR DEBUG] Parent mutation!', {
+                        type: mutation.type,
+                        attributeName: mutation.attributeName,
+                        parentDisplay: window.getComputedStyle(toolbar.parentElement).display
+                    });
+                }
+            });
+            parentObserver.observe(toolbar.parentElement, {
+                attributes: true,
+                attributeFilter: ['style', 'class']
+            });
+        }
+
+        // Check after delays
+        setTimeout(() => {
+            console.log('[TOOLBAR DEBUG] After 500ms:', {
+                display: toolbar.style.display,
+                className: toolbar.className,
+                computedDisplay: window.getComputedStyle(toolbar).display,
+                offsetWidth: toolbar.offsetWidth,
+                boundingRect: toolbar.getBoundingClientRect()
+            });
+        }, 500);
+
+        setTimeout(() => {
+            console.log('[TOOLBAR DEBUG] After 2000ms:', {
+                display: toolbar.style.display,
+                className: toolbar.className,
+                computedDisplay: window.getComputedStyle(toolbar).display,
+                offsetWidth: toolbar.offsetWidth,
+                boundingRect: toolbar.getBoundingClientRect()
+            });
+        }, 2000);
+    }
+
     log.info(' init() completed successfully');
 }
 
