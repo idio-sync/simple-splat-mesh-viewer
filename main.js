@@ -2992,12 +2992,6 @@ function applyControlsVisibilityDirect(controlsPanel, shouldShow) {
         annotationBar.style.left = shouldShow ? '280px' : '0';
     }
 
-    // Update left toolbar position based on panel visibility
-    const leftToolbar = document.getElementById('left-toolbar');
-    if (leftToolbar) {
-        leftToolbar.style.left = shouldShow ? '295px' : '15px';
-    }
-
     // DIAGNOSTIC: Check again after a delay (after potential transition)
     setTimeout(() => {
         const delayedComputed = window.getComputedStyle(controlsPanel);
