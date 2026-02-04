@@ -13,7 +13,9 @@
  *   kiosk  - No toolbar, no controls panel, metadata sidebar in view-only mode
  */
 
-import { log } from './utilities.js';
+import { Logger } from './utilities.js';
+
+const log = Logger.getLogger('ShareDialog');
 
 // =============================================================================
 // STATE
