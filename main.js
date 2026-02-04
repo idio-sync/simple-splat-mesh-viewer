@@ -1979,6 +1979,13 @@ async function handleSplatFile(event) {
         // Store blob for archive export
         currentSplatBlob = file;
 
+        // Pre-compute hash in background for faster export later
+        if (archiveCreator) {
+            archiveCreator.precomputeHash(file).catch(e => {
+                console.warn('[main.js] Background hash precompute failed:', e);
+            });
+        }
+
         // Update info - Spark doesn't expose count directly, show file name
         document.getElementById('splat-vertices').textContent = 'Loaded';
 
@@ -2042,6 +2049,13 @@ async function handleModelFile(event) {
 
             // Store blob for archive export
             currentMeshBlob = mainFile;
+
+            // Pre-compute hash in background for faster export later
+            if (archiveCreator) {
+                archiveCreator.precomputeHash(mainFile).catch(e => {
+                    console.warn('[main.js] Background hash precompute failed:', e);
+                });
+            }
 
             // Count faces
             let faceCount = 0;
@@ -2727,6 +2741,26 @@ async function loadSplatFromUrl(url) {
     showLoading('Loading Gaussian Splat...');
 
     try {
+        // Fetch the file as blob for archive creation
+        console.log('[main.js] Fetching splat from URL:', url);
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+        }
+        const blob = await response.blob();
+        currentSplatBlob = blob;
+        console.log('[main.js] Splat blob stored, size:', blob.size);
+
+        // Pre-compute hash in background for faster export later
+        if (archiveCreator) {
+            archiveCreator.precomputeHash(blob).catch(e => {
+                console.warn('[main.js] Background hash precompute failed:', e);
+            });
+        }
+
+        // Create blob URL for loading
+        const blobUrl = URL.createObjectURL(blob);
+
         // Remove existing splat
         if (splatMesh) {
             scene.remove(splatMesh);
@@ -2735,7 +2769,7 @@ async function loadSplatFromUrl(url) {
         }
 
         // Create SplatMesh using Spark
-        splatMesh = new SplatMesh({ url: url });
+        splatMesh = new SplatMesh({ url: blobUrl });
 
         // Verify SplatMesh is a valid THREE.Object3D
         if (!(splatMesh instanceof THREE.Object3D)) {
@@ -2775,6 +2809,26 @@ async function loadModelFromUrl(url) {
     showLoading('Loading 3D Model...');
 
     try {
+        // Fetch the file as blob for archive creation
+        console.log('[main.js] Fetching model from URL:', url);
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+        }
+        const blob = await response.blob();
+        currentMeshBlob = blob;
+        console.log('[main.js] Mesh blob stored, size:', blob.size);
+
+        // Pre-compute hash in background for faster export later
+        if (archiveCreator) {
+            archiveCreator.precomputeHash(blob).catch(e => {
+                console.warn('[main.js] Background hash precompute failed:', e);
+            });
+        }
+
+        // Create blob URL for loading
+        const blobUrl = URL.createObjectURL(blob);
+
         // Clear existing model
         while (modelGroup.children.length > 0) {
             const child = modelGroup.children[0];
@@ -2786,9 +2840,9 @@ async function loadModelFromUrl(url) {
         let loadedObject;
 
         if (extension === 'glb' || extension === 'gltf') {
-            loadedObject = await loadGLTFFromUrl(url);
+            loadedObject = await loadGLTFFromUrl(blobUrl);
         } else if (extension === 'obj') {
-            loadedObject = await loadOBJFromUrl(url);
+            loadedObject = await loadOBJFromUrl(blobUrl);
         }
 
         if (loadedObject) {
@@ -2801,8 +2855,9 @@ async function loadModelFromUrl(url) {
             updateTransformInputs();
             storeLastPositions();
 
-            // Count faces
+            // Count faces and vertices
             let faceCount = 0;
+            let vertexCount = 0;
             loadedObject.traverse((child) => {
                 if (child.isMesh && child.geometry) {
                     const geo = child.geometry;
@@ -2811,8 +2866,12 @@ async function loadModelFromUrl(url) {
                     } else if (geo.attributes.position) {
                         faceCount += geo.attributes.position.count / 3;
                     }
+                    if (geo.attributes.position) {
+                        vertexCount += geo.attributes.position.count;
+                    }
                 }
             });
+            state.meshVertexCount = vertexCount;
 
             // Update UI
             const filename = url.split('/').pop() || 'URL';
