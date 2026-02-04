@@ -459,6 +459,38 @@ input[type="range"]::-webkit-slider-thumb:hover {
     font-size: 0.9rem;
 }
 
+#loading-progress-container {
+    width: 250px;
+    height: 8px;
+    background: #2a2a4a;
+    border-radius: 4px;
+    margin-top: 15px;
+    overflow: hidden;
+}
+
+#loading-progress-container.hidden {
+    display: none;
+}
+
+#loading-progress-bar {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #4ecdc4, #6a6aba);
+    border-radius: 4px;
+    transition: width 0.1s ease-out;
+}
+
+#loading-progress-text {
+    margin-top: 8px;
+    color: #4ecdc4;
+    font-size: 0.85rem;
+    font-family: monospace;
+}
+
+#loading-progress-text.hidden {
+    display: none;
+}
+
 /* Toggle controls button */
 .toggle-controls-btn {
     position: absolute;

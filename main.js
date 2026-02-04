@@ -711,13 +711,51 @@ function updateTransformInputs() {
     }
 }
 
-function showLoading(text = 'Loading...') {
+function showLoading(text = 'Loading...', showProgress = false) {
     loadingText.textContent = text;
     loadingOverlay.classList.remove('hidden');
+
+    // Show/hide progress bar elements
+    const progressContainer = document.getElementById('loading-progress-container');
+    const progressText = document.getElementById('loading-progress-text');
+    if (progressContainer && progressText) {
+        if (showProgress) {
+            progressContainer.classList.remove('hidden');
+            progressText.classList.remove('hidden');
+            updateProgress(0);
+        } else {
+            progressContainer.classList.add('hidden');
+            progressText.classList.add('hidden');
+        }
+    }
+}
+
+function updateProgress(percent, stage = null) {
+    const progressBar = document.getElementById('loading-progress-bar');
+    const progressText = document.getElementById('loading-progress-text');
+    const loadingTextEl = document.getElementById('loading-text');
+
+    if (progressBar) {
+        progressBar.style.width = `${percent}%`;
+    }
+    if (progressText) {
+        progressText.textContent = `${Math.round(percent)}%`;
+    }
+    if (stage && loadingTextEl) {
+        loadingTextEl.textContent = stage;
+    }
 }
 
 function hideLoading() {
     loadingOverlay.classList.add('hidden');
+
+    // Reset progress bar
+    const progressContainer = document.getElementById('loading-progress-container');
+    const progressText = document.getElementById('loading-progress-text');
+    const progressBar = document.getElementById('loading-progress-bar');
+    if (progressContainer) progressContainer.classList.add('hidden');
+    if (progressText) progressText.classList.add('hidden');
+    if (progressBar) progressBar.style.width = '0%';
 }
 
 // Handle loading splat from URL via prompt
@@ -1507,6 +1545,10 @@ async function downloadArchive() {
     if (includePreview && renderer) {
         console.log('[main.js] Capturing preview screenshot');
         try {
+            // Force a render to ensure canvas has current content
+            // WebGL canvases clear after each frame unless preserveDrawingBuffer is set
+            renderer.render(scene, camera);
+
             const canvas = renderer.domElement;
             const previewBlob = await captureScreenshot(canvas, { width: 512, height: 512 });
             if (previewBlob) {
@@ -1527,16 +1569,22 @@ async function downloadArchive() {
         return;
     }
 
-    // Create and download
+    // Create and download with progress
     console.log('[main.js] Starting archive creation');
-    showLoading('Creating archive...');
+    showLoading('Creating archive...', true); // Show with progress bar
     try {
         console.log('[main.js] Calling archiveCreator.downloadArchive');
-        await archiveCreator.downloadArchive({
-            filename: metadata.project.id || 'archive',
-            format: format,
-            includeHashes: includeHashes
-        });
+        await archiveCreator.downloadArchive(
+            {
+                filename: metadata.project.id || 'archive',
+                format: format,
+                includeHashes: includeHashes
+            },
+            (percent, stage) => {
+                // Progress callback
+                updateProgress(percent, stage);
+            }
+        );
         console.log('[main.js] Archive download complete');
         hideLoading();
         hideExportPanel();

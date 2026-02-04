@@ -442,9 +442,10 @@ export class ArchiveCreator {
     /**
      * Create the archive file
      * @param {Object} options - Creation options
+     * @param {Function} onProgress - Progress callback (percent, stage)
      * @returns {Promise<Blob>} The archive blob
      */
-    async createArchive(options = {}) {
+    async createArchive(options = {}, onProgress = null) {
         console.log('[archive-creator] createArchive called with options:', options);
         const {
             format = 'a3d',
@@ -454,14 +455,17 @@ export class ArchiveCreator {
 
         console.log('[archive-creator] Using compression:', compression);
 
-        // Calculate hashes if requested
+        // Calculate hashes if requested (0-20% of progress)
         if (includeHashes) {
             console.log('[archive-creator] Calculating hashes...');
+            if (onProgress) onProgress(0, 'Calculating hashes...');
             await this.calculateHashes();
             console.log('[archive-creator] Hashes calculated');
+            if (onProgress) onProgress(20, 'Hashes complete');
         }
 
         console.log('[archive-creator] Creating JSZip instance');
+        if (onProgress) onProgress(includeHashes ? 20 : 0, 'Preparing archive...');
         const zip = new JSZip();
 
         // Add manifest
@@ -485,23 +489,38 @@ export class ArchiveCreator {
             });
         }
 
-        // Generate the archive
+        // Generate the archive (20-100% of progress)
         console.log('[archive-creator] Generating zip archive...');
-        const archiveBlob = await zip.generateAsync({
-            type: 'blob',
-            compression: compression,
-            compressionOptions: compression === 'DEFLATE' ? { level: 6 } : undefined
-        });
+        if (onProgress) onProgress(25, 'Generating archive...');
+
+        const baseProgress = includeHashes ? 25 : 5;
+        const archiveBlob = await zip.generateAsync(
+            {
+                type: 'blob',
+                compression: compression,
+                compressionOptions: compression === 'DEFLATE' ? { level: 6 } : undefined
+            },
+            (metadata) => {
+                // JSZip progress callback
+                const zipProgress = metadata.percent;
+                const totalProgress = baseProgress + (zipProgress * (100 - baseProgress) / 100);
+                if (onProgress) {
+                    onProgress(Math.round(totalProgress), `Packing: ${Math.round(zipProgress)}%`);
+                }
+            }
+        );
 
         console.log('[archive-creator] Archive generated, size:', archiveBlob.size);
+        if (onProgress) onProgress(100, 'Complete');
         return archiveBlob;
     }
 
     /**
      * Download the archive
      * @param {Object} options - Creation options plus filename
+     * @param {Function} onProgress - Progress callback (percent, stage)
      */
-    async downloadArchive(options = {}) {
+    async downloadArchive(options = {}, onProgress = null) {
         console.log('[archive-creator] downloadArchive called with options:', options);
         const {
             filename = 'archive',
@@ -510,7 +529,7 @@ export class ArchiveCreator {
         } = options;
 
         console.log('[archive-creator] Creating archive blob...');
-        const blob = await this.createArchive({ format, ...createOptions });
+        const blob = await this.createArchive({ format, ...createOptions }, onProgress);
         console.log('[archive-creator] Archive blob created, size:', blob.size);
 
         const url = URL.createObjectURL(blob);
