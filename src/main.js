@@ -4,25 +4,25 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { SplatMesh } from '@sparkjsdev/spark';
-import { ArchiveLoader, isArchiveFile } from './archive-loader.js';
-import { AnnotationSystem } from './annotation-system.js';
-import { ArchiveCreator, captureScreenshot } from './archive-creator.js';
-import { CAMERA, TIMING } from './constants.js';
-import { Logger, notify, processMeshMaterials, computeMeshFaceCount, computeMeshVertexCount, disposeObject } from './utilities.js';
-import { SceneManager } from './scene-manager.js';
+import { ArchiveLoader, isArchiveFile } from './modules/archive-loader.js';
+import { AnnotationSystem } from './modules/annotation-system.js';
+import { ArchiveCreator, captureScreenshot } from './modules/archive-creator.js';
+import { CAMERA, TIMING } from './modules/constants.js';
+import { Logger, notify, processMeshMaterials, computeMeshFaceCount, computeMeshVertexCount, disposeObject } from './modules/utilities.js';
+import { SceneManager } from './modules/scene-manager.js';
 import {
     icpAlignObjects as icpAlignObjectsHandler,
     autoAlignObjects as autoAlignObjectsHandler,
     fitToView as fitToViewHandler,
     resetAlignment as resetAlignmentHandler,
     resetCamera as resetCameraHandler
-} from './alignment.js';
+} from './modules/alignment.js';
 import {
     showLoading,
     hideLoading,
     updateProgress,
     addListener
-} from './ui-controller.js';
+} from './modules/ui-controller.js';
 import {
     formatFileSize,
     switchEditTab,
@@ -30,17 +30,17 @@ import {
     collectMetadata,
     setupLicenseField,
     hideMetadataSidebar
-} from './metadata-manager.js';
+} from './modules/metadata-manager.js';
 import {
     loadSplatFromFile as loadSplatFromFileHandler,
     loadSplatFromUrl as loadSplatFromUrlHandler,
     loadModelFromFile as loadModelFromFileHandler,
     loadModelFromUrl as loadModelFromUrlHandler
-} from './file-handlers.js';
+} from './modules/file-handlers.js';
 import {
     initShareDialog,
     showShareDialog
-} from './share-dialog.js';
+} from './modules/share-dialog.js';
 
 // Create logger for this module
 const log = Logger.getLogger('main.js');
