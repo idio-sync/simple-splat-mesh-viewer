@@ -69,6 +69,7 @@ let archiveCreator = null;
 // Blob data for archive export (stored when loading files)
 let currentSplatBlob = null;
 let currentMeshBlob = null;
+let currentPopupAnnotationId = null; // Track which annotation's popup is shown
 
 // Three.js objects - Split view (right side)
 let rendererRight = null;
@@ -1997,16 +1998,25 @@ function populateMetadataDisplay() {
     // Get metadata from form or archive
     const metadata = collectMetadata();
 
-    // Title
+    // Track if sections have content
+    let hasDetails = false;
+    let hasStats = false;
+
+    // Title - always show
     const titleEl = document.getElementById('display-title');
     if (titleEl) {
         titleEl.textContent = metadata.project.title || 'Untitled';
     }
 
-    // Description
+    // Description - hide if empty
     const descEl = document.getElementById('display-description');
     if (descEl) {
-        descEl.textContent = metadata.project.description || '';
+        if (metadata.project.description) {
+            descEl.textContent = metadata.project.description;
+            descEl.style.display = '';
+        } else {
+            descEl.style.display = 'none';
+        }
     }
 
     // Creator/Operator
@@ -2016,6 +2026,7 @@ function populateMetadataDisplay() {
         if (metadata.provenance.operator) {
             creatorEl.textContent = metadata.provenance.operator;
             creatorRow.style.display = '';
+            hasDetails = true;
         } else {
             creatorRow.style.display = 'none';
         }
@@ -2032,6 +2043,7 @@ function populateMetadataDisplay() {
                 year: 'numeric', month: 'long', day: 'numeric'
             });
             dateRow.style.display = '';
+            hasDetails = true;
         } else {
             dateRow.style.display = 'none';
         }
@@ -2044,6 +2056,7 @@ function populateMetadataDisplay() {
         if (metadata.provenance.location) {
             locationEl.textContent = metadata.provenance.location;
             locationRow.style.display = '';
+            hasDetails = true;
         } else {
             locationRow.style.display = 'none';
         }
@@ -2056,25 +2069,42 @@ function populateMetadataDisplay() {
         if (metadata.provenance.captureDevice) {
             deviceEl.textContent = metadata.provenance.captureDevice;
             deviceRow.style.display = '';
+            hasDetails = true;
         } else {
             deviceRow.style.display = 'none';
         }
     }
 
-    // License
+    // Hide the details section and divider if no details
+    const detailsSection = document.querySelector('#metadata-display .display-details');
+    const divider = document.querySelector('#metadata-display .display-divider');
+    if (detailsSection) {
+        detailsSection.style.display = hasDetails ? '' : 'none';
+    }
+    if (divider) {
+        divider.style.display = hasDetails ? '' : 'none';
+    }
+
+    // License - hide if not set
     const licenseRow = document.getElementById('display-license-row');
     const licenseEl = document.getElementById('display-license');
     if (licenseRow && licenseEl) {
         const license = metadata.project.license;
-        if (license && license !== 'custom') {
+        if (license && license !== 'custom' && license !== 'CC0') {
+            // Show non-default licenses
             licenseEl.textContent = license;
-            licenseRow.classList.remove('hidden');
+            licenseRow.style.display = '';
         } else if (license === 'custom') {
             const customLicense = document.getElementById('meta-custom-license')?.value;
-            licenseEl.textContent = customLicense || 'Custom License';
-            licenseRow.classList.remove('hidden');
+            if (customLicense) {
+                licenseEl.textContent = customLicense;
+                licenseRow.style.display = '';
+            } else {
+                licenseRow.style.display = 'none';
+            }
         } else {
-            licenseRow.classList.add('hidden');
+            // Hide CC0 (default) or empty
+            licenseRow.style.display = 'none';
         }
     }
 
@@ -2085,9 +2115,10 @@ function populateMetadataDisplay() {
         if (state.splatLoaded) {
             const count = document.getElementById('splat-vertices')?.textContent || '-';
             splatCountEl.textContent = count;
-            splatStat.classList.remove('hidden');
+            splatStat.style.display = '';
+            hasStats = true;
         } else {
-            splatStat.classList.add('hidden');
+            splatStat.style.display = 'none';
         }
     }
 
@@ -2098,9 +2129,10 @@ function populateMetadataDisplay() {
         if (state.modelLoaded) {
             const count = document.getElementById('model-faces')?.textContent || '-';
             meshCountEl.textContent = count;
-            meshStat.classList.remove('hidden');
+            meshStat.style.display = '';
+            hasStats = true;
         } else {
-            meshStat.classList.add('hidden');
+            meshStat.style.display = 'none';
         }
     }
 
@@ -2109,12 +2141,19 @@ function populateMetadataDisplay() {
     const annoCountEl = document.getElementById('display-anno-count');
     if (annoStat && annoCountEl && annotationSystem) {
         const count = annotationSystem.getCount();
-        annoCountEl.textContent = count.toString();
         if (count > 0) {
-            annoStat.classList.remove('hidden');
+            annoCountEl.textContent = count.toString();
+            annoStat.style.display = '';
+            hasStats = true;
         } else {
-            annoStat.classList.add('hidden');
+            annoStat.style.display = 'none';
         }
+    }
+
+    // Hide the stats section if nothing to show
+    const statsSection = document.getElementById('display-stats');
+    if (statsSection) {
+        statsSection.style.display = hasStats ? '' : 'none';
     }
 }
 
@@ -2129,6 +2168,9 @@ function showAnnotationPopup(annotation) {
     const marker = document.querySelector(`.annotation-marker[data-annotation-id="${annotation.id}"]`);
     if (!marker) return;
 
+    // Track which annotation is shown
+    currentPopupAnnotationId = annotation.id;
+
     // Get annotation number from marker
     const number = marker.textContent;
 
@@ -2142,6 +2184,28 @@ function showAnnotationPopup(annotation) {
     if (bodyEl) bodyEl.textContent = annotation.body || '';
 
     // Position popup near the marker
+    updateAnnotationPopupPosition();
+
+    popup.classList.remove('hidden');
+}
+
+// Update annotation popup position to follow the marker
+function updateAnnotationPopupPosition() {
+    if (!currentPopupAnnotationId) return;
+
+    const popup = document.getElementById('annotation-info-popup');
+    if (!popup || popup.classList.contains('hidden')) return;
+
+    const marker = document.querySelector(`.annotation-marker[data-annotation-id="${currentPopupAnnotationId}"]`);
+    if (!marker) return;
+
+    // Hide popup if marker is hidden (behind camera)
+    if (marker.style.display === 'none') {
+        popup.style.visibility = 'hidden';
+        return;
+    }
+    popup.style.visibility = 'visible';
+
     const markerRect = marker.getBoundingClientRect();
     const popupWidth = 320;
     const padding = 15;
@@ -2163,14 +2227,13 @@ function showAnnotationPopup(annotation) {
 
     popup.style.left = left + 'px';
     popup.style.top = top + 'px';
-
-    popup.classList.remove('hidden');
 }
 
 // Hide annotation popup
 function hideAnnotationPopup() {
     const popup = document.getElementById('annotation-info-popup');
     if (popup) popup.classList.add('hidden');
+    currentPopupAnnotationId = null;
 }
 
 // ==================== End Annotation/Export Functions ====================
@@ -3927,6 +3990,9 @@ function animate() {
         if (annotationSystem) {
             annotationSystem.updateMarkerPositions();
         }
+
+        // Update annotation popup position to follow marker
+        updateAnnotationPopupPosition();
 
         updateFPS();
 

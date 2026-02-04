@@ -92,8 +92,9 @@ body {
     background: #0f0f1a;
     padding: 20px;
     overflow-y: auto;
-    border-left: 1px solid #333;
+    border-right: 1px solid #333;
     z-index: 100;
+    order: -1; /* Move to left side of flexbox */
     /* Smooth transition for show/hide */
     transition: width 0.15s ease-out, min-width 0.15s ease-out, padding 0.15s ease-out;
 }
@@ -104,7 +105,7 @@ body {
     min-width: 0 !important;
     padding: 0 !important;
     overflow: hidden !important;
-    border-left-width: 0 !important;
+    border-right-width: 0 !important;
     pointer-events: none; /* Prevent capturing clicks when collapsed */
 }
 
@@ -491,11 +492,11 @@ input[type="range"]::-webkit-slider-thumb:hover {
     display: none;
 }
 
-/* Toggle controls button */
+/* Toggle controls button - positioned on left since controls panel is on left */
 .toggle-controls-btn {
     position: absolute;
     top: 15px;
-    right: 15px;
+    left: 15px;
     width: 40px;
     height: 40px;
     background: rgba(0, 0, 0, 0.6);
@@ -1030,11 +1031,11 @@ input[type="range"]::-webkit-slider-thumb:hover {
     border-bottom: 1px solid #3a3a5a;
 }
 
-/* Metadata Panel - slides out to the left of controls */
+/* Metadata Panel - slides in from right side */
 #metadata-panel {
     position: fixed;
     top: 0;
-    right: 280px; /* Position to left of controls panel */
+    right: 0;
     width: 380px;
     height: 100vh;
     background: #0f0f1a;
@@ -1444,7 +1445,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 #metadata-display {
     position: fixed;
     bottom: 30px;
-    left: 30px;
+    right: 30px;
     z-index: 200;
     background: rgba(10, 10, 18, 0.92);
     border: 1px solid rgba(78, 205, 196, 0.3);
@@ -1625,8 +1626,9 @@ input[type="range"]::-webkit-slider-thumb:hover {
     #controls-panel {
         width: 100%;
         height: 40%;
-        border-left: none;
-        border-top: 1px solid #333;
+        border-right: none;
+        border-bottom: 1px solid #333;
+        order: 1; /* Reset order for column layout */
     }
 
     #viewer-container {
