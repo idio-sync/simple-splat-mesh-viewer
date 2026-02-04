@@ -995,6 +995,9 @@ async function loadSplatFromBlobUrl(blobUrl, fileName) {
     // Create SplatMesh using Spark
     splatMesh = new SplatMesh({ url: blobUrl });
 
+    // Apply default rotation to correct upside-down orientation
+    splatMesh.rotation.x = Math.PI;
+
     // Verify SplatMesh is a valid THREE.Object3D
     if (!(splatMesh instanceof THREE.Object3D)) {
         console.warn('[main.js] WARNING: SplatMesh is not an instance of THREE.Object3D!');
@@ -1947,6 +1950,9 @@ async function handleSplatFile(event) {
         // Create SplatMesh using Spark
         splatMesh = new SplatMesh({ url: fileUrl });
 
+        // Apply default rotation to correct upside-down orientation
+        splatMesh.rotation.x = Math.PI;
+
         // Verify SplatMesh is a valid THREE.Object3D (detect instance conflicts)
         if (!(splatMesh instanceof THREE.Object3D)) {
             console.warn('[main.js] WARNING: SplatMesh is not an instance of THREE.Object3D!');
@@ -2770,6 +2776,10 @@ async function loadSplatFromUrl(url) {
 
         // Create SplatMesh using Spark
         splatMesh = new SplatMesh({ url: blobUrl });
+
+        // Apply default rotation to correct upside-down orientation
+        // Many splat files use Z-up coordinate system; rotate to Y-up
+        splatMesh.rotation.x = Math.PI; // 180 degrees on X-axis
 
         // Verify SplatMesh is a valid THREE.Object3D
         if (!(splatMesh instanceof THREE.Object3D)) {

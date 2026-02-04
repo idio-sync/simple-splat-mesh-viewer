@@ -643,11 +643,15 @@ export class ArchiveCreator {
         if (onProgress) onProgress(25, 'Generating archive...');
 
         const baseProgress = includeHashes ? 25 : 5;
+        const startZipTime = performance.now();
+
         const archiveBlob = await zip.generateAsync(
             {
                 type: 'blob',
                 compression: compression,
-                compressionOptions: compression === 'DEFLATE' ? { level: 6 } : undefined
+                compressionOptions: compression === 'DEFLATE' ? { level: 6 } : undefined,
+                // Stream files to reduce memory pressure on large files
+                streamFiles: true
             },
             (metadata) => {
                 // JSZip progress callback
@@ -658,6 +662,9 @@ export class ArchiveCreator {
                 }
             }
         );
+
+        const zipElapsed = performance.now() - startZipTime;
+        console.log(`[archive-creator] ZIP generation took ${zipElapsed.toFixed(0)}ms`);
 
         console.log('[archive-creator] Archive generated, size:', archiveBlob.size);
         if (onProgress) onProgress(100, 'Complete');
