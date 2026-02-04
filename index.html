@@ -7,12 +7,13 @@
 
     <!-- Content Security Policy - Defense in depth against XSS -->
     <!-- Note: frame-ancestors must be set via HTTP headers (see nginx.conf), not meta tags -->
+    <!-- Note: 'unsafe-eval' is required for Spark.js WASM and PLY parser -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self';
-        script-src 'self' https://esm.sh https://*.esm.sh https://sparkjs.dev 'sha256-nH2CN3/vDPF45UQyVYtDdP1Ge+x7gm4RuV4BHgCaa5s=';
+        script-src 'self' https://esm.sh https://*.esm.sh https://sparkjs.dev 'sha256-nH2CN3/vDPF45UQyVYtDdP1Ge+x7gm4RuV4BHgCaa5s=' 'unsafe-eval';
         style-src 'self' 'unsafe-inline';
         img-src 'self' blob: data:;
-        connect-src 'self' https: blob:;
+        connect-src 'self' https: blob: data:;
         worker-src 'self' blob:;
         font-src 'self';
         media-src 'self' blob:;
