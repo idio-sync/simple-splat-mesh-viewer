@@ -166,7 +166,7 @@ function validateUserUrl(urlString, resourceType) {
 
 // Global state
 const state = {
-    displayMode: config.initialViewMode || 'both', // 'splat', 'model', 'pointcloud', 'both', 'split'
+    displayMode: config.initialViewMode || 'model', // 'splat', 'model', 'pointcloud', 'both', 'split'
     selectedObject: 'none', // 'splat', 'model', 'both', 'none'
     transformMode: 'translate', // 'translate', 'rotate', 'scale'
     splatLoaded: false,
@@ -972,7 +972,7 @@ function updateVisibility() {
         }
 
         if (pointcloudGroup) {
-            pointcloudGroup.visible = showPointcloud || showModel;
+            pointcloudGroup.visible = showPointcloud;
         }
     }
 }
@@ -2065,6 +2065,9 @@ function switchSidebarMode(mode) {
     // Refresh content for the selected mode
     if (mode === 'view') {
         populateMetadataDisplay();
+    } else if (mode === 'edit') {
+        updateMetadataStats();
+        updateAssetStatus();
     } else if (mode === 'annotations') {
         updateSidebarAnnotationsList();
     }
@@ -2187,6 +2190,12 @@ function exportMetadataManifest() {
         _creation_date: new Date().toISOString(),
         ...metadata
     };
+
+    // Include annotations if present
+    if (annotationSystem && annotationSystem.hasAnnotations()) {
+        manifest.annotations = annotationSystem.toJSON();
+    }
+
     const json = JSON.stringify(manifest, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -2210,6 +2219,12 @@ function importMetadataManifest() {
             try {
                 const manifest = JSON.parse(event.target.result);
                 prefillMetadataFromArchive(manifest);
+
+                // Load annotations if present in manifest
+                if (manifest.annotations && Array.isArray(manifest.annotations) && manifest.annotations.length > 0) {
+                    loadAnnotationsFromArchive(manifest.annotations);
+                }
+
                 populateMetadataDisplay();
                 notify.success('Manifest imported');
             } catch (err) {

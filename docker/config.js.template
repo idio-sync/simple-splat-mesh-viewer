@@ -130,7 +130,7 @@
     // Control and view mode settings
     const urlControls = params.get('controls'); // 'full', 'minimal', 'none', or null
     const controlsMode = urlControls || 'full';
-    const viewMode = params.get('mode') || 'both'; // splat, model, both, split
+    const viewMode = params.get('mode') || 'model'; // splat, model, pointcloud, both, split
     const toolbarMode = params.get('toolbar') || 'show'; // show, hide
     const sidebarMode = params.get('sidebar') || 'closed'; // closed, view, edit
 
