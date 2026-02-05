@@ -1,0 +1,286 @@
+{
+  "container_version": "1.0",
+  "packer": "simple-splat-mesh-viewer",
+  "packer_version": "1.0.0",
+  "_creation_date": "2025-03-15T14:22:08.000Z",
+  "project": {
+    "title": "Lincoln Memorial — Seated Statue of Abraham Lincoln",
+    "id": "lm-metrology-2025-03",
+    "license": "CC0",
+    "description": "# Lincoln Memorial — Seated Statue of Abraham Lincoln\n\nHigh-resolution metrology-grade 3D scan of the monumental seated statue of [Abraham Lincoln](https://en.wikipedia.org/wiki/Abraham_Lincoln), the 16th President of the United States, located within the [Lincoln Memorial](https://en.wikipedia.org/wiki/Lincoln_Memorial) on the western end of the [National Mall](https://en.wikipedia.org/wiki/National_Mall) in Washington, D.C.\n\n## History\n\nThe Lincoln Memorial was designed by architect [Henry Bacon](https://en.wikipedia.org/wiki/Henry_Bacon) and constructed between 1914 and 1922. The seated figure of Lincoln was sculpted by [Daniel Chester French](https://en.wikipedia.org/wiki/Daniel_Chester_French) and carved by the [Piccirilli Brothers](https://en.wikipedia.org/wiki/Piccirilli_Brothers) from 28 blocks of white [Georgia marble](https://en.wikipedia.org/wiki/Georgia_marble). The statue stands 19 feet (5.8 m) tall from head to foot and 19 feet wide, and would be 28 feet tall if the figure were standing.\n\n## Significance\n\nThe memorial was dedicated on May 30, 1922, with [Robert Todd Lincoln](https://en.wikipedia.org/wiki/Robert_Todd_Lincoln), the president's only surviving son, in attendance. It has since become an iconic symbol of American democracy and was the site of [Martin Luther King Jr.](https://en.wikipedia.org/wiki/Martin_Luther_King_Jr.)'s [\"I Have a Dream\" speech](https://en.wikipedia.org/wiki/I_Have_a_Dream) on August 28, 1963, during the [March on Washington](https://en.wikipedia.org/wiki/March_on_Washington_for_Jobs_and_Freedom).\n\nThe memorial is administered by the [National Park Service](https://en.wikipedia.org/wiki/National_Park_Service) and was listed on the [National Register of Historic Places](https://en.wikipedia.org/wiki/National_Register_of_Historic_Places) on October 15, 1966.\n\n## Scan Details\n\nThis archive contains a metrology-grade terrestrial laser scan and photogrammetric capture of the seated figure, including:\n\n- **Gaussian splat** reconstruction for photorealistic visualization\n- **Mesh** geometry derived from structured-light scanning for dimensional analysis\n- Sub-millimeter accuracy verified against physical control points\n- Full color calibration using X-Rite ColorChecker targets\n\n## Condition Notes\n\nThe statue shows minor surface soiling consistent with its age and indoor exposure. Hairline cracks are present in several marble blocks, most notably along the left arm rest and at two block seams on the torso. These are documented in the annotations. The [2011 earthquake](https://en.wikipedia.org/wiki/2011_Virginia_earthquake) damage repairs to the memorial structure are visible at the ceiling but did not affect the statue itself."
+  },
+  "relationships": {
+    "part_of": "National Mall & Memorial Parks Digital Preservation Collection",
+    "derived_from": "NPS HABS/HAER Survey DC-0428",
+    "replaces": "",
+    "related_objects": [
+      {
+        "title": "Lincoln Memorial Building — Exterior Laser Scan",
+        "description": "Companion terrestrial laser scan of the full memorial building exterior, columns, and reflecting pool approach.",
+        "url": "https://www.nps.gov/subjects/heritagedocumentation/lincoln-memorial.htm"
+      },
+      {
+        "title": "Gettysburg Address Tablet — South Wall",
+        "description": "High-resolution scan of the carved Gettysburg Address inscription on the south interior wall by Jules Guerin.",
+        "url": ""
+      },
+      {
+        "title": "Daniel Chester French Papers — Library of Congress",
+        "description": "Original design drawings, plaster maquettes documentation, and correspondence related to the statue commission.",
+        "url": "https://www.loc.gov/collections/daniel-chester-french-papers/"
+      }
+    ]
+  },
+  "provenance": {
+    "capture_date": "2025-03-10",
+    "capture_device": "Leica RTC360 + Artec Ray II",
+    "device_serial": "RTC360-7842195 / AR2-20241087",
+    "operator": "Sarah Chen, NPS Heritage Documentation Programs",
+    "operator_orcid": "0000-0002-7391-5482",
+    "location": "Lincoln Memorial Interior, National Mall, Washington, D.C.",
+    "convention_hints": ["Y-up", "meters", "right-handed"],
+    "processing_software": [
+      {
+        "name": "Leica Cyclone REGISTER 360+",
+        "version": "2024.1.0",
+        "url": "https://leica-geosystems.com/products/laser-scanners/software/leica-cyclone"
+      },
+      {
+        "name": "Artec Studio",
+        "version": "18.2",
+        "url": "https://www.artec3d.com/3d-software/artec-studio"
+      },
+      {
+        "name": "CloudCompare",
+        "version": "2.13.1",
+        "url": "https://www.cloudcompare.org/"
+      },
+      {
+        "name": "Agisoft Metashape Professional",
+        "version": "2.1.3",
+        "url": "https://www.agisoft.com/"
+      },
+      {
+        "name": "Postshot",
+        "version": "1.3.0",
+        "url": "https://www.jawset.com/"
+      }
+    ],
+    "processing_notes": "Point cloud registration from 47 TLS scan positions (Leica RTC360) combined with 312 structured-light patches (Artec Ray II) for surface detail. Global registration achieved via 24 surveyed control targets with RMSE 0.18mm. Photogrammetric texture from 1,847 calibrated photographs (Canon EOS R5, 50mm f/1.4). Gaussian splat trained from photogrammetric dataset using Postshot. Mesh decimated from 890M to 45M faces with 0.05mm max deviation tolerance in CloudCompare."
+  },
+  "quality_metrics": {
+    "tier": "metrology",
+    "accuracy_grade": "survey-grade",
+    "capture_resolution": {
+      "value": 0.1,
+      "unit": "mm",
+      "type": "point spacing"
+    },
+    "alignment_error": {
+      "value": 0.18,
+      "unit": "mm",
+      "method": "RMSE"
+    },
+    "scale_verification": "Verified against 6 physical scale bars (Leica GKL221) placed around statue base and armrests. Max deviation 0.22mm over 1.5m reference distance. Independent check measurements at 8 control-point pairs agree within 0.3mm.",
+    "data_quality": {
+      "coverage_gaps": "Minor occlusion beneath the seat between Lincoln's legs and the back of the chair. Approximately 2% of total surface area unresolvable due to deep undercuts in the draped fabric folds on the lower rear. Top of head has reduced point density due to viewing angle limitations.",
+      "reconstruction_areas": "Small interpolated patches (< 5cm²) on the underside of each armrest where scanner line-of-sight was obstructed. Gap-filled using Poisson surface reconstruction constrained to neighboring geometry. All reconstructed areas are flagged in the mesh vertex color channel (R=255).",
+      "color_calibration": "X-Rite ColorChecker Passport Photo 2 placed at 4 positions under controlled LED illumination (5600K). White balance and color profile applied per ICC workflow. Mean Delta-E 2000 across all patches: 1.4 (max 2.8). Note: in-situ lighting varies due to overhead skylights; captures taken between 06:00–07:30 before public opening for consistent diffuse illumination.",
+      "measurement_uncertainty": "Combined standard uncertainty (k=2, 95% confidence): ±0.35mm for point positions, ±0.5mm for derived dimensions. Uncertainty budget accounts for scanner instrument error, registration residuals, temperature-induced marble expansion (coefficient 7.3 µm/m/°C, ΔT < 2°C during capture), and target centering."
+    }
+  },
+  "archival_record": {
+    "standard": "VRA Core + Dublin Core",
+    "title": "Statue of Abraham Lincoln",
+    "alternate_titles": [
+      "Seated Lincoln",
+      "Lincoln Memorial Statue",
+      "The Lincoln Statue"
+    ],
+    "ids": {
+      "accession_number": "NPS-NAMA-00127",
+      "siris_id": "",
+      "uri": "https://www.nps.gov/linc/index.htm"
+    },
+    "creation": {
+      "creator": "Daniel Chester French (sculptor); Piccirilli Brothers (carvers)",
+      "date_created": "1920",
+      "period": "Early 20th Century / Neoclassical",
+      "culture": "American"
+    },
+    "physical_description": {
+      "medium": "Georgia white marble (Tate, Georgia quarry); 28 interlocking blocks",
+      "dimensions": {
+        "height": "5.79 m (19 ft)",
+        "width": "5.79 m (19 ft)",
+        "depth": "4.57 m (15 ft)"
+      },
+      "condition": "Good. Surface soiling from atmospheric particulates. Hairline cracks along two block seams on torso and left armrest, stable and monitored. Minor biological growth (algae) on rear lower surfaces. No active deterioration. Last condition assessment: NPS, September 2024."
+    },
+    "provenance": "Commissioned by the Lincoln Memorial Commission, established by Act of Congress (1911). Sculpted by Daniel Chester French in his Chesterwood studio, Stockbridge, Massachusetts, 1915–1920. Carved in situ by Attilio and Furio Piccirilli, 1920. Dedicated May 30, 1922. Administered by National Park Service since 1933. Listed on the National Register of Historic Places, October 15, 1966 (Ref #66000030).",
+    "rights": {
+      "copyright_status": "Public Domain — U.S. Government work and age of creation (pre-1929)",
+      "credit_line": "National Park Service, Heritage Documentation Programs. 3D documentation by NPS Digital Imaging Lab."
+    },
+    "context": {
+      "description": "The statue depicts Lincoln seated in contemplation, gazing eastward toward the Washington Monument and the U.S. Capitol. His hands rest on fasces — Roman symbols of authority — integrated into the armrests of the chair, symbolizing the Union held together through the Civil War. The figure's face was modeled from life casts made by Leonard Volk in 1860 and Gutzon Borglum's 1908 bust.",
+      "location_history": "The statue has remained in its original location since installation in 1920. The memorial building and statue are a contributing property to the National Mall & Memorial Parks cultural landscape."
+    },
+    "coverage": {
+      "spatial": {
+        "location_name": "Lincoln Memorial, National Mall, Washington, D.C., USA",
+        "coordinates": {
+          "latitude": "38.8893",
+          "longitude": "-77.0502"
+        }
+      },
+      "temporal": {
+        "subject_period": "1914–1922 (construction); depicts Abraham Lincoln ca. 1861–1865",
+        "subject_date_circa": true
+      }
+    }
+  },
+  "material_standard": {
+    "workflow": "metalness-roughness (PBR)",
+    "occlusion_packed": false,
+    "color_space": "sRGB",
+    "normal_space": "OpenGL (+Y up)"
+  },
+  "preservation": {
+    "format_registry": {
+      "glb": "fmt/861",
+      "obj": "fmt/935",
+      "ply": "fmt/831"
+    },
+    "significant_properties": [
+      "Geometric accuracy (sub-millimeter point positions)",
+      "Color fidelity (ICC-profiled, Delta-E < 3.0)",
+      "Scale accuracy (verified to physical control measurements)",
+      "Spatial reference (aligned to NAD83 / UTM Zone 18N via survey control)"
+    ],
+    "rendering_requirements": "WebGL 2.0 with EXT_color_buffer_float for gaussian splat rendering. Mesh LOD recommended for real-time display; full-resolution mesh (45M faces) requires 8GB+ GPU memory.",
+    "rendering_notes": "Gaussian splat trained at 3M points for web delivery. Original point cloud (1.2B points) and full-resolution mesh available from NPS Heritage Documentation Programs upon request. Splat default orientation is rotated 180° on X-axis (Z-up to Y-up conversion)."
+  },
+  "data_entries": {
+    "scene_0": {
+      "file_name": "assets/scene_0.spz",
+      "created_by": "Postshot",
+      "_created_by_version": "1.3.0",
+      "_source_notes": "Gaussian splat trained from 1,847 photogrammetric images. 3M splat primitives, compressed SPZ format.",
+      "_parameters": {
+        "position": [0, 0, 0],
+        "rotation": [3.14159, 0, 0],
+        "scale": 1
+      }
+    },
+    "mesh_0": {
+      "file_name": "assets/mesh_0.glb",
+      "created_by": "Artec Studio + CloudCompare",
+      "_created_by_version": "18.2 / 2.13.1",
+      "_source_notes": "Structured-light mesh, decimated from 890M to 45M faces. Draco-compressed GLB with 4K PBR textures (baseColor, normal, roughness).",
+      "_parameters": {
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
+        "scale": 1
+      }
+    },
+    "thumbnail_0": {
+      "file_name": "preview.jpg",
+      "created_by": "simple-splat-mesh-viewer"
+    }
+  },
+  "annotations": [
+    {
+      "id": "anno_1",
+      "title": "Proper Right Hand — Clenched Fist",
+      "body": "Lincoln's right hand is clenched in a fist, symbolizing his strength and determination during the [Civil War](https://en.wikipedia.org/wiki/American_Civil_War). [Daniel Chester French](https://en.wikipedia.org/wiki/Daniel_Chester_French) intentionally contrasted this with the open left hand.\n\nThe knuckle detail was carved from a single marble block. Note the visible tool marks from the Piccirilli Brothers' point chisel work in the recesses between the fingers — these were intentionally left unpolished to create shadow depth.\n\n**Condition:** Minor surface soiling. No cracks or losses.",
+      "position": { "x": -0.8712, "y": 2.145, "z": 0.9531 },
+      "camera_target": { "x": -0.8712, "y": 2.145, "z": 0.9531 },
+      "camera_position": { "x": -1.95, "y": 2.35, "z": 2.10 }
+    },
+    {
+      "id": "anno_2",
+      "title": "Proper Left Hand — Open and Relaxed",
+      "body": "The left hand is open and relaxed, symbolizing Lincoln's compassion and peaceful nature. This deliberate contrast with the clenched right hand was part of French's original concept sketches, now held in the [Library of Congress](https://en.wikipedia.org/wiki/Library_of_Congress).\n\nPopular myth claims the hands spell out \"A\" and \"L\" in [American Sign Language](https://en.wikipedia.org/wiki/American_Sign_Language). While French had a deaf son and was familiar with ASL, the NPS considers this coincidental — French's own writings reference the symbolic contrast of resolve and mercy, not ASL.\n\n**Condition:** Good. Light abrasion on fingertips consistent with age.",
+      "position": { "x": 0.8856, "y": 2.112, "z": 0.9214 },
+      "camera_target": { "x": 0.8856, "y": 2.112, "z": 0.9214 },
+      "camera_position": { "x": 1.92, "y": 2.30, "z": 2.15 }
+    },
+    {
+      "id": "anno_3",
+      "title": "Block Seam — Torso Joint (Hairline Crack)",
+      "body": "Visible hairline crack running along the seam between marble blocks 14 and 15, spanning approximately 42cm across the lower torso.\n\nThis crack was first documented in the 1989 NPS condition survey and has been monitored annually with crack gauges since 1997. Total measured movement over 28 years: < 0.05mm. Rated **stable and non-progressive** by NPS structural engineers.\n\nThe crack follows the natural bedding plane of the Georgia marble and is typical of large multi-block marble sculptures of this period.\n\n**Measurement:** Width ranges from 0.08mm to 0.22mm along its length. Documented in vertex color channel (R=200, flagged for monitoring).",
+      "position": { "x": 0.0423, "y": 2.845, "z": 0.4102 },
+      "camera_target": { "x": 0.0423, "y": 2.845, "z": 0.4102 },
+      "camera_position": { "x": 0.15, "y": 2.90, "z": 1.60 }
+    },
+    {
+      "id": "anno_4",
+      "title": "Head and Face — Life Cast Reference",
+      "body": "The face was modeled primarily from two sources:\n\n1. [Leonard Volk](https://en.wikipedia.org/wiki/Leonard_Volk)'s 1860 life mask, cast in Chicago when Lincoln was a presidential candidate\n2. [Gutzon Borglum](https://en.wikipedia.org/wiki/Gutzon_Borglum)'s 1908 marble bust based on the Volk mask\n\nFrench spent four years refining the expression, creating numerous study models at his [Chesterwood](https://en.wikipedia.org/wiki/Chesterwood_(Stockbridge,_Massachusetts)) studio. The final expression conveys what French described as \"the qualities of a great leader tempered by a deep compassion for humanity.\"\n\nThe overhead skylights create dramatic shadow patterns on the face that change throughout the day — an effect architect [Henry Bacon](https://en.wikipedia.org/wiki/Henry_Bacon) and French planned collaboratively.\n\n**Scan note:** Reduced point density on top of the head (~40% of nominal) due to height and viewing angle. Top surface reconstructed from oblique captures.",
+      "position": { "x": 0.0185, "y": 5.214, "z": 0.2873 },
+      "camera_target": { "x": 0.0185, "y": 5.214, "z": 0.2873 },
+      "camera_position": { "x": 0.10, "y": 5.10, "z": 2.50 }
+    },
+    {
+      "id": "anno_5",
+      "title": "Fasces — Chair Armrest Detail",
+      "body": "The front of each armrest features [fasces](https://en.wikipedia.org/wiki/Fasces) — a Roman symbol of authority consisting of bundled rods bound with straps. In the context of the Lincoln Memorial, the fasces represent the authority of the Union and the binding together of the states.\n\nAbove each fasces is a carved eagle with outstretched wings. French's design integrates these classical republican symbols throughout the chair, which itself is modeled on a Roman *sella curulis* (magistrate's chair).\n\n**Condition:** Left armrest fasces show the hairline crack documented in annotation 3 extending into this area. Right armrest fasces in good condition.",
+      "position": { "x": -1.22, "y": 1.45, "z": 1.12 },
+      "camera_target": { "x": -1.22, "y": 1.45, "z": 1.12 },
+      "camera_position": { "x": -2.40, "y": 1.60, "z": 2.30 }
+    },
+    {
+      "id": "anno_6",
+      "title": "Draped Flag — Rear of Chair",
+      "body": "The back of the chair is draped with a carved American flag, visible from the side and rear viewing angles. This detail is often missed by visitors viewing the statue from the front.\n\nThe flag carving demonstrates the Piccirilli Brothers' mastery of deep marble undercutting — the fabric folds are carved to a depth of up to 12cm, creating realistic shadow play.\n\n**Scan note:** Deep undercuts in the lower folds created the primary coverage gap (~2% of total surface). These areas were filled using constrained Poisson reconstruction and are flagged in the mesh vertex color channel.",
+      "position": { "x": 0.0312, "y": 3.10, "z": -0.8945 },
+      "camera_target": { "x": 0.0312, "y": 3.10, "z": -0.8945 },
+      "camera_position": { "x": 0.20, "y": 3.25, "z": -2.50 }
+    },
+    {
+      "id": "anno_7",
+      "title": "Base Platform — Survey Control Point CP-04",
+      "body": "One of 24 surveyed control targets used for global registration of the scan data. This control point (CP-04) is a brass survey disk set into the marble base platform.\n\n**Survey coordinates (NAD83 / UTM Zone 18N):**\n- Easting: 323,456.782 m\n- Northing: 4,306,721.445 m\n- Elevation: 15.234 m (NAVD88)\n\nRegistration residual at this point: 0.14mm (below network RMSE of 0.18mm).\n\nAll 24 control points were established by NPS survey crews using Trimble S9 total station with 0.1mm precision prisms.",
+      "position": { "x": 1.85, "y": 0.02, "z": 1.95 },
+      "camera_target": { "x": 1.85, "y": 0.02, "z": 1.95 },
+      "camera_position": { "x": 2.50, "y": 0.80, "z": 3.00 }
+    },
+    {
+      "id": "anno_8",
+      "title": "Shoe Detail — Proper Right Foot",
+      "body": "Lincoln's right foot is placed slightly forward of the left, a compositional choice by French to suggest the moment of rising from the chair — as if Lincoln is about to stand and address the viewer.\n\nThe shoe detail includes accurate period lacing and sole construction, based on preserved examples of Lincoln's actual boots held by the [Smithsonian National Museum of American History](https://en.wikipedia.org/wiki/National_Museum_of_American_History).\n\n**Condition:** Good. Minor chipping at the toe edge (pre-existing, documented in 1962 NPS survey). Biological growth (green algae) visible on the sole underside where moisture collects.",
+      "position": { "x": -0.4521, "y": 0.32, "z": 1.78 },
+      "camera_target": { "x": -0.4521, "y": 0.32, "z": 1.78 },
+      "camera_position": { "x": -0.80, "y": 0.95, "z": 3.10 }
+    }
+  ],
+  "integrity": {
+    "algorithm": "SHA-256",
+    "manifest_hash": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
+    "assets": {
+      "assets/scene_0.spz": "3f8a2b1c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1",
+      "assets/mesh_0.glb": "7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6",
+      "preview.jpg": "e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5"
+    }
+  },
+  "_meta": {
+    "quality": {
+      "splat_count": 3000000,
+      "mesh_polygons": 45000000,
+      "mesh_vertices": 22500000,
+      "splat_file_size": 184320000,
+      "mesh_file_size": 1073741824
+    },
+    "custom_fields": {
+      "nps_unit_code": "LINC",
+      "nps_alpha_code": "NAMA",
+      "nrhp_reference": "66000030",
+      "survey_datum": "NAD83 / UTM Zone 18N / NAVD88",
+      "temperature_during_capture": "18.4°C ± 0.8°C",
+      "humidity_during_capture": "42% RH",
+      "original_point_count": "1,200,000,000",
+      "habs_survey_number": "DC-0428"
+    }
+  }
+}
