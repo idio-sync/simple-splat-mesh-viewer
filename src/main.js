@@ -671,6 +671,14 @@ function setupUIEvents() {
     addListener('btn-export-cancel', 'click', hideExportPanel);
     addListener('btn-export-download', 'click', downloadArchive);
 
+    // Kiosk viewer checkbox toggle
+    addListener('export-kiosk-viewer', 'change', (e) => {
+        const submenu = document.getElementById('kiosk-viewer-options');
+        if (submenu) {
+            submenu.classList.toggle('hidden', !e.target.checked);
+        }
+    });
+
     // Metadata panel controls
     addListener('btn-close-sidebar', 'click', hideMetadataPanel);
     addListener('btn-add-custom-field', 'click', addCustomField);
@@ -1840,12 +1848,30 @@ function showExportPanel() {
         log.info(' export-panel found, removing hidden class');
         panel.classList.remove('hidden');
     }
+    updateKioskAssetCheckboxes();
 }
 
 // Hide export panel
 function hideExportPanel() {
     const panel = document.getElementById('export-panel');
     if (panel) panel.classList.add('hidden');
+}
+
+// Update kiosk viewer asset checkboxes based on loaded state
+function updateKioskAssetCheckboxes() {
+    const assets = [
+        { id: 'kiosk-include-splat', loaded: state.splatLoaded },
+        { id: 'kiosk-include-model', loaded: state.modelLoaded },
+        { id: 'kiosk-include-pointcloud', loaded: state.pointcloudLoaded },
+        { id: 'kiosk-include-annotations', loaded: annotationSystem && annotationSystem.hasAnnotations() }
+    ];
+    assets.forEach(({ id, loaded }) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.checked = !!loaded;
+            el.disabled = !loaded;
+        }
+    });
 }
 
 // Download archive

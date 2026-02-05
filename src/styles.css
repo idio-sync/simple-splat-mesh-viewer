@@ -963,6 +963,36 @@ input[type="range"]::-webkit-slider-thumb:hover {
     flex: 1;
 }
 
+.kiosk-option {
+    margin-bottom: 4px;
+    padding: 10px;
+    border: 1px solid #3a3a5a;
+    border-radius: 6px;
+    background: #1e1e32;
+}
+
+.kiosk-option .checkbox-group {
+    margin-top: 0;
+}
+
+.kiosk-submenu {
+    margin-top: 10px;
+    padding: 10px;
+    border-top: 1px solid #3a3a5a;
+}
+
+.kiosk-submenu .checkbox-group {
+    margin-top: 6px;
+}
+
+.kiosk-submenu .checkbox-group input:disabled {
+    opacity: 0.4;
+}
+
+.kiosk-submenu .checkbox-group input:disabled + label {
+    opacity: 0.4;
+}
+
 .radio-group {
     display: flex;
     gap: 20px;

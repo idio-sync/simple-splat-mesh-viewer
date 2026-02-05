@@ -786,6 +786,32 @@
                 <label><input type="radio" name="export-format" value="a3d" checked> .a3d (Standard)</label>
                 <label><input type="radio" name="export-format" value="a3z"> .a3z (Compressed)</label>
             </div>
+            <div class="kiosk-option">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="export-kiosk-viewer" />
+                    <label for="export-kiosk-viewer">Include Offline Viewer</label>
+                </div>
+                <p class="hint-text" style="margin-top: 4px; text-align: left;">Saves assets and viewer as a single .html file that can be opened offline.</p>
+                <div id="kiosk-viewer-options" class="kiosk-submenu hidden">
+                    <label style="margin-bottom: 8px; display: block;">Include in viewer:</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="kiosk-include-splat" checked disabled />
+                        <label for="kiosk-include-splat">Gaussian Splat</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="kiosk-include-model" checked disabled />
+                        <label for="kiosk-include-model">3D Model</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="kiosk-include-pointcloud" checked disabled />
+                        <label for="kiosk-include-pointcloud">Point Cloud</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="kiosk-include-annotations" checked disabled />
+                        <label for="kiosk-include-annotations">Annotations</label>
+                    </div>
+                </div>
+            </div>
             <div class="btn-group">
                 <button id="btn-export-cancel" class="action-btn secondary">Cancel</button>
                 <button id="btn-export-download" class="action-btn">Download</button>
