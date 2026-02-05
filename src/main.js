@@ -39,7 +39,12 @@ import {
     loadSplatFromFile as loadSplatFromFileHandler,
     loadSplatFromUrl as loadSplatFromUrlHandler,
     loadModelFromFile as loadModelFromFileHandler,
-    loadModelFromUrl as loadModelFromUrlHandler
+    loadModelFromUrl as loadModelFromUrlHandler,
+    loadPointcloudFromFile as loadPointcloudFromFileHandler,
+    loadPointcloudFromUrl as loadPointcloudFromUrlHandler,
+    loadPointcloudFromBlobUrl as loadPointcloudFromBlobUrlHandler,
+    updatePointcloudPointSize,
+    updatePointcloudOpacity
 } from './modules/file-handlers.js';
 import {
     initShareDialog,
@@ -165,11 +170,15 @@ const state = {
     transformMode: 'translate', // 'translate', 'rotate', 'scale'
     splatLoaded: false,
     modelLoaded: false,
+    pointcloudLoaded: false,
     modelOpacity: 1,
     modelWireframe: false,
+    pointcloudPointSize: 0.01,
+    pointcloudOpacity: 1,
     controlsVisible: config.showControls,
     currentSplatUrl: config.defaultSplatUrl || null,
     currentModelUrl: config.defaultModelUrl || null,
+    currentPointcloudUrl: config.defaultPointcloudUrl || null,
     // Archive state
     archiveLoaded: false,
     archiveManifest: null,
@@ -186,6 +195,7 @@ let scene, camera, renderer, controls, transformControls;
 let flyControls = null;
 let splatMesh = null;
 let modelGroup = null;
+let pointcloudGroup = null;
 let gridHelper = null;
 let ambientLight, hemisphereLight, directionalLight1, directionalLight2;
 
@@ -196,6 +206,7 @@ let archiveCreator = null;
 // Blob data for archive export (stored when loading files)
 let currentSplatBlob = null;
 let currentMeshBlob = null;
+let currentPointcloudBlob = null;
 let currentPopupAnnotationId = null; // Track which annotation's popup is shown
 
 // Three.js objects - Split view (right side)
@@ -264,6 +275,7 @@ function createAlignmentDeps() {
     return {
         splatMesh,
         modelGroup,
+        pointcloudGroup,
         camera,
         controls,
         state,
@@ -309,6 +321,7 @@ function init() {
     directionalLight1 = sceneManager.directionalLight1;
     directionalLight2 = sceneManager.directionalLight2;
     modelGroup = sceneManager.modelGroup;
+    pointcloudGroup = sceneManager.pointcloudGroup;
 
     // Initialize fly camera controls (disabled by default, orbit mode is default)
     flyControls = new FlyControls(camera, renderer.domElement);
@@ -476,6 +489,8 @@ function setupUIEvents() {
     addListener('splat-input', 'change', handleSplatFile);
     addListener('model-input', 'change', handleModelFile);
     addListener('archive-input', 'change', handleArchiveFile);
+    addListener('pointcloud-input', 'change', handlePointcloudFile);
+    addListener('btn-load-pointcloud-url', 'click', handleLoadPointcloudFromUrlPrompt);
     addListener('btn-load-archive-url', 'click', handleLoadArchiveFromUrlPrompt);
 
     // URL load buttons (using prompt)
@@ -546,6 +561,44 @@ function setupUIEvents() {
         addListener(`model-rot-${axis}`, 'change', (e) => {
             if (modelGroup) {
                 modelGroup.rotation[axis] = THREE.MathUtils.degToRad(parseFloat(e.target.value) || 0);
+            }
+        });
+    });
+
+    // Point cloud settings
+    addListener('pointcloud-scale', 'input', (e) => {
+        const scale = parseFloat(e.target.value);
+        const valueEl = document.getElementById('pointcloud-scale-value');
+        if (valueEl) valueEl.textContent = scale.toFixed(1);
+        if (pointcloudGroup) {
+            pointcloudGroup.scale.setScalar(scale);
+        }
+    });
+
+    addListener('pointcloud-point-size', 'input', (e) => {
+        state.pointcloudPointSize = parseFloat(e.target.value);
+        const valueEl = document.getElementById('pointcloud-point-size-value');
+        if (valueEl) valueEl.textContent = state.pointcloudPointSize.toFixed(3);
+        updatePointcloudPointSize(pointcloudGroup, state.pointcloudPointSize);
+    });
+
+    addListener('pointcloud-opacity', 'input', (e) => {
+        state.pointcloudOpacity = parseFloat(e.target.value);
+        const valueEl = document.getElementById('pointcloud-opacity-value');
+        if (valueEl) valueEl.textContent = state.pointcloudOpacity.toFixed(2);
+        updatePointcloudOpacity(pointcloudGroup, state.pointcloudOpacity);
+    });
+
+    // Point cloud position inputs
+    ['x', 'y', 'z'].forEach(axis => {
+        addListener(`pointcloud-pos-${axis}`, 'change', (e) => {
+            if (pointcloudGroup) {
+                pointcloudGroup.position[axis] = parseFloat(e.target.value) || 0;
+            }
+        });
+        addListener(`pointcloud-rot-${axis}`, 'change', (e) => {
+            if (pointcloudGroup) {
+                pointcloudGroup.rotation[axis] = THREE.MathUtils.degToRad(parseFloat(e.target.value) || 0);
             }
         });
     });
@@ -869,6 +922,7 @@ function updateVisibility() {
         // In split mode, both are visible but rendered in separate views
         if (splatMesh) splatMesh.visible = true;
         if (modelGroup) modelGroup.visible = true;
+        if (pointcloudGroup) pointcloudGroup.visible = true;
     } else {
         const showSplat = mode === 'splat' || mode === 'both';
         const showModel = mode === 'model' || mode === 'both';
@@ -879,6 +933,11 @@ function updateVisibility() {
 
         if (modelGroup) {
             modelGroup.visible = showModel;
+        }
+
+        // Point cloud follows model visibility
+        if (pointcloudGroup) {
+            pointcloudGroup.visible = showModel;
         }
     }
 }
@@ -917,6 +976,18 @@ function updateTransformInputs() {
         setInputValue('model-scale', modelGroup.scale.x);
         setTextContent('model-scale-value', modelGroup.scale.x.toFixed(1));
     }
+
+    // Update pointcloud inputs
+    if (pointcloudGroup) {
+        setInputValue('pointcloud-pos-x', pointcloudGroup.position.x.toFixed(2));
+        setInputValue('pointcloud-pos-y', pointcloudGroup.position.y.toFixed(2));
+        setInputValue('pointcloud-pos-z', pointcloudGroup.position.z.toFixed(2));
+        setInputValue('pointcloud-rot-x', THREE.MathUtils.radToDeg(pointcloudGroup.rotation.x).toFixed(1));
+        setInputValue('pointcloud-rot-y', THREE.MathUtils.radToDeg(pointcloudGroup.rotation.y).toFixed(1));
+        setInputValue('pointcloud-rot-z', THREE.MathUtils.radToDeg(pointcloudGroup.rotation.z).toFixed(1));
+        setInputValue('pointcloud-scale', pointcloudGroup.scale.x);
+        setTextContent('pointcloud-scale-value', pointcloudGroup.scale.x.toFixed(1));
+    }
 }
 
 // Handle loading splat from URL via prompt
@@ -953,6 +1024,22 @@ function handleLoadModelFromUrlPrompt() {
     loadModelFromUrl(validation.url);
 }
 
+// Handle loading point cloud from URL via prompt
+function handleLoadPointcloudFromUrlPrompt() {
+    log.info(' handleLoadPointcloudFromUrlPrompt called');
+    const url = prompt('Enter E57 Point Cloud URL (.e57):');
+    log.info(' User entered:', url);
+    if (!url) return;
+
+    const validation = validateUserUrl(url, 'pointcloud');
+    if (!validation.valid) {
+        notify.error('Cannot load point cloud: ' + validation.error);
+        return;
+    }
+
+    loadPointcloudFromUrl(validation.url);
+}
+
 // Handle loading archive from URL via prompt
 function handleLoadArchiveFromUrlPrompt() {
     log.info(' handleLoadArchiveFromUrlPrompt called');
@@ -968,6 +1055,24 @@ function handleLoadArchiveFromUrlPrompt() {
     }
 
     loadArchiveFromUrl(validation.url);
+}
+
+// Handle point cloud file input
+async function handlePointcloudFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    document.getElementById('pointcloud-filename').textContent = file.name;
+    showLoading('Loading point cloud...');
+
+    try {
+        await loadPointcloudFromFileHandler(file, createPointcloudDeps());
+        hideLoading();
+    } catch (error) {
+        log.error('Error loading point cloud:', error);
+        hideLoading();
+        notify.error('Error loading point cloud: ' + error.message);
+    }
 }
 
 // Handle archive file input
@@ -1096,6 +1201,36 @@ async function processArchive(archiveLoader, archiveName) {
             }
         }
 
+        // Load point cloud (pointcloud_0) if present
+        const pointcloudEntry = archiveLoader.getPointcloudEntry();
+        if (pointcloudEntry && contentInfo.hasPointcloud) {
+            try {
+                showLoading('Loading point cloud from archive...');
+                const pcData = await archiveLoader.extractFile(pointcloudEntry.file_name);
+                if (pcData) {
+                    const result = await loadPointcloudFromBlobUrlHandler(pcData.url, pointcloudEntry.file_name, { pointcloudGroup });
+                    state.pointcloudLoaded = true;
+
+                    // Apply transform from entry parameters if present
+                    const transform = archiveLoader.getEntryTransform(pointcloudEntry);
+                    if (pointcloudGroup && (transform.position.some(v => v !== 0) ||
+                                            transform.rotation.some(v => v !== 0) ||
+                                            transform.scale !== 1)) {
+                        pointcloudGroup.position.fromArray(transform.position);
+                        pointcloudGroup.rotation.set(...transform.rotation);
+                        pointcloudGroup.scale.setScalar(transform.scale);
+                    }
+
+                    // Update UI
+                    document.getElementById('pointcloud-filename').textContent = pointcloudEntry.file_name.split('/').pop();
+                    document.getElementById('pointcloud-points').textContent = result.pointCount.toLocaleString();
+                }
+            } catch (e) {
+                errors.push(`Failed to load point cloud: ${e.message}`);
+                log.error(' Error loading point cloud from archive:', e);
+            }
+        }
+
         // Check for global alignment data
         const globalAlignment = archiveLoader.getGlobalAlignment();
         if (globalAlignment) {
@@ -1126,16 +1261,22 @@ async function processArchive(archiveLoader, archiveName) {
                 currentMeshBlob = meshData.blob;
             }
         }
+        if (state.pointcloudLoaded && pointcloudEntry) {
+            const pcData = await archiveLoader.extractFile(pointcloudEntry.file_name);
+            if (pcData) {
+                currentPointcloudBlob = pcData.blob;
+            }
+        }
 
         // Show warning if there were partial errors
-        if (errors.length > 0 && (loadedSplat || loadedMesh)) {
+        if (errors.length > 0 && (loadedSplat || loadedMesh || state.pointcloudLoaded)) {
             log.warn(' Archive loaded with warnings:', errors);
         }
 
         // Alert if no viewable content
-        if (!loadedSplat && !loadedMesh) {
+        if (!loadedSplat && !loadedMesh && !state.pointcloudLoaded) {
             hideLoading();
-            notify.warning('Archive does not contain any viewable splat or mesh files.');
+            notify.warning('Archive does not contain any viewable splat, mesh, or point cloud files.');
             return;
         }
 
@@ -1753,6 +1894,23 @@ async function downloadArchive() {
         });
     }
 
+    // Add point cloud if loaded
+    log.info(' Checking pointcloud:', { currentPointcloudBlob: !!currentPointcloudBlob, pointcloudLoaded: state.pointcloudLoaded });
+    if (currentPointcloudBlob && state.pointcloudLoaded) {
+        const fileName = document.getElementById('pointcloud-filename')?.textContent || 'pointcloud.e57';
+        const position = pointcloudGroup ? [pointcloudGroup.position.x, pointcloudGroup.position.y, pointcloudGroup.position.z] : [0, 0, 0];
+        const rotation = pointcloudGroup ? [pointcloudGroup.rotation.x, pointcloudGroup.rotation.y, pointcloudGroup.rotation.z] : [0, 0, 0];
+        const scale = pointcloudGroup ? pointcloudGroup.scale.x : 1;
+
+        log.info(' Adding pointcloud:', { fileName, position, rotation, scale });
+        archiveCreator.addPointcloud(currentPointcloudBlob, fileName, {
+            position, rotation, scale,
+            created_by: metadata.pointcloudMetadata?.createdBy || 'unknown',
+            created_by_version: metadata.pointcloudMetadata?.version || '',
+            source_notes: metadata.pointcloudMetadata?.sourceNotes || ''
+        });
+    }
+
     // Add annotations
     if (annotationSystem && annotationSystem.hasAnnotations()) {
         log.info(' Adding annotations');
@@ -1766,7 +1924,9 @@ async function downloadArchive() {
         meshPolys: state.modelLoaded ? parseInt(document.getElementById('model-faces')?.textContent) || 0 : 0,
         meshVerts: state.modelLoaded ? (state.meshVertexCount || 0) : 0,
         splatFileSize: currentSplatBlob?.size || 0,
-        meshFileSize: currentMeshBlob?.size || 0
+        meshFileSize: currentMeshBlob?.size || 0,
+        pointcloudPoints: state.pointcloudLoaded ? parseInt(document.getElementById('pointcloud-points')?.textContent?.replace(/,/g, '')) || 0 : 0,
+        pointcloudFileSize: currentPointcloudBlob?.size || 0
     });
 
     // Add preview/thumbnail
@@ -2067,6 +2227,19 @@ function updateAssetStatus() {
             if (meshFields) meshFields.classList.add('hidden');
         }
     }
+
+    // Point cloud asset
+    const pcStatus = document.getElementById('pointcloud-asset-status');
+    if (pcStatus) {
+        if (state.pointcloudLoaded) {
+            const fileName = document.getElementById('pointcloud-filename')?.textContent || 'Point cloud loaded';
+            pcStatus.textContent = fileName;
+            pcStatus.classList.add('loaded');
+        } else {
+            pcStatus.textContent = 'No point cloud loaded';
+            pcStatus.classList.remove('loaded');
+        }
+    }
 }
 
 // Prefill metadata panel from archive manifest
@@ -2333,6 +2506,20 @@ function populateMetadataDisplay() {
         }
     }
 
+    // Stats - Point cloud count
+    const pcStat = document.getElementById('display-pointcloud-stat');
+    const pcCountEl = document.getElementById('display-pointcloud-count');
+    if (pcStat && pcCountEl) {
+        if (state.pointcloudLoaded) {
+            const count = document.getElementById('pointcloud-points')?.textContent || '-';
+            pcCountEl.textContent = count;
+            pcStat.style.display = '';
+            hasStats = true;
+        } else {
+            pcStat.style.display = 'none';
+        }
+    }
+
     // Stats - Annotation count
     const annoStat = document.getElementById('display-anno-stat');
     const annoCountEl = document.getElementById('display-anno-count');
@@ -2539,6 +2726,12 @@ function applyAlignmentData(data) {
         modelGroup.scale.setScalar(data.model.scale);
     }
 
+    if (data.pointcloud && pointcloudGroup) {
+        pointcloudGroup.position.fromArray(data.pointcloud.position);
+        pointcloudGroup.rotation.set(...data.pointcloud.rotation);
+        pointcloudGroup.scale.setScalar(data.pointcloud.scale);
+    }
+
     updateTransformInputs();
     storeLastPositions();
 }
@@ -2587,9 +2780,11 @@ function copyShareLink() {
         archiveUrl: state.currentArchiveUrl,
         splatUrl: state.currentSplatUrl,
         modelUrl: state.currentModelUrl,
+        pointcloudUrl: state.currentPointcloudUrl,
         displayMode: state.displayMode,
         splatTransform: null,
-        modelTransform: null
+        modelTransform: null,
+        pointcloudTransform: null
     };
 
     // Add splat transform if available
@@ -2607,6 +2802,15 @@ function copyShareLink() {
             position: [modelGroup.position.x, modelGroup.position.y, modelGroup.position.z],
             rotation: [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z],
             scale: modelGroup.scale.x
+        };
+    }
+
+    // Add pointcloud transform if available
+    if (pointcloudGroup) {
+        shareState.pointcloudTransform = {
+            position: [pointcloudGroup.position.x, pointcloudGroup.position.y, pointcloudGroup.position.z],
+            rotation: [pointcloudGroup.rotation.x, pointcloudGroup.rotation.y, pointcloudGroup.rotation.z],
+            scale: pointcloudGroup.scale.x
         };
     }
 
@@ -2896,11 +3100,15 @@ async function loadDefaultFiles() {
         await loadModelFromUrl(config.defaultModelUrl);
     }
 
+    if (config.defaultPointcloudUrl) {
+        await loadPointcloudFromUrl(config.defaultPointcloudUrl);
+    }
+
     // Handle alignment priority:
     // 1. Inline alignment params (highest priority - encoded in URL)
     // 2. Alignment URL file
     // 3. Auto-align (fallback)
-    if (state.splatLoaded || state.modelLoaded) {
+    if (state.splatLoaded || state.modelLoaded || state.pointcloudLoaded) {
         // Wait a moment for objects to fully initialize
         await new Promise(resolve => setTimeout(resolve, TIMING.URL_MODEL_LOAD_DELAY));
 
@@ -3102,6 +3310,49 @@ function loadOBJFromUrl(url) {
 }
 
 // ============================================================
+// Point cloud loading - URL wrapper
+// ============================================================
+
+function createPointcloudDeps() {
+    return {
+        pointcloudGroup,
+        state,
+        archiveCreator,
+        callbacks: {
+            onPointcloudLoaded: (object, file, pointCount, blob) => {
+                currentPointcloudBlob = blob;
+                updateVisibility();
+                updateTransformInputs();
+                storeLastPositions();
+
+                // Update UI
+                const fileName = file.name || file;
+                document.getElementById('pointcloud-filename').textContent = fileName;
+                document.getElementById('pointcloud-points').textContent = pointCount.toLocaleString();
+            }
+        }
+    };
+}
+
+async function loadPointcloudFromUrl(url) {
+    showLoading('Downloading Point Cloud...', true);
+
+    try {
+        log.info(' Fetching point cloud from URL:', url);
+        await loadPointcloudFromUrlHandler(url, createPointcloudDeps(), (received, total) => {
+            const percent = Math.round((received / total) * 90);
+            updateProgress(percent, `Downloading Point Cloud... ${formatFileSize(received)} / ${formatFileSize(total)}`);
+        });
+        state.currentPointcloudUrl = url;
+        hideLoading();
+    } catch (error) {
+        log.error('Error loading point cloud from URL:', error);
+        hideLoading();
+        notify.error('Error loading point cloud: ' + error.message);
+    }
+}
+
+// ============================================================
 // Alignment functions - wrappers for alignment.js module
 // ============================================================
 
@@ -3166,23 +3417,27 @@ function animate() {
         }
 
         if (state.displayMode === 'split') {
-            // Split view - render splat on left, model on right
+            // Split view - render splat on left, model + pointcloud on right
             const splatVisible = splatMesh ? splatMesh.visible : false;
             const modelVisible = modelGroup ? modelGroup.visible : false;
+            const pcVisible = pointcloudGroup ? pointcloudGroup.visible : false;
 
             // Left view - splat only
             if (splatMesh) splatMesh.visible = true;
             if (modelGroup) modelGroup.visible = false;
+            if (pointcloudGroup) pointcloudGroup.visible = false;
             renderer.render(scene, camera);
 
-            // Right view - model only
+            // Right view - model + pointcloud
             if (splatMesh) splatMesh.visible = false;
             if (modelGroup) modelGroup.visible = true;
+            if (pointcloudGroup) pointcloudGroup.visible = true;
             rendererRight.render(scene, camera);
 
             // Restore visibility
             if (splatMesh) splatMesh.visible = splatVisible;
             if (modelGroup) modelGroup.visible = modelVisible;
+            if (pointcloudGroup) pointcloudGroup.visible = pcVisible;
         } else {
             // Normal view
             renderer.render(scene, camera);

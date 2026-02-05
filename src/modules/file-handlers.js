@@ -16,6 +16,7 @@ import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader } from './archive-loader.js';
 import { TIMING } from './constants.js';
+import { E57Loader } from 'three-e57-loader';
 import { Logger, notify, processMeshMaterials, computeMeshFaceCount, computeMeshVertexCount, disposeObject, fetchWithProgress } from './utilities.js';
 
 const log = Logger.getLogger('file-handlers');
@@ -724,6 +725,226 @@ export function updateModelWireframe(modelGroup, wireframe) {
 }
 
 // =============================================================================
+// E57 POINT CLOUD LOADING
+// =============================================================================
+
+/**
+ * Load an E57 file and return a THREE.Group containing THREE.Points
+ * @param {string} url - URL or blob URL to the E57 file
+ * @returns {Promise<THREE.Group>} Group containing the point cloud
+ */
+export function loadE57(url) {
+    return new Promise((resolve, reject) => {
+        const loader = new E57Loader();
+        loader.load(
+            url,
+            (geometry) => {
+                const material = new THREE.PointsMaterial({
+                    size: 0.01,
+                    vertexColors: geometry.hasAttribute('color'),
+                    sizeAttenuation: true
+                });
+                const points = new THREE.Points(geometry, material);
+                const group = new THREE.Group();
+                group.add(points);
+                resolve(group);
+            },
+            undefined,
+            (error) => {
+                reject(error);
+            }
+        );
+    });
+}
+
+/**
+ * Load a point cloud from a File object
+ * @param {File} file - The E57 file
+ * @param {Object} deps - Dependencies
+ */
+export async function loadPointcloudFromFile(file, deps) {
+    const {
+        pointcloudGroup,
+        state,
+        archiveCreator,
+        callbacks = {}
+    } = deps;
+
+    log.info('Loading point cloud from file:', file.name);
+
+    // Clear existing pointcloud
+    if (pointcloudGroup) {
+        while (pointcloudGroup.children.length > 0) {
+            const child = pointcloudGroup.children[0];
+            disposeObject(child);
+            pointcloudGroup.remove(child);
+        }
+    }
+
+    // Create blob URL
+    const fileUrl = URL.createObjectURL(file);
+
+    try {
+        const loadedObject = await loadE57(fileUrl);
+        pointcloudGroup.add(loadedObject);
+        state.pointcloudLoaded = true;
+
+        // Compute point count
+        let pointCount = 0;
+        loadedObject.traverse((child) => {
+            if (child.isPoints && child.geometry) {
+                const posAttr = child.geometry.getAttribute('position');
+                if (posAttr) pointCount += posAttr.count;
+            }
+        });
+
+        // Pre-compute hash for archive export
+        const blob = file.slice ? file : new Blob([file]);
+        if (archiveCreator) {
+            archiveCreator.precomputeHash(blob).catch(() => {});
+        }
+
+        if (callbacks.onPointcloudLoaded) {
+            callbacks.onPointcloudLoaded(loadedObject, file, pointCount, blob);
+        }
+
+        log.info('Point cloud loaded:', file.name, 'points:', pointCount);
+    } finally {
+        URL.revokeObjectURL(fileUrl);
+    }
+}
+
+/**
+ * Load a point cloud from a URL
+ * @param {string} url - The URL to the E57 file
+ * @param {Object} deps - Dependencies
+ * @param {Function} onProgress - Progress callback
+ */
+export async function loadPointcloudFromUrl(url, deps, onProgress = null) {
+    const {
+        pointcloudGroup,
+        state,
+        archiveCreator,
+        callbacks = {}
+    } = deps;
+
+    log.info('Loading point cloud from URL:', url);
+
+    // Clear existing pointcloud
+    if (pointcloudGroup) {
+        while (pointcloudGroup.children.length > 0) {
+            const child = pointcloudGroup.children[0];
+            disposeObject(child);
+            pointcloudGroup.remove(child);
+        }
+    }
+
+    // Fetch with progress
+    const blob = await fetchWithProgress(url, onProgress);
+    const blobUrl = URL.createObjectURL(blob);
+
+    // Pre-compute hash
+    if (archiveCreator) {
+        archiveCreator.precomputeHash(blob).catch(() => {});
+    }
+
+    try {
+        const loadedObject = await loadE57(blobUrl);
+        pointcloudGroup.add(loadedObject);
+        state.pointcloudLoaded = true;
+        state.currentPointcloudUrl = url;
+
+        // Compute point count
+        let pointCount = 0;
+        loadedObject.traverse((child) => {
+            if (child.isPoints && child.geometry) {
+                const posAttr = child.geometry.getAttribute('position');
+                if (posAttr) pointCount += posAttr.count;
+            }
+        });
+
+        const fileName = url.split('/').pop() || 'pointcloud.e57';
+
+        if (callbacks.onPointcloudLoaded) {
+            callbacks.onPointcloudLoaded(loadedObject, { name: fileName }, pointCount, blob);
+        }
+
+        log.info('Point cloud loaded from URL:', url, 'points:', pointCount);
+    } finally {
+        URL.revokeObjectURL(blobUrl);
+    }
+}
+
+/**
+ * Load a point cloud from a blob URL (used by archive loader)
+ * @param {string} blobUrl - The blob URL
+ * @param {string} fileName - Original filename
+ * @param {Object} deps - Dependencies
+ * @returns {Promise<{object: THREE.Group, pointCount: number}>}
+ */
+export async function loadPointcloudFromBlobUrl(blobUrl, fileName, deps) {
+    const { pointcloudGroup } = deps;
+
+    log.info('Loading point cloud from blob URL:', fileName);
+
+    // Clear existing pointcloud
+    if (pointcloudGroup) {
+        while (pointcloudGroup.children.length > 0) {
+            const child = pointcloudGroup.children[0];
+            disposeObject(child);
+            pointcloudGroup.remove(child);
+        }
+    }
+
+    const loadedObject = await loadE57(blobUrl);
+    pointcloudGroup.add(loadedObject);
+
+    // Compute point count
+    let pointCount = 0;
+    loadedObject.traverse((child) => {
+        if (child.isPoints && child.geometry) {
+            const posAttr = child.geometry.getAttribute('position');
+            if (posAttr) pointCount += posAttr.count;
+        }
+    });
+
+    return { object: loadedObject, pointCount };
+}
+
+/**
+ * Update point cloud point size
+ * @param {THREE.Group} pointcloudGroup - The point cloud group
+ * @param {number} size - Point size
+ */
+export function updatePointcloudPointSize(pointcloudGroup, size) {
+    if (pointcloudGroup) {
+        pointcloudGroup.traverse((child) => {
+            if (child.isPoints && child.material) {
+                child.material.size = size;
+                child.material.needsUpdate = true;
+            }
+        });
+    }
+}
+
+/**
+ * Update point cloud opacity
+ * @param {THREE.Group} pointcloudGroup - The point cloud group
+ * @param {number} opacity - Opacity value (0-1)
+ */
+export function updatePointcloudOpacity(pointcloudGroup, opacity) {
+    if (pointcloudGroup) {
+        pointcloudGroup.traverse((child) => {
+            if (child.isPoints && child.material) {
+                child.material.transparent = opacity < 1;
+                child.material.opacity = opacity;
+                child.material.needsUpdate = true;
+            }
+        });
+    }
+}
+
+// =============================================================================
 // ALIGNMENT FILE OPERATIONS
 // =============================================================================
 
@@ -790,6 +1011,12 @@ export default {
     loadModelFromFile,
     loadModelFromUrl,
     loadModelFromBlobUrl,
+    loadE57,
+    loadPointcloudFromFile,
+    loadPointcloudFromUrl,
+    loadPointcloudFromBlobUrl,
+    updatePointcloudPointSize,
+    updatePointcloudOpacity,
     loadArchiveFromFile,
     loadArchiveFromUrl,
     processArchive,

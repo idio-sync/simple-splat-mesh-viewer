@@ -601,7 +601,8 @@ export function collectMetadata() {
             formatRegistry: {
                 glb: document.getElementById('meta-pres-format-glb')?.value || 'fmt/861',
                 obj: document.getElementById('meta-pres-format-obj')?.value || 'fmt/935',
-                ply: document.getElementById('meta-pres-format-ply')?.value || 'fmt/831'
+                ply: document.getElementById('meta-pres-format-ply')?.value || 'fmt/831',
+                e57: document.getElementById('meta-pres-format-e57')?.value || 'fmt/643'
             },
             significantProperties: [],
             renderingRequirements: document.getElementById('meta-pres-render-req')?.value || '',
@@ -616,6 +617,11 @@ export function collectMetadata() {
             createdBy: document.getElementById('meta-mesh-created-by')?.value || '',
             version: document.getElementById('meta-mesh-version')?.value || '',
             sourceNotes: document.getElementById('meta-mesh-notes')?.value || ''
+        },
+        pointcloudMetadata: {
+            createdBy: document.getElementById('meta-pointcloud-created-by')?.value || '',
+            version: document.getElementById('meta-pointcloud-version')?.value || '',
+            sourceNotes: document.getElementById('meta-pointcloud-notes')?.value || ''
         },
         customFields: {},
         includeIntegrity: document.getElementById('meta-include-integrity')?.checked ?? true
@@ -672,7 +678,8 @@ export function collectMetadata() {
         { id: 'meta-pres-prop-normals', value: 'normal_maps' },
         { id: 'meta-pres-prop-pbr', value: 'pbr_materials' },
         { id: 'meta-pres-prop-scale', value: 'real_world_scale' },
-        { id: 'meta-pres-prop-splat', value: 'gaussian_splat_data' }
+        { id: 'meta-pres-prop-splat', value: 'gaussian_splat_data' },
+        { id: 'meta-pres-prop-pointcloud', value: 'e57_point_cloud_data' }
     ];
     propCheckboxes.forEach(({ id, value }) => {
         if (document.getElementById(id)?.checked) {
@@ -961,7 +968,8 @@ export function prefillMetadataFromArchive(manifest) {
             const formatFields = {
                 'meta-pres-format-glb': pres.format_registry.glb,
                 'meta-pres-format-obj': pres.format_registry.obj,
-                'meta-pres-format-ply': pres.format_registry.ply
+                'meta-pres-format-ply': pres.format_registry.ply,
+                'meta-pres-format-e57': pres.format_registry.e57
             };
             for (const [id, value] of Object.entries(formatFields)) {
                 const el = document.getElementById(id);
@@ -978,7 +986,8 @@ export function prefillMetadataFromArchive(manifest) {
                 'normal_maps': 'meta-pres-prop-normals',
                 'pbr_materials': 'meta-pres-prop-pbr',
                 'real_world_scale': 'meta-pres-prop-scale',
-                'gaussian_splat_data': 'meta-pres-prop-splat'
+                'gaussian_splat_data': 'meta-pres-prop-splat',
+                'e57_point_cloud_data': 'meta-pres-prop-pointcloud'
             };
             // First uncheck all
             for (const id of Object.values(propMap)) {

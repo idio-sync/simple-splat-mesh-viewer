@@ -239,6 +239,9 @@ function buildShareUrl() {
         if (currentState.modelUrl) {
             params.set('model', currentState.modelUrl);
         }
+        if (currentState.pointcloudUrl) {
+            params.set('pointcloud', currentState.pointcloudUrl);
+        }
     }
 
     // Get current option values from the form
@@ -300,6 +303,19 @@ function addAlignmentParams(params) {
         }
         if (t.scale !== undefined && t.scale !== 1) {
             params.set('ms', parseFloat(t.scale.toFixed(4)));
+        }
+    }
+
+    if (currentState.pointcloudTransform) {
+        const t = currentState.pointcloudTransform;
+        if (t.position && (t.position[0] !== 0 || t.position[1] !== 0 || t.position[2] !== 0)) {
+            params.set('pp', formatVec3(t.position));
+        }
+        if (t.rotation && (t.rotation[0] !== 0 || t.rotation[1] !== 0 || t.rotation[2] !== 0)) {
+            params.set('pr', formatVec3(t.rotation));
+        }
+        if (t.scale !== undefined && t.scale !== 1) {
+            params.set('ps', parseFloat(t.scale.toFixed(4)));
         }
     }
 }

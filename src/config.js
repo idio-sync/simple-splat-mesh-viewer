@@ -3,6 +3,7 @@
 //   ?archive=URL     - Archive container file (.a3d, .a3z) - takes priority over splat/model
 //   ?splat=URL       - Default splat file to load
 //   ?model=URL       - Default model file to load
+//   ?pointcloud=URL  - Default E57 point cloud file to load
 //   ?alignment=URL   - Default alignment JSON file to load
 //   ?controls=MODE   - Control panel mode: full, minimal, none
 //   ?mode=VIEW       - Initial view mode: splat, model, both, split
@@ -16,6 +17,9 @@
 //   ?mp=x,y,z        - Model position
 //   ?mr=x,y,z        - Model rotation (radians)
 //   ?ms=scale        - Model scale
+//   ?pp=x,y,z        - Point cloud position
+//   ?pr=x,y,z        - Point cloud rotation (radians)
+//   ?ps=scale        - Point cloud scale
 //
 // Security:
 //   By default, only same-origin URLs are allowed. To allow external domains,
@@ -116,6 +120,7 @@
     const archiveUrl = validateUrl(params.get('archive'), 'archive');
     const splatUrl = validateUrl(params.get('splat'), 'splat');
     const modelUrl = validateUrl(params.get('model'), 'model');
+    const pointcloudUrl = validateUrl(params.get('pointcloud'), 'pointcloud');
     const alignmentUrl = validateUrl(params.get('alignment'), 'alignment');
     const controlsMode = params.get('controls') || 'full'; // full, minimal, none
     const viewMode = params.get('mode') || 'both'; // splat, model, both, split
@@ -129,10 +134,13 @@
     const modelPos = parseVec3(params.get('mp'));
     const modelRot = parseVec3(params.get('mr'));
     const modelScale = params.get('ms') ? parseFloat(params.get('ms')) : null;
+    const pcPos = parseVec3(params.get('pp'));
+    const pcRot = parseVec3(params.get('pr'));
+    const pcScale = params.get('ps') ? parseFloat(params.get('ps')) : null;
 
     // Build inline alignment object if any params are present
     let inlineAlignment = null;
-    if (splatPos || splatRot || splatScale !== null || modelPos || modelRot || modelScale !== null) {
+    if (splatPos || splatRot || splatScale !== null || modelPos || modelRot || modelScale !== null || pcPos || pcRot || pcScale !== null) {
         inlineAlignment = {};
         if (splatPos || splatRot || splatScale !== null) {
             inlineAlignment.splat = {
@@ -148,6 +156,13 @@
                 scale: modelScale !== null && !isNaN(modelScale) ? modelScale : 1
             };
         }
+        if (pcPos || pcRot || pcScale !== null) {
+            inlineAlignment.pointcloud = {
+                position: pcPos || [0, 0, 0],
+                rotation: pcRot || [0, 0, 0],
+                scale: pcScale !== null && !isNaN(pcScale) ? pcScale : 1
+            };
+        }
     }
 
     // Determine what to show based on controls mode
@@ -159,6 +174,7 @@
         defaultArchiveUrl: archiveUrl,
         defaultSplatUrl: splatUrl,
         defaultModelUrl: modelUrl,
+        defaultPointcloudUrl: pointcloudUrl,
         defaultAlignmentUrl: alignmentUrl,
         inlineAlignment: inlineAlignment,
         showControls: controlsMode !== 'none',

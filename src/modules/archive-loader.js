@@ -15,6 +15,7 @@ const ARCHIVE_EXTENSIONS = ['a3d', 'a3z'];
 const SUPPORTED_FORMATS = {
     splat: ['.ply', '.spz', '.ksplat', '.sog', '.splat'],
     mesh: ['.glb', '.gltf', '.obj'],
+    pointcloud: ['.e57'],
     thumbnail: ['.png', '.jpg', '.jpeg', '.webp']
 };
 
@@ -291,6 +292,15 @@ export class ArchiveLoader {
     }
 
     /**
+     * Get the primary point cloud entry
+     * @returns {Object|null} The point cloud entry or null
+     */
+    getPointcloudEntry() {
+        const pointclouds = this.findEntriesByPrefix('pointcloud_');
+        return pointclouds.length > 0 ? pointclouds[0].entry : null;
+    }
+
+    /**
      * Get the primary thumbnail entry
      * @returns {Object|null} The thumbnail entry or null
      */
@@ -424,11 +434,13 @@ export class ArchiveLoader {
     getContentInfo() {
         const scene = this.getSceneEntry();
         const mesh = this.getMeshEntry();
+        const pointcloud = this.getPointcloudEntry();
         const thumbnail = this.getThumbnailEntry();
 
         return {
             hasSplat: scene !== null && isFormatSupported(scene.file_name, 'splat'),
             hasMesh: mesh !== null && isFormatSupported(mesh.file_name, 'mesh'),
+            hasPointcloud: pointcloud !== null && isFormatSupported(pointcloud.file_name, 'pointcloud'),
             hasThumbnail: thumbnail !== null && isFormatSupported(thumbnail.file_name, 'thumbnail')
         };
     }
