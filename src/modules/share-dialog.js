@@ -38,10 +38,11 @@ const SHARE_OPTIONS = {
         label: 'Display Mode',
         type: 'select',
         options: [
-            { value: 'both', label: 'Both (Splat + Model)' },
+            { value: 'both', label: 'Model/Splat' },
             { value: 'splat', label: 'Splat Only' },
             { value: 'model', label: 'Model Only' },
-            { value: 'split', label: 'Split View' }
+            { value: 'pointcloud', label: 'Point Cloud Only' },
+            { value: 'split', label: 'Split Model/Splat' }
         ],
         default: 'both'
     },

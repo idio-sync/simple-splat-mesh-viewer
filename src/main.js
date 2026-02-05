@@ -166,7 +166,7 @@ function validateUserUrl(urlString, resourceType) {
 
 // Global state
 const state = {
-    displayMode: config.initialViewMode || 'both', // 'splat', 'model', 'both', 'split'
+    displayMode: config.initialViewMode || 'both', // 'splat', 'model', 'pointcloud', 'both', 'split'
     selectedObject: 'none', // 'splat', 'model', 'both', 'none'
     transformMode: 'translate', // 'translate', 'rotate', 'scale'
     splatLoaded: false,
@@ -483,6 +483,7 @@ function setupUIEvents() {
     // Display mode toggles
     addListener('btn-splat', 'click', () => setDisplayMode('splat'));
     addListener('btn-model', 'click', () => setDisplayMode('model'));
+    addListener('btn-pointcloud', 'click', () => setDisplayMode('pointcloud'));
     addListener('btn-both', 'click', () => setDisplayMode('both'));
     addListener('btn-split', 'click', () => setDisplayMode('split'));
 
@@ -550,6 +551,10 @@ function setupUIEvents() {
     addListener('model-wireframe', 'change', (e) => {
         state.modelWireframe = e.target.checked;
         updateModelWireframe();
+    });
+
+    addListener('model-no-texture', 'change', (e) => {
+        toggleModelTextures(!e.target.checked);
     });
 
     // Model position inputs
@@ -752,7 +757,7 @@ function setDisplayMode(mode) {
     state.displayMode = mode;
 
     // Update button states
-    ['splat', 'model', 'both', 'split'].forEach(m => {
+    ['splat', 'model', 'pointcloud', 'both', 'split'].forEach(m => {
         const btn = document.getElementById(`btn-${m}`);
         if (btn) btn.classList.toggle('active', m === mode);
     });
@@ -956,6 +961,7 @@ function updateVisibility() {
     } else {
         const showSplat = mode === 'splat' || mode === 'both';
         const showModel = mode === 'model' || mode === 'both';
+        const showPointcloud = mode === 'pointcloud';
 
         if (splatMesh) {
             splatMesh.visible = showSplat;
@@ -965,9 +971,8 @@ function updateVisibility() {
             modelGroup.visible = showModel;
         }
 
-        // Point cloud follows model visibility
         if (pointcloudGroup) {
-            pointcloudGroup.visible = showModel;
+            pointcloudGroup.visible = showPointcloud || showModel;
         }
     }
 }
@@ -2167,6 +2172,54 @@ function setupMetadataSidebar() {
     if (addRelatedBtn) {
         addRelatedBtn.addEventListener('click', addRelatedObject);
     }
+
+    // Metadata import/export
+    addListener('btn-export-metadata', 'click', exportMetadataManifest);
+    addListener('btn-import-metadata', 'click', importMetadataManifest);
+}
+
+function exportMetadataManifest() {
+    const metadata = collectMetadata();
+    const manifest = {
+        container_version: '1.0',
+        packer: 'simple-splat-mesh-viewer',
+        packer_version: '1.0.0',
+        _creation_date: new Date().toISOString(),
+        ...metadata
+    };
+    const json = JSON.stringify(manifest, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'manifest.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    notify.success('Manifest exported');
+}
+
+function importMetadataManifest() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const manifest = JSON.parse(event.target.result);
+                prefillMetadataFromArchive(manifest);
+                populateMetadataDisplay();
+                notify.success('Manifest imported');
+            } catch (err) {
+                log.error('Failed to parse manifest:', err);
+                notify.error('Invalid manifest file: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    });
+    input.click();
 }
 
 // Update quality stats display in metadata panel
@@ -2735,6 +2788,51 @@ function updateModelWireframe() {
             }
         });
     }
+}
+
+// Store original texture maps for restore
+const _storedTextures = new WeakMap();
+
+function toggleModelTextures(showTextures) {
+    if (!modelGroup) return;
+    modelGroup.traverse((child) => {
+        if (child.isMesh && child.material) {
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            materials.forEach(mat => {
+                if (!showTextures) {
+                    // Store original maps and remove them
+                    if (!_storedTextures.has(mat)) {
+                        _storedTextures.set(mat, {
+                            map: mat.map,
+                            normalMap: mat.normalMap,
+                            roughnessMap: mat.roughnessMap,
+                            metalnessMap: mat.metalnessMap,
+                            aoMap: mat.aoMap,
+                            emissiveMap: mat.emissiveMap
+                        });
+                    }
+                    mat.map = null;
+                    mat.normalMap = null;
+                    mat.roughnessMap = null;
+                    mat.metalnessMap = null;
+                    mat.aoMap = null;
+                    mat.emissiveMap = null;
+                } else {
+                    // Restore original maps
+                    const stored = _storedTextures.get(mat);
+                    if (stored) {
+                        mat.map = stored.map;
+                        mat.normalMap = stored.normalMap;
+                        mat.roughnessMap = stored.roughnessMap;
+                        mat.metalnessMap = stored.metalnessMap;
+                        mat.aoMap = stored.aoMap;
+                        mat.emissiveMap = stored.emissiveMap;
+                    }
+                }
+                mat.needsUpdate = true;
+            });
+        }
+    });
 }
 
 function saveAlignment() {

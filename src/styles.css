@@ -2054,9 +2054,21 @@ input[type="range"]::-webkit-slider-thumb:hover {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
-    margin-bottom: 16px;
+    margin-bottom: 8px;
     padding-bottom: 12px;
     border-bottom: 1px solid #2a2a3a;
+}
+
+.metadata-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.metadata-actions .action-btn {
+    flex: 1;
+    font-size: 0.75rem;
+    padding: 5px 8px;
 }
 
 .edit-tab {

@@ -196,6 +196,10 @@
                     <button class="edit-tab" data-tab="assets">Assets</button>
                     <button class="edit-tab" data-tab="integrity">Integrity</button>
                 </div>
+                <div class="metadata-actions">
+                    <button id="btn-import-metadata" class="action-btn" title="Import metadata from a manifest.json file">Import Manifest</button>
+                    <button id="btn-export-metadata" class="action-btn" title="Export current metadata as manifest.json">Export Manifest</button>
+                </div>
 
                 <!-- Project Tab -->
                 <div class="edit-tab-content active" id="edit-tab-project">
@@ -789,15 +793,16 @@
         </div>
 
         <div id="controls-panel">
-            <h2>Splat/Mesh Viewer</h2>
+            <h2>3D Viewer Proof of Concept</h2>
 
             <div class="control-section">
                 <h3>Display Mode</h3>
                 <div class="toggle-group">
                     <button id="btn-splat" class="toggle-btn">Splat</button>
                     <button id="btn-model" class="toggle-btn">Model</button>
-                    <button id="btn-both" class="toggle-btn active">Both</button>
-                    <button id="btn-split" class="toggle-btn">Split</button>
+                    <button id="btn-pointcloud" class="toggle-btn">Point Cloud</button>
+                    <button id="btn-both" class="toggle-btn active">Model/Splat</button>
+                    <button id="btn-split" class="toggle-btn">Split M/S</button>
                 </div>
             </div>
 
@@ -869,32 +874,6 @@
             </div>
 
             <div class="control-section collapsible collapsed">
-                <h3 class="collapsible-header">Splat Settings <span class="collapse-icon">▶</span></h3>
-                <div class="collapsible-content">
-                    <div class="slider-group">
-                        <label for="splat-scale">Scale: <span id="splat-scale-value">1.0</span></label>
-                        <input type="range" id="splat-scale" min="0.1" max="5" step="0.1" value="1" />
-                    </div>
-                    <div class="position-inputs">
-                        <label>Position:</label>
-                        <div class="xyz-inputs">
-                            <input type="number" id="splat-pos-x" value="0" step="0.1" />
-                            <input type="number" id="splat-pos-y" value="0" step="0.1" />
-                            <input type="number" id="splat-pos-z" value="0" step="0.1" />
-                        </div>
-                    </div>
-                    <div class="position-inputs">
-                        <label>Rotation (deg):</label>
-                        <div class="xyz-inputs">
-                            <input type="number" id="splat-rot-x" value="0" step="1" />
-                            <input type="number" id="splat-rot-y" value="0" step="1" />
-                            <input type="number" id="splat-rot-z" value="0" step="1" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="control-section collapsible collapsed">
                 <h3 class="collapsible-header">Model Settings <span class="collapse-icon">▶</span></h3>
                 <div class="collapsible-content">
                     <div class="slider-group">
@@ -908,6 +887,10 @@
                     <div class="checkbox-group">
                         <input type="checkbox" id="model-wireframe" />
                         <label for="model-wireframe">Wireframe</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="model-no-texture" />
+                        <label for="model-no-texture">Hide Textures</label>
                     </div>
                     <div class="position-inputs">
                         <label>Position:</label>
@@ -975,6 +958,32 @@
                             <input type="number" id="pointcloud-rot-x" value="0" step="1" />
                             <input type="number" id="pointcloud-rot-y" value="0" step="1" />
                             <input type="number" id="pointcloud-rot-z" value="0" step="1" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-section collapsible collapsed">
+                <h3 class="collapsible-header">Splat Settings <span class="collapse-icon">▶</span></h3>
+                <div class="collapsible-content">
+                    <div class="slider-group">
+                        <label for="splat-scale">Scale: <span id="splat-scale-value">1.0</span></label>
+                        <input type="range" id="splat-scale" min="0.1" max="5" step="0.1" value="1" />
+                    </div>
+                    <div class="position-inputs">
+                        <label>Position:</label>
+                        <div class="xyz-inputs">
+                            <input type="number" id="splat-pos-x" value="0" step="0.1" />
+                            <input type="number" id="splat-pos-y" value="0" step="0.1" />
+                            <input type="number" id="splat-pos-z" value="0" step="0.1" />
+                        </div>
+                    </div>
+                    <div class="position-inputs">
+                        <label>Rotation (deg):</label>
+                        <div class="xyz-inputs">
+                            <input type="number" id="splat-rot-x" value="0" step="1" />
+                            <input type="number" id="splat-rot-y" value="0" step="1" />
+                            <input type="number" id="splat-rot-z" value="0" step="1" />
                         </div>
                     </div>
                 </div>

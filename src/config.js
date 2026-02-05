@@ -6,7 +6,7 @@
 //   ?pointcloud=URL  - Default E57 point cloud file to load
 //   ?alignment=URL   - Default alignment JSON file to load
 //   ?controls=MODE   - Control panel mode: full, minimal, none
-//   ?mode=VIEW       - Initial view mode: splat, model, both, split
+//   ?mode=VIEW       - Initial view mode: splat, model, pointcloud, both, split
 //   ?toolbar=STATE   - Toolbar visibility: show, hide
 //   ?sidebar=STATE   - Metadata sidebar state: closed, view, edit
 //
