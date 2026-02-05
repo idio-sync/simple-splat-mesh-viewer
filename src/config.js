@@ -123,7 +123,7 @@
     const pointcloudUrl = validateUrl(params.get('pointcloud'), 'pointcloud');
     const alignmentUrl = validateUrl(params.get('alignment'), 'alignment');
     const controlsMode = params.get('controls') || 'full'; // full, minimal, none
-    const viewMode = params.get('mode') || 'both'; // splat, model, both, split
+    const viewMode = params.get('mode') || 'model'; // splat, model, pointcloud, both, split
     const toolbarMode = params.get('toolbar') || 'show'; // show, hide
     const sidebarMode = params.get('sidebar') || 'closed'; // closed, view, edit
 

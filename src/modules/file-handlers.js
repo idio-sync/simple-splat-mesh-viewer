@@ -729,7 +729,9 @@ export function updateModelWireframe(modelGroup, wireframe) {
 // =============================================================================
 
 /**
- * Load an E57 file and return a THREE.Group containing THREE.Points
+ * Load an E57 file and return a THREE.Group containing THREE.Points.
+ * E57 files from surveying/scanning use Z-up convention, so we rotate
+ * the geometry to Three.js Y-up coordinate system.
  * @param {string} url - URL or blob URL to the E57 file
  * @returns {Promise<THREE.Group>} Group containing the point cloud
  */
@@ -739,6 +741,9 @@ export function loadE57(url) {
         loader.load(
             url,
             (geometry) => {
+                // Convert from Z-up (E57/surveying) to Y-up (Three.js)
+                geometry.rotateX(-Math.PI / 2);
+
                 const material = new THREE.PointsMaterial({
                     size: 0.01,
                     vertexColors: geometry.hasAttribute('color'),

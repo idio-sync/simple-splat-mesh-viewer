@@ -798,10 +798,10 @@
             <div class="control-section">
                 <h3>Display Mode</h3>
                 <div class="toggle-group">
+                    <button id="btn-model" class="toggle-btn active">Model</button>
                     <button id="btn-splat" class="toggle-btn">Splat</button>
-                    <button id="btn-model" class="toggle-btn">Model</button>
                     <button id="btn-pointcloud" class="toggle-btn">Point Cloud</button>
-                    <button id="btn-both" class="toggle-btn active">Model/Splat</button>
+                    <button id="btn-both" class="toggle-btn">Model/Splat</button>
                     <button id="btn-split" class="toggle-btn">Split M/S</button>
                 </div>
             </div>
@@ -810,7 +810,7 @@
                 <h3 class="collapsible-header">Load Files <span class="collapse-icon">▶</span></h3>
                 <div class="collapsible-content">
                     <div class="load-subsection">
-                        <h4>Gaussian Splat</h4>
+                        <h4>Gaussian Splat (.ply, .splat, .ksplat, .spz)</h4>
                         <input type="file" id="splat-input" accept=".ply,.splat,.ksplat,.spz,.sog" />
                         <div class="button-row">
                             <label for="splat-input" class="file-label">From File</label>
@@ -819,7 +819,7 @@
                         <span id="splat-filename" class="filename">No file loaded</span>
                     </div>
                     <div class="load-subsection">
-                        <h4>3D Model</h4>
+                        <h4>3D Model (.glb, .gltf, .obj)</h4>
                         <input type="file" id="model-input" accept=".glb,.gltf,.obj" multiple />
                         <div class="button-row">
                             <label for="model-input" class="file-label">From File</label>
@@ -828,7 +828,7 @@
                         <span id="model-filename" class="filename">No file loaded</span>
                     </div>
                     <div class="load-subsection">
-                        <h4>Point Cloud</h4>
+                        <h4>Point Cloud (.e57)</h4>
                         <input type="file" id="pointcloud-input" accept=".e57" />
                         <div class="button-row">
                             <label for="pointcloud-input" class="file-label">From File</label>

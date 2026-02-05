@@ -166,7 +166,7 @@ function validateUserUrl(urlString, resourceType) {
 
 // Global state
 const state = {
-    displayMode: config.initialViewMode || 'both', // 'splat', 'model', 'pointcloud', 'both', 'split'
+    displayMode: config.initialViewMode || 'model', // 'splat', 'model', 'pointcloud', 'both', 'split'
     selectedObject: 'none', // 'splat', 'model', 'both', 'none'
     transformMode: 'translate', // 'translate', 'rotate', 'scale'
     splatLoaded: false,
@@ -972,7 +972,7 @@ function updateVisibility() {
         }
 
         if (pointcloudGroup) {
-            pointcloudGroup.visible = showPointcloud || showModel;
+            pointcloudGroup.visible = showPointcloud;
         }
     }
 }
@@ -1889,6 +1889,26 @@ async function downloadArchive() {
     log.info(' Setting provenance');
     archiveCreator.setProvenance(metadata.provenance);
 
+    // Apply relationships
+    log.info(' Setting relationships');
+    archiveCreator.setRelationships(metadata.relationships);
+
+    // Apply quality metrics
+    log.info(' Setting quality metrics');
+    archiveCreator.setQualityMetrics(metadata.qualityMetrics);
+
+    // Apply archival record
+    log.info(' Setting archival record');
+    archiveCreator.setArchivalRecord(metadata.archivalRecord);
+
+    // Apply material standard
+    log.info(' Setting material standard');
+    archiveCreator.setMaterialStandard(metadata.materialStandard);
+
+    // Apply preservation
+    log.info(' Setting preservation');
+    archiveCreator.setPreservation(metadata.preservation);
+
     // Apply custom fields
     if (Object.keys(metadata.customFields).length > 0) {
         log.info(' Setting custom fields');
@@ -2065,6 +2085,9 @@ function switchSidebarMode(mode) {
     // Refresh content for the selected mode
     if (mode === 'view') {
         populateMetadataDisplay();
+    } else if (mode === 'edit') {
+        updateMetadataStats();
+        updateAssetStatus();
     } else if (mode === 'annotations') {
         updateSidebarAnnotationsList();
     }
@@ -2187,6 +2210,12 @@ function exportMetadataManifest() {
         _creation_date: new Date().toISOString(),
         ...metadata
     };
+
+    // Include annotations if present
+    if (annotationSystem && annotationSystem.hasAnnotations()) {
+        manifest.annotations = annotationSystem.toJSON();
+    }
+
     const json = JSON.stringify(manifest, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -2210,6 +2239,12 @@ function importMetadataManifest() {
             try {
                 const manifest = JSON.parse(event.target.result);
                 prefillMetadataFromArchive(manifest);
+
+                // Load annotations if present in manifest
+                if (manifest.annotations && Array.isArray(manifest.annotations) && manifest.annotations.length > 0) {
+                    loadAnnotationsFromArchive(manifest.annotations);
+                }
+
                 populateMetadataDisplay();
                 notify.success('Manifest imported');
             } catch (err) {
@@ -2357,25 +2392,204 @@ function prefillMetadataFromArchive(manifest) {
         }
     }
 
+    // Relationships
+    if (manifest.relationships) {
+        const r = manifest.relationships;
+        const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+        setVal('meta-part-of', r.part_of);
+        setVal('meta-derived-from', r.derived_from);
+        setVal('meta-replaces', r.replaces);
+
+        // Related objects
+        if (r.related_objects && Array.isArray(r.related_objects)) {
+            const container = document.getElementById('related-objects-list');
+            if (container) {
+                r.related_objects.forEach(obj => {
+                    // Trigger add related object button
+                    const addBtn = document.getElementById('btn-add-related-object');
+                    if (addBtn) addBtn.click();
+                    const rows = container.querySelectorAll('.related-object-row');
+                    const lastRow = rows[rows.length - 1];
+                    if (lastRow) {
+                        const titleInput = lastRow.querySelector('.related-object-title');
+                        const descInput = lastRow.querySelector('.related-object-desc');
+                        const urlInput = lastRow.querySelector('.related-object-url');
+                        if (titleInput && obj.title) titleInput.value = obj.title;
+                        if (descInput && obj.description) descInput.value = obj.description;
+                        if (urlInput && obj.url) urlInput.value = obj.url;
+                    }
+                });
+            }
+        }
+    }
+
     // Provenance
     if (manifest.provenance) {
-        if (manifest.provenance.capture_date) {
-            document.getElementById('meta-capture-date').value = manifest.provenance.capture_date;
-        }
-        if (manifest.provenance.capture_device) {
-            document.getElementById('meta-capture-device').value = manifest.provenance.capture_device;
-        }
-        if (manifest.provenance.operator) {
-            document.getElementById('meta-operator').value = manifest.provenance.operator;
-        }
-        if (manifest.provenance.location) {
-            document.getElementById('meta-location').value = manifest.provenance.location;
-        }
+        const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+        setVal('meta-capture-date', manifest.provenance.capture_date);
+        setVal('meta-capture-device', manifest.provenance.capture_device);
+        setVal('meta-device-serial', manifest.provenance.device_serial);
+        setVal('meta-operator', manifest.provenance.operator);
+        setVal('meta-operator-orcid', manifest.provenance.operator_orcid);
+        setVal('meta-location', manifest.provenance.location);
+        setVal('meta-processing-notes', manifest.provenance.processing_notes);
+
         if (manifest.provenance.convention_hints) {
             const hints = Array.isArray(manifest.provenance.convention_hints)
                 ? manifest.provenance.convention_hints.join(', ')
                 : manifest.provenance.convention_hints;
             document.getElementById('meta-conventions').value = hints;
+        }
+
+        // Processing software
+        if (manifest.provenance.processing_software && Array.isArray(manifest.provenance.processing_software)) {
+            const container = document.getElementById('processing-software-list');
+            if (container) {
+                manifest.provenance.processing_software.forEach(sw => {
+                    const addBtn = document.getElementById('btn-add-software');
+                    if (addBtn) addBtn.click();
+                    const rows = container.querySelectorAll('.software-row');
+                    const lastRow = rows[rows.length - 1];
+                    if (lastRow) {
+                        const nameInput = lastRow.querySelector('.software-name');
+                        const versionInput = lastRow.querySelector('.software-version');
+                        const urlInput = lastRow.querySelector('.software-url');
+                        if (nameInput && sw.name) nameInput.value = sw.name;
+                        if (versionInput && sw.version) versionInput.value = sw.version;
+                        if (urlInput && sw.url) urlInput.value = sw.url;
+                    }
+                });
+            }
+        }
+    }
+
+    // Quality metrics
+    if (manifest.quality_metrics) {
+        const q = manifest.quality_metrics;
+        const setVal = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined && val !== null) el.value = val; };
+        setVal('meta-quality-tier', q.tier);
+        setVal('meta-quality-accuracy', q.accuracy_grade);
+        setVal('meta-quality-scale-verify', q.scale_verification);
+
+        if (q.capture_resolution) {
+            setVal('meta-quality-res-value', q.capture_resolution.value);
+            setVal('meta-quality-res-unit', q.capture_resolution.unit);
+            setVal('meta-quality-res-type', q.capture_resolution.type);
+        }
+        if (q.alignment_error) {
+            setVal('meta-quality-align-value', q.alignment_error.value);
+            setVal('meta-quality-align-unit', q.alignment_error.unit);
+            setVal('meta-quality-align-method', q.alignment_error.method);
+        }
+        if (q.data_quality) {
+            setVal('meta-quality-coverage-gaps', q.data_quality.coverage_gaps);
+            setVal('meta-quality-reconstruction', q.data_quality.reconstruction_areas);
+            setVal('meta-quality-color-calibration', q.data_quality.color_calibration);
+            setVal('meta-quality-uncertainty', q.data_quality.measurement_uncertainty);
+        }
+    }
+
+    // Archival record
+    if (manifest.archival_record) {
+        const a = manifest.archival_record;
+        const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+        setVal('meta-archival-standard', a.standard);
+        setVal('meta-archival-title', a.title);
+        if (a.alternate_titles && Array.isArray(a.alternate_titles)) {
+            setVal('meta-archival-alt-titles', a.alternate_titles.join(', '));
+        }
+        if (a.ids) {
+            setVal('meta-archival-accession', a.ids.accession_number);
+            setVal('meta-archival-siris', a.ids.siris_id);
+            setVal('meta-archival-uri', a.ids.uri);
+        }
+        if (a.creation) {
+            setVal('meta-archival-creator', a.creation.creator);
+            setVal('meta-archival-date-created', a.creation.date_created);
+            setVal('meta-archival-period', a.creation.period);
+            setVal('meta-archival-culture', a.creation.culture);
+        }
+        if (a.physical_description) {
+            setVal('meta-archival-medium', a.physical_description.medium);
+            setVal('meta-archival-condition', a.physical_description.condition);
+            if (a.physical_description.dimensions) {
+                setVal('meta-archival-dim-height', a.physical_description.dimensions.height);
+                setVal('meta-archival-dim-width', a.physical_description.dimensions.width);
+                setVal('meta-archival-dim-depth', a.physical_description.dimensions.depth);
+            }
+        }
+        setVal('meta-archival-provenance', a.provenance);
+        if (a.rights) {
+            setVal('meta-archival-copyright', a.rights.copyright_status);
+            setVal('meta-archival-credit', a.rights.credit_line);
+        }
+        if (a.context) {
+            setVal('meta-archival-context-desc', a.context.description);
+            setVal('meta-archival-location-history', a.context.location_history);
+        }
+        if (a.coverage) {
+            if (a.coverage.spatial) {
+                setVal('meta-coverage-location', a.coverage.spatial.location_name);
+                if (a.coverage.spatial.coordinates && a.coverage.spatial.coordinates.length >= 2) {
+                    const latEl = document.getElementById('meta-coverage-lat');
+                    const lonEl = document.getElementById('meta-coverage-lon');
+                    if (latEl && a.coverage.spatial.coordinates[0] != null) latEl.value = a.coverage.spatial.coordinates[0];
+                    if (lonEl && a.coverage.spatial.coordinates[1] != null) lonEl.value = a.coverage.spatial.coordinates[1];
+                }
+            }
+            if (a.coverage.temporal) {
+                setVal('meta-coverage-period', a.coverage.temporal.subject_period);
+                const circaEl = document.getElementById('meta-coverage-circa');
+                if (circaEl && a.coverage.temporal.subject_date_circa !== undefined) {
+                    circaEl.checked = !!a.coverage.temporal.subject_date_circa;
+                }
+            }
+        }
+    }
+
+    // Material standard
+    if (manifest.material_standard) {
+        const m = manifest.material_standard;
+        const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+        setVal('meta-material-workflow', m.workflow);
+        setVal('meta-material-colorspace', m.color_space);
+        setVal('meta-material-normalspace', m.normal_space);
+        const occEl = document.getElementById('meta-material-occlusion-packed');
+        if (occEl && m.occlusion_packed !== undefined) occEl.checked = !!m.occlusion_packed;
+    }
+
+    // Preservation
+    if (manifest.preservation) {
+        const p = manifest.preservation;
+        const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+        if (p.format_registry) {
+            setVal('meta-pres-format-glb', p.format_registry.glb);
+            setVal('meta-pres-format-obj', p.format_registry.obj);
+            setVal('meta-pres-format-ply', p.format_registry.ply);
+            setVal('meta-pres-format-e57', p.format_registry.e57);
+        }
+        setVal('meta-pres-render-req', p.rendering_requirements);
+        setVal('meta-pres-render-notes', p.rendering_notes);
+
+        // Significant properties checkboxes
+        if (p.significant_properties && Array.isArray(p.significant_properties)) {
+            const propMap = {
+                'geometry': 'meta-pres-prop-geometry',
+                'vertex_color': 'meta-pres-prop-vertex-color',
+                'uv_mapping': 'meta-pres-prop-uv',
+                'normal_maps': 'meta-pres-prop-normals',
+                'pbr_materials': 'meta-pres-prop-pbr',
+                'real_world_scale': 'meta-pres-prop-scale',
+                'gaussian_splat_data': 'meta-pres-prop-splat',
+                'e57_point_cloud_data': 'meta-pres-prop-pointcloud'
+            };
+            p.significant_properties.forEach(prop => {
+                const elId = propMap[prop];
+                if (elId) {
+                    const el = document.getElementById(elId);
+                    if (el) el.checked = true;
+                }
+            });
         }
     }
 
