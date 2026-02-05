@@ -63,6 +63,12 @@
                         <circle cx="12" cy="10" r="3"></circle>
                     </svg>
                 </button>
+                <button id="btn-fly-mode" class="toolbar-btn" title="Fly Camera Mode (F)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                    </svg>
+                </button>
                 <button id="btn-export-archive" class="toolbar-btn" title="Export Archive">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -73,6 +79,9 @@
             </div>
             <div id="transform-hint" class="hidden">
                 <span id="hint-text">Click on splat or model to select</span>
+            </div>
+            <div id="fly-mode-hint" class="hidden">
+                WASD move &middot; Q/E down/up &middot; Right-click look &middot; Shift fast &middot; Scroll speed
             </div>
             <div id="annotation-mode-indicator" class="hidden">
                 Click on model to place annotation

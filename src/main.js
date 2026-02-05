@@ -9,6 +9,7 @@ import { AnnotationSystem } from './modules/annotation-system.js';
 import { ArchiveCreator, captureScreenshot } from './modules/archive-creator.js';
 import { CAMERA, TIMING } from './modules/constants.js';
 import { Logger, notify, processMeshMaterials, computeMeshFaceCount, computeMeshVertexCount, disposeObject, parseMarkdown, fetchWithProgress } from './modules/utilities.js';
+import { FlyControls } from './modules/fly-controls.js';
 import { SceneManager } from './modules/scene-manager.js';
 import {
     icpAlignObjects as icpAlignObjectsHandler,
@@ -182,6 +183,7 @@ let sceneManager = null;
 
 // Three.js objects - Main view (references extracted from SceneManager for backward compatibility)
 let scene, camera, renderer, controls, transformControls;
+let flyControls = null;
 let splatMesh = null;
 let modelGroup = null;
 let gridHelper = null;
@@ -308,6 +310,9 @@ function init() {
     directionalLight2 = sceneManager.directionalLight2;
     modelGroup = sceneManager.modelGroup;
 
+    // Initialize fly camera controls (disabled by default, orbit mode is default)
+    flyControls = new FlyControls(camera, renderer.domElement);
+
     // Set up SceneManager callbacks for transform controls
     sceneManager.onTransformChange = () => {
         updateTransformInputs();
@@ -373,6 +378,15 @@ function onWindowResize() {
 }
 
 function onKeyDown(event) {
+    // Don't handle transform shortcuts when fly mode is active
+    // (WASD/Q/E are used for camera movement in fly mode)
+    if (flyControls && flyControls.enabled) {
+        if (event.key === 'Escape') {
+            toggleFlyMode(); // ESC exits fly mode
+        }
+        return;
+    }
+
     switch (event.key.toLowerCase()) {
         case 'w':
             setTransformMode('translate');
@@ -386,6 +400,39 @@ function onKeyDown(event) {
         case 'escape':
             setSelectedObject('none');
             break;
+    }
+}
+
+// ==================== Fly Camera Mode ====================
+
+function toggleFlyMode() {
+    if (!flyControls) return;
+
+    const btn = document.getElementById('btn-fly-mode');
+    const hint = document.getElementById('fly-mode-hint');
+    const isActive = flyControls.enabled;
+
+    if (isActive) {
+        // Disable fly mode, re-enable orbit
+        flyControls.disable();
+        controls.enabled = true;
+        if (controlsRight) controlsRight.enabled = true;
+        // Re-sync orbit controls target to where camera is looking
+        const dir = new THREE.Vector3();
+        camera.getWorldDirection(dir);
+        controls.target.copy(camera.position).add(dir.multiplyScalar(5));
+        controls.update();
+        if (btn) btn.classList.remove('active');
+        if (hint) hint.classList.add('hidden');
+        log.info('Switched to Orbit camera mode');
+    } else {
+        // Enable fly mode, disable orbit
+        controls.enabled = false;
+        if (controlsRight) controlsRight.enabled = false;
+        flyControls.enable();
+        if (btn) btn.classList.add('active');
+        if (hint) hint.classList.remove('hidden');
+        log.info('Switched to Fly camera mode');
     }
 }
 
@@ -557,6 +604,9 @@ function setupUIEvents() {
     addListener('btn-sidebar-update-anno-camera', 'click', updateSelectedAnnotationCamera);
     addListener('btn-sidebar-delete-anno', 'click', deleteSelectedAnnotation);
 
+    // Fly camera mode toggle
+    addListener('btn-fly-mode', 'click', toggleFlyMode);
+
     // Export/archive creation controls
     addListener('btn-export-archive', 'click', showExportPanel);
     addListener('btn-export-cancel', 'click', hideExportPanel);
@@ -619,6 +669,8 @@ function setupUIEvents() {
             toggleAnnotationMode();
         } else if (e.key.toLowerCase() === 'm' && !e.ctrlKey && !e.metaKey) {
             toggleMetadataDisplay();
+        } else if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey) {
+            toggleFlyMode();
         } else if (e.key === 'Escape') {
             hideAnnotationPopup();
             hideMetadataDisplay();
@@ -3097,8 +3149,13 @@ function animate() {
     requestAnimationFrame(animate);
 
     try {
-        controls.update();
-        controlsRight.update();
+        // Update active camera controls
+        if (flyControls && flyControls.enabled) {
+            flyControls.update();
+        } else {
+            controls.update();
+            controlsRight.update();
+        }
 
         if (state.displayMode === 'split') {
             // Split view - render splat on left, model on right
