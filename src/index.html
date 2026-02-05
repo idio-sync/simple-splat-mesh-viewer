@@ -172,6 +172,10 @@
                             <span class="stat-number" id="display-mesh-count">-</span>
                             <span class="stat-label">Polygons</span>
                         </div>
+                        <div class="display-stat" id="display-pointcloud-stat" style="display: none;">
+                            <span class="stat-number" id="display-pointcloud-count">-</span>
+                            <span class="stat-label">Points</span>
+                        </div>
                         <div class="display-stat" id="display-anno-stat">
                             <span class="stat-number" id="display-anno-count">0</span>
                             <span class="stat-label">Annotations</span>
@@ -466,6 +470,24 @@
                             </div>
                         </div>
                     </div>
+                    <div class="asset-group">
+                        <div class="subsection-header">Point Cloud Asset</div>
+                        <div class="asset-status" id="pointcloud-asset-status">No point cloud loaded</div>
+                        <div class="asset-fields hidden" id="pointcloud-asset-fields">
+                            <div class="metadata-field">
+                                <label for="meta-pointcloud-created-by">Created By</label>
+                                <input type="text" id="meta-pointcloud-created-by" placeholder="e.g., FARO Scene, Leica Cyclone">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-pointcloud-version">Tool Version</label>
+                                <input type="text" id="meta-pointcloud-version" placeholder="e.g., 2024.1">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-pointcloud-notes">Source Notes</label>
+                                <textarea id="meta-pointcloud-notes" rows="2" placeholder="Additional notes about this point cloud..."></textarea>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Quality Tab -->
@@ -647,6 +669,11 @@
                         <input type="text" id="meta-pres-format-ply" value="fmt/831" placeholder="fmt/831">
                         <span class="field-hint">PRONOM identifier for Stanford PLY</span>
                     </div>
+                    <div class="metadata-field">
+                        <label for="meta-pres-format-e57">E57 Format ID</label>
+                        <input type="text" id="meta-pres-format-e57" value="fmt/643" placeholder="fmt/643">
+                        <span class="field-hint">PRONOM identifier for ASTM E57</span>
+                    </div>
 
                     <div class="subsection-header">Significant Properties</div>
                     <span class="field-hint" style="display: block; margin-bottom: 10px;">Properties that must be preserved for the asset to remain meaningful</span>
@@ -677,6 +704,10 @@
                     <div class="checkbox-group">
                         <input type="checkbox" id="meta-pres-prop-splat">
                         <label for="meta-pres-prop-splat">Gaussian Splat Data</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="meta-pres-prop-pointcloud">
+                        <label for="meta-pres-prop-pointcloud">E57 Point Cloud Data</label>
                     </div>
 
                     <div class="subsection-header">Rendering Requirements</div>
@@ -790,6 +821,15 @@
                             <button id="btn-load-model-url" class="action-btn">From URL</button>
                         </div>
                         <span id="model-filename" class="filename">No file loaded</span>
+                    </div>
+                    <div class="load-subsection">
+                        <h4>Point Cloud</h4>
+                        <input type="file" id="pointcloud-input" accept=".e57" />
+                        <div class="button-row">
+                            <label for="pointcloud-input" class="file-label">From File</label>
+                            <button id="btn-load-pointcloud-url" class="action-btn">From URL</button>
+                        </div>
+                        <span id="pointcloud-filename" class="filename">No file loaded</span>
                     </div>
                     <div class="load-subsection">
                         <h4>Archive (.a3d/.a3z)</h4>
@@ -907,6 +947,40 @@
             </div>
 
             <div class="control-section collapsible collapsed">
+                <h3 class="collapsible-header">Point Cloud Settings <span class="collapse-icon">▶</span></h3>
+                <div class="collapsible-content">
+                    <div class="slider-group">
+                        <label for="pointcloud-scale">Scale: <span id="pointcloud-scale-value">1.0</span></label>
+                        <input type="range" id="pointcloud-scale" min="0.1" max="5" step="0.1" value="1" />
+                    </div>
+                    <div class="slider-group">
+                        <label for="pointcloud-point-size">Point Size: <span id="pointcloud-point-size-value">0.01</span></label>
+                        <input type="range" id="pointcloud-point-size" min="0.001" max="0.1" step="0.001" value="0.01" />
+                    </div>
+                    <div class="slider-group">
+                        <label for="pointcloud-opacity">Opacity: <span id="pointcloud-opacity-value">1.0</span></label>
+                        <input type="range" id="pointcloud-opacity" min="0" max="1" step="0.05" value="1" />
+                    </div>
+                    <div class="position-inputs">
+                        <label>Position:</label>
+                        <div class="xyz-inputs">
+                            <input type="number" id="pointcloud-pos-x" value="0" step="0.1" />
+                            <input type="number" id="pointcloud-pos-y" value="0" step="0.1" />
+                            <input type="number" id="pointcloud-pos-z" value="0" step="0.1" />
+                        </div>
+                    </div>
+                    <div class="position-inputs">
+                        <label>Rotation (deg):</label>
+                        <div class="xyz-inputs">
+                            <input type="number" id="pointcloud-rot-x" value="0" step="1" />
+                            <input type="number" id="pointcloud-rot-y" value="0" step="1" />
+                            <input type="number" id="pointcloud-rot-z" value="0" step="1" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-section collapsible collapsed">
                 <h3 class="collapsible-header">Alignment <span class="collapse-icon">▶</span></h3>
                 <div class="collapsible-content">
                     <button id="btn-auto-align" class="action-btn">Auto Align</button>
@@ -941,6 +1015,7 @@
                 <div id="info-panel">
                     <p>Splat count: <span id="splat-vertices">-</span></p>
                     <p>Model faces: <span id="model-faces">-</span></p>
+                    <p>Point cloud: <span id="pointcloud-points">-</span></p>
                     <p>FPS: <span id="fps-counter">-</span></p>
                 </div>
             </div>
@@ -975,7 +1050,9 @@
             "three": "https://esm.sh/three@0.170.0",
             "three/addons/": "https://esm.sh/three@0.170.0/examples/jsm/",
             "@sparkjsdev/spark": "https://sparkjs.dev/releases/spark/0.1.10/spark.module.js",
-            "fflate": "https://esm.sh/fflate@0.8.2"
+            "fflate": "https://esm.sh/fflate@0.8.2",
+            "three-e57-loader": "https://esm.sh/three-e57-loader@1.2.0?external=three",
+            "web-e57": "https://esm.sh/web-e57@1.2.0"
         }
     }
     </script>

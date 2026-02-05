@@ -235,7 +235,8 @@ export class ArchiveCreator {
                 format_registry: {
                     glb: "fmt/861",
                     obj: "fmt/935",
-                    ply: "fmt/831"
+                    ply: "fmt/831",
+                    e57: "fmt/643"
                 },
                 significant_properties: [],
                 rendering_requirements: "",
@@ -530,6 +531,9 @@ export class ArchiveCreator {
             if (preservation.formatRegistry.ply !== undefined) {
                 this.manifest.preservation.format_registry.ply = preservation.formatRegistry.ply;
             }
+            if (preservation.formatRegistry.e57 !== undefined) {
+                this.manifest.preservation.format_registry.e57 = preservation.formatRegistry.e57;
+            }
         }
 
         if (preservation.significantProperties !== undefined) {
@@ -673,6 +677,51 @@ export class ArchiveCreator {
     }
 
     /**
+     * Add a point cloud entry (E57 file)
+     * @param {Blob} blob - The file data
+     * @param {string} fileName - Original filename
+     * @param {Object} options - Additional options
+     */
+    addPointcloud(blob, fileName, options = {}) {
+        const index = this._countEntriesOfType('pointcloud_');
+        const entryKey = `pointcloud_${index}`;
+        const ext = fileName.split('.').pop().toLowerCase();
+        const archivePath = `assets/pointcloud_${index}.${ext}`;
+
+        this.files.set(archivePath, { blob, originalName: fileName });
+
+        this.manifest.data_entries[entryKey] = {
+            file_name: archivePath,
+            created_by: options.created_by || "unknown",
+            _created_by_version: options.created_by_version || "",
+            _source_notes: options.source_notes || "",
+            _parameters: {
+                position: options.position || [0, 0, 0],
+                rotation: options.rotation || [0, 0, 0],
+                scale: options.scale !== undefined ? options.scale : 1,
+                ...(options.parameters || {})
+            }
+        };
+
+        return entryKey;
+    }
+
+    /**
+     * Update an existing point cloud entry's metadata
+     * @param {number} index - Pointcloud index (0-based)
+     * @param {Object} metadata - Metadata to update
+     */
+    updatePointcloudMetadata(index, { createdBy, version, sourceNotes }) {
+        const entryKey = `pointcloud_${index}`;
+        if (!this.manifest.data_entries[entryKey]) return false;
+
+        if (createdBy !== undefined) this.manifest.data_entries[entryKey].created_by = createdBy;
+        if (version !== undefined) this.manifest.data_entries[entryKey]._created_by_version = version;
+        if (sourceNotes !== undefined) this.manifest.data_entries[entryKey]._source_notes = sourceNotes;
+        return true;
+    }
+
+    /**
      * Add a thumbnail/preview image
      * @param {Blob} blob - The image data
      * @param {string} fileName - Original filename
@@ -706,7 +755,7 @@ export class ArchiveCreator {
      * Set quality statistics in _meta
      * @param {Object} stats - Quality statistics
      */
-    setQualityStats({ splatCount, meshPolys, meshVerts, splatFileSize, meshFileSize }) {
+    setQualityStats({ splatCount, meshPolys, meshVerts, splatFileSize, meshFileSize, pointcloudPoints, pointcloudFileSize }) {
         if (!this.manifest._meta.quality) {
             this.manifest._meta.quality = {};
         }
@@ -715,6 +764,8 @@ export class ArchiveCreator {
         if (meshVerts !== undefined) this.manifest._meta.quality.mesh_vertices = meshVerts;
         if (splatFileSize !== undefined) this.manifest._meta.quality.splat_file_size = splatFileSize;
         if (meshFileSize !== undefined) this.manifest._meta.quality.mesh_file_size = meshFileSize;
+        if (pointcloudPoints !== undefined) this.manifest._meta.quality.pointcloud_points = pointcloudPoints;
+        if (pointcloudFileSize !== undefined) this.manifest._meta.quality.pointcloud_file_size = pointcloudFileSize;
     }
 
     /**
@@ -758,6 +809,7 @@ export class ArchiveCreator {
     captureFromViewer(viewerState) {
         const { splatBlob, splatFileName, splatTransform, splatMetadata,
                 meshBlob, meshFileName, meshTransform, meshMetadata,
+                pointcloudBlob, pointcloudFileName, pointcloudTransform, pointcloudMetadata,
                 annotations, qualityStats } = viewerState;
 
         if (splatBlob && splatFileName) {
@@ -779,6 +831,17 @@ export class ArchiveCreator {
                 created_by: meshMetadata?.createdBy || "unknown",
                 created_by_version: meshMetadata?.version || "",
                 source_notes: meshMetadata?.sourceNotes || ""
+            });
+        }
+
+        if (pointcloudBlob && pointcloudFileName) {
+            this.addPointcloud(pointcloudBlob, pointcloudFileName, {
+                position: pointcloudTransform?.position || [0, 0, 0],
+                rotation: pointcloudTransform?.rotation || [0, 0, 0],
+                scale: pointcloudTransform?.scale || 1,
+                created_by: pointcloudMetadata?.createdBy || "unknown",
+                created_by_version: pointcloudMetadata?.version || "",
+                source_notes: pointcloudMetadata?.sourceNotes || ""
             });
         }
 
@@ -837,6 +900,9 @@ export class ArchiveCreator {
         }
         if (metadata.meshMetadata) {
             this.updateMeshMetadata(0, metadata.meshMetadata);
+        }
+        if (metadata.pointcloudMetadata) {
+            this.updatePointcloudMetadata(0, metadata.pointcloudMetadata);
         }
 
         // Custom fields
@@ -1020,7 +1086,7 @@ export class ArchiveCreator {
         for (const [path, { blob }] of entries) {
             // Use STORE (level 0) for already-compressed formats
             const ext = path.split('.').pop().toLowerCase();
-            const alreadyCompressed = ['glb', 'spz', 'sog', 'jpg', 'jpeg', 'png', 'webp'].includes(ext);
+            const alreadyCompressed = ['glb', 'spz', 'sog', 'jpg', 'jpeg', 'png', 'webp', 'e57'].includes(ext);
             const fileLevel = alreadyCompressed ? 0 : defaultLevel;
 
             log.debug(' Converting file:', path, 'size:', blob.size, 'level:', fileLevel);
@@ -1129,9 +1195,10 @@ export class ArchiveCreator {
         // Check for at least one viewable asset
         const hasScene = Object.keys(this.manifest.data_entries).some(k => k.startsWith('scene_'));
         const hasMesh = Object.keys(this.manifest.data_entries).some(k => k.startsWith('mesh_'));
+        const hasPointcloud = Object.keys(this.manifest.data_entries).some(k => k.startsWith('pointcloud_'));
 
-        if (!hasScene && !hasMesh) {
-            errors.push('Archive must contain at least one scene (splat) or mesh file');
+        if (!hasScene && !hasMesh && !hasPointcloud) {
+            errors.push('Archive must contain at least one scene (splat), mesh, or point cloud file');
         }
 
         // Check project info

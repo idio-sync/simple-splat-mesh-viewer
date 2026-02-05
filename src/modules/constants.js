@@ -103,6 +103,9 @@ export const TIMING = {
     // Delay after loading model from blob
     MODEL_LOAD_DELAY: 100,
 
+    // Delay after loading point cloud
+    POINTCLOUD_LOAD_DELAY: 100,
+
     // Delay before auto-alignment after archive load
     AUTO_ALIGN_DELAY: 500,
 
@@ -153,5 +156,6 @@ export const FILES = {
     // Supported file extensions
     SPLAT_EXTENSIONS: ['.ply', '.splat', '.ksplat', '.spz', '.sog'],
     MODEL_EXTENSIONS: ['.glb', '.gltf', '.obj'],
+    POINTCLOUD_EXTENSIONS: ['.e57'],
     ARCHIVE_EXTENSIONS: ['.a3d', '.a3z']
 };

@@ -2,16 +2,18 @@
 // Environment variables are substituted by docker-entrypoint.sh at container startup
 //
 // Docker Environment Variables:
-//   DEFAULT_ARCHIVE_URL  - Archive container file (.a3d, .a3z) - takes priority
-//   DEFAULT_SPLAT_URL    - Default splat file to load
-//   DEFAULT_MODEL_URL    - Default model file to load
-//   DEFAULT_ALIGNMENT_URL - Default alignment JSON file to load
-//   SHOW_CONTROLS        - Show (true) or hide (false) the controls panel
+//   DEFAULT_ARCHIVE_URL    - Archive container file (.a3d, .a3z) - takes priority
+//   DEFAULT_SPLAT_URL      - Default splat file to load
+//   DEFAULT_MODEL_URL      - Default model file to load
+//   DEFAULT_POINTCLOUD_URL - Default E57 point cloud file to load
+//   DEFAULT_ALIGNMENT_URL  - Default alignment JSON file to load
+//   SHOW_CONTROLS          - Show (true) or hide (false) the controls panel
 //
 // URL parameters can override environment defaults:
 //   ?archive=URL     - Archive container file (.a3d, .a3z) - takes priority
 //   ?splat=URL       - Splat file to load
 //   ?model=URL       - Model file to load
+//   ?pointcloud=URL  - E57 point cloud file to load
 //   ?alignment=URL   - Alignment JSON file to load
 //   ?controls=MODE   - Control panel mode: full, minimal, none
 //   ?mode=VIEW       - Initial view mode: splat, model, both, split
@@ -19,9 +21,9 @@
 //   ?sidebar=MODE    - Sidebar mode: closed, view, edit
 //
 // Inline alignment params:
-//   ?sp=x,y,z  - Splat position    ?mp=x,y,z  - Model position
-//   ?sr=x,y,z  - Splat rotation    ?mr=x,y,z  - Model rotation
-//   ?ss=scale  - Splat scale       ?ms=scale  - Model scale
+//   ?sp=x,y,z  - Splat position    ?mp=x,y,z  - Model position    ?pp=x,y,z  - Point cloud position
+//   ?sr=x,y,z  - Splat rotation    ?mr=x,y,z  - Model rotation    ?pr=x,y,z  - Point cloud rotation
+//   ?ss=scale  - Splat scale       ?ms=scale  - Model scale       ?ps=scale  - Point cloud scale
 //
 // Security:
 //   By default, only same-origin URLs are allowed. To allow external domains,
@@ -114,6 +116,7 @@
     const envArchive = "${DEFAULT_ARCHIVE_URL}";
     const envSplat = "${DEFAULT_SPLAT_URL}";
     const envModel = "${DEFAULT_MODEL_URL}";
+    const envPointcloud = "${DEFAULT_POINTCLOUD_URL}";
     const envAlignment = "${DEFAULT_ALIGNMENT_URL}";
     const envShowControls = ${SHOW_CONTROLS}; // This becomes true/false
 
@@ -121,6 +124,7 @@
     const archiveUrl = validateUrl(params.get('archive') || envArchive, 'archive');
     const splatUrl = validateUrl(params.get('splat') || envSplat, 'splat');
     const modelUrl = validateUrl(params.get('model') || envModel, 'model');
+    const pointcloudUrl = validateUrl(params.get('pointcloud') || envPointcloud, 'pointcloud');
     const alignmentUrl = validateUrl(params.get('alignment') || envAlignment, 'alignment');
 
     // Control and view mode settings
@@ -137,10 +141,13 @@
     const modelPos = parseVec3(params.get('mp'));
     const modelRot = parseVec3(params.get('mr'));
     const modelScale = params.get('ms') ? parseFloat(params.get('ms')) : null;
+    const pcPos = parseVec3(params.get('pp'));
+    const pcRot = parseVec3(params.get('pr'));
+    const pcScale = params.get('ps') ? parseFloat(params.get('ps')) : null;
 
     // Build inline alignment object if any params are present
     let inlineAlignment = null;
-    if (splatPos || splatRot || splatScale !== null || modelPos || modelRot || modelScale !== null) {
+    if (splatPos || splatRot || splatScale !== null || modelPos || modelRot || modelScale !== null || pcPos || pcRot || pcScale !== null) {
         inlineAlignment = {};
         if (splatPos || splatRot || splatScale !== null) {
             inlineAlignment.splat = {
@@ -156,12 +163,20 @@
                 scale: modelScale !== null && !isNaN(modelScale) ? modelScale : 1
             };
         }
+        if (pcPos || pcRot || pcScale !== null) {
+            inlineAlignment.pointcloud = {
+                position: pcPos || [0, 0, 0],
+                rotation: pcRot || [0, 0, 0],
+                scale: pcScale !== null && !isNaN(pcScale) ? pcScale : 1
+            };
+        }
     }
 
     window.APP_CONFIG = {
         defaultArchiveUrl: archiveUrl,
         defaultSplatUrl: splatUrl,
         defaultModelUrl: modelUrl,
+        defaultPointcloudUrl: pointcloudUrl,
         defaultAlignmentUrl: alignmentUrl,
         inlineAlignment: inlineAlignment,
 

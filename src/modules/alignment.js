@@ -694,7 +694,7 @@ export function autoAlignObjects(deps) {
  * @returns {void}
  */
 export function fitToView(deps) {
-    const { splatMesh, modelGroup, camera, controls } = deps;
+    const { splatMesh, modelGroup, pointcloudGroup, camera, controls } = deps;
 
     const box = new THREE.Box3();
     let hasContent = false;
@@ -718,6 +718,14 @@ export function fitToView(deps) {
 
     if (modelGroup && modelGroup.children.length > 0) {
         const tempBox = new THREE.Box3().setFromObject(modelGroup);
+        if (!tempBox.isEmpty()) {
+            box.union(tempBox);
+            hasContent = true;
+        }
+    }
+
+    if (pointcloudGroup && pointcloudGroup.children.length > 0) {
+        const tempBox = new THREE.Box3().setFromObject(pointcloudGroup);
         if (!tempBox.isEmpty()) {
             box.union(tempBox);
             hasContent = true;
@@ -809,7 +817,7 @@ export function applyAlignmentData(data, deps) {
  * @param {Object} deps - Dependencies object
  */
 export function resetAlignment(deps) {
-    const { splatMesh, modelGroup, updateTransformInputs, storeLastPositions } = deps;
+    const { splatMesh, modelGroup, pointcloudGroup, updateTransformInputs, storeLastPositions } = deps;
 
     if (splatMesh) {
         splatMesh.position.set(0, 0, 0);
@@ -821,6 +829,12 @@ export function resetAlignment(deps) {
         modelGroup.position.set(0, 0, 0);
         modelGroup.rotation.set(0, 0, 0);
         modelGroup.scale.setScalar(1);
+    }
+
+    if (pointcloudGroup) {
+        pointcloudGroup.position.set(0, 0, 0);
+        pointcloudGroup.rotation.set(0, 0, 0);
+        pointcloudGroup.scale.setScalar(1);
     }
 
     updateTransformInputs();
