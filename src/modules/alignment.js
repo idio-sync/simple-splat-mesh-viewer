@@ -394,21 +394,13 @@ export async function icpAlignObjects(deps) {
         return;
     }
 
-    // Debug: Check splat state
-    log.debug('[ICP] splatMesh exists:', !!splatMesh);
-    log.debug('[ICP] splatMesh.packedSplats:', !!splatMesh.packedSplats);
-    if (splatMesh.packedSplats) {
-        log.debug('[ICP] packedSplats.splatCount:', splatMesh.packedSplats.splatCount);
-        log.debug('[ICP] packedSplats.forEachSplat:', typeof splatMesh.packedSplats.forEachSplat);
-    }
-
     showLoading('Running ICP alignment...');
 
     // Allow UI to update
     await new Promise(resolve => setTimeout(resolve, 50));
 
     try {
-        // Extract points
+        // Extract points in world space
         log.debug('[ICP] Extracting splat positions...');
         const splatPoints = extractSplatPositions(splatMesh, 3000);
         log.debug('[ICP] Extracted splat points:', splatPoints.length);
@@ -419,53 +411,86 @@ export async function icpAlignObjects(deps) {
 
         if (splatPoints.length < 10) {
             hideLoading();
-            log.error('[ICP] Not enough splat points:', splatPoints.length);
             notify.warning('Could not extract enough splat positions for ICP (' + splatPoints.length + ' found). The splat may not support position extraction or may still be loading.');
             return;
         }
 
         if (meshPoints.length < 10) {
             hideLoading();
-            log.error('[ICP] Not enough mesh points:', meshPoints.length);
             notify.warning('Could not extract enough mesh vertices for ICP (' + meshPoints.length + ' found).');
             return;
         }
 
         log.debug(`[ICP] Starting ICP with ${splatPoints.length} splat points and ${meshPoints.length} mesh points`);
 
+        // ---- Step 0: Centroid pre-alignment and scale correction ----
+        const srcCentroid = computeCentroid(splatPoints);
+        const tgtCentroid = computeCentroid(meshPoints);
+
+        // Compute RMS spread from centroids for scale estimation
+        let srcSpreadSq = 0, tgtSpreadSq = 0;
+        for (const p of splatPoints) {
+            srcSpreadSq += (p.x - srcCentroid.x) ** 2 + (p.y - srcCentroid.y) ** 2 + (p.z - srcCentroid.z) ** 2;
+        }
+        for (const p of meshPoints) {
+            tgtSpreadSq += (p.x - tgtCentroid.x) ** 2 + (p.y - tgtCentroid.y) ** 2 + (p.z - tgtCentroid.z) ** 2;
+        }
+        const srcRMS = Math.sqrt(srcSpreadSq / splatPoints.length);
+        const tgtRMS = Math.sqrt(tgtSpreadSq / meshPoints.length);
+        const scaleFactor = (srcRMS > 1e-10) ? tgtRMS / srcRMS : 1.0;
+
+        log.debug(`[ICP] Source RMS spread: ${srcRMS.toFixed(4)}, Target RMS spread: ${tgtRMS.toFixed(4)}, Scale factor: ${scaleFactor.toFixed(4)}`);
+
+        // Build pre-alignment matrix: translate to origin, scale, translate to target centroid
+        const preAlign = new THREE.Matrix4();
+        const toOrigin = new THREE.Matrix4().makeTranslation(-srcCentroid.x, -srcCentroid.y, -srcCentroid.z);
+        const scaleM = new THREE.Matrix4().makeScale(scaleFactor, scaleFactor, scaleFactor);
+        const toTarget = new THREE.Matrix4().makeTranslation(tgtCentroid.x, tgtCentroid.y, tgtCentroid.z);
+        preAlign.copy(toTarget).multiply(scaleM).multiply(toOrigin);
+
+        // Apply pre-alignment to working points
+        let currentPoints = splatPoints.map(p => {
+            const v = new THREE.Vector3(p.x, p.y, p.z);
+            v.applyMatrix4(preAlign);
+            return { x: v.x, y: v.y, z: v.z, index: p.index };
+        });
+
+        // Cumulative transformation starts with pre-alignment
+        let cumulativeMatrix = preAlign.clone();
+
         // Build KD-tree from mesh points for fast nearest neighbor search
         const kdTree = new KDTree([...meshPoints]);
 
-        // ICP parameters
+        // ---- ICP iterations ----
         const maxIterations = 50;
         const convergenceThreshold = 1e-6;
         let prevMeanError = Infinity;
 
-        // Working copy of splat points (we transform these during iteration)
-        let currentPoints = splatPoints.map(p => ({ x: p.x, y: p.y, z: p.z, index: p.index }));
-
-        // Cumulative transformation
-        let cumulativeMatrix = new THREE.Matrix4();
-
         for (let iter = 0; iter < maxIterations; iter++) {
-            // Step 1: Find correspondences (nearest neighbors)
-            const correspondences = [];
-            let totalError = 0;
-
+            // Step 1: Find correspondences with outlier rejection
+            const allCorrespondences = [];
             for (const srcPt of currentPoints) {
                 const nearest = kdTree.nearestNeighbor(srcPt);
                 if (nearest.point) {
-                    correspondences.push({
+                    allCorrespondences.push({
                         source: srcPt,
                         target: nearest.point,
                         distSq: nearest.distSq
                     });
-                    totalError += nearest.distSq;
                 }
             }
 
+            if (allCorrespondences.length < 10) break;
+
+            // Outlier rejection: discard worst 20% of correspondences by distance
+            allCorrespondences.sort((a, b) => a.distSq - b.distSq);
+            const keepCount = Math.max(10, Math.floor(allCorrespondences.length * 0.8));
+            const correspondences = allCorrespondences.slice(0, keepCount);
+
+            let totalError = 0;
+            for (const c of correspondences) totalError += c.distSq;
             const meanError = totalError / correspondences.length;
-            log.debug(`[ICP] Iteration ${iter + 1}: Mean squared error = ${meanError.toFixed(6)}`);
+            log.debug(`[ICP] Iteration ${iter + 1}: Mean squared error = ${meanError.toFixed(6)} (${correspondences.length} correspondences)`);
 
             // Check convergence
             if (Math.abs(prevMeanError - meanError) < convergenceThreshold) {
@@ -510,24 +535,29 @@ export async function icpAlignObjects(deps) {
             });
         }
 
-        // Apply the cumulative transformation to the splat mesh
+        // ---- Apply cumulative transformation to splat mesh ----
         log.debug('[ICP] Applying cumulative transformation to splat mesh');
 
-        // Decompose the cumulative matrix into position, quaternion, scale
-        const position = new THREE.Vector3();
-        const quaternion = new THREE.Quaternion();
-        const scale = new THREE.Vector3();
-        cumulativeMatrix.decompose(position, quaternion, scale);
+        // Combine with existing local transform, accounting for parent
+        // cumulativeMatrix maps: old world positions -> new world positions
+        // We need: new local matrix such that parent * newLocal = cumulativeMatrix * parent * oldLocal
+        // If parent is identity: newLocal = cumulativeMatrix * oldLocal
+        const parentWorldInverse = new THREE.Matrix4();
+        if (splatMesh.parent) {
+            splatMesh.parent.updateMatrixWorld(true);
+            parentWorldInverse.copy(splatMesh.parent.matrixWorld).invert();
+        }
 
-        // Apply to splat mesh (combine with existing transform)
-        const currentSplatMatrix = splatMesh.matrix.clone();
-        currentSplatMatrix.premultiply(cumulativeMatrix);
+        // newLocal = parentInverse * cumulative * parentWorld * oldLocal
+        const oldWorldMatrix = splatMesh.matrixWorld.clone();
+        const newWorldMatrix = cumulativeMatrix.clone().multiply(oldWorldMatrix);
+        const newLocalMatrix = parentWorldInverse.clone().multiply(newWorldMatrix);
 
         // Decompose the result
         const newPos = new THREE.Vector3();
         const newQuat = new THREE.Quaternion();
         const newScale = new THREE.Vector3();
-        currentSplatMatrix.decompose(newPos, newQuat, newScale);
+        newLocalMatrix.decompose(newPos, newQuat, newScale);
 
         // Apply to splatMesh
         splatMesh.position.copy(newPos);
@@ -538,13 +568,14 @@ export async function icpAlignObjects(deps) {
 
         log.debug('[ICP] ICP alignment complete');
         log.debug('[ICP] New splat position:', splatMesh.position.toArray());
-        log.debug('[ICP] New splat rotation:', splatMesh.rotation.toArray().map(r => THREE.MathUtils.radToDeg(r)));
+        log.debug('[ICP] New splat scale:', splatMesh.scale.toArray());
+        log.debug('[ICP] Scale correction applied:', scaleFactor.toFixed(4));
 
         updateTransformInputs();
         storeLastPositions();
 
         hideLoading();
-        notify.success('ICP alignment complete');
+        notify.success(`ICP alignment complete (scale: ${scaleFactor.toFixed(2)}x)`);
 
     } catch (e) {
         log.error('[ICP] ICP alignment failed:', e);

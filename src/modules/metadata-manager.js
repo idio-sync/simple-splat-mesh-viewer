@@ -49,6 +49,9 @@ export function hideMetadataSidebar() {
 
     const btn = document.getElementById('btn-metadata');
     if (btn) btn.classList.remove('active');
+
+    // Trigger resize so the 3D view reclaims the space after transition
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 300);
 }
 
 /**
@@ -205,7 +208,7 @@ export function setupMetadataSidebar(deps = {}) {
 
     if (annoTitleInput && deps.annotationSystem) {
         annoTitleInput.addEventListener('change', () => {
-            const selectedAnno = deps.annotationSystem.getSelectedAnnotation();
+            const selectedAnno = deps.annotationSystem.selectedAnnotation;
             if (selectedAnno) {
                 deps.annotationSystem.updateAnnotation(selectedAnno.id, {
                     title: annoTitleInput.value
@@ -217,7 +220,7 @@ export function setupMetadataSidebar(deps = {}) {
 
     if (annoBodyInput && deps.annotationSystem) {
         annoBodyInput.addEventListener('change', () => {
-            const selectedAnno = deps.annotationSystem.getSelectedAnnotation();
+            const selectedAnno = deps.annotationSystem.selectedAnnotation;
             if (selectedAnno) {
                 deps.annotationSystem.updateAnnotation(selectedAnno.id, {
                     body: annoBodyInput.value

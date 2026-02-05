@@ -626,6 +626,50 @@ function disposeObject(object) {
 }
 
 // =============================================================================
+// FETCH WITH PROGRESS
+// =============================================================================
+
+/**
+ * Fetch a URL with download progress tracking via ReadableStream.
+ * Falls back to a simple fetch if content-length is unavailable.
+ *
+ * @param {string} url - URL to fetch
+ * @param {Function} onProgress - Callback with (receivedBytes, totalBytes). totalBytes may be 0 if unknown.
+ * @returns {Promise<Blob>} The fetched data as a Blob
+ */
+async function fetchWithProgress(url, onProgress = null) {
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+    }
+
+    const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+
+    // If no progress callback or no content-length, fall back to simple blob
+    if (!onProgress || !contentLength) {
+        const blob = await response.blob();
+        if (onProgress) onProgress(blob.size, blob.size);
+        return blob;
+    }
+
+    // Stream the response and track progress
+    const reader = response.body.getReader();
+    const chunks = [];
+    let receivedLength = 0;
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        receivedLength += value.length;
+        onProgress(receivedLength, contentLength);
+    }
+
+    // Combine chunks into a single Blob
+    return new Blob(chunks);
+}
+
+// =============================================================================
 // SIMPLE MARKDOWN PARSER
 // =============================================================================
 
@@ -820,5 +864,8 @@ export {
 
     // Markdown parsing
     parseMarkdown,
-    sanitizeUrl
+    sanitizeUrl,
+
+    // Network utilities
+    fetchWithProgress
 };

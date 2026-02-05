@@ -8,7 +8,8 @@ import { ArchiveLoader, isArchiveFile } from './modules/archive-loader.js';
 import { AnnotationSystem } from './modules/annotation-system.js';
 import { ArchiveCreator, captureScreenshot } from './modules/archive-creator.js';
 import { CAMERA, TIMING } from './modules/constants.js';
-import { Logger, notify, processMeshMaterials, computeMeshFaceCount, computeMeshVertexCount, disposeObject, parseMarkdown } from './modules/utilities.js';
+import { Logger, notify, processMeshMaterials, computeMeshFaceCount, computeMeshVertexCount, disposeObject, parseMarkdown, fetchWithProgress } from './modules/utilities.js';
+import { FlyControls } from './modules/fly-controls.js';
 import { SceneManager } from './modules/scene-manager.js';
 import {
     icpAlignObjects as icpAlignObjectsHandler,
@@ -28,6 +29,8 @@ import {
     formatFileSize,
     switchEditTab,
     addCustomField,
+    addProcessingSoftware,
+    addRelatedObject,
     collectMetadata,
     setupLicenseField,
     hideMetadataSidebar
@@ -180,6 +183,7 @@ let sceneManager = null;
 
 // Three.js objects - Main view (references extracted from SceneManager for backward compatibility)
 let scene, camera, renderer, controls, transformControls;
+let flyControls = null;
 let splatMesh = null;
 let modelGroup = null;
 let gridHelper = null;
@@ -306,6 +310,9 @@ function init() {
     directionalLight2 = sceneManager.directionalLight2;
     modelGroup = sceneManager.modelGroup;
 
+    // Initialize fly camera controls (disabled by default, orbit mode is default)
+    flyControls = new FlyControls(camera, renderer.domElement);
+
     // Set up SceneManager callbacks for transform controls
     sceneManager.onTransformChange = () => {
         updateTransformInputs();
@@ -341,6 +348,9 @@ function init() {
     applyControlsVisibility();
     applyControlsMode();
 
+    // Show grid by default
+    toggleGridlines(true);
+
     // Apply viewer mode settings (toolbar visibility, sidebar state)
     applyViewerModeSettings();
 
@@ -368,6 +378,15 @@ function onWindowResize() {
 }
 
 function onKeyDown(event) {
+    // Don't handle transform shortcuts when fly mode is active
+    // (WASD/Q/E are used for camera movement in fly mode)
+    if (flyControls && flyControls.enabled) {
+        if (event.key === 'Escape') {
+            toggleFlyMode(); // ESC exits fly mode
+        }
+        return;
+    }
+
     switch (event.key.toLowerCase()) {
         case 'w':
             setTransformMode('translate');
@@ -381,6 +400,39 @@ function onKeyDown(event) {
         case 'escape':
             setSelectedObject('none');
             break;
+    }
+}
+
+// ==================== Fly Camera Mode ====================
+
+function toggleFlyMode() {
+    if (!flyControls) return;
+
+    const btn = document.getElementById('btn-fly-mode');
+    const hint = document.getElementById('fly-mode-hint');
+    const isActive = flyControls.enabled;
+
+    if (isActive) {
+        // Disable fly mode, re-enable orbit
+        flyControls.disable();
+        controls.enabled = true;
+        if (controlsRight) controlsRight.enabled = true;
+        // Re-sync orbit controls target to where camera is looking
+        const dir = new THREE.Vector3();
+        camera.getWorldDirection(dir);
+        controls.target.copy(camera.position).add(dir.multiplyScalar(5));
+        controls.update();
+        if (btn) btn.classList.remove('active');
+        if (hint) hint.classList.add('hidden');
+        log.info('Switched to Orbit camera mode');
+    } else {
+        // Enable fly mode, disable orbit
+        controls.enabled = false;
+        if (controlsRight) controlsRight.enabled = false;
+        flyControls.enable();
+        if (btn) btn.classList.add('active');
+        if (hint) hint.classList.remove('hidden');
+        log.info('Switched to Fly camera mode');
     }
 }
 
@@ -552,6 +604,9 @@ function setupUIEvents() {
     addListener('btn-sidebar-update-anno-camera', 'click', updateSelectedAnnotationCamera);
     addListener('btn-sidebar-delete-anno', 'click', deleteSelectedAnnotation);
 
+    // Fly camera mode toggle
+    addListener('btn-fly-mode', 'click', toggleFlyMode);
+
     // Export/archive creation controls
     addListener('btn-export-archive', 'click', showExportPanel);
     addListener('btn-export-cancel', 'click', hideExportPanel);
@@ -614,6 +669,8 @@ function setupUIEvents() {
             toggleAnnotationMode();
         } else if (e.key.toLowerCase() === 'm' && !e.ctrlKey && !e.metaKey) {
             toggleMetadataDisplay();
+        } else if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey) {
+            toggleFlyMode();
         } else if (e.key === 'Escape') {
             hideAnnotationPopup();
             hideMetadataDisplay();
@@ -1511,7 +1568,7 @@ function updateSidebarAnnotationsList() {
     const annotations = annotationSystem.getAnnotations();
     const list = document.getElementById('sidebar-annotations-list');
     const editor = document.getElementById('sidebar-annotation-editor');
-    const selectedAnno = annotationSystem.getSelectedAnnotation();
+    const selectedAnno = annotationSystem.selectedAnnotation;
 
     if (!list) return;
 
@@ -1783,6 +1840,9 @@ function showMetadataSidebar(mode = 'view') {
     // Update toolbar button state
     const btn = document.getElementById('btn-metadata');
     if (btn) btn.classList.add('active');
+
+    // Resize the 3D view after sidebar transition completes
+    setTimeout(onWindowResize, 300);
 }
 
 // Switch sidebar mode (view/edit/annotations)
@@ -1877,7 +1937,7 @@ function setupMetadataSidebar() {
 
     if (annoTitleInput) {
         annoTitleInput.addEventListener('change', () => {
-            const selectedAnno = annotationSystem?.getSelectedAnnotation();
+            const selectedAnno = annotationSystem?.selectedAnnotation;
             if (selectedAnno) {
                 annotationSystem.updateAnnotation(selectedAnno.id, {
                     title: annoTitleInput.value
@@ -1890,13 +1950,24 @@ function setupMetadataSidebar() {
 
     if (annoBodyInput) {
         annoBodyInput.addEventListener('change', () => {
-            const selectedAnno = annotationSystem?.getSelectedAnnotation();
+            const selectedAnno = annotationSystem?.selectedAnnotation;
             if (selectedAnno) {
                 annotationSystem.updateAnnotation(selectedAnno.id, {
                     body: annoBodyInput.value
                 });
             }
         });
+    }
+
+    // Dynamic list add buttons (Related Objects / Processing Software)
+    const addSoftwareBtn = document.getElementById('btn-add-processing-software');
+    if (addSoftwareBtn) {
+        addSoftwareBtn.addEventListener('click', addProcessingSoftware);
+    }
+
+    const addRelatedBtn = document.getElementById('btn-add-related-object');
+    if (addRelatedBtn) {
+        addRelatedBtn.addEventListener('click', addRelatedObject);
     }
 }
 
@@ -2846,18 +2917,18 @@ async function loadDefaultFiles() {
 }
 
 async function loadSplatFromUrl(url) {
-    showLoading('Loading Gaussian Splat...');
+    showLoading('Downloading Gaussian Splat...', true);
 
     try {
-        // Fetch the file as blob for archive creation
+        // Fetch the file as blob with progress tracking
         log.info(' Fetching splat from URL:', url);
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
-        }
-        const blob = await response.blob();
+        const blob = await fetchWithProgress(url, (received, total) => {
+            const percent = Math.round((received / total) * 90); // 0-90% for download
+            updateProgress(percent, `Downloading Gaussian Splat... ${formatFileSize(received)} / ${formatFileSize(total)}`);
+        });
         currentSplatBlob = blob;
         log.info(' Splat blob stored, size:', blob.size);
+        updateProgress(90, 'Processing Gaussian Splat...');
 
         // Pre-compute hash in background for faster export later
         if (archiveCreator) {
@@ -2918,18 +2989,18 @@ async function loadSplatFromUrl(url) {
 }
 
 async function loadModelFromUrl(url) {
-    showLoading('Loading 3D Model...');
+    showLoading('Downloading 3D Model...', true);
 
     try {
-        // Fetch the file as blob for archive creation
+        // Fetch the file as blob with progress tracking
         log.info(' Fetching model from URL:', url);
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
-        }
-        const blob = await response.blob();
+        const blob = await fetchWithProgress(url, (received, total) => {
+            const percent = Math.round((received / total) * 90); // 0-90% for download
+            updateProgress(percent, `Downloading 3D Model... ${formatFileSize(received)} / ${formatFileSize(total)}`);
+        });
         currentMeshBlob = blob;
         log.info(' Mesh blob stored, size:', blob.size);
+        updateProgress(90, 'Processing 3D Model...');
 
         // Pre-compute hash in background for faster export later
         if (archiveCreator) {
@@ -3078,8 +3149,13 @@ function animate() {
     requestAnimationFrame(animate);
 
     try {
-        controls.update();
-        controlsRight.update();
+        // Update active camera controls
+        if (flyControls && flyControls.enabled) {
+            flyControls.update();
+        } else {
+            controls.update();
+            controlsRight.update();
+        }
 
         if (state.displayMode === 'split') {
             // Split view - render splat on left, model on right

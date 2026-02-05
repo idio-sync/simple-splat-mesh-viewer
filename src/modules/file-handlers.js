@@ -16,7 +16,7 @@ import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader } from './archive-loader.js';
 import { TIMING } from './constants.js';
-import { Logger, notify, processMeshMaterials, computeMeshFaceCount, computeMeshVertexCount, disposeObject } from './utilities.js';
+import { Logger, notify, processMeshMaterials, computeMeshFaceCount, computeMeshVertexCount, disposeObject, fetchWithProgress } from './utilities.js';
 
 const log = Logger.getLogger('file-handlers');
 
@@ -165,15 +165,11 @@ export async function loadSplatFromFile(file, deps) {
  * @param {Object} deps - Dependencies
  * @returns {Promise<Object>} The loaded splat mesh
  */
-export async function loadSplatFromUrl(url, deps) {
+export async function loadSplatFromUrl(url, deps, onProgress = null) {
     const { scene, getSplatMesh, setSplatMesh, state, archiveCreator, callbacks } = deps;
 
     log.info('Fetching splat from URL:', url);
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
-    }
-    const blob = await response.blob();
+    const blob = await fetchWithProgress(url, onProgress);
     log.info('Splat blob fetched, size:', blob.size);
 
     // Pre-compute hash in background
@@ -457,15 +453,11 @@ export async function loadModelFromFile(files, deps) {
  * @param {Object} deps - Dependencies
  * @returns {Promise<THREE.Group>}
  */
-export async function loadModelFromUrl(url, deps) {
+export async function loadModelFromUrl(url, deps, onProgress = null) {
     const { modelGroup, state, archiveCreator, callbacks } = deps;
 
     log.info('Fetching model from URL:', url);
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
-    }
-    const blob = await response.blob();
+    const blob = await fetchWithProgress(url, onProgress);
     log.info('Mesh blob fetched, size:', blob.size);
 
     // Pre-compute hash in background
