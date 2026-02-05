@@ -281,7 +281,7 @@ export function formatFileSize(bytes) {
  * @param {Object} deps - Dependencies (state, annotationSystem, blobs)
  */
 export function updateMetadataStats(deps = {}) {
-    const { state = {}, annotationSystem, currentSplatBlob, currentMeshBlob } = deps;
+    const { state = {}, annotationSystem, currentSplatBlob, currentMeshBlob, currentPointcloudBlob } = deps;
 
     // Splat count
     const splatCountEl = document.getElementById('meta-splat-count');
@@ -332,6 +332,7 @@ export function updateMetadataStats(deps = {}) {
         let totalSize = 0;
         if (currentSplatBlob) totalSize += currentSplatBlob.size;
         if (currentMeshBlob) totalSize += currentMeshBlob.size;
+        if (currentPointcloudBlob) totalSize += currentPointcloudBlob.size;
         archiveSizeEl.textContent = totalSize > 0 ? '~' + formatFileSize(totalSize) : '-';
     }
 }
@@ -372,6 +373,22 @@ export function updateAssetStatus(deps = {}) {
             meshStatus.textContent = 'No mesh loaded';
             meshStatus.classList.remove('loaded');
             if (meshFields) meshFields.classList.add('hidden');
+        }
+    }
+
+    // Pointcloud asset
+    const pcStatus = document.getElementById('pointcloud-asset-status');
+    const pcFields = document.getElementById('pointcloud-asset-fields');
+    if (pcStatus) {
+        if (state.pointcloudLoaded) {
+            const fileName = document.getElementById('pointcloud-filename')?.textContent || 'Point cloud loaded';
+            pcStatus.textContent = fileName;
+            pcStatus.classList.add('loaded');
+            if (pcFields) pcFields.classList.remove('hidden');
+        } else {
+            pcStatus.textContent = 'No point cloud loaded';
+            pcStatus.classList.remove('loaded');
+            if (pcFields) pcFields.classList.add('hidden');
         }
     }
 }
@@ -1038,6 +1055,21 @@ export function prefillMetadataFromArchive(manifest) {
                 'meta-mesh-notes': mesh._source_notes
             };
             for (const [id, value] of Object.entries(meshFields)) {
+                const el = document.getElementById(id);
+                if (el && value) el.value = value;
+            }
+        }
+
+        // Find pointcloud entry
+        const pcKey = Object.keys(manifest.data_entries).find(k => k.startsWith('pointcloud_'));
+        if (pcKey) {
+            const pc = manifest.data_entries[pcKey];
+            const pcFields = {
+                'meta-pointcloud-created-by': pc.created_by,
+                'meta-pointcloud-version': pc._created_by_version,
+                'meta-pointcloud-notes': pc._source_notes
+            };
+            for (const [id, value] of Object.entries(pcFields)) {
                 const el = document.getElementById(id);
                 if (el && value) el.value = value;
             }

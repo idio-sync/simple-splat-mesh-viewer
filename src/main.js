@@ -76,6 +76,7 @@ const config = window.APP_CONFIG || {
     defaultArchiveUrl: '',
     defaultSplatUrl: '',
     defaultModelUrl: '',
+    defaultPointcloudUrl: '',
     defaultAlignmentUrl: '',
     inlineAlignment: null,
     showControls: true,
@@ -836,6 +837,9 @@ let lastSplatScale = new THREE.Vector3(1, 1, 1);
 let lastModelPosition = new THREE.Vector3();
 let lastModelRotation = new THREE.Euler();
 let lastModelScale = new THREE.Vector3(1, 1, 1);
+let lastPointcloudPosition = new THREE.Vector3();
+let lastPointcloudRotation = new THREE.Euler();
+let lastPointcloudScale = new THREE.Vector3(1, 1, 1);
 
 function syncBothObjects() {
     if (!splatMesh || !modelGroup) return;
@@ -856,6 +860,14 @@ function syncBothObjects() {
         modelGroup.rotation.y += deltaRot.y;
         modelGroup.rotation.z += deltaRot.z;
         modelGroup.scale.multiplyScalar(scaleRatio);
+
+        if (pointcloudGroup) {
+            pointcloudGroup.position.add(deltaPos);
+            pointcloudGroup.rotation.x += deltaRot.x;
+            pointcloudGroup.rotation.y += deltaRot.y;
+            pointcloudGroup.rotation.z += deltaRot.z;
+            pointcloudGroup.scale.multiplyScalar(scaleRatio);
+        }
     } else if (transformControls.object === modelGroup) {
         const deltaPos = new THREE.Vector3().subVectors(modelGroup.position, lastModelPosition);
         const deltaRot = new THREE.Euler(
@@ -871,6 +883,14 @@ function syncBothObjects() {
         splatMesh.rotation.y += deltaRot.y;
         splatMesh.rotation.z += deltaRot.z;
         splatMesh.scale.multiplyScalar(scaleRatio);
+
+        if (pointcloudGroup) {
+            pointcloudGroup.position.add(deltaPos);
+            pointcloudGroup.rotation.x += deltaRot.x;
+            pointcloudGroup.rotation.y += deltaRot.y;
+            pointcloudGroup.rotation.z += deltaRot.z;
+            pointcloudGroup.scale.multiplyScalar(scaleRatio);
+        }
     }
 
     // Update last positions and scales
@@ -883,6 +903,11 @@ function syncBothObjects() {
         lastModelPosition.copy(modelGroup.position);
         lastModelRotation.copy(modelGroup.rotation);
         lastModelScale.copy(modelGroup.scale);
+    }
+    if (pointcloudGroup) {
+        lastPointcloudPosition.copy(pointcloudGroup.position);
+        lastPointcloudRotation.copy(pointcloudGroup.rotation);
+        lastPointcloudScale.copy(pointcloudGroup.scale);
     }
 }
 
@@ -897,6 +922,11 @@ function storeLastPositions() {
         lastModelPosition.copy(modelGroup.position);
         lastModelRotation.copy(modelGroup.rotation);
         lastModelScale.copy(modelGroup.scale);
+    }
+    if (pointcloudGroup) {
+        lastPointcloudPosition.copy(pointcloudGroup.position);
+        lastPointcloudRotation.copy(pointcloudGroup.rotation);
+        lastPointcloudScale.copy(pointcloudGroup.scale);
     }
 }
 
@@ -2190,6 +2220,7 @@ function updateMetadataStats() {
         let totalSize = 0;
         if (currentSplatBlob) totalSize += currentSplatBlob.size;
         if (currentMeshBlob) totalSize += currentMeshBlob.size;
+        if (currentPointcloudBlob) totalSize += currentPointcloudBlob.size;
         archiveSizeEl.textContent = totalSize > 0 ? '~' + formatFileSize(totalSize) : '-';
     }
 }
@@ -2230,14 +2261,17 @@ function updateAssetStatus() {
 
     // Point cloud asset
     const pcStatus = document.getElementById('pointcloud-asset-status');
+    const pcFields = document.getElementById('pointcloud-asset-fields');
     if (pcStatus) {
         if (state.pointcloudLoaded) {
             const fileName = document.getElementById('pointcloud-filename')?.textContent || 'Point cloud loaded';
             pcStatus.textContent = fileName;
             pcStatus.classList.add('loaded');
+            if (pcFields) pcFields.classList.remove('hidden');
         } else {
             pcStatus.textContent = 'No point cloud loaded';
             pcStatus.classList.remove('loaded');
+            if (pcFields) pcFields.classList.add('hidden');
         }
     }
 }
@@ -2321,6 +2355,21 @@ function prefillMetadataFromArchive(manifest) {
             }
             if (mesh._source_notes) {
                 document.getElementById('meta-mesh-notes').value = mesh._source_notes;
+            }
+        }
+
+        // Find pointcloud entry
+        const pcKey = Object.keys(manifest.data_entries).find(k => k.startsWith('pointcloud_'));
+        if (pcKey) {
+            const pc = manifest.data_entries[pcKey];
+            if (pc.created_by) {
+                document.getElementById('meta-pointcloud-created-by').value = pc.created_by;
+            }
+            if (pc._created_by_version) {
+                document.getElementById('meta-pointcloud-version').value = pc._created_by_version;
+            }
+            if (pc._source_notes) {
+                document.getElementById('meta-pointcloud-notes').value = pc._source_notes;
             }
         }
     }
