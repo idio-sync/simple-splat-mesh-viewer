@@ -630,23 +630,26 @@ function disposeObject(object) {
 // =============================================================================
 
 /**
- * Simple markdown parser for annotation descriptions.
- * Supports: links, images, bold, italic, code, and line breaks.
- * Sanitizes output to prevent XSS attacks.
- *
- * @param {string} text - Markdown text to parse
- * @returns {string} HTML string
+ * Escape HTML entities to prevent XSS
+ * @param {string} text - Text to escape
+ * @returns {string} Escaped text
  */
-function parseMarkdown(text) {
-    if (!text) return '';
-
-    // Escape HTML entities first to prevent XSS
-    let html = text
+function escapeHtml(text) {
+    return text
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+}
+
+/**
+ * Parse inline markdown elements (links, bold, italic, code)
+ * @param {string} text - Text to parse
+ * @returns {string} HTML string
+ */
+function parseInlineMarkdown(text) {
+    let html = escapeHtml(text);
 
     // Images: ![alt](url) - must come before links
     html = html.replace(
@@ -677,10 +680,102 @@ function parseMarkdown(text) {
     // Inline code: `code`
     html = html.replace(/`([^`]+)`/g, '<code class="md-code">$1</code>');
 
-    // Line breaks: convert newlines to <br>
-    html = html.replace(/\n/g, '<br>');
-
     return html;
+}
+
+/**
+ * Wiki-style markdown parser for descriptions and annotations.
+ * Supports: headers, bullet/numbered lists, links, images, bold, italic, code.
+ * Sanitizes output to prevent XSS attacks.
+ *
+ * @param {string} text - Markdown text to parse
+ * @returns {string} HTML string
+ */
+function parseMarkdown(text) {
+    if (!text) return '';
+
+    const lines = text.split('\n');
+    const result = [];
+    let inList = false;
+    let listType = null; // 'ul' or 'ol'
+
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+
+        // Headers: # ## ### ####
+        const headerMatch = line.match(/^(#{1,4})\s+(.+)$/);
+        if (headerMatch) {
+            if (inList) {
+                result.push(`</${listType}>`);
+                inList = false;
+                listType = null;
+            }
+            const level = headerMatch[1].length;
+            const content = parseInlineMarkdown(headerMatch[2]);
+            result.push(`<h${level} class="md-h${level}">${content}</h${level}>`);
+            continue;
+        }
+
+        // Horizontal rule: --- or ***
+        if (/^(-{3,}|\*{3,})$/.test(line.trim())) {
+            if (inList) {
+                result.push(`</${listType}>`);
+                inList = false;
+                listType = null;
+            }
+            result.push('<hr class="md-hr">');
+            continue;
+        }
+
+        // Unordered list: - item or * item
+        const ulMatch = line.match(/^[\s]*[-*]\s+(.+)$/);
+        if (ulMatch) {
+            if (!inList || listType !== 'ul') {
+                if (inList) result.push(`</${listType}>`);
+                result.push('<ul class="md-ul">');
+                inList = true;
+                listType = 'ul';
+            }
+            result.push(`<li>${parseInlineMarkdown(ulMatch[1])}</li>`);
+            continue;
+        }
+
+        // Ordered list: 1. item
+        const olMatch = line.match(/^[\s]*\d+\.\s+(.+)$/);
+        if (olMatch) {
+            if (!inList || listType !== 'ol') {
+                if (inList) result.push(`</${listType}>`);
+                result.push('<ol class="md-ol">');
+                inList = true;
+                listType = 'ol';
+            }
+            result.push(`<li>${parseInlineMarkdown(olMatch[1])}</li>`);
+            continue;
+        }
+
+        // Close list if we hit a non-list line
+        if (inList) {
+            result.push(`</${listType}>`);
+            inList = false;
+            listType = null;
+        }
+
+        // Empty line = paragraph break
+        if (line.trim() === '') {
+            result.push('<br>');
+            continue;
+        }
+
+        // Regular paragraph text
+        result.push(`<p class="md-p">${parseInlineMarkdown(line)}</p>`);
+    }
+
+    // Close any open list
+    if (inList) {
+        result.push(`</${listType}>`);
+    }
+
+    return result.join('\n');
 }
 
 /**

@@ -1071,11 +1071,11 @@ export function populateMetadataDisplay(deps = {}) {
         titleEl.textContent = metadata.project.title || 'Untitled';
     }
 
-    // Description - hide if empty
+    // Description - hide if empty, render as markdown
     const descEl = document.getElementById('display-description');
     if (descEl) {
         if (metadata.project.description) {
-            descEl.textContent = metadata.project.description;
+            descEl.innerHTML = parseMarkdown(metadata.project.description);
             descEl.style.display = '';
         } else {
             descEl.style.display = 'none';
