@@ -11,7 +11,7 @@
  * - Archive metadata UI
  */
 
-import { Logger } from './utilities.js';
+import { Logger, parseMarkdown } from './utilities.js';
 
 const log = Logger.getLogger('metadata-manager');
 
@@ -411,7 +411,7 @@ export function addCustomField() {
 }
 
 /**
- * Add a processing software row
+ * Add a processing software row with name, version, and URL fields
  */
 export function addProcessingSoftware() {
     const container = document.getElementById('processing-software-list');
@@ -423,12 +423,17 @@ export function addProcessingSoftware() {
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.className = 'software-name';
-    nameInput.placeholder = 'Software name (e.g., Blender)';
+    nameInput.placeholder = 'Software name';
 
     const versionInput = document.createElement('input');
     versionInput.type = 'text';
     versionInput.className = 'software-version';
     versionInput.placeholder = 'Version';
+
+    const urlInput = document.createElement('input');
+    urlInput.type = 'url';
+    urlInput.className = 'software-url';
+    urlInput.placeholder = 'URL (optional)';
 
     const removeBtn = document.createElement('button');
     removeBtn.className = 'remove-btn';
@@ -438,12 +443,13 @@ export function addProcessingSoftware() {
 
     row.appendChild(nameInput);
     row.appendChild(versionInput);
+    row.appendChild(urlInput);
     row.appendChild(removeBtn);
     container.appendChild(row);
 }
 
 /**
- * Add a related object row
+ * Add a related object row with title, description, and URL fields
  */
 export function addRelatedObject() {
     const container = document.getElementById('related-objects-list');
@@ -452,15 +458,20 @@ export function addRelatedObject() {
     const row = document.createElement('div');
     row.className = 'related-object-row';
 
-    const idInput = document.createElement('input');
-    idInput.type = 'text';
-    idInput.className = 'related-object-id';
-    idInput.placeholder = 'Object ID';
+    const titleInput = document.createElement('input');
+    titleInput.type = 'text';
+    titleInput.className = 'related-object-title';
+    titleInput.placeholder = 'Title';
 
-    const typeInput = document.createElement('input');
-    typeInput.type = 'text';
-    typeInput.className = 'related-object-type';
-    typeInput.placeholder = 'Relationship type';
+    const descInput = document.createElement('input');
+    descInput.type = 'text';
+    descInput.className = 'related-object-desc';
+    descInput.placeholder = 'Description / relationship';
+
+    const urlInput = document.createElement('input');
+    urlInput.type = 'url';
+    urlInput.className = 'related-object-url';
+    urlInput.placeholder = 'URL (optional)';
 
     const removeBtn = document.createElement('button');
     removeBtn.className = 'remove-btn';
@@ -468,8 +479,9 @@ export function addRelatedObject() {
     removeBtn.textContent = '\u00D7';
     removeBtn.addEventListener('click', () => row.remove());
 
-    row.appendChild(idInput);
-    row.appendChild(typeInput);
+    row.appendChild(titleInput);
+    row.appendChild(descInput);
+    row.appendChild(urlInput);
     row.appendChild(removeBtn);
     container.appendChild(row);
 }
@@ -585,8 +597,8 @@ export function collectMetadata() {
         preservation: {
             formatRegistry: {
                 glb: document.getElementById('meta-pres-format-glb')?.value || 'fmt/861',
-                obj: document.getElementById('meta-pres-format-obj')?.value || 'fmt/831',
-                ply: document.getElementById('meta-pres-format-ply')?.value || ''
+                obj: document.getElementById('meta-pres-format-obj')?.value || 'fmt/935',
+                ply: document.getElementById('meta-pres-format-ply')?.value || 'fmt/831'
             },
             significantProperties: [],
             renderingRequirements: document.getElementById('meta-pres-render-req')?.value || '',
@@ -622,10 +634,15 @@ export function collectMetadata() {
     // Collect related objects
     const relatedObjectRows = document.querySelectorAll('.related-object-row');
     relatedObjectRows.forEach(row => {
-        const id = row.querySelector('.related-object-id')?.value?.trim();
-        const type = row.querySelector('.related-object-type')?.value?.trim();
-        if (id) {
-            metadata.relationships.relatedObjects.push({ id, type: type || 'related' });
+        const title = row.querySelector('.related-object-title')?.value?.trim();
+        const description = row.querySelector('.related-object-desc')?.value?.trim();
+        const url = row.querySelector('.related-object-url')?.value?.trim();
+        if (title || url) {
+            metadata.relationships.relatedObjects.push({
+                title: title || '',
+                description: description || '',
+                url: url || ''
+            });
         }
     });
 
@@ -634,8 +651,13 @@ export function collectMetadata() {
     softwareRows.forEach(row => {
         const name = row.querySelector('.software-name')?.value?.trim();
         const version = row.querySelector('.software-version')?.value?.trim();
+        const url = row.querySelector('.software-url')?.value?.trim();
         if (name) {
-            metadata.provenance.processingSoftware.push({ name, version: version || '' });
+            metadata.provenance.processingSoftware.push({
+                name,
+                version: version || '',
+                url: url || ''
+            });
         }
     });
 
@@ -728,10 +750,12 @@ export function prefillMetadataFromArchive(manifest) {
                     addRelatedObject();
                     const rows = container.querySelectorAll('.related-object-row');
                     const lastRow = rows[rows.length - 1];
-                    const idInput = lastRow.querySelector('.related-object-id');
-                    const typeInput = lastRow.querySelector('.related-object-type');
-                    if (idInput) idInput.value = obj.id || '';
-                    if (typeInput) typeInput.value = obj.type || '';
+                    const titleInput = lastRow.querySelector('.related-object-title');
+                    const descInput = lastRow.querySelector('.related-object-desc');
+                    const urlInput = lastRow.querySelector('.related-object-url');
+                    if (titleInput) titleInput.value = obj.title || '';
+                    if (descInput) descInput.value = obj.description || '';
+                    if (urlInput) urlInput.value = obj.url || '';
                 }
             }
         }
@@ -775,8 +799,10 @@ export function prefillMetadataFromArchive(manifest) {
                     const lastRow = rows[rows.length - 1];
                     const nameInput = lastRow.querySelector('.software-name');
                     const versionInput = lastRow.querySelector('.software-version');
+                    const urlInput = lastRow.querySelector('.software-url');
                     if (nameInput) nameInput.value = sw.name || '';
                     if (versionInput) versionInput.value = sw.version || '';
+                    if (urlInput) urlInput.value = sw.url || '';
                 }
             }
         }
@@ -1045,11 +1071,11 @@ export function populateMetadataDisplay(deps = {}) {
         titleEl.textContent = metadata.project.title || 'Untitled';
     }
 
-    // Description - hide if empty
+    // Description - hide if empty, render as markdown
     const descEl = document.getElementById('display-description');
     if (descEl) {
         if (metadata.project.description) {
-            descEl.textContent = metadata.project.description;
+            descEl.innerHTML = parseMarkdown(metadata.project.description);
             descEl.style.display = '';
         } else {
             descEl.style.display = 'none';
@@ -1291,7 +1317,7 @@ export function showAnnotationPopup(annotation) {
 
     if (numberEl) numberEl.textContent = number;
     if (titleEl) titleEl.textContent = annotation.title || 'Untitled';
-    if (bodyEl) bodyEl.textContent = annotation.body || '';
+    if (bodyEl) bodyEl.innerHTML = parseMarkdown(annotation.body || '');
 
     popup.classList.remove('hidden');
 

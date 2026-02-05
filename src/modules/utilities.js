@@ -626,6 +626,177 @@ function disposeObject(object) {
 }
 
 // =============================================================================
+// SIMPLE MARKDOWN PARSER
+// =============================================================================
+
+/**
+ * Escape HTML entities to prevent XSS
+ * @param {string} text - Text to escape
+ * @returns {string} Escaped text
+ */
+function escapeHtml(text) {
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+/**
+ * Parse inline markdown elements (links, bold, italic, code)
+ * @param {string} text - Text to parse
+ * @returns {string} HTML string
+ */
+function parseInlineMarkdown(text) {
+    let html = escapeHtml(text);
+
+    // Images: ![alt](url) - must come before links
+    html = html.replace(
+        /!\[([^\]]*)\]\(([^)]+)\)/g,
+        '<img src="$2" alt="$1" class="md-image" loading="lazy">'
+    );
+
+    // Links: [text](url)
+    html = html.replace(
+        /\[([^\]]+)\]\(([^)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>'
+    );
+
+    // Auto-link URLs that aren't already in anchor tags
+    html = html.replace(
+        /(?<!href="|src=")(https?:\/\/[^\s<]+)/g,
+        '<a href="$1" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>'
+    );
+
+    // Bold: **text** or __text__
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+
+    // Italic: *text* or _text_ (not inside words)
+    html = html.replace(/(?<![*\w])\*([^*]+)\*(?![*\w])/g, '<em>$1</em>');
+    html = html.replace(/(?<![_\w])_([^_]+)_(?![_\w])/g, '<em>$1</em>');
+
+    // Inline code: `code`
+    html = html.replace(/`([^`]+)`/g, '<code class="md-code">$1</code>');
+
+    return html;
+}
+
+/**
+ * Wiki-style markdown parser for descriptions and annotations.
+ * Supports: headers, bullet/numbered lists, links, images, bold, italic, code.
+ * Sanitizes output to prevent XSS attacks.
+ *
+ * @param {string} text - Markdown text to parse
+ * @returns {string} HTML string
+ */
+function parseMarkdown(text) {
+    if (!text) return '';
+
+    const lines = text.split('\n');
+    const result = [];
+    let inList = false;
+    let listType = null; // 'ul' or 'ol'
+
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+
+        // Headers: # ## ### ####
+        const headerMatch = line.match(/^(#{1,4})\s+(.+)$/);
+        if (headerMatch) {
+            if (inList) {
+                result.push(`</${listType}>`);
+                inList = false;
+                listType = null;
+            }
+            const level = headerMatch[1].length;
+            const content = parseInlineMarkdown(headerMatch[2]);
+            result.push(`<h${level} class="md-h${level}">${content}</h${level}>`);
+            continue;
+        }
+
+        // Horizontal rule: --- or ***
+        if (/^(-{3,}|\*{3,})$/.test(line.trim())) {
+            if (inList) {
+                result.push(`</${listType}>`);
+                inList = false;
+                listType = null;
+            }
+            result.push('<hr class="md-hr">');
+            continue;
+        }
+
+        // Unordered list: - item or * item
+        const ulMatch = line.match(/^[\s]*[-*]\s+(.+)$/);
+        if (ulMatch) {
+            if (!inList || listType !== 'ul') {
+                if (inList) result.push(`</${listType}>`);
+                result.push('<ul class="md-ul">');
+                inList = true;
+                listType = 'ul';
+            }
+            result.push(`<li>${parseInlineMarkdown(ulMatch[1])}</li>`);
+            continue;
+        }
+
+        // Ordered list: 1. item
+        const olMatch = line.match(/^[\s]*\d+\.\s+(.+)$/);
+        if (olMatch) {
+            if (!inList || listType !== 'ol') {
+                if (inList) result.push(`</${listType}>`);
+                result.push('<ol class="md-ol">');
+                inList = true;
+                listType = 'ol';
+            }
+            result.push(`<li>${parseInlineMarkdown(olMatch[1])}</li>`);
+            continue;
+        }
+
+        // Close list if we hit a non-list line
+        if (inList) {
+            result.push(`</${listType}>`);
+            inList = false;
+            listType = null;
+        }
+
+        // Empty line = paragraph break
+        if (line.trim() === '') {
+            result.push('<br>');
+            continue;
+        }
+
+        // Regular paragraph text
+        result.push(`<p class="md-p">${parseInlineMarkdown(line)}</p>`);
+    }
+
+    // Close any open list
+    if (inList) {
+        result.push(`</${listType}>`);
+    }
+
+    return result.join('\n');
+}
+
+/**
+ * Sanitize a URL for use in href/src attributes.
+ * Only allows http, https, and data URLs.
+ *
+ * @param {string} url - URL to sanitize
+ * @returns {string} Sanitized URL or empty string if unsafe
+ */
+function sanitizeUrl(url) {
+    if (!url) return '';
+    const trimmed = url.trim().toLowerCase();
+    if (trimmed.startsWith('http://') ||
+        trimmed.startsWith('https://') ||
+        trimmed.startsWith('data:image/')) {
+        return url;
+    }
+    return '';
+}
+
+// =============================================================================
 // EXPORTS
 // =============================================================================
 
@@ -645,5 +816,9 @@ export {
     createDefaultMaterial,
     computeMeshFaceCount,
     computeMeshVertexCount,
-    disposeObject
+    disposeObject,
+
+    // Markdown parsing
+    parseMarkdown,
+    sanitizeUrl
 };

@@ -1658,6 +1658,45 @@ input[type="range"]::-webkit-slider-thumb:hover {
     display: none;
 }
 
+/* Markdown styles for annotation descriptions */
+.annotation-info-body .md-link {
+    color: #4ecdc4;
+    text-decoration: none;
+    border-bottom: 1px dotted #4ecdc4;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.annotation-info-body .md-link:hover {
+    color: #7eeee6;
+    border-color: #7eeee6;
+}
+
+.annotation-info-body .md-image {
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: 6px;
+    margin: 8px 0;
+    display: block;
+}
+
+.annotation-info-body .md-code {
+    background: rgba(78, 205, 196, 0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    color: #4ecdc4;
+}
+
+.annotation-info-body strong {
+    color: #fff;
+    font-weight: 600;
+}
+
+.annotation-info-body em {
+    font-style: italic;
+}
+
 /* ============================================
    Museum-Style Metadata Display
    ============================================ */
@@ -1724,6 +1763,94 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 .display-description:empty {
     display: none;
+}
+
+/* Markdown styles for description */
+.display-description .md-h1,
+.display-description .md-h2,
+.display-description .md-h3,
+.display-description .md-h4 {
+    color: #fff;
+    font-style: normal;
+    margin: 16px 0 8px 0;
+    font-family: inherit;
+}
+
+.display-description .md-h1 { font-size: 1.4rem; font-weight: 600; }
+.display-description .md-h2 { font-size: 1.2rem; font-weight: 600; }
+.display-description .md-h3 { font-size: 1.05rem; font-weight: 600; }
+.display-description .md-h4 { font-size: 0.95rem; font-weight: 600; }
+
+.display-description .md-h1:first-child,
+.display-description .md-h2:first-child,
+.display-description .md-h3:first-child,
+.display-description .md-h4:first-child {
+    margin-top: 0;
+}
+
+.display-description .md-p {
+    margin: 0 0 8px 0;
+    font-style: italic;
+}
+
+.display-description .md-ul,
+.display-description .md-ol {
+    margin: 8px 0;
+    padding-left: 24px;
+    font-style: normal;
+}
+
+.display-description .md-ul li,
+.display-description .md-ol li {
+    margin: 4px 0;
+    color: #bbb;
+}
+
+.display-description .md-hr {
+    border: none;
+    border-top: 1px solid rgba(78, 205, 196, 0.3);
+    margin: 16px 0;
+}
+
+.display-description .md-link {
+    color: #4ecdc4;
+    text-decoration: none;
+    border-bottom: 1px dotted #4ecdc4;
+    font-style: normal;
+}
+
+.display-description .md-link:hover {
+    color: #7eeee6;
+    border-color: #7eeee6;
+}
+
+.display-description .md-image {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
+    margin: 12px 0;
+    display: block;
+}
+
+.display-description .md-code {
+    background: rgba(78, 205, 196, 0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    color: #4ecdc4;
+    font-style: normal;
+}
+
+.display-description strong {
+    color: #fff;
+    font-weight: 600;
+    font-style: normal;
+}
+
+.display-description em {
+    font-style: italic;
+    color: #ccc;
 }
 
 .display-divider {
