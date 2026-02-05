@@ -665,6 +665,14 @@ function setupUIEvents() {
             return; // Don't trigger if typing in input
         }
 
+        // In fly mode, only allow F (toggle out) and Escape
+        if (flyControls && flyControls.enabled) {
+            if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey) {
+                toggleFlyMode();
+            }
+            return;
+        }
+
         if (e.key.toLowerCase() === 'a' && !e.ctrlKey && !e.metaKey) {
             toggleAnnotationMode();
         } else if (e.key.toLowerCase() === 'm' && !e.ctrlKey && !e.metaKey) {

@@ -120,6 +120,13 @@ export class SceneManager {
         this.controls.screenSpacePanning = true;
         this.controls.minDistance = ORBIT_CONTROLS.MIN_DISTANCE;
         this.controls.maxDistance = ORBIT_CONTROLS.MAX_DISTANCE;
+        // Explicit mouse mapping: left=orbit, middle=zoom, right=pan
+        this.controls.mouseButtons = {
+            LEFT: THREE.MOUSE.ROTATE,
+            MIDDLE: THREE.MOUSE.DOLLY,
+            RIGHT: THREE.MOUSE.PAN
+        };
+        this.controls.rotateSpeed = 1.0;
 
         // Orbit Controls - Right
         this.controlsRight = new OrbitControls(this.camera, this.rendererRight.domElement);
@@ -128,6 +135,12 @@ export class SceneManager {
         this.controlsRight.screenSpacePanning = true;
         this.controlsRight.minDistance = ORBIT_CONTROLS.MIN_DISTANCE;
         this.controlsRight.maxDistance = ORBIT_CONTROLS.MAX_DISTANCE;
+        this.controlsRight.mouseButtons = {
+            LEFT: THREE.MOUSE.ROTATE,
+            MIDDLE: THREE.MOUSE.DOLLY,
+            RIGHT: THREE.MOUSE.PAN
+        };
+        this.controlsRight.rotateSpeed = 1.0;
 
         // Transform Controls
         this.transformControls = new TransformControls(this.camera, this.renderer.domElement);
