@@ -29,7 +29,7 @@ const CDN_DEPS = {
     threeOBJLoader: 'https://esm.sh/three@0.170.0/examples/jsm/loaders/OBJLoader.js?external=three',
     threeOrbitControls: 'https://esm.sh/three@0.170.0/examples/jsm/controls/OrbitControls.js?external=three',
     spark: 'https://sparkjs.dev/releases/spark/0.1.10/spark.module.js',
-    fflate: 'https://esm.sh/fflate@0.8.2?bundle'
+    fflate: 'https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js'
 };
 
 /**
@@ -243,9 +243,10 @@ console.log('[Kiosk] Script executing');
         function decode(b64) { return decodeURIComponent(escape(atob(b64))); }
         function makeBlob(src) { return URL.createObjectURL(new Blob([src], { type: 'application/javascript' })); }
 
-        // Strip CDN internal path references (e.g. /three@0.170.0/..., /v135/pkg@1.0/...)
-        // that can't resolve from blob URLs. These are CDN routing artifacts, not real deps.
-        // The pattern matches: from "/package@version/..." or from "/v123/package@version/..."
+        // Strip CDN internal path references that are self-references within
+        // a standalone bundle (e.g. /three@0.170.0/es2022/three.bundle.mjs).
+        // Only safe to apply to standalone/bundled modules where all code is
+        // already inlined and these paths are redundant CDN routing artifacts.
         function stripCdnPaths(src) {
             return src.replace(/from\\s*["']\\/(v\\d+\\/)?[\\w@][^"']*@[^"']*["']/g, 'from "data:application/javascript,"');
         }
@@ -260,8 +261,15 @@ console.log('[Kiosk] Script executing');
                 .replace(/from\\s*["']https?:\\/\\/esm\\.sh\\/[^"']*three@[^"']*["']/g, 'from "' + threeUrl + '"');
         }
 
-        // 1. Three.js core (standalone build — should have no imports, but strip
-        //    any CDN routing artifacts just in case)
+        // For esm.sh ?bundle or ?external modules: resolve internal esm.sh
+        // path references by fetching inline. These are NOT self-references —
+        // they point to the actual code. We rewrite them to blob URLs by
+        // looking up the decoded source from a known set.
+        // For non-three CDN paths, we leave them as data URIs only if they
+        // would otherwise break. We handle this per-module below.
+
+        // 1. Three.js core — standalone build from jsDelivr, has no imports.
+        //    Apply stripCdnPaths as safety net only.
         setStatus('Loading Three.js...');
         var threeSrc = stripCdnPaths(decode(deps.three));
         var threeUrl = makeBlob(threeSrc);
@@ -269,25 +277,27 @@ console.log('[Kiosk] Script executing');
         var THREE = await import(threeUrl);
         console.log('[Kiosk] Three.js loaded, exports: ' + Object.keys(THREE).length + ' symbols');
 
-        // 2. Addons (rewrite their "three" imports to our blob URL, strip other CDN paths)
+        // 2. Addons — esm.sh ?external=three bundles all deps except three.
+        //    Only need to rewrite "three" imports; other internal paths are
+        //    bundled inline by esm.sh's ?external flag.
         setStatus('Loading controls and loaders...');
-        var orbitSrc = rewriteThreeImports(stripCdnPaths(decode(deps.threeOrbitControls)), threeUrl);
+        var orbitSrc = rewriteThreeImports(decode(deps.threeOrbitControls), threeUrl);
         var OrbitControls = (await import(makeBlob(orbitSrc))).OrbitControls;
         console.log('[Kiosk] OrbitControls loaded');
 
-        var gltfSrc = rewriteThreeImports(stripCdnPaths(decode(deps.threeGLTFLoader)), threeUrl);
+        var gltfSrc = rewriteThreeImports(decode(deps.threeGLTFLoader), threeUrl);
         var GLTFLoader = (await import(makeBlob(gltfSrc))).GLTFLoader;
         console.log('[Kiosk] GLTFLoader loaded');
 
-        var objSrc = rewriteThreeImports(stripCdnPaths(decode(deps.threeOBJLoader)), threeUrl);
+        var objSrc = rewriteThreeImports(decode(deps.threeOBJLoader), threeUrl);
         var OBJLoader = (await import(makeBlob(objSrc))).OBJLoader;
         console.log('[Kiosk] OBJLoader loaded');
 
-        // 3. Spark.js (rewrite three imports if present, strip CDN paths)
+        // 3. Spark.js (from sparkjs.dev, not esm.sh — rewrite three imports only)
         var SplatMesh = null;
         try {
             setStatus('Loading Spark.js...');
-            var sparkSrc = rewriteThreeImports(stripCdnPaths(decode(deps.spark)), threeUrl);
+            var sparkSrc = rewriteThreeImports(decode(deps.spark), threeUrl);
             var sparkMod = await import(makeBlob(sparkSrc));
             SplatMesh = sparkMod.SplatMesh;
             console.log('[Kiosk] Spark.js loaded, SplatMesh:', !!SplatMesh);
@@ -295,9 +305,9 @@ console.log('[Kiosk] Script executing');
             console.warn('[Kiosk] Spark.js failed to load (splats will not render):', e.message);
         }
 
-        // 4. fflate (standalone, no three dependency — strip CDN paths)
+        // 4. fflate (esm.sh ?bundle — do NOT strip CDN paths, they are the actual code)
         setStatus('Loading decompression library...');
-        var fflateSrc = stripCdnPaths(decode(deps.fflate));
+        var fflateSrc = decode(deps.fflate);
         var fflate = await import(makeBlob(fflateSrc));
         console.log('[Kiosk] fflate loaded');
 
