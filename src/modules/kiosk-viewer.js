@@ -119,13 +119,12 @@ ${KIOSK_CSS}
     <div id="controls-hint">Click and drag to rotate &middot; Scroll to zoom &middot; Right-click to pan</div>
 </div>
 <script>
-// Embedded data — deps as base64, manifest as JSON
-window.__KIOSK_DEPS__ = ${depsLiteral};
-window.__KIOSK_MANIFEST__ = ${manifestJSON};
-</script>
-<script type="module">
+// Embedded data
+var __KIOSK_DEPS__ = ${depsLiteral};
+var __KIOSK_MANIFEST__ = ${manifestJSON};
+
 ${KIOSK_BOOTSTRAP_JS}
-</script>
+<\/script>
 </body>
 </html>
 <!-- KIOSK_ZIP_BOUNDARY -->`;
@@ -230,9 +229,14 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; c
 // =============================================================================
 
 const KIOSK_BOOTSTRAP_JS = `
+console.log('[Kiosk] Script executing');
+
 (async function() {
-    const loadingText = document.getElementById('loading-text');
-    const setStatus = (msg) => { if (loadingText) loadingText.textContent = msg; };
+    var loadingText = document.getElementById('loading-text');
+    function setStatus(msg) {
+        console.log('[Kiosk] ' + msg);
+        if (loadingText) loadingText.textContent = msg;
+    }
 
     try {
         // =====================================================================
@@ -240,61 +244,75 @@ const KIOSK_BOOTSTRAP_JS = `
         // =====================================================================
         setStatus('Loading libraries...');
 
-        const deps = window.__KIOSK_DEPS__;
-        const decode = (b64) => decodeURIComponent(escape(atob(b64)));
-        const makeBlob = (src) => URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
+        var deps = __KIOSK_DEPS__;
+        if (!deps || !deps.three) throw new Error('Embedded dependency data is missing');
+
+        function decode(b64) { return decodeURIComponent(escape(atob(b64))); }
+        function makeBlob(src) { return URL.createObjectURL(new Blob([src], { type: 'application/javascript' })); }
 
         // Rewrite imports from "three" (bare specifier) to use the Three.js blob URL.
         // Also handles esm.sh internal URLs that reference three.
-        const rewriteThreeImports = (src, threeUrl) => {
+        function rewriteThreeImports(src, threeUrl) {
             return src
                 .replace(/from\\s*["']three["']/g, 'from "' + threeUrl + '"')
                 .replace(/from\\s*["']\\/v\\d+\\/three@[^"']*["']/g, 'from "' + threeUrl + '"')
                 .replace(/from\\s*["']https?:\\/\\/esm\\.sh\\/[^"']*three@[^"']*["']/g, 'from "' + threeUrl + '"');
-        };
+        }
 
         // 1. Three.js core (standalone bundle, no external imports)
-        const threeSrc = decode(deps.three);
-        const threeUrl = makeBlob(threeSrc);
-        const THREE = await import(threeUrl);
+        setStatus('Loading Three.js...');
+        var threeSrc = decode(deps.three);
+        var threeUrl = makeBlob(threeSrc);
+        console.log('[Kiosk] Three.js blob URL created, importing...');
+        var THREE = await import(threeUrl);
+        console.log('[Kiosk] Three.js loaded, exports: ' + Object.keys(THREE).length + ' symbols');
 
         // 2. Addons (rewrite their "three" imports to our blob URL)
-        const orbitSrc = rewriteThreeImports(decode(deps.threeOrbitControls), threeUrl);
-        const { OrbitControls } = await import(makeBlob(orbitSrc));
+        setStatus('Loading controls and loaders...');
+        var orbitSrc = rewriteThreeImports(decode(deps.threeOrbitControls), threeUrl);
+        var OrbitControls = (await import(makeBlob(orbitSrc))).OrbitControls;
+        console.log('[Kiosk] OrbitControls loaded');
 
-        const gltfSrc = rewriteThreeImports(decode(deps.threeGLTFLoader), threeUrl);
-        const { GLTFLoader } = await import(makeBlob(gltfSrc));
+        var gltfSrc = rewriteThreeImports(decode(deps.threeGLTFLoader), threeUrl);
+        var GLTFLoader = (await import(makeBlob(gltfSrc))).GLTFLoader;
+        console.log('[Kiosk] GLTFLoader loaded');
 
-        const objSrc = rewriteThreeImports(decode(deps.threeOBJLoader), threeUrl);
-        const { OBJLoader } = await import(makeBlob(objSrc));
+        var objSrc = rewriteThreeImports(decode(deps.threeOBJLoader), threeUrl);
+        var OBJLoader = (await import(makeBlob(objSrc))).OBJLoader;
+        console.log('[Kiosk] OBJLoader loaded');
 
         // 3. Spark.js (rewrite three imports if present)
-        let SplatMesh = null;
+        var SplatMesh = null;
         try {
-            const sparkSrc = rewriteThreeImports(decode(deps.spark), threeUrl);
-            const sparkMod = await import(makeBlob(sparkSrc));
+            setStatus('Loading Spark.js...');
+            var sparkSrc = rewriteThreeImports(decode(deps.spark), threeUrl);
+            var sparkMod = await import(makeBlob(sparkSrc));
             SplatMesh = sparkMod.SplatMesh;
+            console.log('[Kiosk] Spark.js loaded, SplatMesh:', !!SplatMesh);
         } catch (e) {
-            console.warn('[Kiosk] Spark.js failed to load:', e.message);
+            console.warn('[Kiosk] Spark.js failed to load (splats will not render):', e.message);
         }
 
         // 4. fflate (standalone, no three dependency)
-        const fflateSrc = decode(deps.fflate);
-        const fflate = await import(makeBlob(fflateSrc));
+        setStatus('Loading decompression library...');
+        var fflateSrc = decode(deps.fflate);
+        var fflate = await import(makeBlob(fflateSrc));
+        console.log('[Kiosk] fflate loaded');
 
         // =====================================================================
         // PHASE 2: Read ourselves and extract ZIP data
         // =====================================================================
         setStatus('Reading archive data...');
-        let fileBytes = null;
+        var fileBytes = null;
 
         try {
-            const resp = await fetch(window.location.href);
+            var resp = await fetch(window.location.href);
             if (resp.ok) {
                 fileBytes = new Uint8Array(await resp.arrayBuffer());
+                console.log('[Kiosk] Self-read complete: ' + fileBytes.length + ' bytes');
             }
         } catch (e) {
-            // fetch failed (likely Firefox file://) — show drag-and-drop
+            console.warn('[Kiosk] fetch(self) failed (expected on file://):', e.message);
         }
 
         if (!fileBytes) {
@@ -306,19 +324,24 @@ const KIOSK_BOOTSTRAP_JS = `
         }
 
         // Find the ZIP boundary
-        const zipStart = findZipBoundary(fileBytes);
+        var zipStart = findZipBoundary(fileBytes);
+        console.log('[Kiosk] ZIP boundary at byte: ' + zipStart);
         if (zipStart === -1) {
-            throw new Error('No archive data found in this file.');
+            throw new Error('No archive data found in this file. File size: ' + fileBytes.length);
         }
 
-        const zipData = fileBytes.slice(zipStart);
-        const files = fflate.unzipSync(zipData);
-        const decoder = new TextDecoder();
+        var zipData = fileBytes.slice(zipStart);
+        console.log('[Kiosk] ZIP data size: ' + zipData.length + ' bytes');
+        var files = fflate.unzipSync(zipData);
+        var fileNames = Object.keys(files);
+        console.log('[Kiosk] Extracted ' + fileNames.length + ' files: ' + fileNames.join(', '));
+        var decoder = new TextDecoder();
 
         // Parse manifest (prefer embedded in ZIP, fall back to inline)
-        let manifest = window.__KIOSK_MANIFEST__;
+        var manifest = __KIOSK_MANIFEST__;
         if (files['manifest.json']) {
             manifest = JSON.parse(decoder.decode(files['manifest.json']));
+            console.log('[Kiosk] Using manifest from ZIP');
         }
         if (!manifest) throw new Error('No manifest found in archive.');
 
@@ -327,26 +350,25 @@ const KIOSK_BOOTSTRAP_JS = `
         // =====================================================================
         setStatus('Loading 3D content...');
 
-        const canvas = document.getElementById('canvas');
-        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        var canvas = document.getElementById('canvas');
+        var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
-        renderer.toneMapping = THREE.ACESFilmicToneMapping;
 
-        const scene = new THREE.Scene();
+        var scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1a1a2e);
 
-        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 1000);
+        var camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 1000);
         camera.position.set(0, 1, 3);
 
-        const controls = new OrbitControls(camera, renderer.domElement);
+        var controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.1;
 
         // Lighting
         scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        var dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
         dirLight.position.set(5, 10, 7);
         scene.add(dirLight);
 
@@ -354,38 +376,46 @@ const KIOSK_BOOTSTRAP_JS = `
         scene.add(new THREE.GridHelper(10, 10, 0x3a3a5a, 0x2a2a3a));
 
         // Load assets
-        const entries = manifest.data_entries || {};
-        const boundingBox = new THREE.Box3();
-        let hasContent = false;
+        var entries = manifest.data_entries || {};
+        var boundingBox = new THREE.Box3();
+        var hasContent = false;
 
-        for (const [key, entry] of Object.entries(entries)) {
-            const filePath = entry.file_name;
-            const fileData = files[filePath];
-            if (!fileData) continue;
+        var entryKeys = Object.keys(entries);
+        for (var i = 0; i < entryKeys.length; i++) {
+            var key = entryKeys[i];
+            var entry = entries[key];
+            var filePath = entry.file_name;
+            var fileData = files[filePath];
+            if (!fileData) {
+                console.warn('[Kiosk] File not found in archive: ' + filePath);
+                continue;
+            }
 
-            const assetBlob = new Blob([fileData]);
-            const assetUrl = URL.createObjectURL(assetBlob);
-            const params = entry._parameters || {};
+            var assetBlob = new Blob([fileData]);
+            var assetUrl = URL.createObjectURL(assetBlob);
+            var params = entry._parameters || {};
 
             try {
-                if (key.startsWith('scene_') && SplatMesh) {
-                    const splatMesh = new SplatMesh({ url: assetUrl });
+                if (key.indexOf('scene_') === 0 && SplatMesh) {
+                    console.log('[Kiosk] Loading splat: ' + filePath);
+                    var splatMesh = new SplatMesh({ url: assetUrl });
                     splatMesh.rotation.x = Math.PI;
                     applyTransform(splatMesh, params);
                     scene.add(splatMesh);
                     hasContent = true;
 
-                } else if (key.startsWith('mesh_')) {
-                    const ext = filePath.split('.').pop().toLowerCase();
-                    let object = null;
+                } else if (key.indexOf('mesh_') === 0) {
+                    console.log('[Kiosk] Loading mesh: ' + filePath);
+                    var ext = filePath.split('.').pop().toLowerCase();
+                    var object = null;
 
                     if (ext === 'glb' || ext === 'gltf') {
-                        const loader = new GLTFLoader();
-                        const gltf = await new Promise((res, rej) => loader.load(assetUrl, res, undefined, rej));
+                        var gltfLoader = new GLTFLoader();
+                        var gltf = await new Promise(function(res, rej) { gltfLoader.load(assetUrl, res, undefined, rej); });
                         object = gltf.scene;
                     } else if (ext === 'obj') {
-                        const loader = new OBJLoader();
-                        object = await new Promise((res, rej) => loader.load(assetUrl, res, undefined, rej));
+                        var objLoader = new OBJLoader();
+                        object = await new Promise(function(res, rej) { objLoader.load(assetUrl, res, undefined, rej); });
                     }
 
                     if (object) {
@@ -393,9 +423,10 @@ const KIOSK_BOOTSTRAP_JS = `
                         scene.add(object);
                         hasContent = true;
                         boundingBox.expandByObject(object);
+                        console.log('[Kiosk] Mesh loaded: ' + filePath);
                     }
 
-                } else if (key.startsWith('pointcloud_')) {
+                } else if (key.indexOf('pointcloud_') === 0) {
                     console.warn('[Kiosk] Point cloud display requires E57 WASM (not available offline)');
                 }
             } catch (err) {
@@ -405,9 +436,9 @@ const KIOSK_BOOTSTRAP_JS = `
 
         // Fit camera to content
         if (!boundingBox.isEmpty()) {
-            const center = boundingBox.getCenter(new THREE.Vector3());
-            const size = boundingBox.getSize(new THREE.Vector3());
-            const maxDim = Math.max(size.x, size.y, size.z);
+            var center = boundingBox.getCenter(new THREE.Vector3());
+            var size = boundingBox.getSize(new THREE.Vector3());
+            var maxDim = Math.max(size.x, size.y, size.z);
             camera.position.copy(center);
             camera.position.z += maxDim * 1.5;
             camera.position.y += maxDim * 0.5;
@@ -415,20 +446,21 @@ const KIOSK_BOOTSTRAP_JS = `
         }
 
         // Load annotations
-        const annotations = manifest.annotations || [];
-        const annoSprites = [];
-        annotations.forEach(anno => {
-            if (!anno.position) return;
-            const el = document.createElement('div');
+        var annotations = manifest.annotations || [];
+        var annoSprites = [];
+        for (var a = 0; a < annotations.length; a++) {
+            var anno = annotations[a];
+            if (!anno.position) continue;
+            var el = document.createElement('div');
             el.className = 'anno-marker';
             el.textContent = anno.title || anno.id || 'Note';
-            el.addEventListener('click', () => showAnnoPopup(anno, el));
+            el.addEventListener('click', showAnnoPopup.bind(null, anno, el));
             document.body.appendChild(el);
             annoSprites.push({
                 pos: new THREE.Vector3(anno.position[0], anno.position[1], anno.position[2]),
-                el
+                el: el
             });
-        });
+        }
 
         // Populate info panel
         populateInfo(manifest);
@@ -436,13 +468,14 @@ const KIOSK_BOOTSTRAP_JS = `
         // Show viewer
         document.getElementById('loading').style.display = 'none';
         document.getElementById('viewer').classList.remove('hidden');
-        setTimeout(() => {
-            const hint = document.getElementById('controls-hint');
+        console.log('[Kiosk] Viewer ready, content loaded: ' + hasContent);
+        setTimeout(function() {
+            var hint = document.getElementById('controls-hint');
             if (hint) hint.classList.add('fade');
         }, 5000);
 
         // Resize
-        window.addEventListener('resize', () => {
+        window.addEventListener('resize', function() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -453,23 +486,24 @@ const KIOSK_BOOTSTRAP_JS = `
             requestAnimationFrame(animate);
             controls.update();
 
-            annoSprites.forEach(({ pos, el }) => {
-                const sp = pos.clone().project(camera);
-                if (sp.z > 1) { el.style.display = 'none'; return; }
-                el.style.display = '';
-                el.style.position = 'fixed';
-                el.style.left = ((sp.x * 0.5 + 0.5) * window.innerWidth) + 'px';
-                el.style.top = ((-sp.y * 0.5 + 0.5) * window.innerHeight) + 'px';
-                el.style.transform = 'translate(-50%, -50%)';
-                el.style.zIndex = '20';
-            });
+            for (var s = 0; s < annoSprites.length; s++) {
+                var sp = annoSprites[s].pos.clone().project(camera);
+                var ael = annoSprites[s].el;
+                if (sp.z > 1) { ael.style.display = 'none'; continue; }
+                ael.style.display = '';
+                ael.style.position = 'fixed';
+                ael.style.left = ((sp.x * 0.5 + 0.5) * window.innerWidth) + 'px';
+                ael.style.top = ((-sp.y * 0.5 + 0.5) * window.innerHeight) + 'px';
+                ael.style.transform = 'translate(-50%, -50%)';
+                ael.style.zIndex = '20';
+            }
 
             renderer.render(scene, camera);
         })();
 
     } catch (err) {
         setStatus('Error: ' + err.message);
-        console.error('[Kiosk Viewer]', err);
+        console.error('[Kiosk Viewer] Fatal error:', err);
     }
 })();
 
@@ -478,34 +512,37 @@ const KIOSK_BOOTSTRAP_JS = `
 // =========================================================================
 
 function findZipBoundary(bytes) {
-    const marker = new TextEncoder().encode('<!-- KIOSK_ZIP_BOUNDARY -->');
-    let pos = -1;
+    // Search for the boundary marker comment
+    var marker = [60,33,45,45,32,75,73,79,83,75,95,90,73,80,95,66,79,85,78,68,65,82,89,32,45,45,62];
+    var pos = -1;
 
-    // Search for boundary marker
-    outer:
-    for (let i = 0; i < bytes.length - marker.length; i++) {
-        for (let j = 0; j < marker.length; j++) {
-            if (bytes[i + j] !== marker[j]) continue outer;
+    for (var i = 0; i < bytes.length - marker.length; i++) {
+        var match = true;
+        for (var j = 0; j < marker.length; j++) {
+            if (bytes[i + j] !== marker[j]) { match = false; break; }
         }
-        pos = i + marker.length;
-        break;
+        if (match) { pos = i + marker.length; break; }
     }
 
     if (pos !== -1) {
         // Skip whitespace after marker
         while (pos < bytes.length && (bytes[pos] === 10 || bytes[pos] === 13 || bytes[pos] === 32)) pos++;
-        // Verify ZIP local file header magic (PK\\x03\\x04)
+        // Verify ZIP local file header magic (PK 03 04)
         if (pos + 3 < bytes.length && bytes[pos] === 0x50 && bytes[pos+1] === 0x4B && bytes[pos+2] === 0x03 && bytes[pos+3] === 0x04) {
             return pos;
         }
+        console.warn('[Kiosk] Found boundary marker but no ZIP magic after it at offset ' + pos);
     }
 
-    // Fallback: find end-of-central-directory, then first local file header
-    for (let i = bytes.length - 22; i >= 0; i--) {
-        if (bytes[i] === 0x50 && bytes[i+1] === 0x4B && bytes[i+2] === 0x05 && bytes[i+3] === 0x06) {
-            for (let j = 0; j < i; j++) {
-                if (bytes[j] === 0x50 && bytes[j+1] === 0x4B && bytes[j+2] === 0x03 && bytes[j+3] === 0x04) {
-                    return j;
+    // Fallback: scan for first PK local file header after end-of-central-directory
+    console.log('[Kiosk] Boundary marker not found, scanning for ZIP signatures...');
+    for (var i2 = bytes.length - 22; i2 >= 0; i2--) {
+        if (bytes[i2] === 0x50 && bytes[i2+1] === 0x4B && bytes[i2+2] === 0x05 && bytes[i2+3] === 0x06) {
+            console.log('[Kiosk] Found EOCD at offset ' + i2);
+            for (var j2 = 0; j2 < i2; j2++) {
+                if (bytes[j2] === 0x50 && bytes[j2+1] === 0x4B && bytes[j2+2] === 0x03 && bytes[j2+3] === 0x04) {
+                    console.log('[Kiosk] Found first local file header at offset ' + j2);
+                    return j2;
                 }
             }
         }
@@ -514,21 +551,21 @@ function findZipBoundary(bytes) {
 }
 
 function waitForFileDrop() {
-    return new Promise((resolve) => {
-        const overlay = document.getElementById('drop-overlay');
+    return new Promise(function(resolve) {
+        var overlay = document.getElementById('drop-overlay');
         overlay.classList.remove('hidden');
 
-        const handleDrop = (e) => {
+        function handleDrop(e) {
             e.preventDefault();
             overlay.classList.add('hidden');
-            const file = e.dataTransfer.files[0];
+            var file = e.dataTransfer.files[0];
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = () => resolve(new Uint8Array(reader.result));
+            var reader = new FileReader();
+            reader.onload = function() { resolve(new Uint8Array(reader.result)); };
             reader.readAsArrayBuffer(file);
-        };
+        }
 
-        document.addEventListener('dragover', (e) => e.preventDefault());
+        document.addEventListener('dragover', function(e) { e.preventDefault(); });
         document.addEventListener('drop', handleDrop);
     });
 }
@@ -537,27 +574,27 @@ function applyTransform(object, params) {
     if (params.position) object.position.set(params.position[0] || 0, params.position[1] || 0, params.position[2] || 0);
     if (params.rotation) object.rotation.set(params.rotation[0] || 0, params.rotation[1] || 0, params.rotation[2] || 0);
     if (params.scale !== undefined) {
-        const s = typeof params.scale === 'number' ? params.scale : 1;
+        var s = typeof params.scale === 'number' ? params.scale : 1;
         object.scale.set(s, s, s);
     }
 }
 
 function showAnnoPopup(anno, marker) {
-    const old = document.querySelector('.anno-popup');
+    var old = document.querySelector('.anno-popup');
     if (old) old.remove();
 
-    const popup = document.createElement('div');
+    var popup = document.createElement('div');
     popup.className = 'anno-popup';
-    const title = (anno.title || 'Annotation').replace(/</g, '&lt;');
-    const body = (anno.body || anno.description || '').replace(/</g, '&lt;');
+    var title = (anno.title || 'Annotation').replace(/</g, '&lt;');
+    var body = (anno.body || anno.description || '').replace(/</g, '&lt;');
     popup.innerHTML = '<h4>' + title + '</h4><p>' + body + '</p>';
 
-    const rect = marker.getBoundingClientRect();
+    var rect = marker.getBoundingClientRect();
     popup.style.left = (rect.right + 8) + 'px';
     popup.style.top = rect.top + 'px';
     document.body.appendChild(popup);
 
-    setTimeout(() => {
+    setTimeout(function() {
         document.addEventListener('click', function handler(e) {
             if (!popup.contains(e.target) && e.target !== marker) {
                 popup.remove();
@@ -568,29 +605,30 @@ function showAnnoPopup(anno, marker) {
 }
 
 function populateInfo(manifest) {
-    const titleEl = document.getElementById('info-title');
-    const descEl = document.getElementById('info-description');
-    const detailsEl = document.getElementById('info-details');
+    var titleEl = document.getElementById('info-title');
+    var descEl = document.getElementById('info-description');
+    var detailsEl = document.getElementById('info-details');
 
-    if (titleEl) titleEl.textContent = manifest.project?.title || 'Untitled';
+    if (titleEl) titleEl.textContent = manifest.project && manifest.project.title ? manifest.project.title : 'Untitled';
     if (descEl) {
-        descEl.textContent = manifest.project?.description || '';
-        if (!manifest.project?.description) descEl.style.display = 'none';
+        var desc = manifest.project && manifest.project.description ? manifest.project.description : '';
+        descEl.textContent = desc;
+        if (!desc) descEl.style.display = 'none';
     }
     if (detailsEl) {
-        const rows = [];
-        if (manifest.provenance?.operator) rows.push(['Creator', manifest.provenance.operator]);
-        if (manifest.provenance?.capture_date) {
+        var rows = [];
+        if (manifest.provenance && manifest.provenance.operator) rows.push(['Creator', manifest.provenance.operator]);
+        if (manifest.provenance && manifest.provenance.capture_date) {
             rows.push(['Captured', new Date(manifest.provenance.capture_date).toLocaleDateString()]);
         }
-        if (manifest.provenance?.location) rows.push(['Location', manifest.provenance.location]);
-        if (manifest.project?.license) rows.push(['License', manifest.project.license]);
-        const ac = (manifest.annotations || []).length;
+        if (manifest.provenance && manifest.provenance.location) rows.push(['Location', manifest.provenance.location]);
+        if (manifest.project && manifest.project.license) rows.push(['License', manifest.project.license]);
+        var ac = (manifest.annotations || []).length;
         if (ac > 0) rows.push(['Annotations', ac.toString()]);
 
-        detailsEl.innerHTML = rows.map(([l, v]) =>
-            '<div class="row"><span class="label">' + l + '</span><span class="value">' + v + '</span></div>'
-        ).join('');
+        detailsEl.innerHTML = rows.map(function(r) {
+            return '<div class="row"><span class="label">' + r[0] + '</span><span class="value">' + r[1] + '</span></div>';
+        }).join('');
         if (!rows.length) detailsEl.style.display = 'none';
     }
 }
