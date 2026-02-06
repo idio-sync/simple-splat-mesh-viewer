@@ -22,12 +22,14 @@ const log = Logger.getLogger('kiosk-viewer');
 // CDN URLs for dependencies to fetch and inline.
 // All JS deps are fetched from jsDelivr (serves raw npm files). Three.js addons
 // have simple `from "three"` bare imports that we rewrite to the Three.js blob URL.
-// fflate uses the UMD build to avoid ES module resolution issues entirely.
+// GLTFLoader has a relative import to BufferGeometryUtils which we also fetch and
+// rewrite to a blob URL. fflate uses the UMD build to avoid module resolution issues.
 const CDN_DEPS = {
     three: 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js',
     threeGLTFLoader: 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/loaders/GLTFLoader.js',
     threeOBJLoader: 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/loaders/OBJLoader.js',
     threeOrbitControls: 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/controls/OrbitControls.js',
+    threeBufferGeomUtils: 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/utils/BufferGeometryUtils.js',
     spark: 'https://sparkjs.dev/releases/spark/0.1.10/spark.module.js',
     fflate: 'https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js'
 };
@@ -260,12 +262,19 @@ console.log('[Kiosk] Script executing');
         console.log('[Kiosk] Three.js loaded, exports: ' + Object.keys(THREE).length + ' symbols');
 
         // 2. Addons — jsDelivr serves raw npm files with bare "three" imports.
+        //    GLTFLoader also has a relative import to BufferGeometryUtils that
+        //    we resolve to a blob URL (relative paths fail from blob context).
         setStatus('Loading controls and loaders...');
         var orbitSrc = rewriteThreeImports(decode(deps.threeOrbitControls), threeUrl);
         var OrbitControls = (await import(makeBlob(orbitSrc))).OrbitControls;
         console.log('[Kiosk] OrbitControls loaded');
 
-        var gltfSrc = rewriteThreeImports(decode(deps.threeGLTFLoader), threeUrl);
+        var bufGeomSrc = rewriteThreeImports(decode(deps.threeBufferGeomUtils), threeUrl);
+        var bufGeomUrl = makeBlob(bufGeomSrc);
+
+        var gltfSrc = decode(deps.threeGLTFLoader);
+        gltfSrc = rewriteThreeImports(gltfSrc, threeUrl);
+        gltfSrc = gltfSrc.split('../utils/BufferGeometryUtils.js').join(bufGeomUrl);
         var GLTFLoader = (await import(makeBlob(gltfSrc))).GLTFLoader;
         console.log('[Kiosk] GLTFLoader loaded');
 
