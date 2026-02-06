@@ -3941,6 +3941,9 @@ function animate() {
             flyControls.update();
         } else {
             controls.update();
+            // Sync right controls target so it doesn't override the main
+            // camera orientation with a stale target after panning
+            controlsRight.target.copy(controls.target);
             controlsRight.update();
         }
 
