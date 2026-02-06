@@ -243,6 +243,13 @@ console.log('[Kiosk] Script executing');
         function decode(b64) { return decodeURIComponent(escape(atob(b64))); }
         function makeBlob(src) { return URL.createObjectURL(new Blob([src], { type: 'application/javascript' })); }
 
+        // Strip CDN internal path references (e.g. /three@0.170.0/..., /v135/pkg@1.0/...)
+        // that can't resolve from blob URLs. These are CDN routing artifacts, not real deps.
+        // The pattern matches: from "/package@version/..." or from "/v123/package@version/..."
+        function stripCdnPaths(src) {
+            return src.replace(/from\\s*["']\\/(v\\d+\\/)?[\\w@][^"']*@[^"']*["']/g, 'from "data:application/javascript,"');
+        }
+
         // Rewrite imports from "three" (bare specifier) to use the Three.js blob URL.
         // Also handles esm.sh internal URLs that reference three.
         function rewriteThreeImports(src, threeUrl) {
@@ -253,33 +260,34 @@ console.log('[Kiosk] Script executing');
                 .replace(/from\\s*["']https?:\\/\\/esm\\.sh\\/[^"']*three@[^"']*["']/g, 'from "' + threeUrl + '"');
         }
 
-        // 1. Three.js core (standalone bundle, no external imports)
+        // 1. Three.js core (standalone build — should have no imports, but strip
+        //    any CDN routing artifacts just in case)
         setStatus('Loading Three.js...');
-        var threeSrc = decode(deps.three);
+        var threeSrc = stripCdnPaths(decode(deps.three));
         var threeUrl = makeBlob(threeSrc);
         console.log('[Kiosk] Three.js blob URL created, importing...');
         var THREE = await import(threeUrl);
         console.log('[Kiosk] Three.js loaded, exports: ' + Object.keys(THREE).length + ' symbols');
 
-        // 2. Addons (rewrite their "three" imports to our blob URL)
+        // 2. Addons (rewrite their "three" imports to our blob URL, strip other CDN paths)
         setStatus('Loading controls and loaders...');
-        var orbitSrc = rewriteThreeImports(decode(deps.threeOrbitControls), threeUrl);
+        var orbitSrc = rewriteThreeImports(stripCdnPaths(decode(deps.threeOrbitControls)), threeUrl);
         var OrbitControls = (await import(makeBlob(orbitSrc))).OrbitControls;
         console.log('[Kiosk] OrbitControls loaded');
 
-        var gltfSrc = rewriteThreeImports(decode(deps.threeGLTFLoader), threeUrl);
+        var gltfSrc = rewriteThreeImports(stripCdnPaths(decode(deps.threeGLTFLoader)), threeUrl);
         var GLTFLoader = (await import(makeBlob(gltfSrc))).GLTFLoader;
         console.log('[Kiosk] GLTFLoader loaded');
 
-        var objSrc = rewriteThreeImports(decode(deps.threeOBJLoader), threeUrl);
+        var objSrc = rewriteThreeImports(stripCdnPaths(decode(deps.threeOBJLoader)), threeUrl);
         var OBJLoader = (await import(makeBlob(objSrc))).OBJLoader;
         console.log('[Kiosk] OBJLoader loaded');
 
-        // 3. Spark.js (rewrite three imports if present)
+        // 3. Spark.js (rewrite three imports if present, strip CDN paths)
         var SplatMesh = null;
         try {
             setStatus('Loading Spark.js...');
-            var sparkSrc = rewriteThreeImports(decode(deps.spark), threeUrl);
+            var sparkSrc = rewriteThreeImports(stripCdnPaths(decode(deps.spark)), threeUrl);
             var sparkMod = await import(makeBlob(sparkSrc));
             SplatMesh = sparkMod.SplatMesh;
             console.log('[Kiosk] Spark.js loaded, SplatMesh:', !!SplatMesh);
@@ -287,12 +295,9 @@ console.log('[Kiosk] Script executing');
             console.warn('[Kiosk] Spark.js failed to load (splats will not render):', e.message);
         }
 
-        // 4. fflate (standalone, no three dependency)
-        // Strip any esm.sh internal paths that can't resolve from blob URLs
+        // 4. fflate (standalone, no three dependency — strip CDN paths)
         setStatus('Loading decompression library...');
-        var fflateSrc = decode(deps.fflate)
-            .replace(/from\\s*["']\\/v\\d+\\/[^"']*["']/g, 'from "data:application/javascript,"')
-            .replace(/from\\s*["']\\/fflate@[^"']*["']/g, 'from "data:application/javascript,"');
+        var fflateSrc = stripCdnPaths(decode(deps.fflate));
         var fflate = await import(makeBlob(fflateSrc));
         console.log('[Kiosk] fflate loaded');
 
