@@ -20,11 +20,11 @@ import { Logger } from './utilities.js';
 const log = Logger.getLogger('kiosk-viewer');
 
 // CDN URLs for dependencies to fetch and inline.
-// Three.js core uses ?bundle to produce a standalone module.
-// Addons use ?external=three so their `from "three"` imports can be rewritten
-// to point at the Three.js blob URL at runtime.
+// Three.js core is fetched from jsDelivr (official standalone build, no internal imports).
+// Addons use esm.sh with ?external=three so their `from "three"` imports can be
+// rewritten to point at the Three.js blob URL at runtime.
 const CDN_DEPS = {
-    three: 'https://esm.sh/three@0.170.0?bundle',
+    three: 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js',
     threeGLTFLoader: 'https://esm.sh/three@0.170.0/examples/jsm/loaders/GLTFLoader.js?external=three',
     threeOBJLoader: 'https://esm.sh/three@0.170.0/examples/jsm/loaders/OBJLoader.js?external=three',
     threeOrbitControls: 'https://esm.sh/three@0.170.0/examples/jsm/controls/OrbitControls.js?external=three',
@@ -249,6 +249,7 @@ console.log('[Kiosk] Script executing');
             return src
                 .replace(/from\\s*["']three["']/g, 'from "' + threeUrl + '"')
                 .replace(/from\\s*["']\\/v\\d+\\/three@[^"']*["']/g, 'from "' + threeUrl + '"')
+                .replace(/from\\s*["']\\/three@[^"']*["']/g, 'from "' + threeUrl + '"')
                 .replace(/from\\s*["']https?:\\/\\/esm\\.sh\\/[^"']*three@[^"']*["']/g, 'from "' + threeUrl + '"');
         }
 
@@ -287,8 +288,11 @@ console.log('[Kiosk] Script executing');
         }
 
         // 4. fflate (standalone, no three dependency)
+        // Strip any esm.sh internal paths that can't resolve from blob URLs
         setStatus('Loading decompression library...');
-        var fflateSrc = decode(deps.fflate);
+        var fflateSrc = decode(deps.fflate)
+            .replace(/from\\s*["']\\/v\\d+\\/[^"']*["']/g, 'from "data:application/javascript,"')
+            .replace(/from\\s*["']\\/fflate@[^"']*["']/g, 'from "data:application/javascript,"');
         var fflate = await import(makeBlob(fflateSrc));
         console.log('[Kiosk] fflate loaded');
 
