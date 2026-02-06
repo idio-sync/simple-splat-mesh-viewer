@@ -20,16 +20,16 @@ import { Logger } from './utilities.js';
 const log = Logger.getLogger('kiosk-viewer');
 
 // CDN URLs for dependencies to fetch and inline.
-// Three.js core is fetched from jsDelivr (official standalone build, no internal imports).
-// Addons use esm.sh with ?external=three so their `from "three"` imports can be
-// rewritten to point at the Three.js blob URL at runtime.
+// All JS deps are fetched from jsDelivr (serves raw npm files). Three.js addons
+// have simple `from "three"` bare imports that we rewrite to the Three.js blob URL.
+// fflate uses the UMD build to avoid ES module resolution issues entirely.
 const CDN_DEPS = {
     three: 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js',
-    threeGLTFLoader: 'https://esm.sh/three@0.170.0/examples/jsm/loaders/GLTFLoader.js?external=three',
-    threeOBJLoader: 'https://esm.sh/three@0.170.0/examples/jsm/loaders/OBJLoader.js?external=three',
-    threeOrbitControls: 'https://esm.sh/three@0.170.0/examples/jsm/controls/OrbitControls.js?external=three',
+    threeGLTFLoader: 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/loaders/GLTFLoader.js',
+    threeOBJLoader: 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/loaders/OBJLoader.js',
+    threeOrbitControls: 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/controls/OrbitControls.js',
     spark: 'https://sparkjs.dev/releases/spark/0.1.10/spark.module.js',
-    fflate: 'https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js'
+    fflate: 'https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js'
 };
 
 /**
@@ -151,6 +151,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; c
     position: fixed; inset: 0; display: flex; align-items: center;
     justify-content: center; background: #1a1a2e; z-index: 200;
 }
+#loading.hidden { display: none; }
 #file-picker.hidden { display: none; }
 .picker-content { text-align: center; max-width: 480px; padding: 40px; }
 .picker-content h1 { color: #4ecdc4; font-size: 22px; margin-bottom: 8px; }
@@ -215,10 +216,11 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; c
 //
 // This is the script embedded in the generated HTML. It:
 // 1. Decodes base64 dependency sources
-// 2. Creates blob URLs, rewriting internal `from "three"` to the Three.js blob
-// 3. Dynamically imports all deps (single Three.js instance)
-// 4. Loads the separate .a3z archive file (auto-fetch or file picker)
-// 5. Extracts assets and renders in a read-only viewer
+// 2. Creates blob URLs, rewriting bare `from "three"` to the Three.js blob URL
+// 3. Dynamically imports ES modules (Three.js, addons, Spark.js)
+// 4. Loads fflate via UMD (new Function) to avoid module resolution issues
+// 5. Waits for user to select an .a3d/.a3z archive via file picker or drag-drop
+// 6. Extracts assets and renders in a read-only Three.js viewer
 // =============================================================================
 
 const KIOSK_BOOTSTRAP_JS = `
@@ -243,43 +245,21 @@ console.log('[Kiosk] Script executing');
         function decode(b64) { return decodeURIComponent(escape(atob(b64))); }
         function makeBlob(src) { return URL.createObjectURL(new Blob([src], { type: 'application/javascript' })); }
 
-        // Strip CDN internal path references that are self-references within
-        // a standalone bundle (e.g. /three@0.170.0/es2022/three.bundle.mjs).
-        // Only safe to apply to standalone/bundled modules where all code is
-        // already inlined and these paths are redundant CDN routing artifacts.
-        function stripCdnPaths(src) {
-            return src.replace(/from\\s*["']\\/(v\\d+\\/)?[\\w@][^"']*@[^"']*["']/g, 'from "data:application/javascript,"');
-        }
-
-        // Rewrite imports from "three" (bare specifier) to use the Three.js blob URL.
-        // Also handles esm.sh internal URLs that reference three.
+        // Rewrite bare `from "three"` imports to use the Three.js blob URL.
+        // jsDelivr npm files only contain bare "three" specifiers — no CDN paths.
         function rewriteThreeImports(src, threeUrl) {
-            return src
-                .replace(/from\\s*["']three["']/g, 'from "' + threeUrl + '"')
-                .replace(/from\\s*["']\\/v\\d+\\/three@[^"']*["']/g, 'from "' + threeUrl + '"')
-                .replace(/from\\s*["']\\/three@[^"']*["']/g, 'from "' + threeUrl + '"')
-                .replace(/from\\s*["']https?:\\/\\/esm\\.sh\\/[^"']*three@[^"']*["']/g, 'from "' + threeUrl + '"');
+            return src.replace(/from\\s*["']three["']/g, 'from "' + threeUrl + '"');
         }
 
-        // For esm.sh ?bundle or ?external modules: resolve internal esm.sh
-        // path references by fetching inline. These are NOT self-references —
-        // they point to the actual code. We rewrite them to blob URLs by
-        // looking up the decoded source from a known set.
-        // For non-three CDN paths, we leave them as data URIs only if they
-        // would otherwise break. We handle this per-module below.
-
-        // 1. Three.js core — standalone build from jsDelivr, has no imports.
-        //    Apply stripCdnPaths as safety net only.
+        // 1. Three.js core — standalone build from jsDelivr, no imports to rewrite.
         setStatus('Loading Three.js...');
-        var threeSrc = stripCdnPaths(decode(deps.three));
+        var threeSrc = decode(deps.three);
         var threeUrl = makeBlob(threeSrc);
         console.log('[Kiosk] Three.js blob URL created, importing...');
         var THREE = await import(threeUrl);
         console.log('[Kiosk] Three.js loaded, exports: ' + Object.keys(THREE).length + ' symbols');
 
-        // 2. Addons — esm.sh ?external=three bundles all deps except three.
-        //    Only need to rewrite "three" imports; other internal paths are
-        //    bundled inline by esm.sh's ?external flag.
+        // 2. Addons — jsDelivr serves raw npm files with bare "three" imports.
         setStatus('Loading controls and loaders...');
         var orbitSrc = rewriteThreeImports(decode(deps.threeOrbitControls), threeUrl);
         var OrbitControls = (await import(makeBlob(orbitSrc))).OrbitControls;
@@ -293,7 +273,7 @@ console.log('[Kiosk] Script executing');
         var OBJLoader = (await import(makeBlob(objSrc))).OBJLoader;
         console.log('[Kiosk] OBJLoader loaded');
 
-        // 3. Spark.js (from sparkjs.dev, not esm.sh — rewrite three imports only)
+        // 3. Spark.js (from sparkjs.dev — rewrite three imports only)
         var SplatMesh = null;
         try {
             setStatus('Loading Spark.js...');
@@ -305,11 +285,14 @@ console.log('[Kiosk] Script executing');
             console.warn('[Kiosk] Spark.js failed to load (splats will not render):', e.message);
         }
 
-        // 4. fflate (esm.sh ?bundle — do NOT strip CDN paths, they are the actual code)
+        // 4. fflate — UMD build loaded via new Function() to avoid module resolution.
         setStatus('Loading decompression library...');
         var fflateSrc = decode(deps.fflate);
-        var fflate = await import(makeBlob(fflateSrc));
-        console.log('[Kiosk] fflate loaded');
+        var fflateModule = { exports: {} };
+        (new Function('module', 'exports', fflateSrc))(fflateModule, fflateModule.exports);
+        var fflate = fflateModule.exports;
+        if (!fflate.unzip) throw new Error('fflate UMD failed to load (no unzip export)');
+        console.log('[Kiosk] fflate loaded via UMD');
 
         // =====================================================================
         // PHASE 2: Wait for user to select an archive file
