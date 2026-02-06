@@ -245,8 +245,8 @@ console.log('[Kiosk] Script executing');
         function decode(b64) { return decodeURIComponent(escape(atob(b64))); }
         function makeBlob(src) { return URL.createObjectURL(new Blob([src], { type: 'application/javascript' })); }
 
-        // Rewrite bare `from "three"` imports to use the Three.js blob URL.
-        // jsDelivr npm files only contain bare "three" specifiers — no CDN paths.
+        // Rewrite bare 'from "three"' imports to use the Three.js blob URL.
+        // jsDelivr npm files only contain bare "three" specifiers -- no CDN paths.
         function rewriteThreeImports(src, threeUrl) {
             return src.replace(/from\\s*["']three["']/g, 'from "' + threeUrl + '"');
         }
