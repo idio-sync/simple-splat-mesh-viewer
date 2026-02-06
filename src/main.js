@@ -50,11 +50,8 @@ import {
     initShareDialog,
     showShareDialog
 } from './modules/share-dialog.js';
-import {
-    fetchDependencies as fetchKioskDeps,
-    generateKioskHTML,
-    buildPolyglotFile
-} from './modules/kiosk-viewer.js';
+// kiosk-viewer.js is loaded dynamically in downloadKioskViewer() to avoid
+// blocking the main application if the module fails to load.
 
 // Create logger for this module
 const log = Logger.getLogger('main.js');
@@ -2164,6 +2161,11 @@ async function downloadKioskViewer(metadata, includeHashes) {
     showLoading('Creating offline viewer...', true);
 
     try {
+        // Phase 0: Dynamically load the kiosk viewer module
+        updateProgress(1, 'Loading kiosk module...');
+        const { fetchDependencies: fetchKioskDeps, generateKioskHTML, buildPolyglotFile } =
+            await import('./modules/kiosk-viewer.js');
+
         // Phase 1: Fetch CDN dependencies
         updateProgress(5, 'Fetching viewer libraries...');
         const deps = await fetchKioskDeps((msg) => {
