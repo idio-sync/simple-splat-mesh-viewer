@@ -2183,7 +2183,7 @@ async function downloadKioskViewer(metadata, includeHashes) {
 
         // Phase 3: Generate kiosk HTML
         updateProgress(85, 'Assembling viewer...');
-        const manifest = kioskArchive.getManifest();
+        const manifest = kioskArchive.previewManifest();
         const html = generateKioskHTML({
             deps,
             manifest,
