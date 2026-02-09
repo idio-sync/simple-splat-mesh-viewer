@@ -6,7 +6,7 @@ import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader, isArchiveFile } from './modules/archive-loader.js';
 import { AnnotationSystem } from './modules/annotation-system.js';
-import { ArchiveCreator, captureScreenshot } from './modules/archive-creator.js';
+import { ArchiveCreator, captureScreenshot, CRYPTO_AVAILABLE } from './modules/archive-creator.js';
 import { CAMERA, TIMING } from './modules/constants.js';
 import { Logger, notify, processMeshMaterials, computeMeshFaceCount, computeMeshVertexCount, disposeObject, parseMarkdown, fetchWithProgress } from './modules/utilities.js';
 import { FlyControls } from './modules/fly-controls.js';
@@ -33,7 +33,9 @@ import {
     addRelatedObject,
     collectMetadata,
     setupLicenseField,
-    hideMetadataSidebar
+    hideMetadataSidebar,
+    addVersionEntry,
+    setupFieldValidation
 } from './modules/metadata-manager.js';
 import {
     loadSplatFromFile as loadSplatFromFileHandler,
@@ -44,7 +46,8 @@ import {
     loadPointcloudFromUrl as loadPointcloudFromUrlHandler,
     loadPointcloudFromBlobUrl as loadPointcloudFromBlobUrlHandler,
     updatePointcloudPointSize,
-    updatePointcloudOpacity
+    updatePointcloudOpacity,
+    updateModelTextures
 } from './modules/file-handlers.js';
 import {
     initShareDialog,
@@ -348,6 +351,13 @@ function init() {
     // Initialize archive creator
     archiveCreator = new ArchiveCreator();
 
+    // Check crypto availability and warn user
+    if (!CRYPTO_AVAILABLE) {
+        notify.warning('SHA-256 hashing is unavailable (requires HTTPS). Archives will be created without integrity verification.');
+        const banner = document.getElementById('crypto-warning-banner');
+        if (banner) banner.classList.remove('hidden');
+    }
+
     // Handle resize
     window.addEventListener('resize', onWindowResize);
 
@@ -431,8 +441,9 @@ function toggleFlyMode() {
     if (isActive) {
         // Disable fly mode, re-enable orbit
         flyControls.disable();
+        controls.connect();
         controls.enabled = true;
-        if (controlsRight) controlsRight.enabled = true;
+        if (controlsRight) { controlsRight.connect(); controlsRight.enabled = true; }
         // Re-sync orbit controls target to where camera is looking
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
@@ -444,7 +455,8 @@ function toggleFlyMode() {
     } else {
         // Enable fly mode, disable orbit
         controls.enabled = false;
-        if (controlsRight) controlsRight.enabled = false;
+        controls.disconnect();
+        if (controlsRight) { controlsRight.enabled = false; controlsRight.disconnect(); }
         flyControls.enable();
         if (btn) btn.classList.add('active');
         if (hint) hint.classList.remove('hidden');
@@ -556,7 +568,7 @@ function setupUIEvents() {
     });
 
     addListener('model-no-texture', 'change', (e) => {
-        toggleModelTextures(!e.target.checked);
+        updateModelTextures(modelGroup, !e.target.checked);
     });
 
     // Model position inputs
@@ -1550,6 +1562,15 @@ function onAnnotationPlaced(position, cameraState) {
 function onAnnotationSelected(annotation) {
     log.info(' Annotation selected:', annotation.id);
 
+    // Toggle: if clicking already-open annotation, close popup and deselect
+    if (currentPopupAnnotationId === annotation.id) {
+        hideAnnotationPopup();
+        annotationSystem.selectedAnnotation = null;
+        document.querySelectorAll('.annotation-marker.selected').forEach(m => m.classList.remove('selected'));
+        document.querySelectorAll('.annotation-chip.active').forEach(c => c.classList.remove('active'));
+        return;
+    }
+
     // Update annotations list highlighting
     const items = document.querySelectorAll('.annotation-item');
     items.forEach(item => {
@@ -1739,7 +1760,14 @@ function updateAnnotationsUI() {
             chip.title = anno.title || 'Untitled';
 
             chip.addEventListener('click', () => {
-                annotationSystem.goToAnnotation(anno.id);
+                if (currentPopupAnnotationId === anno.id) {
+                    hideAnnotationPopup();
+                    annotationSystem.selectedAnnotation = null;
+                    document.querySelectorAll('.annotation-marker.selected').forEach(m => m.classList.remove('selected'));
+                    document.querySelectorAll('.annotation-chip.active').forEach(c => c.classList.remove('active'));
+                } else {
+                    annotationSystem.goToAnnotation(anno.id);
+                }
             });
 
             chips.appendChild(chip);
@@ -1938,6 +1966,12 @@ async function downloadArchive() {
         archiveCreator.setCustomFields(metadata.customFields);
     }
 
+    // Apply version history
+    if (metadata.versionHistory && metadata.versionHistory.length > 0) {
+        log.info(' Setting version history');
+        archiveCreator.setVersionHistory(metadata.versionHistory);
+    }
+
     // Read which assets the user wants to include
     const includeSplat = document.getElementById('archive-include-splat')?.checked;
     const includeModel = document.getElementById('archive-include-model')?.checked;
@@ -1957,7 +1991,8 @@ async function downloadArchive() {
             position, rotation, scale,
             created_by: metadata.splatMetadata.createdBy || 'unknown',
             created_by_version: metadata.splatMetadata.version || '',
-            source_notes: metadata.splatMetadata.sourceNotes || ''
+            source_notes: metadata.splatMetadata.sourceNotes || '',
+            role: metadata.splatMetadata.role || ''
         });
     }
 
@@ -1974,7 +2009,8 @@ async function downloadArchive() {
             position, rotation, scale,
             created_by: metadata.meshMetadata.createdBy || 'unknown',
             created_by_version: metadata.meshMetadata.version || '',
-            source_notes: metadata.meshMetadata.sourceNotes || ''
+            source_notes: metadata.meshMetadata.sourceNotes || '',
+            role: metadata.meshMetadata.role || ''
         });
     }
 
@@ -1991,7 +2027,8 @@ async function downloadArchive() {
             position, rotation, scale,
             created_by: metadata.pointcloudMetadata?.createdBy || 'unknown',
             created_by_version: metadata.pointcloudMetadata?.version || '',
-            source_notes: metadata.pointcloudMetadata?.sourceNotes || ''
+            source_notes: metadata.pointcloudMetadata?.sourceNotes || '',
+            role: metadata.pointcloudMetadata?.role || ''
         });
     }
 
@@ -2709,6 +2746,25 @@ function prefillMetadataFromArchive(manifest) {
         }
     }
 
+    // Prefill role for each asset type
+    const sceneKey = Object.keys(manifest.data_entries || {}).find(k => k.startsWith('scene_'));
+    if (sceneKey && manifest.data_entries[sceneKey].role) {
+        const el = document.getElementById('meta-splat-role');
+        if (el) el.value = manifest.data_entries[sceneKey].role;
+    }
+
+    const meshKey = Object.keys(manifest.data_entries || {}).find(k => k.startsWith('mesh_'));
+    if (meshKey && manifest.data_entries[meshKey].role) {
+        const el = document.getElementById('meta-mesh-role');
+        if (el) el.value = manifest.data_entries[meshKey].role;
+    }
+
+    const pcKey = Object.keys(manifest.data_entries || {}).find(k => k.startsWith('pointcloud_'));
+    if (pcKey && manifest.data_entries[pcKey].role) {
+        const el = document.getElementById('meta-pointcloud-role');
+        if (el) el.value = manifest.data_entries[pcKey].role;
+    }
+
     // Custom fields from _meta
     if (manifest._meta?.custom_fields) {
         const container = document.getElementById('custom-fields-list');
@@ -2719,6 +2775,25 @@ function prefillMetadataFromArchive(manifest) {
             const lastRow = rows[rows.length - 1];
             lastRow.querySelector('.custom-field-key').value = key;
             lastRow.querySelector('.custom-field-value').value = value;
+        }
+    }
+
+    // Version history
+    if (manifest.version_history && manifest.version_history.length > 0) {
+        const container = document.getElementById('version-history-list');
+        if (container) {
+            container.replaceChildren();
+            for (const entry of manifest.version_history) {
+                addVersionEntry();
+                const rows = container.querySelectorAll('.version-history-row');
+                const lastRow = rows[rows.length - 1];
+                if (lastRow) {
+                    const versionInput = lastRow.querySelector('.version-entry-version');
+                    const descInput = lastRow.querySelector('.version-entry-description');
+                    if (versionInput) versionInput.value = entry.version || '';
+                    if (descInput) descInput.value = entry.description || '';
+                }
+            }
         }
     }
 }
@@ -3072,51 +3147,6 @@ function updateModelWireframe() {
     }
 }
 
-// Store original texture maps for restore
-const _storedTextures = new WeakMap();
-
-function toggleModelTextures(showTextures) {
-    if (!modelGroup) return;
-    modelGroup.traverse((child) => {
-        if (child.isMesh && child.material) {
-            const materials = Array.isArray(child.material) ? child.material : [child.material];
-            materials.forEach(mat => {
-                if (!showTextures) {
-                    // Store original maps and remove them
-                    if (!_storedTextures.has(mat)) {
-                        _storedTextures.set(mat, {
-                            map: mat.map,
-                            normalMap: mat.normalMap,
-                            roughnessMap: mat.roughnessMap,
-                            metalnessMap: mat.metalnessMap,
-                            aoMap: mat.aoMap,
-                            emissiveMap: mat.emissiveMap
-                        });
-                    }
-                    mat.map = null;
-                    mat.normalMap = null;
-                    mat.roughnessMap = null;
-                    mat.metalnessMap = null;
-                    mat.aoMap = null;
-                    mat.emissiveMap = null;
-                } else {
-                    // Restore original maps
-                    const stored = _storedTextures.get(mat);
-                    if (stored) {
-                        mat.map = stored.map;
-                        mat.normalMap = stored.normalMap;
-                        mat.roughnessMap = stored.roughnessMap;
-                        mat.metalnessMap = stored.metalnessMap;
-                        mat.aoMap = stored.aoMap;
-                        mat.emissiveMap = stored.emissiveMap;
-                    }
-                }
-                mat.needsUpdate = true;
-            });
-        }
-    });
-}
-
 function saveAlignment() {
     const alignment = {
         version: 1,
@@ -3356,12 +3386,6 @@ function applyControlsVisibilityDirect(controlsPanel, shouldShow) {
     log.debug('[DIAG] AFTER (immediate) - computed minWidth:', afterComputed.minWidth);
     log.debug('[DIAG] AFTER (immediate) - computed padding:', afterComputed.padding);
     log.debug('[DIAG] AFTER (immediate) - offsetWidth:', controlsPanel.offsetWidth);
-
-    // Update annotation bar position based on panel visibility
-    const annotationBar = document.getElementById('annotation-bar');
-    if (annotationBar) {
-        annotationBar.style.left = shouldShow ? '280px' : '0';
-    }
 
     // DIAGNOSTIC: Check again after a delay (after potential transition)
     setTimeout(() => {
@@ -3863,22 +3887,35 @@ function animate() {
 
 // Initialize when DOM is ready
 log.info(' Setting up initialization, readyState:', document.readyState);
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        log.info(' DOMContentLoaded fired, calling init()');
+
+async function startApp() {
+    // In kiosk mode, delegate to kiosk-main.js (slim viewer-only entry point)
+    if (window.APP_CONFIG?.kiosk) {
+        log.info(' Kiosk mode detected, loading kiosk-main.js');
         try {
-            init();
+            const { init: kioskInit } = await import('./modules/kiosk-main.js');
+            kioskInit();
         } catch (e) {
-            log.error(' Init error:', e);
+            log.error(' Kiosk init error:', e);
             log.error(' Stack:', e.stack);
         }
-    });
-} else {
-    log.info(' DOM already ready, calling init()');
+        return;
+    }
+
     try {
         init();
     } catch (e) {
         log.error(' Init error:', e);
         log.error(' Stack:', e.stack);
     }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        log.info(' DOMContentLoaded fired');
+        startApp();
+    });
+} else {
+    log.info(' DOM already ready');
+    startApp();
 }

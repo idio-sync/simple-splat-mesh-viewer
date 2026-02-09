@@ -16,8 +16,31 @@ import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader } from './archive-loader.js';
 import { TIMING } from './constants.js';
-import { E57Loader } from 'three-e57-loader';
+// E57Loader is loaded lazily via dynamic import to allow graceful degradation
+// when the three-e57-loader CDN module is unavailable (e.g., offline kiosk viewer).
 import { Logger, notify, processMeshMaterials, computeMeshFaceCount, computeMeshVertexCount, disposeObject, fetchWithProgress } from './utilities.js';
+
+// Lazy-loaded E57 support
+let _E57Loader = null;
+let _e57Checked = false;
+
+/**
+ * Lazily load the E57Loader. Returns null if unavailable (e.g., offline).
+ * @returns {Promise<Function|null>}
+ */
+async function getE57Loader() {
+    if (_e57Checked) return _E57Loader;
+    _e57Checked = true;
+    try {
+        const mod = await import('three-e57-loader');
+        _E57Loader = mod.E57Loader;
+        log.info('E57 loader available');
+    } catch (e) {
+        log.warn('E57 loader not available:', e.message);
+        _E57Loader = null;
+    }
+    return _E57Loader;
+}
 
 const log = Logger.getLogger('file-handlers');
 
@@ -725,6 +748,54 @@ export function updateModelWireframe(modelGroup, wireframe) {
 }
 
 // =============================================================================
+// MODEL TEXTURE TOGGLE
+// =============================================================================
+
+const _storedTextures = new WeakMap();
+
+/**
+ * Toggle model textures on/off
+ * @param {THREE.Group} modelGroup - The model group
+ * @param {boolean} showTextures - Whether to show textures
+ */
+export function updateModelTextures(modelGroup, showTextures) {
+    if (!modelGroup) return;
+    modelGroup.traverse((child) => {
+        if (child.isMesh && child.material) {
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            materials.forEach(mat => {
+                if (!showTextures) {
+                    if (!_storedTextures.has(mat)) {
+                        _storedTextures.set(mat, {
+                            map: mat.map, normalMap: mat.normalMap,
+                            roughnessMap: mat.roughnessMap, metalnessMap: mat.metalnessMap,
+                            aoMap: mat.aoMap, emissiveMap: mat.emissiveMap
+                        });
+                    }
+                    mat.map = null;
+                    mat.normalMap = null;
+                    mat.roughnessMap = null;
+                    mat.metalnessMap = null;
+                    mat.aoMap = null;
+                    mat.emissiveMap = null;
+                } else {
+                    const stored = _storedTextures.get(mat);
+                    if (stored) {
+                        mat.map = stored.map;
+                        mat.normalMap = stored.normalMap;
+                        mat.roughnessMap = stored.roughnessMap;
+                        mat.metalnessMap = stored.metalnessMap;
+                        mat.aoMap = stored.aoMap;
+                        mat.emissiveMap = stored.emissiveMap;
+                    }
+                }
+                mat.needsUpdate = true;
+            });
+        }
+    });
+}
+
+// =============================================================================
 // E57 POINT CLOUD LOADING
 // =============================================================================
 
@@ -735,7 +806,11 @@ export function updateModelWireframe(modelGroup, wireframe) {
  * @param {string} url - URL or blob URL to the E57 file
  * @returns {Promise<THREE.Group>} Group containing the point cloud
  */
-export function loadE57(url) {
+export async function loadE57(url) {
+    const E57Loader = await getE57Loader();
+    if (!E57Loader) {
+        throw new Error('E57 point cloud loading is not available. The three-e57-loader module could not be loaded (requires network access).');
+    }
     return new Promise((resolve, reject) => {
         const loader = new E57Loader();
         loader.load(

@@ -36,6 +36,10 @@ export function showMetadataSidebar(mode = 'view', deps = {}) {
     // Update toolbar button state
     const btn = document.getElementById('btn-metadata');
     if (btn) btn.classList.add('active');
+
+    // Adjust annotation bar to account for sidebar width
+    const annotationBar = document.getElementById('annotation-bar');
+    if (annotationBar) annotationBar.style.right = '380px';
 }
 
 /**
@@ -49,6 +53,10 @@ export function hideMetadataSidebar() {
 
     const btn = document.getElementById('btn-metadata');
     if (btn) btn.classList.remove('active');
+
+    // Reset annotation bar to full width
+    const annotationBar = document.getElementById('annotation-bar');
+    if (annotationBar) annotationBar.style.right = '0';
 
     // Trigger resize so the 3D view reclaims the space after transition
     setTimeout(() => window.dispatchEvent(new Event('resize')), 300);
@@ -239,6 +247,14 @@ export function setupMetadataSidebar(deps = {}) {
     if (addRelatedBtn) {
         addRelatedBtn.addEventListener('click', addRelatedObject);
     }
+
+    const addVersionBtn = document.getElementById('btn-add-version-entry');
+    if (addVersionBtn) {
+        addVersionBtn.addEventListener('click', addVersionEntry);
+    }
+
+    // Setup field validation
+    setupFieldValidation();
 }
 
 /**
@@ -506,6 +522,167 @@ export function addRelatedObject() {
     container.appendChild(row);
 }
 
+/**
+ * Add a version history row with version and description fields
+ */
+export function addVersionEntry() {
+    const container = document.getElementById('version-history-list');
+    if (!container) {
+        log.warn('Version history container not found');
+        return;
+    }
+
+    const row = document.createElement('div');
+    row.className = 'version-history-row';
+
+    const versionInput = document.createElement('input');
+    versionInput.type = 'text';
+    versionInput.className = 'version-entry-version';
+    versionInput.placeholder = 'e.g., 1.0';
+
+    const descInput = document.createElement('textarea');
+    descInput.className = 'version-entry-description';
+    descInput.placeholder = 'What changed...';
+    descInput.rows = 1;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'remove-btn';
+    removeBtn.title = 'Remove';
+    removeBtn.textContent = '\u00D7';
+    removeBtn.addEventListener('click', () => {
+        row.remove();
+        log.info('Version history entry removed');
+    });
+
+    row.appendChild(versionInput);
+    row.appendChild(descInput);
+    row.appendChild(removeBtn);
+    container.appendChild(row);
+
+    log.info('Version history entry added');
+}
+
+// =============================================================================
+// METADATA VALIDATION (ADVISORY)
+// =============================================================================
+
+const VALIDATION_RULES = {
+    'meta-operator-orcid': {
+        pattern: /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/,
+        message: 'ORCID must be in format 0000-0000-0000-000X',
+        emptyOk: true
+    },
+    'meta-coverage-lat': {
+        validate: (v) => { const n = parseFloat(v); return !isNaN(n) && n >= -90 && n <= 90; },
+        message: 'Latitude must be between -90 and 90',
+        emptyOk: true
+    },
+    'meta-coverage-lon': {
+        validate: (v) => { const n = parseFloat(v); return !isNaN(n) && n >= -180 && n <= 180; },
+        message: 'Longitude must be between -180 and 180',
+        emptyOk: true
+    },
+    'meta-capture-date': {
+        validate: (v) => !isNaN(new Date(v).getTime()),
+        message: 'Invalid date format',
+        emptyOk: true
+    },
+    'meta-pres-format-glb': {
+        pattern: /^fmt\/\d+$/,
+        message: 'PRONOM ID must be in format fmt/NNN',
+        emptyOk: true
+    },
+    'meta-pres-format-obj': {
+        pattern: /^fmt\/\d+$/,
+        message: 'PRONOM ID must be in format fmt/NNN',
+        emptyOk: true
+    },
+    'meta-pres-format-ply': {
+        pattern: /^fmt\/\d+$/,
+        message: 'PRONOM ID must be in format fmt/NNN',
+        emptyOk: true
+    },
+    'meta-pres-format-e57': {
+        pattern: /^fmt\/\d+$/,
+        message: 'PRONOM ID must be in format fmt/NNN',
+        emptyOk: true
+    }
+};
+
+/**
+ * Validate a single field by ID. Shows/clears inline error.
+ * @param {string} fieldId - DOM element ID
+ * @returns {boolean} true if valid or empty
+ */
+export function validateField(fieldId) {
+    const field = document.getElementById(fieldId);
+    if (!field) return true;
+
+    const rule = VALIDATION_RULES[fieldId];
+    if (!rule) return true;
+
+    const value = field.value.trim();
+
+    // Remove existing error
+    const existingError = field.parentElement?.querySelector('.field-error');
+    if (existingError) existingError.remove();
+    field.classList.remove('validation-error', 'validation-valid');
+
+    if (!value && rule.emptyOk) {
+        return true;
+    }
+
+    let isValid = false;
+    if (rule.pattern) {
+        isValid = rule.pattern.test(value);
+    } else if (rule.validate) {
+        isValid = rule.validate(value);
+    }
+
+    if (isValid) {
+        field.classList.add('validation-valid');
+    } else {
+        field.classList.add('validation-error');
+        const errorSpan = document.createElement('span');
+        errorSpan.className = 'field-error';
+        errorSpan.textContent = rule.message;
+        field.parentElement?.appendChild(errorSpan);
+    }
+
+    return isValid;
+}
+
+/**
+ * Validate all fields with rules. Returns array of error objects.
+ * Advisory only -- does not block export.
+ * @returns {Array<{fieldId: string, message: string}>}
+ */
+export function validateAllFields() {
+    const errors = [];
+    for (const fieldId in VALIDATION_RULES) {
+        if (!validateField(fieldId)) {
+            errors.push({
+                fieldId: fieldId,
+                message: VALIDATION_RULES[fieldId].message
+            });
+        }
+    }
+    return errors;
+}
+
+/**
+ * Attach blur-event validation listeners to all validated fields.
+ * Called once from setupMetadataSidebar().
+ */
+export function setupFieldValidation() {
+    for (const fieldId in VALIDATION_RULES) {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.addEventListener('blur', () => validateField(fieldId));
+        }
+    }
+}
+
 // =============================================================================
 // METADATA COLLECTION
 // =============================================================================
@@ -628,19 +805,23 @@ export function collectMetadata() {
         splatMetadata: {
             createdBy: document.getElementById('meta-splat-created-by')?.value || '',
             version: document.getElementById('meta-splat-version')?.value || '',
-            sourceNotes: document.getElementById('meta-splat-notes')?.value || ''
+            sourceNotes: document.getElementById('meta-splat-notes')?.value || '',
+            role: document.getElementById('meta-splat-role')?.value || ''
         },
         meshMetadata: {
             createdBy: document.getElementById('meta-mesh-created-by')?.value || '',
             version: document.getElementById('meta-mesh-version')?.value || '',
-            sourceNotes: document.getElementById('meta-mesh-notes')?.value || ''
+            sourceNotes: document.getElementById('meta-mesh-notes')?.value || '',
+            role: document.getElementById('meta-mesh-role')?.value || ''
         },
         pointcloudMetadata: {
             createdBy: document.getElementById('meta-pointcloud-created-by')?.value || '',
             version: document.getElementById('meta-pointcloud-version')?.value || '',
-            sourceNotes: document.getElementById('meta-pointcloud-notes')?.value || ''
+            sourceNotes: document.getElementById('meta-pointcloud-notes')?.value || '',
+            role: document.getElementById('meta-pointcloud-role')?.value || ''
         },
         customFields: {},
+        versionHistory: [],
         includeIntegrity: document.getElementById('meta-include-integrity')?.checked ?? true
     };
 
@@ -711,6 +892,20 @@ export function collectMetadata() {
         const value = row.querySelector('.custom-field-value')?.value?.trim();
         if (key && value) {
             metadata.customFields[key] = value;
+        }
+    });
+
+    // Collect version history entries
+    const versionRows = document.querySelectorAll('.version-history-row');
+    versionRows.forEach(row => {
+        const version = row.querySelector('.version-entry-version')?.value?.trim();
+        const description = row.querySelector('.version-entry-description')?.value?.trim();
+        if (version || description) {
+            metadata.versionHistory.push({
+                version: version || '',
+                date: new Date().toISOString().split('T')[0],
+                description: description || ''
+            });
         }
     });
 
@@ -1406,8 +1601,9 @@ export function updateAnnotationPopupPosition(currentPopupAnnotationId) {
 
     // Keep it on screen vertically
     if (top < padding) top = padding;
-    if (top + 200 > window.innerHeight) {
-        top = window.innerHeight - 200 - padding;
+    const popupHeight = popup.getBoundingClientRect().height || 200;
+    if (top + popupHeight > window.innerHeight) {
+        top = window.innerHeight - popupHeight - padding;
     }
 
     popup.style.left = left + 'px';
@@ -1444,5 +1640,9 @@ export default {
     clearArchiveMetadata,
     showAnnotationPopup,
     updateAnnotationPopupPosition,
-    hideAnnotationPopup
+    hideAnnotationPopup,
+    addVersionEntry,
+    validateField,
+    validateAllFields,
+    setupFieldValidation
 };

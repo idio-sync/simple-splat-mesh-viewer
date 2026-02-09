@@ -26,6 +26,21 @@
     <script src="config.js"></script>
 </head>
 <body>
+    <!-- Kiosk file picker overlay (hidden by default, shown by kiosk-main.js) -->
+    <div id="kiosk-file-picker" class="hidden">
+        <div class="kiosk-picker-content">
+            <h1>3D Archive Viewer</h1>
+            <p>Open an .a3d or .a3z archive to view its 3D content.</p>
+            <div class="kiosk-picker-box" id="kiosk-drop-zone">
+                <div class="kiosk-picker-icon">&#128194;</div>
+                <p>Select an <strong>.a3d</strong> or <strong>.a3z</strong> archive</p>
+                <button id="kiosk-picker-btn" type="button">Select Archive File</button>
+                <p class="kiosk-picker-hint">or drag and drop it here</p>
+            </div>
+            <input type="file" id="kiosk-picker-input" accept=".a3z,.a3d" style="display:none">
+        </div>
+    </div>
+
     <div id="app">
         <div id="viewer-container">
             <canvas id="viewer-canvas"></canvas>
@@ -106,6 +121,7 @@
         </div>
 
         <!-- Annotation panel popup -->
+        <!-- KIOSK-STRIP-START: annotation creation panel -->
         <div id="annotation-panel" class="hidden">
             <h3>New Annotation</h3>
             <div class="coords-display">
@@ -122,6 +138,8 @@
                 <button id="btn-anno-save" class="action-btn">Save</button>
             </div>
         </div>
+
+        <!-- KIOSK-STRIP-END: annotation creation panel -->
 
         <!-- Unified Metadata Sidebar (right side) -->
         <div id="metadata-sidebar" class="hidden">
@@ -184,6 +202,7 @@
                 </div>
             </div>
 
+            <!-- KIOSK-STRIP-START: metadata edit tab -->
             <!-- Edit Mode Content -->
             <div class="sidebar-mode-content" id="sidebar-edit">
                 <div class="edit-tabs">
@@ -304,6 +323,12 @@
                         <input type="text" id="meta-conventions" placeholder="e.g., arxiv:2312.13299">
                         <span class="field-hint">Comma-separated list of convention references</span>
                     </div>
+                    <div class="subsection-header">Version History</div>
+                    <div class="field-hint">Track changes between archive versions</div>
+                    <div id="version-history-list"></div>
+                    <button id="btn-add-version-entry" class="action-btn secondary" style="width: 100%; margin-top: 10px;">
+                        + Add Version Entry
+                    </button>
                     <div class="subsection-header">Custom Fields</div>
                     <div id="custom-fields-list"></div>
                     <button id="btn-add-custom-field" class="action-btn secondary" style="width: 100%; margin-top: 10px;">
@@ -454,6 +479,15 @@
                                 <label for="meta-splat-notes">Source Notes</label>
                                 <textarea id="meta-splat-notes" rows="2" placeholder="Additional notes about this asset..."></textarea>
                             </div>
+                            <div class="metadata-field">
+                                <label for="meta-splat-role">Data Role</label>
+                                <select id="meta-splat-role">
+                                    <option value="">Not specified</option>
+                                    <option value="primary">Primary</option>
+                                    <option value="derived">Derived</option>
+                                </select>
+                                <span class="field-hint">Primary = original capture, Derived = processed output</span>
+                            </div>
                         </div>
                     </div>
                     <div class="asset-section" id="mesh-asset-section">
@@ -472,6 +506,15 @@
                                 <label for="meta-mesh-notes">Source Notes</label>
                                 <textarea id="meta-mesh-notes" rows="2" placeholder="Additional notes about this asset..."></textarea>
                             </div>
+                            <div class="metadata-field">
+                                <label for="meta-mesh-role">Data Role</label>
+                                <select id="meta-mesh-role">
+                                    <option value="">Not specified</option>
+                                    <option value="primary">Primary</option>
+                                    <option value="derived">Derived</option>
+                                </select>
+                                <span class="field-hint">Primary = original capture, Derived = processed output</span>
+                            </div>
                         </div>
                     </div>
                     <div class="asset-group">
@@ -489,6 +532,15 @@
                             <div class="metadata-field">
                                 <label for="meta-pointcloud-notes">Source Notes</label>
                                 <textarea id="meta-pointcloud-notes" rows="2" placeholder="Additional notes about this point cloud..."></textarea>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-pointcloud-role">Data Role</label>
+                                <select id="meta-pointcloud-role">
+                                    <option value="">Not specified</option>
+                                    <option value="primary">Primary</option>
+                                    <option value="derived">Derived</option>
+                                </select>
+                                <span class="field-hint">Primary = original capture, Derived = processed output</span>
                             </div>
                         </div>
                     </div>
@@ -728,6 +780,10 @@
 
                 <!-- Integrity Tab -->
                 <div class="edit-tab-content" id="edit-tab-integrity">
+                    <div id="crypto-warning-banner" class="warning-banner hidden">
+                        <span class="warning-icon">⚠</span>
+                        <span>SHA-256 hashing unavailable. This page is not served over HTTPS, so integrity hashes cannot be calculated. Archives will be created without integrity verification.</span>
+                    </div>
                     <div class="integrity-info">
                         <div class="stat-row">
                             <span class="stat-label">Hash Algorithm</span>
@@ -748,6 +804,8 @@
                     </div>
                 </div>
             </div>
+
+            <!-- KIOSK-STRIP-END: metadata edit tab -->
 
             <!-- Annotations Mode Content -->
             <div class="sidebar-mode-content" id="sidebar-annotations">
@@ -778,6 +836,7 @@
             </div>
         </div>
 
+        <!-- KIOSK-STRIP-START: export panel -->
         <div id="export-panel" class="hidden">
             <h3>Export Archive</h3>
             <p class="export-description">Configure metadata before exporting for a complete archive.</p>
@@ -819,6 +878,7 @@
                 <p class="export-hint">One-time download. Opens any .a3d/.a3z archive offline.</p>
             </div>
         </div>
+        <!-- KIOSK-STRIP-END: export panel -->
 
         <div id="controls-panel">
             <h2>3D Viewer Proof of Concept</h2>

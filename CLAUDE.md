@@ -132,3 +132,4 @@ All DOM structure lives in `index.html`. Modules query elements by ID. If you ne
 - **No tests.** Manual testing is the only verification. Security-critical code (archive filename sanitization, URL validation) has no automated coverage.
 - **Point cloud memory.** No size limits on E57 loading. Large files can OOM the browser.
 - **`annotation-system.js`** is the only module that doesn't use Logger — it has no structured logging.
+

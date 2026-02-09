@@ -30,6 +30,7 @@ COPY src/modules/annotation-system.js /usr/share/nginx/html/modules/
 COPY src/modules/share-dialog.js /usr/share/nginx/html/modules/
 COPY src/modules/fly-controls.js /usr/share/nginx/html/modules/
 COPY src/modules/kiosk-viewer.js /usr/share/nginx/html/modules/
+COPY src/modules/kiosk-main.js /usr/share/nginx/html/modules/
 
 # Copy the config template and entrypoint script
 COPY docker/config.js.template /usr/share/nginx/html/config.js.template

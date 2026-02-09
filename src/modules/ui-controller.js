@@ -202,6 +202,12 @@ export function applyControlsVisibility(visible) {
             icon.textContent = visible ? '▶' : '◀';
         }
     }
+
+    // Update annotation bar position to match panel visibility
+    const annotationBar = document.getElementById('annotation-bar');
+    if (annotationBar) {
+        annotationBar.style.left = visible ? '280px' : '0';
+    }
 }
 
 /**
@@ -322,14 +328,15 @@ export function setupCollapsibles() {
     const collapsibles = document.querySelectorAll('.collapsible-header');
 
     collapsibles.forEach(header => {
-        header.addEventListener('click', () => {
-            const content = header.nextElementSibling;
-            const icon = header.querySelector('.collapse-icon');
-
-            if (content && content.classList.contains('collapsible-content')) {
-                content.classList.toggle('collapsed');
+        header.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const section = header.closest('.control-section.collapsible');
+            if (section) {
+                section.classList.toggle('collapsed');
+                const icon = header.querySelector('.collapse-icon');
                 if (icon) {
-                    icon.textContent = content.classList.contains('collapsed') ? '▸' : '▾';
+                    icon.textContent = section.classList.contains('collapsed') ? '▶' : '▼';
                 }
             }
         });

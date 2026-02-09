@@ -16,7 +16,7 @@ for (let i = 0; i < 256; i++) {
 }
 
 // Check if Web Crypto API is available (requires secure context)
-const CRYPTO_AVAILABLE = typeof crypto !== 'undefined' && crypto.subtle;
+export const CRYPTO_AVAILABLE = typeof crypto !== 'undefined' && crypto.subtle;
 
 /**
  * Calculate SHA-256 hash of a Blob or ArrayBuffer
@@ -244,6 +244,7 @@ export class ArchiveCreator {
             },
             data_entries: {},
             annotations: [],
+            version_history: [],
             _meta: {}
         };
     }
@@ -605,6 +606,7 @@ export class ArchiveCreator {
             created_by: options.created_by || "unknown",
             _created_by_version: options.created_by_version || "",
             _source_notes: options.source_notes || "",
+            role: options.role || "",
             _parameters: {
                 position: options.position || [0, 0, 0],
                 rotation: options.rotation || [0, 0, 0],
@@ -621,13 +623,14 @@ export class ArchiveCreator {
      * @param {number} index - Scene index (0-based)
      * @param {Object} metadata - Metadata to update
      */
-    updateSceneMetadata(index, { createdBy, version, sourceNotes }) {
+    updateSceneMetadata(index, { createdBy, version, sourceNotes, role }) {
         const entryKey = `scene_${index}`;
         if (!this.manifest.data_entries[entryKey]) return false;
 
         if (createdBy !== undefined) this.manifest.data_entries[entryKey].created_by = createdBy;
         if (version !== undefined) this.manifest.data_entries[entryKey]._created_by_version = version;
         if (sourceNotes !== undefined) this.manifest.data_entries[entryKey]._source_notes = sourceNotes;
+        if (role !== undefined) this.manifest.data_entries[entryKey].role = role;
         return true;
     }
 
@@ -650,6 +653,7 @@ export class ArchiveCreator {
             created_by: options.created_by || "unknown",
             _created_by_version: options.created_by_version || "",
             _source_notes: options.source_notes || "",
+            role: options.role || "",
             _parameters: {
                 position: options.position || [0, 0, 0],
                 rotation: options.rotation || [0, 0, 0],
@@ -666,13 +670,14 @@ export class ArchiveCreator {
      * @param {number} index - Mesh index (0-based)
      * @param {Object} metadata - Metadata to update
      */
-    updateMeshMetadata(index, { createdBy, version, sourceNotes }) {
+    updateMeshMetadata(index, { createdBy, version, sourceNotes, role }) {
         const entryKey = `mesh_${index}`;
         if (!this.manifest.data_entries[entryKey]) return false;
 
         if (createdBy !== undefined) this.manifest.data_entries[entryKey].created_by = createdBy;
         if (version !== undefined) this.manifest.data_entries[entryKey]._created_by_version = version;
         if (sourceNotes !== undefined) this.manifest.data_entries[entryKey]._source_notes = sourceNotes;
+        if (role !== undefined) this.manifest.data_entries[entryKey].role = role;
         return true;
     }
 
@@ -695,6 +700,7 @@ export class ArchiveCreator {
             created_by: options.created_by || "unknown",
             _created_by_version: options.created_by_version || "",
             _source_notes: options.source_notes || "",
+            role: options.role || "",
             _parameters: {
                 position: options.position || [0, 0, 0],
                 rotation: options.rotation || [0, 0, 0],
@@ -711,13 +717,14 @@ export class ArchiveCreator {
      * @param {number} index - Pointcloud index (0-based)
      * @param {Object} metadata - Metadata to update
      */
-    updatePointcloudMetadata(index, { createdBy, version, sourceNotes }) {
+    updatePointcloudMetadata(index, { createdBy, version, sourceNotes, role }) {
         const entryKey = `pointcloud_${index}`;
         if (!this.manifest.data_entries[entryKey]) return false;
 
         if (createdBy !== undefined) this.manifest.data_entries[entryKey].created_by = createdBy;
         if (version !== undefined) this.manifest.data_entries[entryKey]._created_by_version = version;
         if (sourceNotes !== undefined) this.manifest.data_entries[entryKey]._source_notes = sourceNotes;
+        if (role !== undefined) this.manifest.data_entries[entryKey].role = role;
         return true;
     }
 
@@ -800,6 +807,29 @@ export class ArchiveCreator {
     addAnnotation(annotation) {
         this.annotations.push(annotation);
         this.manifest.annotations = this.annotations;
+    }
+
+    /**
+     * Set version history entries
+     * @param {Array} entries - Array of {version, date, description}
+     */
+    setVersionHistory(entries) {
+        this.manifest.version_history = Array.isArray(entries) ? [...entries] : [];
+    }
+
+    /**
+     * Add a single version history entry
+     * @param {Object} entry - {version, date, description}
+     */
+    addVersionHistoryEntry(entry) {
+        if (!this.manifest.version_history) {
+            this.manifest.version_history = [];
+        }
+        this.manifest.version_history.push({
+            version: entry.version || '',
+            date: entry.date || new Date().toISOString().split('T')[0],
+            description: entry.description || ''
+        });
     }
 
     /**
@@ -908,6 +938,11 @@ export class ArchiveCreator {
         // Custom fields
         if (metadata.customFields && Object.keys(metadata.customFields).length > 0) {
             this.setCustomFields(metadata.customFields);
+        }
+
+        // Version history
+        if (metadata.versionHistory && metadata.versionHistory.length > 0) {
+            this.setVersionHistory(metadata.versionHistory);
         }
 
         // Quality stats (read-only computed stats)

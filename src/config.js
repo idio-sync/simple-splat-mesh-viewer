@@ -122,10 +122,11 @@
     const modelUrl = validateUrl(params.get('model'), 'model');
     const pointcloudUrl = validateUrl(params.get('pointcloud'), 'pointcloud');
     const alignmentUrl = validateUrl(params.get('alignment'), 'alignment');
-    const controlsMode = params.get('controls') || 'full'; // full, minimal, none
-    const viewMode = params.get('mode') || 'model'; // splat, model, pointcloud, both, split
-    const toolbarMode = params.get('toolbar') || 'show'; // show, hide
-    const sidebarMode = params.get('sidebar') || 'closed'; // closed, view, edit
+    const kioskMode = params.get('kiosk') === 'true';
+    const controlsMode = kioskMode ? 'none' : (params.get('controls') || 'full'); // full, minimal, none
+    const viewMode = params.get('mode') || (kioskMode ? 'both' : 'model'); // splat, model, pointcloud, both, split
+    const toolbarMode = kioskMode ? 'show' : (params.get('toolbar') || 'show'); // show, hide
+    const sidebarMode = kioskMode ? 'closed' : (params.get('sidebar') || 'closed'); // closed, view, edit
 
     // Parse inline alignment params
     const splatPos = parseVec3(params.get('sp'));
@@ -171,6 +172,7 @@
     // none: hide all controls (view only)
 
     window.APP_CONFIG = {
+        kiosk: kioskMode,
         defaultArchiveUrl: archiveUrl,
         defaultSplatUrl: splatUrl,
         defaultModelUrl: modelUrl,

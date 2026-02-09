@@ -221,6 +221,12 @@
 
 **Solutions:**
 - **Short-term:** Display a prominent UI warning when `crypto.subtle` is unavailable: "Integrity hashing unavailable — HTTPS required. Archives created here will not include checksums."
+
+  **Status: Implemented (2026-02-08)**
+  - Warning banner added to Integrity tab (shows when crypto.subtle unavailable)
+  - Toast notification on page load for HTTP contexts
+  - Advisory only, does not block archive creation
+
 - **Medium-term:** Bundle a pure-JavaScript SHA-256 fallback (e.g., from the `js-sha256` library, ~4KB minified). Use `crypto.subtle` when available for performance, fall back to the JS implementation on HTTP. This ensures integrity data is always present.
 - **Long-term:** Enforce HTTPS for the application in production deployments. The Docker/nginx configuration should redirect HTTP to HTTPS. Document HTTPS as a deployment requirement.
 
@@ -319,6 +325,13 @@
   - Dates: ISO 8601 format validation
   - PRONOM IDs: regex `fmt/\d+` or `x-fmt/\d+`
   Display validation errors inline next to the field.
+
+  **Status: Implemented (2026-02-08)**
+  - Format validation for ORCID, coordinates, dates, PRONOM IDs
+  - Inline error display with blur-triggered validation
+  - Advisory only, does not block export
+  - CSS classes for error/valid states
+
 - **Medium-term:** Validate the entire manifest against a JSON Schema before export. Show a validation report listing errors, warnings, and suggestions. Allow export with warnings but block export with errors (e.g., missing required fields).
 - **Long-term:** Implement a pre-submission validation service that checks metadata against institutional requirements. Different institutions may have different required fields — support configurable validation profiles.
 
@@ -348,6 +361,13 @@
     }
   ]
   ```
+
+  **Status: Implemented (2026-02-08)**
+  - version_history array added to manifest root
+  - UI in Project tab with "Add Version Entry" button
+  - Each entry contains: version, date, description
+  - Preserved on archive re-import (round-trip support)
+
 - **Medium-term:** Implement a diff tool that can compare two `.a3d` archives and report changes: new/modified/removed files, metadata differences, annotation changes, transform differences.
 - **Long-term:** Support incremental archives that reference a base archive and contain only the changed files. This reduces storage for large datasets with frequent updates. Implement a PREMIS-style event log that records every significant action (creation, annotation, re-alignment, export).
 
@@ -478,6 +498,13 @@
     }
   }
   ```
+
+  **Status: Implemented (2026-02-08)**
+  - Role field added to each data entry (primary/derived/blank)
+  - Dropdown in Assets tab for splat, mesh, and pointcloud
+  - Stored in manifest as data_entries[key].role
+  - Preserved on round-trip
+
 - **Medium-term:** Support a derivation chain in the manifest that records how each file was produced from its parent: which software, which parameters, which version. This creates a full processing provenance graph within the archive, not just a flat list of files.
 - **Long-term:** Align the data hierarchy with PREMIS (Preservation Metadata: Implementation Strategies) object relationships. PREMIS defines relationship types like `isDerivedFrom`, `hasSource`, `isPartOf` that map naturally to this hierarchy and are understood by preservation systems worldwide.
 
