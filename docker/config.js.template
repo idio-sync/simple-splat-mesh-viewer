@@ -127,12 +127,15 @@
     const pointcloudUrl = validateUrl(params.get('pointcloud') || envPointcloud, 'pointcloud');
     const alignmentUrl = validateUrl(params.get('alignment') || envAlignment, 'alignment');
 
-    // Control and view mode settings
+    // Kiosk mode
+    const kioskMode = params.get('kiosk') === 'true';
+
+    // Control and view mode settings (kiosk overrides defaults)
     const urlControls = params.get('controls'); // 'full', 'minimal', 'none', or null
-    const controlsMode = urlControls || 'full';
-    const viewMode = params.get('mode') || 'model'; // splat, model, pointcloud, both, split
-    const toolbarMode = params.get('toolbar') || 'show'; // show, hide
-    const sidebarMode = params.get('sidebar') || 'closed'; // closed, view, edit
+    const controlsMode = kioskMode ? 'none' : (urlControls || 'full');
+    const viewMode = params.get('mode') || (kioskMode ? 'both' : 'model'); // splat, model, pointcloud, both, split
+    const toolbarMode = kioskMode ? 'show' : (params.get('toolbar') || 'show'); // show, hide
+    const sidebarMode = kioskMode ? 'closed' : (params.get('sidebar') || 'closed'); // closed, view, edit
 
     // Parse inline alignment params
     const splatPos = parseVec3(params.get('sp'));
@@ -173,6 +176,7 @@
     }
 
     window.APP_CONFIG = {
+        kiosk: kioskMode,
         defaultArchiveUrl: archiveUrl,
         defaultSplatUrl: splatUrl,
         defaultModelUrl: modelUrl,
@@ -181,7 +185,7 @@
         inlineAlignment: inlineAlignment,
 
         // Logic: Show controls if Env says yes AND URL doesn't explicitly say 'none'
-        showControls: (envShowControls && urlControls !== 'none'),
+        showControls: kioskMode ? true : (envShowControls && urlControls !== 'none'),
 
         // Control panel mode
         controlsMode: controlsMode,
