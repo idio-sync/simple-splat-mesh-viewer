@@ -250,6 +250,212 @@ export class ArchiveCreator {
     }
 
     /**
+     * Generate a plain-text README for inclusion in the archive.
+     * Written for maximum longevity: pure ASCII, no markup, no Unicode.
+     * A reader in 50 or 200 years should be able to understand the archive
+     * contents without any knowledge of this software.
+     * @returns {string} Plain-text README content
+     */
+    _generateReadme() {
+        const m = this.manifest;
+        const lines = [];
+        const W = 68; // line width for separators
+        const sep = '='.repeat(W);
+        const subsep = '-'.repeat(W);
+
+        // -- Header --
+        lines.push(sep);
+        lines.push('ARCHIVE-3D CONTAINER');
+        lines.push(sep);
+        lines.push('');
+        lines.push('This file is a self-contained archive of 3D scan data in the');
+        lines.push('archive-3d format. It is a standard ZIP file. You can extract');
+        lines.push('its contents with any ZIP utility on any operating system.');
+        lines.push('');
+
+        // -- Project --
+        const hasProject = m.project.title || m.project.description;
+        if (hasProject) {
+            lines.push('PROJECT');
+            lines.push(subsep);
+            if (m.project.title) lines.push(`Title:       ${m.project.title}`);
+            if (m.project.description) {
+                // Strip asset: references and keep plain text only
+                const desc = m.project.description
+                    .replace(/!\[.*?\]\(asset:[^)]+\)/g, '')
+                    .replace(/\n+/g, ' ')
+                    .trim();
+                if (desc) lines.push(`Description: ${desc}`);
+            }
+            if (m.project.license) lines.push(`License:     ${m.project.license}`);
+            if (m.archival_record?.creation?.creator) {
+                lines.push(`Creator:     ${m.archival_record.creation.creator}`);
+            } else if (m.provenance.operator) {
+                lines.push(`Operator:    ${m.provenance.operator}`);
+            }
+            if (m.provenance.capture_date) lines.push(`Captured:    ${m.provenance.capture_date}`);
+            if (m.provenance.location) lines.push(`Location:    ${m.provenance.location}`);
+            if (m.provenance.capture_device) lines.push(`Device:      ${m.provenance.capture_device}`);
+            lines.push('');
+        }
+
+        // -- Contents --
+        lines.push('CONTENTS');
+        lines.push(subsep);
+        lines.push('manifest.json    Structured metadata (JSON format)');
+
+        // List data entry files with descriptions
+        const formatLabels = {
+            ply: 'Gaussian splat data (PLY format)',
+            splat: 'Gaussian splat data',
+            ksplat: 'Gaussian splat data',
+            spz: 'Gaussian splat data (Spark compressed)',
+            sog: 'Gaussian splat data (SOG format)',
+            glb: '3D mesh (glTF Binary format)',
+            gltf: '3D mesh (glTF format)',
+            obj: '3D mesh (Wavefront OBJ format)',
+            e57: 'Point cloud (ASTM E57 format)',
+            jpg: 'Image',
+            jpeg: 'Image',
+            png: 'Image',
+        };
+
+        for (const [key, entry] of Object.entries(m.data_entries)) {
+            const fname = entry.file_name;
+            const ext = fname.split('.').pop().toLowerCase();
+            let label = formatLabels[ext] || 'Data file';
+            if (key.startsWith('thumbnail_')) label = 'Thumbnail preview';
+            if (key.startsWith('image_')) label = 'Embedded image';
+            const role = entry.role ? ` [${entry.role}]` : '';
+
+            // Find size from this.files if available
+            const fileInfo = this.files.get(fname);
+            let sizeStr = '';
+            if (fileInfo) {
+                const bytes = fileInfo.blob.size;
+                if (bytes >= 1024 * 1024) {
+                    sizeStr = ` (${(bytes / (1024 * 1024)).toFixed(1)} MB)`;
+                } else if (bytes >= 1024) {
+                    sizeStr = ` (${(bytes / 1024).toFixed(0)} KB)`;
+                }
+            }
+            const padded = (fname + sizeStr).padEnd(24);
+            lines.push(`${padded} ${label}${role}`);
+        }
+
+        lines.push('README.txt'.padEnd(24) + ' This file');
+        lines.push('');
+
+        // Annotation count
+        if (m.annotations && m.annotations.length > 0) {
+            lines.push(`This archive contains ${m.annotations.length} spatial annotation(s)`);
+            lines.push('stored in manifest.json.');
+            lines.push('');
+        }
+
+        // -- Technology Guide --
+        lines.push('TECHNOLOGY GUIDE');
+        lines.push(subsep);
+        lines.push('The data files in this archive use open, documented formats.');
+        lines.push('Below is a brief description of each, for reference:');
+        lines.push('');
+
+        // Only list formats that are actually present
+        const presentExts = new Set();
+        for (const entry of Object.values(m.data_entries)) {
+            presentExts.add(entry.file_name.split('.').pop().toLowerCase());
+        }
+
+        if (presentExts.has('glb') || presentExts.has('gltf')) {
+            lines.push('  glTF / GLB (Graphics Language Transmission Format)');
+            lines.push('    An open standard by the Khronos Group for 3D models.');
+            lines.push('    Contains geometry, materials, and textures. GLB is the');
+            lines.push('    binary-packed variant. Widely supported by 3D software');
+            lines.push('    including Blender, MeshLab, and most CAD tools.');
+            lines.push('    Specification: https://www.khronos.org/gltf/');
+            lines.push('');
+        }
+        if (presentExts.has('obj')) {
+            lines.push('  OBJ (Wavefront OBJ)');
+            lines.push('    A plain-text 3D geometry format. Contains vertices,');
+            lines.push('    faces, and normals. Readable by virtually all 3D');
+            lines.push('    software. Developed by Wavefront Technologies (1980s).');
+            lines.push('');
+        }
+        if (presentExts.has('e57')) {
+            lines.push('  E57 (ASTM E2807 standard)');
+            lines.push('    A standardized format for 3D point cloud data from');
+            lines.push('    laser scanners and other 3D imaging systems. Governed');
+            lines.push('    by ASTM International. Supported by CloudCompare,');
+            lines.push('    Leica Cyclone, Autodesk ReCap, and most survey tools.');
+            lines.push('    Standard: ASTM E2807-11');
+            lines.push('');
+        }
+        if (presentExts.has('ply') || presentExts.has('splat') || presentExts.has('ksplat') || presentExts.has('spz') || presentExts.has('sog')) {
+            lines.push('  PLY / splat formats (Gaussian Splatting)');
+            lines.push('    3D Gaussian Splatting is a rendering technique published');
+            lines.push('    in 2023 that represents scenes as collections of 3D');
+            lines.push('    Gaussian primitives. These formats store per-splat');
+            lines.push('    attributes (position, covariance, color, opacity).');
+            lines.push('    NOTE: This is a rapidly evolving technology. The splat');
+            lines.push('    files in this archive are derived visualization products,');
+            lines.push('    not primary measurement data. If these formats become');
+            lines.push('    unreadable in the future, the mesh and/or point cloud');
+            lines.push('    files in this archive preserve the underlying geometry.');
+            lines.push('');
+        }
+
+        lines.push('  JSON (JavaScript Object Notation)');
+        lines.push('    A plain-text data interchange format. The manifest.json');
+        lines.push('    file contains all metadata, spatial annotations, and');
+        lines.push('    alignment transforms. Readable by any text editor and');
+        lines.push('    parseable by every modern programming language.');
+        lines.push('    Specification: RFC 8259 / ECMA-404');
+        lines.push('');
+
+        // -- How To Use --
+        lines.push('HOW TO USE THIS ARCHIVE');
+        lines.push(subsep);
+        lines.push('1. Extract the ZIP file using any standard tool:');
+        lines.push('     unzip archive.a3d');
+        lines.push('   or rename to .zip and use your OS built-in extractor.');
+        lines.push('');
+        lines.push('2. Open manifest.json in any text editor to read the full');
+        lines.push('   metadata: project information, provenance, quality metrics,');
+        lines.push('   spatial annotations, and alignment transforms.');
+        lines.push('');
+        lines.push('3. Open the 3D data files in appropriate software:');
+        lines.push('   - GLB/glTF/OBJ meshes: Blender, MeshLab, or any 3D viewer');
+        lines.push('   - E57 point clouds: CloudCompare, Leica Cyclone, ReCap');
+        lines.push('   - PLY splat files: any Gaussian splatting viewer');
+        lines.push('');
+        lines.push('4. The alignment transforms in manifest.json (under each');
+        lines.push('   data entry\'s _parameters field) record the position,');
+        lines.push('   rotation, and scale needed to spatially register the');
+        lines.push('   assets relative to each other.');
+        lines.push('');
+
+        // -- About This Format --
+        lines.push('ABOUT THIS FORMAT');
+        lines.push(subsep);
+        lines.push(`Format:    archive-3d v${m.container_version}`);
+        lines.push(`Created:   ${m._creation_date}`);
+        lines.push(`Packer:    ${m.packer} v${m.packer_version}`);
+        lines.push('');
+        lines.push('The archive-3d format is an open container for bundling 3D');
+        lines.push('scan data with structured metadata for long-term preservation.');
+        lines.push('It uses standard ZIP compression and JSON metadata so that no');
+        lines.push('specialized software is required to extract or inspect the');
+        lines.push('contents.');
+        lines.push('');
+        lines.push('For the format specification, see:');
+        lines.push('  https://github.com/idio-sync/archive-3d');
+        lines.push('');
+
+        return lines.join('\n');
+    }
+
+    /**
      * Reset the creator to empty state
      * Note: hashCache is preserved to allow reuse of pre-computed hashes
      */
@@ -1127,6 +1333,10 @@ export class ArchiveCreator {
         log.debug(' Generating manifest');
         const manifestJson = this.generateManifest();
         zipData['manifest.json'] = [strToU8(manifestJson), { level: 6 }];
+
+        // Add plain-text README for long-term discoverability
+        const readmeText = this._generateReadme();
+        zipData['README.txt'] = [strToU8(readmeText), { level: 6 }];
 
         // Convert blobs to Uint8Array and add to structure
         log.debug(' Converting files, count:', this.files.size);

@@ -93,7 +93,7 @@ Prioritized list of future work, drawn from the [code review](CODE_REVIEW.md), [
 
 ### Preservation Standards
 - [ ] Add OAIS reference model mapping to the specification document
-- [ ] Include a plain-text `README.txt` in every archive explaining how to extract and read the contents
+- [x] Include a plain-text `README.txt` in every archive explaining how to extract and read the contents
 - [ ] Generate standards-compliant metadata sidecar files on demand (Dublin Core XML, METS, PREMIS)
 
 ---
