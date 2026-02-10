@@ -21,6 +21,11 @@ Prioritized list of future work, drawn from the [code review](CODE_REVIEW.md), [
 
 ## High Priority
 
+## Mobile Support
+- [ ] Add mobile friendly layout and view for kiosk mode
+- [x] **Done** — Display proxy (LOD) mesh support in archives — upload a pre-simplified mesh, kiosk viewer loads it automatically
+- [ ] Auto-detect mobile devices in kiosk viewer and warn if no proxy mesh available
+
 ### Measurement & Analysis Tools
 - [ ] Point-to-point distance measurement (click two surface points, display Euclidean distance)
 - [ ] Coordinate readout on hover (XYZ in scene units)
@@ -107,9 +112,10 @@ Prioritized list of future work, drawn from the [code review](CODE_REVIEW.md), [
 - [ ] Change detection — compare two captures of the same subject over time
 
 ### Progressive Loading
-- [ ] Mesh simplification on load — create a display-resolution proxy for large meshes
+- [x] **Done** — Multi-resolution archives with LOD proxy variants in the manifest (`lod: "proxy"`, `derived_from`)
+- [ ] In-browser mesh decimation via meshoptimizer WASM (for meshes under 2M faces)
 - [ ] Octree-based point cloud renderer that loads visible nodes on demand
-- [ ] Multi-resolution archives with LOD variants listed in the manifest
+- [ ] Draco/meshopt geometry compression for smaller archive transfer size
 
 ### Alignment
 - [ ] Add convergence criteria and maximum correspondence distance to ICP

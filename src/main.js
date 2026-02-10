@@ -7,7 +7,7 @@ import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader, isArchiveFile } from './modules/archive-loader.js';
 import { AnnotationSystem } from './modules/annotation-system.js';
 import { ArchiveCreator, captureScreenshot, CRYPTO_AVAILABLE } from './modules/archive-creator.js';
-import { CAMERA, TIMING, ASSET_STATE } from './modules/constants.js';
+import { CAMERA, TIMING, ASSET_STATE, MESH_LOD } from './modules/constants.js';
 import { Logger, notify, processMeshMaterials, computeMeshFaceCount, computeMeshVertexCount, disposeObject, parseMarkdown, resolveAssetRefs, fetchWithProgress } from './modules/utilities.js';
 import { FlyControls } from './modules/fly-controls.js';
 import { SceneManager } from './modules/scene-manager.js';
@@ -47,6 +47,7 @@ import {
     loadPointcloudFromFile as loadPointcloudFromFileHandler,
     loadPointcloudFromUrl as loadPointcloudFromUrlHandler,
     loadPointcloudFromBlobUrl as loadPointcloudFromBlobUrlHandler,
+    loadArchiveFullResMesh,
     updatePointcloudPointSize,
     updatePointcloudOpacity,
     updateModelTextures
@@ -195,6 +196,8 @@ const state = {
     archiveLoader: null,
     // Per-asset loading state for lazy archive extraction
     assetStates: { splat: ASSET_STATE.UNLOADED, mesh: ASSET_STATE.UNLOADED, pointcloud: ASSET_STATE.UNLOADED },
+    // Whether the currently displayed mesh is a proxy (display-quality LOD)
+    viewingProxy: false,
     // Embedded images for annotation/description markdown
     imageAssets: new Map()
 };
@@ -218,6 +221,7 @@ let archiveCreator = null;
 // Blob data for archive export (stored when loading files)
 let currentSplatBlob = null;
 let currentMeshBlob = null;
+let currentProxyMeshBlob = null;
 let currentPointcloudBlob = null;
 let currentPopupAnnotationId = null; // Track which annotation's popup is shown
 
@@ -269,6 +273,12 @@ function createFileHandlerDeps() {
                 storeLastPositions();
                 currentMeshBlob = file;
                 document.getElementById('model-faces').textContent = (faceCount || 0).toLocaleString();
+                // Advisory face count warnings
+                if (faceCount > MESH_LOD.DESKTOP_WARNING_FACES) {
+                    notify.warning(`Mesh has ${faceCount.toLocaleString()} faces. A display proxy is recommended for broad device support.`);
+                } else if (faceCount > MESH_LOD.MOBILE_WARNING_FACES) {
+                    notify.info(`Mesh has ${faceCount.toLocaleString()} faces — may not display on mobile/tablet. Consider adding a display proxy.`);
+                }
                 // Auto-align if splat is already loaded, otherwise center on grid
                 if (state.splatLoaded) {
                     setTimeout(() => autoAlignObjects(), TIMING.AUTO_ALIGN_DELAY);
@@ -512,8 +522,11 @@ function setupUIEvents() {
     addListener('model-input', 'change', handleModelFile);
     addListener('archive-input', 'change', handleArchiveFile);
     addListener('pointcloud-input', 'change', handlePointcloudFile);
+    addListener('proxy-mesh-input', 'change', handleProxyMeshFile);
     addListener('btn-load-pointcloud-url', 'click', handleLoadPointcloudFromUrlPrompt);
     addListener('btn-load-archive-url', 'click', handleLoadArchiveFromUrlPrompt);
+    addListener('btn-load-full-res', 'click', handleLoadFullResMesh);
+    addListener('proxy-load-full-link', 'click', (e) => { e.preventDefault(); handleLoadFullResMesh(); });
 
     // URL load buttons (using prompt)
     const splatUrlBtn = document.getElementById('btn-load-splat-url');
@@ -1249,23 +1262,43 @@ async function ensureAssetLoaded(assetType) {
             return true;
 
         } else if (assetType === 'mesh') {
-            const meshEntry = archiveLoader.getMeshEntry();
             const contentInfo = archiveLoader.getContentInfo();
+            const meshEntry = archiveLoader.getMeshEntry();
             if (!meshEntry || !contentInfo.hasMesh) {
                 state.assetStates[assetType] = ASSET_STATE.UNLOADED;
                 return false;
             }
-            const meshData = await archiveLoader.extractFile(meshEntry.file_name);
+            // Prefer proxy mesh when available
+            const proxyEntry = archiveLoader.getMeshProxyEntry();
+            const useProxy = contentInfo.hasMeshProxy && proxyEntry;
+            const entryToLoad = useProxy ? proxyEntry : meshEntry;
+
+            const meshData = await archiveLoader.extractFile(entryToLoad.file_name);
             if (!meshData) { state.assetStates[assetType] = ASSET_STATE.ERROR; return false; }
-            await loadModelFromBlobUrl(meshData.url, meshEntry.file_name);
-            // Apply transform
+            await loadModelFromBlobUrl(meshData.url, entryToLoad.file_name);
+            // Apply transform from primary mesh entry
             const transform = archiveLoader.getEntryTransform(meshEntry);
             if (modelGroup && (transform.position.some(v => v !== 0) || transform.rotation.some(v => v !== 0) || transform.scale !== 1)) {
                 modelGroup.position.fromArray(transform.position);
                 modelGroup.rotation.set(...transform.rotation);
                 modelGroup.scale.setScalar(transform.scale);
             }
-            currentMeshBlob = meshData.blob;
+            if (useProxy) {
+                // Store the proxy blob for re-export, extract full-res blob in background
+                currentProxyMeshBlob = meshData.blob;
+                const proxyName = entryToLoad.file_name.split('/').pop();
+                const proxyFilenameEl = document.getElementById('proxy-mesh-filename');
+                if (proxyFilenameEl) proxyFilenameEl.textContent = proxyName;
+                archiveLoader.extractFile(meshEntry.file_name).then(fullData => {
+                    if (fullData) currentMeshBlob = fullData.blob;
+                }).catch(() => {});
+                state.viewingProxy = true;
+                document.getElementById('proxy-mesh-indicator')?.classList.remove('hidden');
+                const fullResBtn = document.getElementById('btn-load-full-res');
+                if (fullResBtn) fullResBtn.style.display = '';
+            } else {
+                currentMeshBlob = meshData.blob;
+            }
             state.assetStates[assetType] = ASSET_STATE.LOADED;
             return true;
 
@@ -2106,6 +2139,14 @@ async function downloadArchive() {
 
     // Add mesh if loaded and selected
     log.info(' Checking mesh:', { currentMeshBlob: !!currentMeshBlob, modelLoaded: state.modelLoaded });
+    // If viewing a proxy and full-res blob hasn't been extracted yet, extract now
+    if (includeModel && state.modelLoaded && !currentMeshBlob && state.viewingProxy && state.archiveLoader) {
+        const meshEntry = state.archiveLoader.getMeshEntry();
+        if (meshEntry) {
+            const fullData = await state.archiveLoader.extractFile(meshEntry.file_name);
+            if (fullData) currentMeshBlob = fullData.blob;
+        }
+    }
     if (includeModel && currentMeshBlob && state.modelLoaded) {
         const fileName = document.getElementById('model-filename')?.textContent || 'mesh.glb';
         const position = modelGroup ? [modelGroup.position.x, modelGroup.position.y, modelGroup.position.z] : [0, 0, 0];
@@ -2119,6 +2160,20 @@ async function downloadArchive() {
             created_by_version: metadata.meshMetadata.version || '',
             source_notes: metadata.meshMetadata.sourceNotes || '',
             role: metadata.meshMetadata.role || ''
+        });
+    }
+
+    // Add display proxy mesh if available
+    if (includeModel && currentProxyMeshBlob) {
+        const proxyFileName = document.getElementById('proxy-mesh-filename')?.textContent || 'mesh_proxy.glb';
+        const position = modelGroup ? [modelGroup.position.x, modelGroup.position.y, modelGroup.position.z] : [0, 0, 0];
+        const rotation = modelGroup ? [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z] : [0, 0, 0];
+        const scale = modelGroup ? modelGroup.scale.x : 1;
+
+        log.info(' Adding mesh proxy:', { proxyFileName });
+        archiveCreator.addMeshProxy(currentProxyMeshBlob, proxyFileName, {
+            position, rotation, scale,
+            derived_from: 'mesh_0'
         });
     }
 
@@ -3285,6 +3340,48 @@ async function handleModelFile(event) {
         log.error('Error loading model:', error);
         hideLoading();
         notify.error('Error loading model: ' + error.message);
+    }
+}
+
+async function handleProxyMeshFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    currentProxyMeshBlob = file;
+    document.getElementById('proxy-mesh-filename').textContent = file.name;
+    notify.info(`Display proxy "${file.name}" ready — will be included in archive exports.`);
+}
+
+async function handleLoadFullResMesh() {
+    const archiveLoader = state.archiveLoader;
+    if (!archiveLoader) {
+        notify.error('No archive loaded');
+        return;
+    }
+
+    showLoading('Loading full resolution mesh...');
+    try {
+        const result = await loadArchiveFullResMesh(archiveLoader, createFileHandlerDeps());
+        if (result.loaded) {
+            currentMeshBlob = result.blob;
+            state.viewingProxy = false;
+            document.getElementById('model-faces').textContent = (result.faceCount || 0).toLocaleString();
+            // Hide proxy indicator and Load Full Res button
+            document.getElementById('proxy-mesh-indicator')?.classList.add('hidden');
+            const fullResBtn = document.getElementById('btn-load-full-res');
+            if (fullResBtn) fullResBtn.style.display = 'none';
+            updateModelOpacity();
+            updateModelWireframe();
+            updateVisibility();
+            notify.success('Full resolution mesh loaded');
+        } else {
+            notify.error(result.error || 'Failed to load full resolution mesh');
+        }
+        hideLoading();
+    } catch (error) {
+        log.error('Error loading full resolution mesh:', error);
+        hideLoading();
+        notify.error('Error loading full resolution mesh: ' + error.message);
     }
 }
 

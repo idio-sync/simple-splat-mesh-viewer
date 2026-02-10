@@ -160,6 +160,17 @@ export const ASSET_STATE = {
 };
 
 // =============================================================================
+// MESH LOD / PROXY THRESHOLDS
+// =============================================================================
+
+export const MESH_LOD = {
+    // Face count above which a mobile warning is shown (advisory only)
+    MOBILE_WARNING_FACES: 300_000,
+    // Face count above which a general GPU memory warning is shown (advisory only)
+    DESKTOP_WARNING_FACES: 10_000_000
+};
+
+// =============================================================================
 // FILE HANDLING
 // =============================================================================
 

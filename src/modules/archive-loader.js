@@ -355,12 +355,36 @@ export class ArchiveLoader {
     }
 
     /**
-     * Get the primary mesh entry
+     * Get the primary mesh entry (excludes proxy entries)
      * @returns {Object|null} The mesh entry or null
      */
     getMeshEntry() {
         const meshes = this.findEntriesByPrefix('mesh_');
+        // Return the first non-proxy mesh entry
+        for (const { key, entry } of meshes) {
+            if (entry.lod !== 'proxy') return entry;
+        }
         return meshes.length > 0 ? meshes[0].entry : null;
+    }
+
+    /**
+     * Get the display proxy mesh entry if one exists
+     * @returns {Object|null} The proxy mesh entry or null
+     */
+    getMeshProxyEntry() {
+        const meshes = this.findEntriesByPrefix('mesh_');
+        for (const { key, entry } of meshes) {
+            if (entry.lod === 'proxy') return entry;
+        }
+        return null;
+    }
+
+    /**
+     * Check if the archive has a display proxy for the mesh
+     * @returns {boolean}
+     */
+    hasMeshProxy() {
+        return this.getMeshProxyEntry() !== null;
     }
 
     /**
@@ -515,12 +539,14 @@ export class ArchiveLoader {
     getContentInfo() {
         const scene = this.getSceneEntry();
         const mesh = this.getMeshEntry();
+        const meshProxy = this.getMeshProxyEntry();
         const pointcloud = this.getPointcloudEntry();
         const thumbnail = this.getThumbnailEntry();
 
         return {
             hasSplat: scene !== null && isFormatSupported(scene.file_name, 'splat'),
             hasMesh: mesh !== null && isFormatSupported(mesh.file_name, 'mesh'),
+            hasMeshProxy: meshProxy !== null && isFormatSupported(meshProxy.file_name, 'mesh'),
             hasPointcloud: pointcloud !== null && isFormatSupported(pointcloud.file_name, 'pointcloud'),
             hasThumbnail: thumbnail !== null && isFormatSupported(thumbnail.file_name, 'thumbnail')
         };

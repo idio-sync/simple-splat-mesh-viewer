@@ -92,6 +92,13 @@
                         <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
                     </svg>
                 </button>
+                <button id="btn-load-full-res" class="toolbar-btn" title="Load Full Resolution Mesh" style="display:none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                        <polyline points="2 17 12 22 22 17"></polyline>
+                        <polyline points="2 12 12 17 22 12"></polyline>
+                    </svg>
+                </button>
                 <button id="btn-export-archive" class="toolbar-btn" title="Export Archive">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -109,6 +116,9 @@
             <div id="annotation-mode-indicator" class="hidden">
                 Click on model to place annotation
             </div>
+            <div id="proxy-mesh-indicator" class="hidden">
+                Viewing display proxy &middot; <a href="#" id="proxy-load-full-link">Load full resolution</a>
+            </div>
         </div>
 
         <!-- Annotation markers container -->
@@ -120,7 +130,7 @@
                 <span class="annotation-info-number"></span>
                 <h4 class="annotation-info-title"></h4>
             </div>
-            <p class="annotation-info-body"></p>
+            <div class="annotation-info-body"></div>
         </div>
 
         <!-- Annotation bar at bottom -->
@@ -913,6 +923,15 @@
                             <button id="btn-load-model-url" class="action-btn">From URL</button>
                         </div>
                         <span id="model-filename" class="filename">No file loaded</span>
+                    </div>
+                    <div class="load-subsection" id="proxy-mesh-subsection">
+                        <h4>Display Proxy (.glb, .gltf, .obj) <span class="optional-label">optional</span></h4>
+                        <input type="file" id="proxy-mesh-input" accept=".glb,.gltf,.obj" />
+                        <div class="button-row">
+                            <label for="proxy-mesh-input" class="file-label">From File</label>
+                        </div>
+                        <span id="proxy-mesh-filename" class="filename">No proxy loaded</span>
+                        <p class="field-hint">Pre-simplified mesh for mobile/tablet viewers. Full-resolution mesh is preserved in the archive.</p>
                     </div>
                     <div class="load-subsection">
                         <h4>Point Cloud (.e57)</h4>

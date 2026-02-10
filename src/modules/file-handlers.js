@@ -800,29 +800,40 @@ export async function loadArchiveAsset(archiveLoader, assetType, deps) {
             return { loaded: true, blob: splatData.blob, error: null };
 
         } else if (assetType === 'mesh') {
-            const meshEntry = archiveLoader.getMeshEntry();
             const contentInfo = archiveLoader.getContentInfo();
+            const meshEntry = archiveLoader.getMeshEntry();
             if (!meshEntry || !contentInfo.hasMesh) {
                 state.assetStates[assetType] = ASSET_STATE.UNLOADED;
                 return { loaded: false, blob: null, error: 'No mesh in archive' };
             }
 
-            const meshData = await archiveLoader.extractFile(meshEntry.file_name);
+            // Prefer proxy mesh when available
+            const proxyEntry = archiveLoader.getMeshProxyEntry();
+            const useProxy = contentInfo.hasMeshProxy && proxyEntry;
+            const entryToLoad = useProxy ? proxyEntry : meshEntry;
+
+            const meshData = await archiveLoader.extractFile(entryToLoad.file_name);
             if (!meshData) {
                 state.assetStates[assetType] = ASSET_STATE.ERROR;
                 return { loaded: false, blob: null, error: 'Failed to extract mesh file' };
             }
 
-            const result = await loadModelFromBlobUrl(meshData.url, meshEntry.file_name, deps);
+            const result = await loadModelFromBlobUrl(meshData.url, entryToLoad.file_name, deps);
 
-            // Apply transform from manifest
+            // Apply transform from the primary mesh entry (proxy inherits the same transform)
             const transform = archiveLoader.getEntryTransform(meshEntry);
             if (callbacks.onApplyModelTransform) {
                 callbacks.onApplyModelTransform(transform);
             }
 
             state.assetStates[assetType] = ASSET_STATE.LOADED;
-            return { loaded: true, blob: meshData.blob, error: null, faceCount: result?.faceCount || 0 };
+            return {
+                loaded: true,
+                blob: meshData.blob,
+                error: null,
+                faceCount: result?.faceCount || 0,
+                isProxy: !!useProxy
+            };
 
         } else if (assetType === 'pointcloud') {
             const contentInfo = archiveLoader.getContentInfo();
@@ -864,6 +875,48 @@ export async function loadArchiveAsset(archiveLoader, assetType, deps) {
         log.error(`Error loading ${assetType} from archive:`, e);
         return { loaded: false, blob: null, error: e.message };
     }
+}
+
+/**
+ * Load the full-resolution mesh from an archive, replacing the currently displayed proxy.
+ * Clears the existing modelGroup contents before loading.
+ * @param {ArchiveLoader} archiveLoader - The archive loader
+ * @param {Object} deps - Dependencies { state, modelGroup, callbacks }
+ * @returns {Promise<Object>} { loaded, blob, error, faceCount }
+ */
+export async function loadArchiveFullResMesh(archiveLoader, deps) {
+    const { state, callbacks = {} } = deps;
+    const meshEntry = archiveLoader.getMeshEntry();
+    if (!meshEntry) {
+        return { loaded: false, blob: null, error: 'No full-resolution mesh in archive' };
+    }
+
+    const meshData = await archiveLoader.extractFile(meshEntry.file_name);
+    if (!meshData) {
+        return { loaded: false, blob: null, error: 'Failed to extract full-resolution mesh' };
+    }
+
+    // Clear existing model (the proxy) before loading
+    const { modelGroup } = deps;
+    if (modelGroup) {
+        while (modelGroup.children.length > 0) {
+            const child = modelGroup.children[0];
+            modelGroup.remove(child);
+            disposeObject(child);
+        }
+    }
+
+    state.modelLoaded = false;
+    const result = await loadModelFromBlobUrl(meshData.url, meshEntry.file_name, deps);
+
+    // Apply transform from manifest
+    const transform = archiveLoader.getEntryTransform(meshEntry);
+    if (callbacks.onApplyModelTransform) {
+        callbacks.onApplyModelTransform(transform);
+    }
+
+    state.assetStates.mesh = ASSET_STATE.LOADED;
+    return { loaded: true, blob: meshData.blob, error: null, faceCount: result?.faceCount || 0 };
 }
 
 /**
@@ -1305,6 +1358,7 @@ export default {
     processArchive,
     processArchivePhase1,
     loadArchiveAsset,
+    loadArchiveFullResMesh,
     getAssetTypesForMode,
     getPrimaryAssetType,
     updateModelOpacity,

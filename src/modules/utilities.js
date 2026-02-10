@@ -253,11 +253,11 @@ class NotificationManager {
         this.container.id = 'notification-container';
         this.container.style.cssText = `
             position: fixed;
-            top: 20px;
-            right: 20px;
+            bottom: 20px;
+            left: 20px;
             z-index: 10000;
             display: flex;
-            flex-direction: column;
+            flex-direction: column-reverse;
             gap: 10px;
             max-width: 400px;
             pointer-events: none;

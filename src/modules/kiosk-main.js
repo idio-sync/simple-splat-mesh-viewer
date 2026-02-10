@@ -349,6 +349,7 @@ async function handleArchiveFile(file) {
         prefillMetadataFromArchive(manifest);
         populateMetadataDisplay({ state, annotationSystem, imageAssets: state.imageAssets });
         populateDetailedMetadata(manifest);
+        reorderKioskSidebar();
 
         // Set display mode based on what was loaded
         updateProgress(90, 'Finalizing...');
@@ -765,6 +766,69 @@ function applyGlobalAlignment(alignment) {
     controls.update();
 }
 
+/**
+ * Reorder the kiosk sidebar so the layout is:
+ *   Title > Description > Annotations > Detail collapsibles > Creator/Date/Location/Device/License
+ * Called after all sidebar sections have been populated.
+ */
+function reorderKioskSidebar() {
+    const viewContent = document.querySelector('#sidebar-view .display-content');
+    if (!viewContent) return;
+
+    // Gather the sections we want to reorder
+    const annoHeader = viewContent.querySelector('.kiosk-anno-header');
+    const annoList = document.getElementById('kiosk-annotation-list');
+    const detailSections = viewContent.querySelectorAll('.kiosk-detail-section');
+    const details = viewContent.querySelector('.display-details');
+    const license = document.getElementById('display-license-row');
+    const stats = document.getElementById('display-stats');
+
+    // Find all dividers (we'll re-add them as needed)
+    const dividers = viewContent.querySelectorAll('.display-divider');
+
+    // Remove dividers (we'll create fresh ones where needed)
+    dividers.forEach(d => d.remove());
+
+    // Move annotations right after description (remove first, then re-insert)
+    const description = document.getElementById('display-description');
+    const insertAfter = description || viewContent.querySelector('.display-title');
+    if (!insertAfter) return;
+
+    const addDivider = (beforeEl) => {
+        const d = document.createElement('div');
+        d.className = 'display-divider';
+        viewContent.insertBefore(d, beforeEl);
+    };
+
+    // 1. Annotations block — right after description
+    if (annoHeader && annoList) {
+        const annoDiv = annoHeader.previousElementSibling;
+        if (annoDiv && annoDiv.classList.contains('display-divider')) annoDiv.remove();
+
+        // Insert after description
+        const afterDesc = insertAfter.nextSibling;
+        addDivider(afterDesc);
+        viewContent.insertBefore(annoHeader, afterDesc);
+        viewContent.insertBefore(annoList, afterDesc);
+    }
+
+    // 2. Detail collapsibles — after annotations (or after description if no annotations)
+    if (detailSections.length > 0) {
+        // Find the spot right before details/license/stats
+        const refNode = details || license || stats;
+        if (refNode) {
+            addDivider(refNode);
+            detailSections.forEach(s => viewContent.insertBefore(s, refNode));
+        }
+    }
+
+    // 3. Details (Creator/Date/Location/Device), License, Stats — stay at the end
+    // They're already at the end by default, just add a divider before them
+    if (details && details.style.display !== 'none') {
+        addDivider(details);
+    }
+}
+
 function populateAnnotationList() {
     const annotations = annotationSystem.getAnnotations();
     if (annotations.length === 0) return;
@@ -1150,6 +1214,10 @@ function hideEditorOnlyUI() {
     // Hide editor-only control sections
     hideEl('load-files-section');
 
+    // Uncheck grid checkbox — grid is never created in kiosk mode
+    const gridCb = document.getElementById('toggle-gridlines');
+    if (gridCb) gridCb.checked = false;
+
     // Hide Alignment and Share sections (no IDs, find by header text)
     const sections = document.querySelectorAll('#controls-panel .control-section');
     sections.forEach(section => {
@@ -1246,6 +1314,28 @@ function showRelevantSettings(hasSplat, hasMesh, hasPointcloud) {
         if (text.startsWith('model settings') && !hasMesh) section.style.display = 'none';
         if (text.startsWith('splat settings') && !hasSplat) section.style.display = 'none';
         if (text.startsWith('point cloud settings') && !hasPointcloud) section.style.display = 'none';
+    });
+
+    // In kiosk mode, hide editing controls (scale, opacity, position, rotation)
+    // but keep visual controls (wireframe, hide textures, lighting)
+    const hideByIds = [
+        'model-scale', 'model-opacity', 'splat-scale',
+        'pointcloud-scale', 'pointcloud-point-size', 'pointcloud-opacity'
+    ];
+    hideByIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.closest('.slider-group')?.style.setProperty('display', 'none');
+    });
+    // Hide all position/rotation inputs
+    container.querySelectorAll('.position-inputs').forEach(el => {
+        el.style.display = 'none';
+    });
+    // Hide entire splat and pointcloud settings (no useful kiosk controls remain)
+    sections.forEach(section => {
+        const header = section.querySelector('h3');
+        const text = header?.textContent?.trim().toLowerCase() || '';
+        if (text.startsWith('splat settings')) section.style.display = 'none';
+        if (text.startsWith('point cloud settings')) section.style.display = 'none';
     });
 
     // Hide display mode buttons for absent data types

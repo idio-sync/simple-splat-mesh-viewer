@@ -888,6 +888,44 @@ export class ArchiveCreator {
     }
 
     /**
+     * Add a display proxy mesh entry (pre-simplified LOD variant)
+     * @param {Blob} blob - The proxy mesh file data
+     * @param {string} fileName - Original filename
+     * @param {Object} options - Additional options (derived_from, face_count, etc.)
+     */
+    addMeshProxy(blob, fileName, options = {}) {
+        // Find the primary mesh index this proxy derives from
+        const derivedFrom = options.derived_from || 'mesh_0';
+        const entryKey = `${derivedFrom}_proxy`;
+        const ext = fileName.split('.').pop().toLowerCase();
+        const archivePath = `assets/${entryKey}.${ext}`;
+
+        this.files.set(archivePath, { blob, originalName: fileName });
+
+        this.manifest.data_entries[entryKey] = {
+            file_name: archivePath,
+            created_by: options.created_by || "unknown",
+            _created_by_version: options.created_by_version || "",
+            _source_notes: options.source_notes || "",
+            role: "derived",
+            lod: "proxy",
+            derived_from: derivedFrom,
+            _parameters: {
+                position: options.position || [0, 0, 0],
+                rotation: options.rotation || [0, 0, 0],
+                scale: options.scale !== undefined ? options.scale : 1,
+                ...(options.parameters || {})
+            }
+        };
+
+        if (options.face_count !== undefined) {
+            this.manifest.data_entries[entryKey].face_count = options.face_count;
+        }
+
+        return entryKey;
+    }
+
+    /**
      * Add a point cloud entry (E57 file)
      * @param {Blob} blob - The file data
      * @param {string} fileName - Original filename
