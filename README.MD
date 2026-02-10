@@ -12,10 +12,15 @@ A web-based viewer for viewing Gaussian splats, 3D models, and E57 point clouds,
 - **Transform controls** for positioning, rotating, and scaling each object independently
 - **Auto-alignment** and **ICP alignment** for registering splats and models
 - **Fly camera mode** for first-person navigation (WASD + mouse look)
-- **Annotation system** for placing spatial notes on 3D surfaces
-- **Metadata editor** with 8 tabs covering project info, provenance, archival records, quality metrics, preservation, and more
+- **Annotation system** for placing spatial notes on 3D surfaces, with image attachments and depth-aware markers
+- **Metadata editor** with 8 tabs covering project info, provenance, archival records, quality metrics, preservation, and more — with inline field validation
+- **Offline kiosk viewer** — generate a self-contained ~1 MB HTML file for client delivery, fully functional with zero network access
+- **Lazy archive loading** — only the manifest is decompressed on open; individual assets load on demand
+- **Image support** in annotations and project descriptions via an `asset:` protocol, stored as separate entries in the archive
+- **Version history** tracking within archives for recording changes across exports
+- **Data entry roles** — classify assets as primary records or derived products for preservation clarity
 - **Shareable URLs** with embedded alignment, display settings, and UI presets
-- **Docker deployment** with environment-variable configuration
+- **Docker deployment** with environment-variable configuration and kiosk mode support
 - **Digital preservation metadata** aligned with Dublin Core, PRONOM, and Smithsonian EDAN standards
 
 ## Quick Start
@@ -124,11 +129,14 @@ docker run -p 8080:80 \
 Press `A` or click the annotation toolbar button to enter placement mode, then click on any 3D surface to create an annotation.
 
 Each annotation stores:
-- Title and description text
+- Title and description (supports markdown with inline images)
 - 3D position on the surface
 - Camera viewpoint (position + target) for restoring the view
+- Optional image attachments stored inside the archive
 
-Annotations appear as numbered markers in the 3D view and as chips in a bottom bar. They are saved inside archive containers and persist across sessions via localStorage.
+Annotations appear as numbered markers in the 3D view and as chips in a bottom bar. Markers are **depth-aware** — they fade when the annotated surface faces away from the camera, reducing visual clutter. In the kiosk viewer, selecting a marker draws an SVG connecting line to its popup.
+
+Annotations are saved inside archive containers and persist across sessions via localStorage. Images referenced in annotation descriptions use an `asset:images/filename.ext` protocol that resolves to blob URLs at runtime.
 
 ### Scene Settings
 
@@ -166,7 +174,9 @@ The left-side toolbar provides quick access to:
 | Metadata | Open the metadata sidebar for viewing or editing |
 | Annotate | Enter annotation placement mode |
 | Fly Camera | Switch to first-person fly camera |
+| Toggle Annotations | Show/hide annotation markers (visible when annotations exist) |
 | Export Archive | Export the current scene as an .a3d or .a3z archive |
+| Download Viewer | Generate a self-contained offline kiosk HTML file |
 
 ## URL Parameters
 
@@ -247,6 +257,33 @@ Access-Control-Allow-Methods: GET, OPTIONS
 Access-Control-Allow-Headers: Origin, Content-Type, Accept, Range
 ```
 
+## Offline Kiosk Viewer
+
+The **Download Viewer** button generates a self-contained HTML file (~1 MB before archive data) that works entirely offline with zero network access. This is designed for delivering 3D scan data to clients who may not have internet access or technical expertise.
+
+### How It Works
+
+1. The generator fetches all CDN dependencies (Three.js, Spark.js, fflate) and application modules at export time
+2. Everything is base64-encoded and embedded inside a single HTML file
+3. Import specifiers are rewritten to blob URLs at runtime so ES modules work without a server
+4. The user opens the HTML file in any modern browser and loads an `.a3d`/`.a3z` archive via file picker or drag-and-drop
+
+### Kiosk Viewer Capabilities
+
+- Full 3D rendering (splats, meshes, point clouds) with display mode switching
+- Orbit and fly camera controls
+- Annotation viewing with depth-aware markers, popups, and connecting lines
+- Metadata sidebar (view-only)
+- Scene settings (background color, lighting, grid)
+- Asset-specific controls (opacity, wireframe, point size)
+- Lazy asset loading — the manifest loads first, then individual assets load on demand with inline progress indicators
+
+### Limitations
+
+- The kiosk viewer is read-only — no archive creation, metadata editing, or alignment tools
+- The embedded JavaScript stack (Three.js 0.170.0, Spark.js 0.1.10) is frozen at export time and may eventually become incompatible with future browsers
+- The archive's raw data files (GLB, PLY, E57) remain the authoritative preservation copies; the kiosk viewer is a convenience access layer
+
 ## Archive Container Format
 
 The archive container format (`.a3d` / `.a3z`) bundles 3D assets, metadata, alignment data, annotations, and preservation information into a single distributable file. It is designed for long-term archival and interoperability, integrating with the [archive-3d](https://github.com/idio-sync/archive-3d) specification.
@@ -262,6 +299,9 @@ scene.a3d/
   model.glb              # 3D mesh
   scan.e57               # Point cloud (optional)
   preview.jpg            # Thumbnail preview (optional)
+  images/                # Image attachments referenced by annotations/descriptions
+    photo1.jpg
+    detail2.png
 ```
 
 ### Manifest Schema
@@ -370,9 +410,23 @@ The `manifest.json` file is the heart of the archive, containing structured meta
     "rendering_notes": ""
   },
 
+  "version_history": [
+    {
+      "version": "1.0",
+      "date": "2026-01-15T08:30:00Z",
+      "description": "Initial capture and processing"
+    },
+    {
+      "version": "1.1",
+      "date": "2026-03-20T14:00:00Z",
+      "description": "Added condition annotations, updated mesh with gap-filled regions"
+    }
+  ],
+
   "data_entries": {
     "scene_0": {
       "file_name": "scene.ply",
+      "role": "derived",
       "created_by": "nerfstudio",
       "_created_by_version": "1.1.0",
       "_source_notes": "Trained for 30k iterations",
@@ -381,12 +435,14 @@ The `manifest.json` file is the heart of the archive, containing structured meta
     },
     "mesh_0": {
       "file_name": "model.glb",
+      "role": "derived",
       "created_by": "Reality Capture",
       "_parameters": { "position": [0.1, 0, -0.2], "rotation": [0, 0, 0], "scale": 1 },
       "_hash": "sha256:def456..."
     },
     "pointcloud_0": {
       "file_name": "scan.e57",
+      "role": "primary",
       "created_by": "Leica Cyclone",
       "_parameters": { "position": [0, 0, 0], "rotation": [0, 0, 0], "scale": 1 },
       "_hash": "sha256:789ghi..."
@@ -401,7 +457,7 @@ The `manifest.json` file is the heart of the archive, containing structured meta
     {
       "id": "anno_1",
       "title": "Crack in tracery",
-      "description": "Structural crack running NE-SW, approx 2.3m",
+      "description": "Structural crack running NE-SW, approx 2.3m\n\n![Detail](asset:images/crack_detail.jpg)",
       "position": { "x": 1.2, "y": 3.4, "z": -0.1 },
       "cameraPosition": { "x": 2.0, "y": 4.0, "z": 3.0 },
       "cameraTarget": { "x": 1.2, "y": 3.4, "z": -0.1 }
@@ -430,19 +486,22 @@ docker run -p 8080:80 -e DEFAULT_ARCHIVE_URL="/assets/scene.a3d" splat-mesh-view
 ```
 
 When an archive is loaded:
-- All assets (splat, mesh, point cloud) are extracted and displayed
+- The manifest is extracted first (lazy loading — asset files remain compressed in memory)
+- Assets are decompressed and loaded on demand, with per-asset inline progress indicators
 - Saved transforms from `_parameters` are applied to each object
-- Metadata populates the sidebar
-- Annotations are restored with their 3D positions and camera views
+- Metadata populates the sidebar (including version history and data entry roles)
+- Annotations are restored with their 3D positions, camera views, and image attachments
+- Image assets under `images/` are resolved to blob URLs for display in descriptions and annotations
 
 ### Exporting Archives
 
 Click the **Export Archive** toolbar button to save the current scene:
 
 1. Choose format: `.a3d` (standard) or `.a3z` (compressed)
-2. The export bundles all loaded assets, current transforms, annotations, and metadata
-3. SHA-256 integrity hashes are computed for each asset file
+2. The export bundles all loaded assets, current transforms, annotations, metadata, and image attachments
+3. SHA-256 integrity hashes are computed for each asset file (requires HTTPS; a warning is shown on HTTP)
 4. A preview thumbnail is captured from the current viewport
+5. Version history entries and data entry roles are preserved in the manifest
 
 ## Metadata Editor
 
@@ -450,14 +509,24 @@ The metadata sidebar (press `M` or click the toolbar button) provides structured
 
 | Tab | Contents |
 |-----|----------|
-| **Project** | Title, ID, description, license, relationships (part of, derived from, replaces, related objects) |
+| **Project** | Title, ID, description (with markdown and image support), license, relationships, version history |
 | **Provenance** | Capture date/device/serial, operator/ORCID, location, processing software list, processing notes, convention hints |
 | **Archival Record** | Dublin Core / Smithsonian EDAN fields: title, identifiers (accession, SIRIS, URI), creation details, physical description, provenance, rights, geographic and temporal coverage |
 | **Quality** | Quality tier (Metrology/Reference/Visualization), accuracy grade, capture resolution, alignment error, scale verification, data quality notes, read-only asset statistics |
 | **Material** | PBR workflow (metal/roughness or specular/glossiness), color space, normal map space, occlusion packing |
 | **Preservation** | PRONOM format registry IDs, significant properties checklist, rendering requirements and notes |
-| **Assets** | Per-asset metadata: created by, tool version, source notes (for splat, mesh, and point cloud separately) |
-| **Integrity** | SHA-256 hash algorithm, manifest hash, per-asset hashes, toggle for including integrity data in exports |
+| **Assets** | Per-asset metadata: created by, tool version, source notes, and archival role (primary/derived) for splat, mesh, and point cloud |
+| **Integrity** | SHA-256 hash algorithm, manifest hash, per-asset hashes, toggle for including integrity data in exports. Displays a warning when HTTPS is unavailable. |
+
+### Field Validation
+
+Structured metadata fields are validated on blur with inline error indicators:
+- **ORCID**: format `0000-0000-0000-000X`
+- **Coordinates**: numeric latitude/longitude within valid ranges
+- **Dates**: ISO 8601 format
+- **PRONOM IDs**: format `fmt/000` or `x-fmt/000`
+
+Validation is advisory — it highlights problems but does not block export.
 
 All metadata is saved into the archive's `manifest.json` on export.
 
@@ -577,27 +646,35 @@ simple-splat-mesh-viewer/
 ├── src/
 │   ├── index.html                  # Main HTML file with UI structure
 │   ├── main.js                     # Core application logic and event handling
-│   ├── config.js                   # Runtime configuration (URL params)
+│   ├── config.js                   # Runtime configuration (URL params, kiosk detection)
 │   ├── pre-module.js               # Pre-module initialization
-│   ├── styles.css                  # UI styles (dark theme)
+│   ├── styles.css                  # UI styles (dark theme + kiosk-mode overrides)
 │   └── modules/
 │       ├── constants.js            # Application constants and defaults
-│       ├── utilities.js            # Logging, hashing, file utilities
+│       ├── utilities.js            # Logging, hashing, markdown, image asset resolution
 │       ├── scene-manager.js        # Three.js scene, camera, renderer setup
-│       ├── file-handlers.js        # File loading (splat, model, E57, archives)
-│       ├── archive-loader.js       # Archive ZIP parsing and extraction
-│       ├── archive-creator.js      # Archive creation and manifest generation
+│       ├── file-handlers.js        # File loading with lazy archive extraction
+│       ├── archive-loader.js       # Archive ZIP parsing, lazy on-demand extraction
+│       ├── archive-creator.js      # Archive creation, manifest, image bundling
 │       ├── alignment.js            # Auto-align, ICP, fit-to-view
-│       ├── annotation-system.js    # 3D annotation placement and management
-│       ├── metadata-manager.js     # Metadata collection and prefill
+│       ├── annotation-system.js    # 3D annotation placement with depth awareness
+│       ├── metadata-manager.js     # Metadata editing, validation, and display
 │       ├── share-dialog.js         # Share URL generation
 │       ├── fly-controls.js         # First-person fly camera
-│       └── ui-controller.js        # UI state management
+│       ├── ui-controller.js        # UI state management
+│       ├── kiosk-viewer.js         # Offline viewer HTML generator
+│       └── kiosk-main.js           # Kiosk viewer entry point (viewer-only mode)
 ├── docker/
 │   ├── Dockerfile                  # nginx:alpine-based container
 │   ├── nginx.conf                  # Nginx configuration
 │   ├── config.js.template          # Docker config with env var substitution
 │   └── docker-entrypoint.sh        # Startup script
+├── docs/
+│   ├── ARCHITECTURE.md             # Plain-English architecture overview
+│   ├── CODE_REVIEW.md              # Code review findings and remediation status
+│   ├── SHORTCOMINGS_AND_SOLUTIONS.md # Known gaps and proposed solutions
+│   ├── SPECIFICATION.md            # Archive format specification
+│   └── ROADMAP.md                  # Prioritized future work
 └── README.MD
 ```
 
@@ -610,7 +687,7 @@ simple-splat-mesh-viewer/
 - [nginx](https://nginx.org/) — Web server for Docker deployment
 - Vanilla JavaScript (ES Modules, no build step)
 
-All dependencies are loaded via browser [import maps](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script/type/importmap) from the [esm.sh](https://esm.sh/) CDN. No bundler or build toolchain is required.
+Runtime dependencies are loaded via browser [import maps](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script/type/importmap) from [esm.sh](https://esm.sh/) and [jsDelivr](https://www.jsdelivr.com/) CDNs. The kiosk viewer generator fetches Three.js core from jsDelivr and Three.js addons from esm.sh for reliable offline bundling. No bundler or build toolchain is required.
 
 ## Browser Compatibility
 

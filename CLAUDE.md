@@ -133,3 +133,5 @@ All DOM structure lives in `index.html`. Modules query elements by ID. If you ne
 - **Point cloud memory.** No size limits on E57 loading. Large files can OOM the browser.
 - **`annotation-system.js`** is the only module that doesn't use Logger — it has no structured logging.
 
+## When changes are made
+- Update ROADMAP.MD if changed item is present
