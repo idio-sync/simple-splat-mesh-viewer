@@ -382,6 +382,14 @@ export class ArchiveLoader {
     }
 
     /**
+     * Get all embedded image entries (used in annotation/description markdown)
+     * @returns {Object[]} Array of image entry objects
+     */
+    getImageEntries() {
+        return this.findEntriesByPrefix('image_').map(({ entry }) => entry);
+    }
+
+    /**
      * Extract a file from the archive as a blob URL.
      * Decompresses on demand and caches the result.
      * @param {string} filename - The filename within the archive

@@ -8,7 +8,7 @@ import { ArchiveLoader, isArchiveFile } from './modules/archive-loader.js';
 import { AnnotationSystem } from './modules/annotation-system.js';
 import { ArchiveCreator, captureScreenshot, CRYPTO_AVAILABLE } from './modules/archive-creator.js';
 import { CAMERA, TIMING, ASSET_STATE } from './modules/constants.js';
-import { Logger, notify, processMeshMaterials, computeMeshFaceCount, computeMeshVertexCount, disposeObject, parseMarkdown, fetchWithProgress } from './modules/utilities.js';
+import { Logger, notify, processMeshMaterials, computeMeshFaceCount, computeMeshVertexCount, disposeObject, parseMarkdown, resolveAssetRefs, fetchWithProgress } from './modules/utilities.js';
 import { FlyControls } from './modules/fly-controls.js';
 import { SceneManager } from './modules/scene-manager.js';
 import {
@@ -194,7 +194,9 @@ const state = {
     currentArchiveUrl: config.defaultArchiveUrl || null,
     archiveLoader: null,
     // Per-asset loading state for lazy archive extraction
-    assetStates: { splat: ASSET_STATE.UNLOADED, mesh: ASSET_STATE.UNLOADED, pointcloud: ASSET_STATE.UNLOADED }
+    assetStates: { splat: ASSET_STATE.UNLOADED, mesh: ASSET_STATE.UNLOADED, pointcloud: ASSET_STATE.UNLOADED },
+    // Embedded images for annotation/description markdown
+    imageAssets: new Map()
 };
 
 // Scene manager instance (handles scene, camera, renderer, controls, lighting)
@@ -1359,6 +1361,23 @@ async function processArchive(archiveLoader, archiveName) {
         // Load annotations from archive
         const annotations = archiveLoader.getAnnotations();
 
+        // Extract embedded images for markdown rendering
+        state.imageAssets.clear();
+        const imageEntries = archiveLoader.getImageEntries();
+        for (const entry of imageEntries) {
+            try {
+                const data = await archiveLoader.extractFile(entry.file_name);
+                if (data) {
+                    state.imageAssets.set(entry.file_name, { blob: data.blob, url: data.url, name: entry.file_name });
+                }
+            } catch (e) {
+                log.warn('Failed to extract image:', entry.file_name, e.message);
+            }
+        }
+        if (imageEntries.length > 0) {
+            log.info(` Extracted ${state.imageAssets.size} embedded images`);
+        }
+
         // === Phase 2: Load primary asset for current display mode ===
         const primaryType = getPrimaryAssetType(state.displayMode, contentInfo);
         showLoading(`Loading ${primaryType} from archive...`);
@@ -2127,6 +2146,14 @@ async function downloadArchive() {
         archiveCreator.setAnnotations(annotationSystem.toJSON());
     }
 
+    // Add embedded images
+    if (state.imageAssets.size > 0) {
+        log.info(` Adding ${state.imageAssets.size} embedded images`);
+        for (const [path, asset] of state.imageAssets) {
+            archiveCreator.addImage(asset.blob, path);
+        }
+    }
+
     // Set quality stats
     log.info(' Setting quality stats');
     archiveCreator.setQualityStats({
@@ -2388,6 +2415,62 @@ function setupMetadataSidebar() {
     const addRelatedBtn = document.getElementById('btn-add-related-object');
     if (addRelatedBtn) {
         addRelatedBtn.addEventListener('click', addRelatedObject);
+    }
+
+    // Image insert buttons — shared file input, target tracks which textarea
+    const imageInput = document.getElementById('image-insert-input');
+    let activeImageTextarea = null;
+
+    function insertImageAtCursor(textarea, text) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const before = textarea.value.substring(0, start);
+        const after = textarea.value.substring(end);
+        textarea.value = before + text + after;
+        textarea.selectionStart = textarea.selectionEnd = start + text.length;
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function sanitizeImageFileName(name) {
+        return name.replace(/[^a-zA-Z0-9._-]/g, '_').toLowerCase();
+    }
+
+    if (imageInput) {
+        const insertButtons = [
+            { btnId: 'btn-anno-insert-image', textareaId: 'anno-body' },
+            { btnId: 'btn-sidebar-insert-image', textareaId: 'sidebar-edit-anno-body' },
+            { btnId: 'btn-desc-insert-image', textareaId: 'meta-description' }
+        ];
+
+        insertButtons.forEach(({ btnId, textareaId }) => {
+            const btn = document.getElementById(btnId);
+            if (btn) {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    activeImageTextarea = document.getElementById(textareaId);
+                    imageInput.value = '';
+                    imageInput.click();
+                });
+            }
+        });
+
+        imageInput.addEventListener('change', () => {
+            const file = imageInput.files[0];
+            if (!file || !activeImageTextarea) return;
+
+            const ext = file.name.split('.').pop().toLowerCase();
+            const baseName = file.name.replace(/\.[^.]+$/, '');
+            const safeName = sanitizeImageFileName(baseName);
+            const timestamp = Date.now();
+            const assetPath = `images/${safeName}_${timestamp}.${ext}`;
+
+            const url = URL.createObjectURL(file);
+            state.imageAssets.set(assetPath, { blob: file, url, name: file.name });
+
+            insertImageAtCursor(activeImageTextarea, `![${file.name}](asset:${assetPath})`);
+            activeImageTextarea = null;
+        });
     }
 
     // Metadata import/export
@@ -2926,11 +3009,11 @@ function populateMetadataDisplay() {
         titleEl.textContent = metadata.project.title || 'Untitled';
     }
 
-    // Description - hide if empty, render as markdown
+    // Description - hide if empty, render as markdown with image resolution
     const descEl = document.getElementById('display-description');
     if (descEl) {
         if (metadata.project.description) {
-            descEl.innerHTML = parseMarkdown(metadata.project.description);
+            descEl.innerHTML = parseMarkdown(resolveAssetRefs(metadata.project.description, state.imageAssets));
             descEl.style.display = '';
         } else {
             descEl.style.display = 'none';
@@ -3113,7 +3196,7 @@ function showAnnotationPopup(annotation) {
 
     if (numberEl) numberEl.textContent = number;
     if (titleEl) titleEl.textContent = annotation.title || 'Untitled';
-    if (bodyEl) bodyEl.innerHTML = parseMarkdown(annotation.body || '');
+    if (bodyEl) bodyEl.innerHTML = parseMarkdown(resolveAssetRefs(annotation.body || '', state.imageAssets));
 
     // Position popup near the marker
     updateAnnotationPopupPosition();

@@ -11,7 +11,7 @@
  * - Archive metadata UI
  */
 
-import { Logger, parseMarkdown } from './utilities.js';
+import { Logger, parseMarkdown, resolveAssetRefs } from './utilities.js';
 
 const log = Logger.getLogger('metadata-manager');
 
@@ -251,6 +251,70 @@ export function setupMetadataSidebar(deps = {}) {
     const addVersionBtn = document.getElementById('btn-add-version-entry');
     if (addVersionBtn) {
         addVersionBtn.addEventListener('click', addVersionEntry);
+    }
+
+    // Image insert buttons — shared file input, target tracks which textarea
+    const imageInput = document.getElementById('image-insert-input');
+    let activeTextarea = null;
+
+    function insertAtCursor(textarea, text) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const before = textarea.value.substring(0, start);
+        const after = textarea.value.substring(end);
+        textarea.value = before + text + after;
+        textarea.selectionStart = textarea.selectionEnd = start + text.length;
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function sanitizeFileName(name) {
+        return name.replace(/[^a-zA-Z0-9._-]/g, '_').toLowerCase();
+    }
+
+    if (imageInput) {
+        // Wire up insert buttons to open file picker
+        const insertButtons = [
+            { btnId: 'btn-anno-insert-image', textareaId: 'anno-body' },
+            { btnId: 'btn-sidebar-insert-image', textareaId: 'sidebar-edit-anno-body' },
+            { btnId: 'btn-desc-insert-image', textareaId: 'meta-description' }
+        ];
+
+        insertButtons.forEach(({ btnId, textareaId }) => {
+            const btn = document.getElementById(btnId);
+            if (btn) {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    activeTextarea = document.getElementById(textareaId);
+                    imageInput.value = '';
+                    imageInput.click();
+                });
+            }
+        });
+
+        // Handle file selection
+        imageInput.addEventListener('change', () => {
+            const file = imageInput.files[0];
+            if (!file || !activeTextarea) return;
+
+            const ext = file.name.split('.').pop().toLowerCase();
+            const baseName = file.name.replace(/\.[^.]+$/, '');
+            const safeName = sanitizeFileName(baseName);
+            const timestamp = Date.now();
+            const assetPath = `images/${safeName}_${timestamp}.${ext}`;
+
+            const blob = file;
+            const url = URL.createObjectURL(blob);
+
+            // Store in imageAssets if available via deps
+            if (deps.imageAssets) {
+                deps.imageAssets.set(assetPath, { blob, url, name: file.name });
+            }
+
+            // Insert markdown at cursor
+            insertAtCursor(activeTextarea, `![${file.name}](asset:${assetPath})`);
+            activeTextarea = null;
+        });
     }
 
     // Setup field validation
@@ -1298,7 +1362,7 @@ export function prefillMetadataFromArchive(manifest) {
  * @param {Object} deps - Dependencies (state, annotationSystem)
  */
 export function populateMetadataDisplay(deps = {}) {
-    const { state = {}, annotationSystem } = deps;
+    const { state = {}, annotationSystem, imageAssets } = deps;
     const metadata = collectMetadata();
 
     let hasDetails = false;
@@ -1314,7 +1378,7 @@ export function populateMetadataDisplay(deps = {}) {
     const descEl = document.getElementById('display-description');
     if (descEl) {
         if (metadata.project.description) {
-            descEl.innerHTML = parseMarkdown(metadata.project.description);
+            descEl.innerHTML = parseMarkdown(resolveAssetRefs(metadata.project.description, imageAssets));
             descEl.style.display = '';
         } else {
             descEl.style.display = 'none';
@@ -1539,7 +1603,7 @@ export function clearArchiveMetadata() {
  * @param {string|null} currentPopupId - Reference to track current popup ID
  * @returns {string} The annotation ID that was shown
  */
-export function showAnnotationPopup(annotation) {
+export function showAnnotationPopup(annotation, imageAssets) {
     const popup = document.getElementById('annotation-info-popup');
     if (!popup) return null;
 
@@ -1556,7 +1620,7 @@ export function showAnnotationPopup(annotation) {
 
     if (numberEl) numberEl.textContent = number;
     if (titleEl) titleEl.textContent = annotation.title || 'Untitled';
-    if (bodyEl) bodyEl.innerHTML = parseMarkdown(annotation.body || '');
+    if (bodyEl) bodyEl.innerHTML = parseMarkdown(resolveAssetRefs(annotation.body || '', imageAssets));
 
     popup.classList.remove('hidden');
 

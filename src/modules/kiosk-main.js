@@ -64,7 +64,8 @@ const state = {
     currentModelUrl: null,
     flyModeActive: false,
     annotationsVisible: true,
-    assetStates: { splat: ASSET_STATE.UNLOADED, mesh: ASSET_STATE.UNLOADED, pointcloud: ASSET_STATE.UNLOADED }
+    assetStates: { splat: ASSET_STATE.UNLOADED, mesh: ASSET_STATE.UNLOADED, pointcloud: ASSET_STATE.UNLOADED },
+    imageAssets: new Map()
 };
 
 // =============================================================================
@@ -115,7 +116,7 @@ export async function init() {
         document.querySelectorAll('.kiosk-anno-item.active').forEach(c => c.classList.remove('active'));
         const item = document.querySelector(`.kiosk-anno-item[data-anno-id="${annotation.id}"]`);
         if (item) item.classList.add('active');
-        currentPopupAnnotationId = showAnnotationPopup(annotation);
+        currentPopupAnnotationId = showAnnotationPopup(annotation, state.imageAssets);
     };
 
     // Wire up UI
@@ -325,11 +326,28 @@ async function handleArchiveFile(file) {
             log.info(`Loaded ${annotations.length} annotations`);
         }
 
+        // Extract embedded images for markdown rendering
+        state.imageAssets.clear();
+        const imageEntries = archiveLoader.getImageEntries();
+        for (const entry of imageEntries) {
+            try {
+                const data = await archiveLoader.extractFile(entry.file_name);
+                if (data) {
+                    state.imageAssets.set(entry.file_name, { blob: data.blob, url: data.url, name: entry.file_name });
+                }
+            } catch (e) {
+                log.warn('Failed to extract image:', entry.file_name, e.message);
+            }
+        }
+        if (imageEntries.length > 0) {
+            log.info(`Extracted ${state.imageAssets.size} embedded images`);
+        }
+
         // Update metadata display
         updateProgress(80, 'Loading metadata...');
         updateArchiveMetadataUI(manifest, archiveLoader);
         prefillMetadataFromArchive(manifest);
-        populateMetadataDisplay({ state, annotationSystem });
+        populateMetadataDisplay({ state, annotationSystem, imageAssets: state.imageAssets });
         populateDetailedMetadata(manifest);
 
         // Set display mode based on what was loaded
@@ -377,7 +395,7 @@ async function handleArchiveFile(file) {
         }
 
         // Open metadata sidebar by default
-        showMetadataSidebar('view');
+        showMetadataSidebar('view', { state, annotationSystem, imageAssets: state.imageAssets });
 
         log.info('Archive loaded successfully:', file.name);
         notify.success(`Loaded: ${file.name}`);
@@ -510,7 +528,7 @@ function setupViewerUI() {
         if (sidebar && !sidebar.classList.contains('hidden')) {
             hideMetadataSidebar();
         } else {
-            showMetadataSidebar('view', { state, annotationSystem });
+            showMetadataSidebar('view', { state, annotationSystem, imageAssets: state.imageAssets });
         }
     });
 
@@ -646,7 +664,7 @@ function setupViewerKeyboardShortcuts() {
             if (sidebar && !sidebar.classList.contains('hidden')) {
                 hideMetadataSidebar();
             } else {
-                showMetadataSidebar('view', { state, annotationSystem });
+                showMetadataSidebar('view', { state, annotationSystem, imageAssets: state.imageAssets });
             }
         },
         '1': () => { state.displayMode = 'model'; setDisplayMode('model', createDisplayModeDeps()); triggerLazyLoad('model'); },
@@ -817,7 +835,7 @@ function populateAnnotationList() {
                     showSingleMarker(anno.id);
                 }
                 annotationSystem.goToAnnotation(anno.id);
-                currentPopupAnnotationId = showAnnotationPopup(anno);
+                currentPopupAnnotationId = showAnnotationPopup(anno, state.imageAssets);
             }
         });
 

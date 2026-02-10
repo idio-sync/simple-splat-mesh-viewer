@@ -39,6 +39,7 @@
                 <p class="kiosk-picker-hint">or drag and drop it here</p>
             </div>
             <input type="file" id="kiosk-picker-input" accept=".a3z,.a3d" style="display:none">
+            <input type="file" id="image-insert-input" accept=".png,.jpg,.jpeg,.webp,.gif" style="display:none">
         </div>
     </div>
 
@@ -138,7 +139,7 @@
             <input type="text" id="anno-id" placeholder="anno_1">
             <label for="anno-title">Title</label>
             <input type="text" id="anno-title" placeholder="Feature name">
-            <label for="anno-body">Description</label>
+            <label for="anno-body">Description <button type="button" class="insert-image-btn" id="btn-anno-insert-image" title="Insert Image"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button></label>
             <textarea id="anno-body" placeholder="Describe this point of interest..."></textarea>
             <div class="btn-group">
                 <button id="btn-anno-cancel" class="action-btn secondary">Cancel</button>
@@ -239,7 +240,7 @@
                         <span class="field-hint">Auto-generated from title if empty</span>
                     </div>
                     <div class="metadata-field">
-                        <label for="meta-description">Description</label>
+                        <label for="meta-description">Description <button type="button" class="insert-image-btn" id="btn-desc-insert-image" title="Insert Image"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button></label>
                         <textarea id="meta-description" rows="3" placeholder="Describe this 3D scene..."></textarea>
                     </div>
                     <div class="metadata-field">
@@ -827,7 +828,7 @@
                         <input type="text" id="sidebar-edit-anno-title" placeholder="Annotation title">
                     </div>
                     <div class="metadata-field">
-                        <label for="sidebar-edit-anno-body">Description</label>
+                        <label for="sidebar-edit-anno-body">Description <button type="button" class="insert-image-btn" id="btn-sidebar-insert-image" title="Insert Image"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button></label>
                         <textarea id="sidebar-edit-anno-body" rows="3" placeholder="Describe this point..."></textarea>
                     </div>
                     <div class="button-row">

@@ -54,14 +54,20 @@ export class AnnotationSystem {
         // Callbacks
         this.onAnnotationCreated = null;
         this.onAnnotationSelected = null;
+        this.onAnnotationUpdated = null;
         this.onPlacementModeChanged = null;
 
         // Reusable vectors for occlusion checks
         this._surfaceNormal = new THREE.Vector3();
         this._viewDir = new THREE.Vector3();
 
+        // Drag state
+        this._dragging = null;
+
         // Bind methods
         this._onClick = this._onClick.bind(this);
+        this._onDragMove = this._onDragMove.bind(this);
+        this._onDragEnd = this._onDragEnd.bind(this);
 
         this._createMarkerContainer();
     }
@@ -260,7 +266,7 @@ export class AnnotationSystem {
 
         this.markerContainer.appendChild(markerEl);
 
-        this.markers.push({
+        const markerObj = {
             element: markerEl,
             annotation: annotation,
             position: new THREE.Vector3(
@@ -268,7 +274,109 @@ export class AnnotationSystem {
                 annotation.position.y,
                 annotation.position.z
             )
+        };
+
+        // Shift+mousedown starts drag to reposition
+        markerEl.addEventListener('mousedown', (e) => {
+            if (e.shiftKey) this._onMarkerShiftDown(e, markerObj);
         });
+
+        this.markers.push(markerObj);
+    }
+
+    /**
+     * Start dragging a marker to reposition it (shift+mousedown)
+     */
+    _onMarkerShiftDown(event, marker) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        this._dragging = {
+            marker,
+            originalPos: marker.position.clone()
+        };
+
+        // Disable orbit controls during drag
+        if (this.controls) this.controls.enabled = false;
+
+        marker.element.classList.add('dragging');
+
+        document.addEventListener('mousemove', this._onDragMove);
+        document.addEventListener('mouseup', this._onDragEnd);
+    }
+
+    /**
+     * Handle drag movement — raycast to find new surface position
+     */
+    _onDragMove(event) {
+        if (!this._dragging) return;
+
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+
+        // Same filter as _onClick — exclude markers, grid, axes
+        const validHit = intersects.find(hit => {
+            let obj = hit.object;
+            while (obj) {
+                if (obj.name === 'annotationMarkers' ||
+                    obj.type === 'GridHelper' ||
+                    obj.type === 'AxesHelper') {
+                    return false;
+                }
+                obj = obj.parent;
+            }
+            return true;
+        });
+
+        if (validHit) {
+            const point = validHit.point;
+            const marker = this._dragging.marker;
+
+            // Update 3D position
+            marker.position.set(point.x, point.y, point.z);
+            marker.annotation.position = {
+                x: parseFloat(point.x.toFixed(4)),
+                y: parseFloat(point.y.toFixed(4)),
+                z: parseFloat(point.z.toFixed(4))
+            };
+        }
+    }
+
+    /**
+     * End drag — finalize position and re-enable controls
+     */
+    _onDragEnd(event) {
+        if (!this._dragging) return;
+
+        const marker = this._dragging.marker;
+
+        document.removeEventListener('mousemove', this._onDragMove);
+        document.removeEventListener('mouseup', this._onDragEnd);
+
+        // Re-enable orbit controls
+        if (this.controls) this.controls.enabled = true;
+
+        marker.element.classList.remove('dragging');
+
+        // Update camera reference for surface-normal occlusion
+        const cameraState = this._getCurrentCameraState();
+        marker.annotation.camera_position = cameraState.camera_position;
+        marker.annotation.camera_target = {
+            x: marker.annotation.position.x,
+            y: marker.annotation.position.y,
+            z: marker.annotation.position.z
+        };
+
+        // Notify that annotation was updated
+        if (this.onAnnotationUpdated) {
+            this.onAnnotationUpdated(marker.annotation);
+        }
+
+        this._dragging = null;
     }
 
     /**

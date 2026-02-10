@@ -7,7 +7,7 @@ A web-based viewer for viewing Gaussian splats, 3D models, and E57 point clouds,
 - Load and display **3D models** (.glb, .gltf, .obj)
 - Load and display **E57 point clouds** (.e57) via [three-e57-loader](https://www.npmjs.com/package/three-e57-loader)
 - Load and display **Gaussian splat** files (.ply, .splat, .ksplat, .spz, .sog)
-- **Archive container support** (.a3d, .a3z) — bundle all assets, metadata, and alignment into a single file
+- **Archive container support** (.a3d, .a3z) — bundle all assets, metadata, and multi-data alignment into a single file
 - **Four display modes**: Model only, Splat only, Both overlaid, or Split side-by-side, and Point Cloud
 - **Transform controls** for positioning, rotating, and scaling each object independently
 - **Auto-alignment** and **ICP alignment** for registering splats and models

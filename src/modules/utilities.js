@@ -707,9 +707,9 @@ function parseInlineMarkdown(text) {
         '<a href="$2" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>'
     );
 
-    // Auto-link URLs that aren't already in anchor tags
+    // Auto-link URLs that aren't already in anchor tags or blob: URLs
     html = html.replace(
-        /(?<!href="|src=")(https?:\/\/[^\s<]+)/g,
+        /(?<!href="|src="|blob:)(https?:\/\/[^\s<"]+)/g,
         '<a href="$1" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>'
     );
 
@@ -834,10 +834,27 @@ function sanitizeUrl(url) {
     const trimmed = url.trim().toLowerCase();
     if (trimmed.startsWith('http://') ||
         trimmed.startsWith('https://') ||
+        trimmed.startsWith('blob:') ||
         trimmed.startsWith('data:image/')) {
         return url;
     }
     return '';
+}
+
+/**
+ * Resolve asset: references in text to blob URLs using an image assets map.
+ * Converts `asset:images/filename.jpg` to the corresponding blob URL.
+ *
+ * @param {string} text - Text containing asset: references
+ * @param {Map} imageAssets - Map of asset path → { blob, url, name }
+ * @returns {string} Text with asset: refs replaced by blob URLs
+ */
+function resolveAssetRefs(text, imageAssets) {
+    if (!text || !imageAssets || imageAssets.size === 0) return text;
+    return text.replace(/asset:(images\/[^\s)"']+)/g, (match, path) => {
+        const asset = imageAssets.get(path);
+        return asset ? asset.url : match;
+    });
 }
 
 // =============================================================================
@@ -865,6 +882,7 @@ export {
     // Markdown parsing
     parseMarkdown,
     sanitizeUrl,
+    resolveAssetRefs,
 
     // Network utilities
     fetchWithProgress

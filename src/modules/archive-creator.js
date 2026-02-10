@@ -750,6 +750,25 @@ export class ArchiveCreator {
     }
 
     /**
+     * Add an embedded image (used in annotation/description markdown)
+     * @param {Blob} blob - The image data
+     * @param {string} archivePath - Path within archive (e.g., 'images/photo.jpg')
+     */
+    addImage(blob, archivePath) {
+        const index = this._countEntriesOfType('image_');
+        const entryKey = `image_${index}`;
+
+        this.files.set(archivePath, { blob, originalName: archivePath });
+
+        this.manifest.data_entries[entryKey] = {
+            file_name: archivePath,
+            created_by: this.manifest.packer
+        };
+
+        return entryKey;
+    }
+
+    /**
      * Count entries of a specific type
      */
     _countEntriesOfType(prefix) {
