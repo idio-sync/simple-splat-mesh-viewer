@@ -392,42 +392,6 @@ export function setupKeyboardShortcuts(handlers) {
 // BUTTON STATE MANAGEMENT
 // =============================================================================
 
-/**
- * Set active state on a group of buttons
- * @param {Array<string>} buttonIds - Array of button IDs (without prefix)
- * @param {string} activeId - ID of the active button (without prefix)
- * @param {string} prefix - ID prefix (default: 'btn-')
- */
-export function setActiveButton(buttonIds, activeId, prefix = 'btn-') {
-    buttonIds.forEach(id => {
-        const btn = document.getElementById(prefix + id);
-        if (btn) btn.classList.toggle('active', id === activeId);
-    });
-}
-
-/**
- * Set active state on selection buttons
- * @param {string} selection - Current selection
- */
-export function setSelectionButtonState(selection) {
-    ['splat', 'model', 'both', 'none'].forEach(s => {
-        const btn = document.getElementById(`btn-select-${s}`);
-        if (btn) btn.classList.toggle('active', s === selection);
-    });
-}
-
-/**
- * Set active state on transform mode buttons
- * @param {string} mode - Current transform mode
- */
-export function setTransformModeButtonState(mode) {
-    ['translate', 'rotate', 'scale'].forEach(m => {
-        const btnId = m === 'translate' ? 'btn-translate' : m === 'rotate' ? 'btn-rotate' : 'btn-scale';
-        const btn = document.getElementById(btnId);
-        if (btn) btn.classList.toggle('active', m === mode);
-    });
-}
-
 // =============================================================================
 // EXPORT PANEL
 // =============================================================================
@@ -598,27 +562,3 @@ export function hideInlineLoading(assetType) {
     }
 }
 
-export default {
-    setDisplayMode,
-    updateVisibility,
-    showLoading,
-    updateProgress,
-    hideLoading,
-    toggleControlsPanel,
-    applyControlsVisibility,
-    applyControlsMode,
-    updateTransformInputs,
-    updateFilename,
-    updateStatusText,
-    setupCollapsibles,
-    addListener,
-    setupKeyboardShortcuts,
-    setActiveButton,
-    setSelectionButtonState,
-    setTransformModeButtonState,
-    showExportPanel,
-    hideExportPanel,
-    copyShareLink,
-    showInlineLoading,
-    hideInlineLoading
-};

@@ -23,7 +23,7 @@ const log = Logger.getLogger('alignment');
  * KD-Tree for efficient nearest neighbor search in 3D space.
  * Used by ICP alignment algorithm.
  */
-export class KDTree {
+class KDTree {
     constructor(points) {
         // points is an array of {x, y, z, index}
         this.root = this.buildTree(points, 0);
@@ -98,7 +98,7 @@ export class KDTree {
  * @param {number} maxPoints - Maximum points to extract
  * @returns {Array<{x: number, y: number, z: number, index: number}>}
  */
-export function extractSplatPositions(splatMeshObj, maxPoints = 5000) {
+function extractSplatPositions(splatMeshObj, maxPoints = 5000) {
     const positions = [];
 
     // Get splat's world matrix for transforming local positions to world space
@@ -177,7 +177,7 @@ export function extractSplatPositions(splatMeshObj, maxPoints = 5000) {
  * @param {number} maxPoints - Maximum points to extract
  * @returns {Array<{x: number, y: number, z: number, index: number}>}
  */
-export function extractMeshVertices(modelGroupObj, maxPoints = 10000) {
+function extractMeshVertices(modelGroupObj, maxPoints = 10000) {
     const positions = [];
     const allVertices = [];
 
@@ -223,7 +223,7 @@ export function extractMeshVertices(modelGroupObj, maxPoints = 10000) {
  * @param {Array<{x: number, y: number, z: number}>} points
  * @returns {{x: number, y: number, z: number}}
  */
-export function computeCentroid(points) {
+function computeCentroid(points) {
     let cx = 0, cy = 0, cz = 0;
     for (const p of points) {
         cx += p.x;
@@ -243,7 +243,7 @@ export function computeCentroid(points) {
  * @param {Object} targetCentroid - Centroid of target points
  * @returns {THREE.Matrix4} Rotation matrix
  */
-export function computeOptimalRotation(sourcePoints, targetPoints, sourceCentroid, targetCentroid) {
+function computeOptimalRotation(sourcePoints, targetPoints, sourceCentroid, targetCentroid) {
     // Build the covariance matrix H
     // H = sum((source - sourceCentroid) * (target - targetCentroid)^T)
     let h = [
@@ -327,7 +327,7 @@ export function computeOptimalRotation(sourcePoints, targetPoints, sourceCentroi
  * @param {Object} splatMeshObj - The SplatMesh object
  * @returns {{min: THREE.Vector3, max: THREE.Vector3, center: THREE.Vector3, found: boolean}}
  */
-export function computeSplatBoundsFromPositions(splatMeshObj) {
+function computeSplatBoundsFromPositions(splatMeshObj) {
     const bounds = {
         min: new THREE.Vector3(Infinity, Infinity, Infinity),
         max: new THREE.Vector3(-Infinity, -Infinity, -Infinity),
@@ -759,34 +759,6 @@ export function fitToView(deps) {
 // ALIGNMENT SAVE/LOAD/RESET
 // =============================================================================
 
-/**
- * Collect current alignment data
- * @param {Object} deps - Dependencies object
- * @returns {Object} Alignment data
- */
-export function collectAlignmentData(deps) {
-    const { splatMesh, modelGroup } = deps;
-
-    const data = {};
-
-    if (splatMesh) {
-        data.splat = {
-            position: [splatMesh.position.x, splatMesh.position.y, splatMesh.position.z],
-            rotation: [splatMesh.rotation.x, splatMesh.rotation.y, splatMesh.rotation.z],
-            scale: splatMesh.scale.x
-        };
-    }
-
-    if (modelGroup) {
-        data.model = {
-            position: [modelGroup.position.x, modelGroup.position.y, modelGroup.position.z],
-            rotation: [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z],
-            scale: modelGroup.scale.x
-        };
-    }
-
-    return data;
-}
 
 /**
  * Apply alignment data to objects
@@ -858,69 +830,6 @@ export function resetCamera(deps) {
 }
 
 // =============================================================================
-// SHARE LINK GENERATION
-// =============================================================================
-
-/**
- * Generate share link parameters from current alignment
- * @param {Object} deps - Dependencies object
- * @param {Object} deps.state - Application state
- * @param {Object} deps.splatMesh - The splat mesh
- * @param {THREE.Group} deps.modelGroup - The model group
- * @returns {URLSearchParams} URL parameters
- */
-export function generateShareParams(deps) {
-    const { state, splatMesh, modelGroup } = deps;
-    const params = new URLSearchParams();
-
-    // Add file URLs
-    if (state.currentArchiveUrl) {
-        params.set('archive', state.currentArchiveUrl);
-    } else {
-        if (state.currentSplatUrl) {
-            params.set('splat', state.currentSplatUrl);
-        }
-        if (state.currentModelUrl) {
-            params.set('model', state.currentModelUrl);
-        }
-    }
-
-    // Add alignment parameters
-    if (splatMesh) {
-        const sp = splatMesh.position;
-        const sr = splatMesh.rotation;
-        const ss = splatMesh.scale.x;
-
-        if (sp.x !== 0 || sp.y !== 0 || sp.z !== 0) {
-            params.set('sp', `${sp.x.toFixed(3)},${sp.y.toFixed(3)},${sp.z.toFixed(3)}`);
-        }
-        if (sr.x !== 0 || sr.y !== 0 || sr.z !== 0) {
-            params.set('sr', `${sr.x.toFixed(4)},${sr.y.toFixed(4)},${sr.z.toFixed(4)}`);
-        }
-        if (ss !== 1) {
-            params.set('ss', ss.toFixed(3));
-        }
-    }
-
-    if (modelGroup) {
-        const mp = modelGroup.position;
-        const mr = modelGroup.rotation;
-        const ms = modelGroup.scale.x;
-
-        if (mp.x !== 0 || mp.y !== 0 || mp.z !== 0) {
-            params.set('mp', `${mp.x.toFixed(3)},${mp.y.toFixed(3)},${mp.z.toFixed(3)}`);
-        }
-        if (mr.x !== 0 || mr.y !== 0 || mr.z !== 0) {
-            params.set('mr', `${mr.x.toFixed(4)},${mr.y.toFixed(4)},${mr.z.toFixed(4)}`);
-        }
-        if (ms !== 1) {
-            params.set('ms', ms.toFixed(3));
-        }
-    }
-
-    return params;
-}
-
 /**
  * Center a model on the grid (y=0) when loaded standalone (without a splat).
  * Positions the model so its bottom is on the grid and it's centered horizontally.

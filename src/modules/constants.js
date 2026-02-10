@@ -127,28 +127,6 @@ export const MATERIAL = {
 };
 
 // =============================================================================
-// TRANSFORM DEFAULTS
-// =============================================================================
-
-export const TRANSFORM = {
-    DEFAULT_POSITION: { x: 0, y: 0, z: 0 },
-    DEFAULT_ROTATION: { x: 0, y: 0, z: 0 },
-    DEFAULT_SCALE: 1.0
-};
-
-// =============================================================================
-// UI CONFIGURATION
-// =============================================================================
-
-export const UI = {
-    // Controls panel width when visible
-    CONTROLS_PANEL_WIDTH: '280px',
-
-    // FPS counter update is handled by the animation loop
-    // No specific timing constant needed
-};
-
-// =============================================================================
 // ASSET STATE (used by lazy archive loading)
 // =============================================================================
 
@@ -170,14 +148,3 @@ export const MESH_LOD = {
     DESKTOP_WARNING_FACES: 10_000_000
 };
 
-// =============================================================================
-// FILE HANDLING
-// =============================================================================
-
-export const FILES = {
-    // Supported file extensions
-    SPLAT_EXTENSIONS: ['.ply', '.splat', '.ksplat', '.spz', '.sog'],
-    MODEL_EXTENSIONS: ['.glb', '.gltf', '.obj'],
-    POINTCLOUD_EXTENSIONS: ['.e57'],
-    ARCHIVE_EXTENSIONS: ['.a3d', '.a3z']
-};

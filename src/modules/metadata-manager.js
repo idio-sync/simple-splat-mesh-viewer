@@ -678,7 +678,7 @@ const VALIDATION_RULES = {
  * @param {string} fieldId - DOM element ID
  * @returns {boolean} true if valid or empty
  */
-export function validateField(fieldId) {
+function validateField(fieldId) {
     const field = document.getElementById(fieldId);
     if (!field) return true;
 
@@ -714,24 +714,6 @@ export function validateField(fieldId) {
     }
 
     return isValid;
-}
-
-/**
- * Validate all fields with rules. Returns array of error objects.
- * Advisory only -- does not block export.
- * @returns {Array<{fieldId: string, message: string}>}
- */
-export function validateAllFields() {
-    const errors = [];
-    for (const fieldId in VALIDATION_RULES) {
-        if (!validateField(fieldId)) {
-            errors.push({
-                fieldId: fieldId,
-                message: VALIDATION_RULES[fieldId].message
-            });
-        }
-    }
-    return errors;
 }
 
 /**
@@ -1688,31 +1670,3 @@ export function hideAnnotationPopup() {
     if (popup) popup.classList.add('hidden');
 }
 
-export default {
-    showMetadataSidebar,
-    hideMetadataSidebar,
-    switchSidebarMode,
-    switchEditTab,
-    toggleMetadataDisplay,
-    showMetadataPanel,
-    hideMetadataPanel,
-    setupMetadataTabs,
-    setupMetadataSidebar,
-    setupLicenseField,
-    formatFileSize,
-    updateMetadataStats,
-    updateAssetStatus,
-    addCustomField,
-    collectMetadata,
-    prefillMetadataFromArchive,
-    populateMetadataDisplay,
-    updateArchiveMetadataUI,
-    clearArchiveMetadata,
-    showAnnotationPopup,
-    updateAnnotationPopupPosition,
-    hideAnnotationPopup,
-    addVersionEntry,
-    validateField,
-    validateAllFields,
-    setupFieldValidation
-};

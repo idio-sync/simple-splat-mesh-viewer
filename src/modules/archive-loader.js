@@ -841,7 +841,4 @@ export class ArchiveLoader {
     }
 }
 
-// Export sanitization function for use in other modules if needed
-export { sanitizeArchiveFilename };
-
 export default ArchiveLoader;

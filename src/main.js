@@ -211,7 +211,6 @@ let flyControls = null;
 let splatMesh = null;
 let modelGroup = null;
 let pointcloudGroup = null;
-let gridHelper = null;
 let ambientLight, hemisphereLight, directionalLight1, directionalLight2;
 
 // Annotation and archive creation
@@ -848,7 +847,6 @@ function setDisplayMode(mode) {
 function toggleGridlines(show) {
     if (sceneManager) {
         sceneManager.toggleGrid(show);
-        gridHelper = sceneManager.gridHelper; // Keep reference in sync
     }
 }
 
@@ -1420,7 +1418,9 @@ async function processArchive(archiveLoader, archiveName) {
             log.info(` Extracted ${state.imageAssets.size} embedded images`);
         }
 
-        // Populate source files list from archive manifest (metadata only, no extraction)
+        // Populate source files list from archive manifest (metadata only).
+        // Blobs are re-extracted on demand at export time via archiveLoader.extractFile().
+        // releaseRawData() is skipped when source files exist so extraction stays possible.
         const archiveSourceEntries = archiveLoader.getSourceFileEntries();
         if (archiveSourceEntries.length > 0) {
             for (const { entry } of archiveSourceEntries) {
@@ -1491,13 +1491,22 @@ async function processArchive(archiveLoader, archiveName) {
                         updateTransformInputs();
                     }
                 }
-                // Release raw ZIP data after all assets are extracted
-                archiveLoader.releaseRawData();
-                log.info('All archive assets loaded, raw data released');
+                // Release raw ZIP data after all assets are extracted,
+                // but keep it if archive has source files (needed for re-export).
+                // For file-based archives, _file is just a File handle — no memory cost.
+                if (!archiveLoader.hasSourceFiles()) {
+                    archiveLoader.releaseRawData();
+                    log.info('All archive assets loaded, raw data released');
+                } else {
+                    log.info('All archive assets loaded, raw data retained for source file re-export');
+                }
             }, 100);
         } else {
-            // All assets already loaded, release raw data
-            archiveLoader.releaseRawData();
+            if (!archiveLoader.hasSourceFiles()) {
+                archiveLoader.releaseRawData();
+            } else {
+                log.info('Raw data retained for source file re-export');
+            }
         }
     } catch (error) {
         log.error(' Error processing archive:', error);
@@ -2238,7 +2247,7 @@ async function downloadArchive() {
         }
     }
 
-    // Add source files
+    // Add user-added source files (have blobs, not from archive)
     const sourceFilesWithBlobs = sourceFiles.filter(sf => sf.file && !sf.fromArchive);
     if (sourceFilesWithBlobs.length > 0) {
         const totalSourceSize = sourceFilesWithBlobs.reduce((sum, sf) => sum + sf.size, 0);
@@ -2251,11 +2260,10 @@ async function downloadArchive() {
         }
     }
 
-    // Re-add source file manifest entries from loaded archive (metadata only, blobs re-extracted)
+    // Re-extract source files from the loaded archive (raw data retained for this purpose)
     if (state.archiveLoader && state.archiveLoader.hasSourceFiles()) {
         const archiveSourceEntries = state.archiveLoader.getSourceFileEntries();
         for (const { entry } of archiveSourceEntries) {
-            // Only re-add if we have the actual file data in the archive
             try {
                 const data = await state.archiveLoader.extractFile(entry.file_name);
                 if (data) {
@@ -3511,8 +3519,6 @@ async function handleLoadFullResMesh() {
         notify.error('Error loading full resolution mesh: ' + error.message);
     }
 }
-
-// loadGLTF, loadOBJ, and loadOBJWithoutMaterials moved to file-handlers.js
 
 function updateModelOpacity() {
     if (modelGroup) {

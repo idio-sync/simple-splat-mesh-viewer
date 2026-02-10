@@ -823,25 +823,6 @@ function parseMarkdown(text) {
 }
 
 /**
- * Sanitize a URL for use in href/src attributes.
- * Only allows http, https, and data URLs.
- *
- * @param {string} url - URL to sanitize
- * @returns {string} Sanitized URL or empty string if unsafe
- */
-function sanitizeUrl(url) {
-    if (!url) return '';
-    const trimmed = url.trim().toLowerCase();
-    if (trimmed.startsWith('http://') ||
-        trimmed.startsWith('https://') ||
-        trimmed.startsWith('blob:') ||
-        trimmed.startsWith('data:image/')) {
-        return url;
-    }
-    return '';
-}
-
-/**
  * Resolve asset: references in text to blob URLs using an image assets map.
  * Converts `asset:images/filename.jpg` to the corresponding blob URL.
  *
@@ -864,24 +845,18 @@ function resolveAssetRefs(text, imageAssets) {
 export {
     // Logging system
     Logger,
-    LogLevel,
 
     // Notification system
     notify,
-    NotificationType,
 
     // Mesh utilities
     processMeshMaterials,
-    ensureMeshNormals,
-    convertToStandardMaterial,
-    createDefaultMaterial,
     computeMeshFaceCount,
     computeMeshVertexCount,
     disposeObject,
 
     // Markdown parsing
     parseMarkdown,
-    sanitizeUrl,
     resolveAssetRefs,
 
     // Network utilities

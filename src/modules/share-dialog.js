@@ -534,26 +534,10 @@ export function showShareDialog(state) {
 /**
  * Hide the share dialog
  */
-export function hideShareDialog() {
+function hideShareDialog() {
     if (dialogElement) {
         dialogElement.classList.add('hidden');
     }
     currentState = null;
 }
 
-/**
- * Parse URL parameters for viewer mode settings
- * Call this from config.js or main.js initialization
- * @returns {Object} Parsed viewer settings
- */
-export function parseViewerModeParams() {
-    const params = new URLSearchParams(window.location.search);
-
-    return {
-        toolbar: params.get('toolbar') || 'show',
-        sidebar: params.get('sidebar') || 'closed'
-    };
-}
-
-// Export constants for external use
-export { SHARE_OPTIONS, UI_PRESETS };
