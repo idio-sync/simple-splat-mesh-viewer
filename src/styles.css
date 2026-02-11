@@ -3466,6 +3466,55 @@ body.kiosk-mode .sidebar-mode-tab:active {
     transition: transform 0.08s ease-in;
 }
 
+/* --- View Switcher Pill (Desktop: bottom-center floating) --- */
+
+body.kiosk-mode .kiosk-view-switcher {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    background: rgba(15, 15, 26, 0.7);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    border: 1px solid rgba(78, 205, 196, 0.15);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+body.kiosk-mode .kiosk-view-btn {
+    padding: 8px 18px;
+    border: none;
+    background: transparent;
+    color: rgba(180, 180, 200, 0.7);
+    font-size: 0.82rem;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: 9px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+}
+
+body.kiosk-mode .kiosk-view-btn:hover {
+    color: rgba(220, 220, 235, 0.9);
+    background: rgba(78, 205, 196, 0.08);
+}
+
+body.kiosk-mode .kiosk-view-btn.active {
+    color: #fff;
+    background: rgba(78, 205, 196, 0.25);
+    box-shadow: 0 0 12px rgba(78, 205, 196, 0.15);
+}
+
+body.kiosk-mode .kiosk-view-btn:active {
+    transform: scale(0.95);
+    transition: transform 0.08s ease-in;
+}
+
 /* --- Sidebar Edge Shadow (viewport side) --- */
 
 body.kiosk-mode #metadata-sidebar:not(.hidden)::before {
@@ -3799,6 +3848,33 @@ body.kiosk-mode #metadata-sidebar ::-webkit-scrollbar-thumb:hover {
     body.kiosk-mode #btn-toggle-annotations:active {
         transform: scale(0.90);
         transition: transform 0.08s ease-in;
+    }
+
+    /* --- View Switcher: Inside Drag Handle on Mobile --- */
+
+    body.kiosk-mode .kiosk-view-switcher {
+        position: static;
+        transform: none;
+        bottom: auto;
+        left: auto;
+        background: rgba(15, 15, 26, 0.5);
+        border: 1px solid rgba(78, 205, 196, 0.1);
+        box-shadow: none;
+        padding: 2px;
+        border-radius: 10px;
+    }
+
+    body.kiosk-mode .kiosk-view-btn {
+        padding: 6px 14px;
+        font-size: 0.75rem;
+    }
+
+    /* Expand drag handle to hold both bar and switcher */
+    body.kiosk-mode #sidebar-drag-handle {
+        flex-direction: column;
+        gap: 8px;
+        height: auto;
+        padding: 10px 0 6px;
     }
 
     /* --- Annotation Markers: Bigger Touch Targets --- */

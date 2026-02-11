@@ -327,6 +327,14 @@ async function handleArchiveFile(file) {
         await showBrandedLoading(archiveLoader);
 
         // === Phase 2: Load primary asset for initial display ===
+        // Set intended display mode early so getPrimaryAssetType loads the right asset first
+        if (contentInfo.hasMesh) {
+            state.displayMode = 'model';
+        } else if (contentInfo.hasSplat) {
+            state.displayMode = 'splat';
+        } else if (contentInfo.hasPointcloud) {
+            state.displayMode = 'pointcloud';
+        }
         updateProgress(30, 'Loading 3D data...');
         const primaryType = getPrimaryAssetType(state.displayMode, contentInfo);
         const primaryLoaded = await ensureAssetLoaded(primaryType);
@@ -385,19 +393,22 @@ async function handleArchiveFile(file) {
         populateSourceFilesList(archiveLoader);
         reorderKioskSidebar();
 
-        // Set display mode based on what was loaded
+        // Set display mode: default to model, fall back to splat, then pointcloud
         updateProgress(90, 'Finalizing...');
-        if (state.splatLoaded && state.modelLoaded) {
-            state.displayMode = 'both';
+        if (state.modelLoaded) {
+            state.displayMode = 'model';
         } else if (state.splatLoaded) {
             state.displayMode = 'splat';
-        } else if (state.modelLoaded) {
-            state.displayMode = 'model';
+        } else if (state.pointcloudLoaded) {
+            state.displayMode = 'pointcloud';
         }
         setDisplayMode(state.displayMode, createDisplayModeDeps());
 
         // Show only relevant settings
         showRelevantSettings(state.splatLoaded, state.modelLoaded, state.pointcloudLoaded);
+
+        // Create view switcher pill (only if 2+ asset types)
+        createViewSwitcher();
 
         // Fit camera to loaded content
         fitCameraToScene();
@@ -522,9 +533,10 @@ function createDisplayModeDeps() {
         updateVisibility: () => {
             const showSplat = state.displayMode === 'splat' || state.displayMode === 'both' || state.displayMode === 'split';
             const showModel = state.displayMode === 'model' || state.displayMode === 'both' || state.displayMode === 'split';
+            const showPointcloud = state.displayMode === 'pointcloud' || state.displayMode === 'both' || state.displayMode === 'split';
             if (splatMesh) splatMesh.visible = showSplat;
             if (modelGroup) modelGroup.visible = showModel;
-            if (pointcloudGroup) pointcloudGroup.visible = showModel;
+            if (pointcloudGroup) pointcloudGroup.visible = showPointcloud;
         }
     };
 }
@@ -709,10 +721,9 @@ function setupViewerKeyboardShortcuts() {
                 showMetadataSidebar('view', { state, annotationSystem, imageAssets: state.imageAssets });
             }
         },
-        '1': () => { state.displayMode = 'model'; setDisplayMode('model', createDisplayModeDeps()); triggerLazyLoad('model'); },
-        '2': () => { state.displayMode = 'splat'; setDisplayMode('splat', createDisplayModeDeps()); triggerLazyLoad('splat'); },
-        '3': () => { state.displayMode = 'both'; setDisplayMode('both', createDisplayModeDeps()); triggerLazyLoad('both'); },
-        '4': () => { state.displayMode = 'split'; setDisplayMode('split', createDisplayModeDeps()); triggerLazyLoad('split'); },
+        '1': () => switchViewMode('model'),
+        '2': () => switchViewMode('splat'),
+        '3': () => switchViewMode('pointcloud'),
         'g': () => {
             const cb = document.getElementById('toggle-gridlines');
             if (cb) { cb.checked = !cb.checked; sceneManager.toggleGrid(cb.checked); }
@@ -722,6 +733,79 @@ function setupViewerKeyboardShortcuts() {
             currentPopupAnnotationId = null;
         }
     });
+}
+
+// =============================================================================
+// VIEW SWITCHER
+// =============================================================================
+
+function switchViewMode(mode) {
+    state.displayMode = mode;
+    setDisplayMode(mode, createDisplayModeDeps());
+    triggerLazyLoad(mode);
+
+    // Update active button state
+    document.querySelectorAll('.kiosk-view-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+}
+
+function createViewSwitcher() {
+    // Remove existing switcher if recreating
+    const existing = document.getElementById('kiosk-view-switcher');
+    if (existing) existing.remove();
+
+    // Use contentInfo from archive to know what types are available
+    // (assets may not be loaded yet but will lazy-load on switch)
+    const contentInfo = state.archiveLoader ? state.archiveLoader.getContentInfo() : null;
+    const types = [];
+    if (contentInfo) {
+        if (contentInfo.hasMesh) types.push({ mode: 'model', label: 'Model' });
+        if (contentInfo.hasSplat) types.push({ mode: 'splat', label: 'Splat' });
+        if (contentInfo.hasPointcloud) types.push({ mode: 'pointcloud', label: 'Point Cloud' });
+    } else {
+        if (state.modelLoaded) types.push({ mode: 'model', label: 'Model' });
+        if (state.splatLoaded) types.push({ mode: 'splat', label: 'Splat' });
+        if (state.pointcloudLoaded) types.push({ mode: 'pointcloud', label: 'Point Cloud' });
+    }
+
+    // Only show if 2+ types available
+    if (types.length < 2) return;
+
+    const pill = document.createElement('div');
+    pill.id = 'kiosk-view-switcher';
+    pill.className = 'kiosk-view-switcher';
+
+    types.forEach(({ mode, label }) => {
+        const btn = document.createElement('button');
+        btn.className = 'kiosk-view-btn';
+        btn.dataset.mode = mode;
+        btn.textContent = label;
+        if (state.displayMode === mode) btn.classList.add('active');
+        btn.addEventListener('click', () => switchViewMode(mode));
+        pill.appendChild(btn);
+    });
+
+    // Desktop: append to document.body (position:fixed bottom-center)
+    // Mobile: insert into #sidebar-drag-handle alongside the drag bar
+    if (isMobileKiosk()) {
+        const handle = document.getElementById('sidebar-drag-handle');
+        if (handle) handle.appendChild(pill);
+    } else {
+        document.body.appendChild(pill);
+    }
+}
+
+function repositionViewSwitcher() {
+    const pill = document.getElementById('kiosk-view-switcher');
+    if (!pill) return;
+
+    const handle = document.getElementById('sidebar-drag-handle');
+    if (isMobileKiosk()) {
+        if (pill.parentElement !== handle && handle) handle.appendChild(pill);
+    } else {
+        if (pill.parentElement !== document.body) document.body.appendChild(pill);
+    }
 }
 
 // =============================================================================
@@ -1866,8 +1950,9 @@ function onWindowResize() {
     if (!container) return;
     sceneManager.onWindowResize(state.displayMode, container);
 
-    // Move annotation toggle based on viewport
+    // Move annotation toggle and view switcher based on viewport
     repositionAnnotationToggle();
+    repositionViewSwitcher();
 
     // Reset sheet state when crossing mobile/desktop boundary
     const sidebar = document.getElementById('metadata-sidebar');
