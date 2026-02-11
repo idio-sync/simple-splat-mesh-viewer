@@ -23,7 +23,8 @@ export const CAMERA = {
 export const ORBIT_CONTROLS = {
     DAMPING_FACTOR: 0.05,             // Smoothing factor for camera movement
     MIN_DISTANCE: 0.1,                // Minimum zoom distance
-    MAX_DISTANCE: 100                 // Maximum zoom distance
+    MAX_DISTANCE: 100,                // Maximum zoom distance
+    AUTO_ROTATE_SPEED: 2.0            // ~30s per revolution at 60fps (matches Sketchfab default)
 };
 
 // =============================================================================
@@ -146,5 +147,33 @@ export const MESH_LOD = {
     MOBILE_WARNING_FACES: 300_000,
     // Face count above which a general GPU memory warning is shown (advisory only)
     DESKTOP_WARNING_FACES: 10_000_000
+};
+
+// =============================================================================
+// SHADOW SETTINGS
+// =============================================================================
+
+export const SHADOWS = {
+    MAP_SIZE: 2048,                   // Shadow map resolution (px)
+    CAMERA_SIZE: 15,                  // Shadow camera frustum half-width
+    CAMERA_NEAR: 0.5,
+    CAMERA_FAR: 50,
+    BIAS: -0.0001,
+    NORMAL_BIAS: 0.02,
+    GROUND_PLANE_SIZE: 30,            // Shadow catcher plane size
+    GROUND_PLANE_Y: -0.02             // Slightly below grid to avoid z-fighting
+};
+
+// =============================================================================
+// ENVIRONMENT MAP PRESETS
+// =============================================================================
+
+export const ENVIRONMENT = {
+    PRESETS: [
+        { name: 'None', url: '' },
+        { name: 'Outdoor', url: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_43d_clear_puresky_1k.hdr' },
+        { name: 'Studio', url: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_09_1k.hdr' },
+        { name: 'Sunset', url: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_48d_partly_cloudy_puresky_1k.hdr' }
+    ]
 };
 

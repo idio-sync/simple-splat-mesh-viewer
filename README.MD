@@ -9,6 +9,9 @@ A web-based viewer for viewing Gaussian splats, 3D models, and E57 point clouds,
 - Load and display **Gaussian splat** files (.ply, .splat, .ksplat, .spz, .sog)
 - **Archive container support** (.a3d, .a3z) — bundle all assets, metadata, and multi-data alignment into a single file
 - **Four display modes**: Model only, Splat only, Both overlaid, or Split side-by-side, and Point Cloud
+- **Scene settings** — tone mapping (6 modes + exposure), HDR environment maps (3 presets + file/URL loading), environment-as-background skybox, shadow casting with shadow catcher ground plane, background image loading
+- **Auto-rotate** — turntable toggle in toolbar for both main app and kiosk viewer
+- **Screenshot capture** — capture viewport screenshots with a viewfinder-based archive preview override, thumbnail gallery with delete, and automatic export to `/screenshots/` in archives
 - **Transform controls** for positioning, rotating, and scaling each object independently
 - **Auto-alignment** and **ICP alignment** for registering splats and models
 - **Fly camera mode** for first-person navigation (WASD + mouse look)
@@ -142,7 +145,18 @@ Annotations are saved inside archive containers and persist across sessions via 
 
 - **Grid** — Toggle a reference grid
 - **Background color** — Choose from presets (dark blue, near black, grays, light gray) or pick a custom color
+- **Background image** — Load a background image from file or URL; clears when switching to environment-as-background
 - **Lighting** — Adjust ambient, hemisphere, and two directional lights (affects models and point clouds only)
+- **Tone mapping** — 6 modes: None (default), Linear, Reinhard, Cineon, ACESFilmic, AgX. Exposure slider (0.1–3.0). Default is None for neutral rendering; opt-in to cinematic looks
+- **HDR environment maps (IBL)** — 3 built-in presets (Outdoor, Studio, Sunset) plus load from `.hdr` file or URL. Provides image-based lighting for realistic reflections and ambient light
+- **Environment as background** — Toggle to display the HDR environment map as a skybox behind the scene (mutually exclusive with solid color and background image)
+- **Shadows** — Toggle shadow casting with PCFSoftShadowMap (2048px). Automatically creates a shadow catcher ground plane with adjustable opacity (0.05–1.0). Auto-enabled in kiosk mode
+
+### Screenshots
+
+- **Capture Screenshot** — Captures a 1024x1024 JPEG of the current viewport. Screenshots appear as thumbnails below the button with a red X to delete
+- **Set Archive Preview Image** — Opens a viewfinder overlay showing the square crop region. Capture from the viewfinder to override the automatic preview generated during archive export
+- **Archive export** — All captured screenshots are bundled into the archive's `/screenshots/` directory on export
 
 ### Asset-Specific Settings
 
@@ -174,6 +188,7 @@ The left-side toolbar provides quick access to:
 | Metadata | Open the metadata sidebar for viewing or editing |
 | Annotate | Enter annotation placement mode |
 | Fly Camera | Switch to first-person fly camera |
+| Auto-Rotate | Toggle turntable auto-rotation (disabled by default in main app) |
 | Toggle Annotations | Show/hide annotation markers (visible when annotations exist) |
 | Export Archive | Export the current scene as an .a3d or .a3z archive |
 | Download Viewer | Generate a self-contained offline kiosk HTML file |
@@ -272,6 +287,8 @@ The **Download Viewer** button generates a self-contained HTML file (~1 MB befor
 
 - Full 3D rendering (splats, meshes, point clouds) with display mode switching
 - Orbit and fly camera controls
+- Auto-rotate turntable (enabled by default, auto-disables on manual interaction)
+- Shadow casting with shadow catcher ground plane
 - Annotation viewing with depth-aware markers, popups, and connecting lines
 - Metadata sidebar (view-only)
 - Scene settings (background color, lighting, grid)
@@ -298,10 +315,13 @@ scene.a3d/
   scene.ply              # Gaussian splat data
   model.glb              # 3D mesh
   scan.e57               # Point cloud (optional)
-  preview.jpg            # Thumbnail preview (optional)
+  preview.jpg            # Thumbnail preview (optional, auto-captured or manual)
   images/                # Image attachments referenced by annotations/descriptions
     photo1.jpg
     detail2.png
+  screenshots/           # User-captured viewport screenshots (optional)
+    screenshot_0.jpg
+    screenshot_1.jpg
 ```
 
 ### Manifest Schema
@@ -500,8 +520,9 @@ Click the **Export Archive** toolbar button to save the current scene:
 1. Choose format: `.a3d` (standard) or `.a3z` (compressed)
 2. The export bundles all loaded assets, current transforms, annotations, metadata, and image attachments
 3. SHA-256 integrity hashes are computed for each asset file (requires HTTPS; a warning is shown on HTTP)
-4. A preview thumbnail is captured from the current viewport
-5. Version history entries and data entry roles are preserved in the manifest
+4. A preview thumbnail is auto-captured from the current viewport (or uses a manual preview if one was set via the viewfinder)
+5. Any captured screenshots are exported to a `screenshots/` directory in the archive
+6. Version history entries and data entry roles are preserved in the manifest
 
 ## Metadata Editor
 

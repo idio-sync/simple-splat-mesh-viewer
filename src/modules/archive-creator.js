@@ -1066,6 +1066,27 @@ export class ArchiveCreator {
     }
 
     /**
+     * Add a screenshot to the archive
+     * @param {Blob} blob - The image data
+     * @param {string} fileName - Original filename
+     */
+    addScreenshot(blob, fileName) {
+        const index = this._countEntriesOfType('screenshot_');
+        const entryKey = `screenshot_${index}`;
+        const ext = fileName.split('.').pop().toLowerCase();
+        const archivePath = `screenshots/${entryKey}.${ext}`;
+
+        this.files.set(archivePath, { blob, originalName: fileName });
+
+        this.manifest.data_entries[entryKey] = {
+            file_name: archivePath,
+            created_by: this.manifest.packer
+        };
+
+        return entryKey;
+    }
+
+    /**
      * Add an embedded image (used in annotation/description markdown)
      * @param {Blob} blob - The image data
      * @param {string} archivePath - Path within archive (e.g., 'images/photo.jpg')

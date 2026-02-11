@@ -413,6 +413,15 @@ async function handleArchiveFile(file) {
         // Fit camera to loaded content
         fitCameraToScene();
 
+        // Enable shadows in kiosk mode
+        sceneManager.enableShadows(true);
+        sceneManager.applyShadowProperties(modelGroup);
+
+        // Enable auto-rotate by default in kiosk mode
+        controls.autoRotate = true;
+        const autoRotateBtn = document.getElementById('btn-auto-rotate');
+        if (autoRotateBtn) autoRotateBtn.classList.add('active');
+
         // Update info panel
         updateInfoPanel();
 
@@ -570,6 +579,22 @@ function setupViewerUI() {
 
     // Fly mode toggle
     addListener('btn-fly-mode', 'click', toggleFlyMode);
+
+    // Auto-rotate toggle
+    addListener('btn-auto-rotate', 'click', () => {
+        controls.autoRotate = !controls.autoRotate;
+        const btn = document.getElementById('btn-auto-rotate');
+        if (btn) btn.classList.toggle('active', controls.autoRotate);
+    });
+
+    // Disable auto-rotate on manual interaction so users can inspect freely
+    controls.addEventListener('start', () => {
+        if (controls.autoRotate) {
+            controls.autoRotate = false;
+            const btn = document.getElementById('btn-auto-rotate');
+            if (btn) btn.classList.remove('active');
+        }
+    });
 
     // Metadata sidebar toggle
     addListener('btn-metadata', 'click', () => {

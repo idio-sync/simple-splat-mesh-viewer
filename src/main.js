@@ -4,7 +4,7 @@ import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader, isArchiveFile } from './modules/archive-loader.js';
 import { AnnotationSystem } from './modules/annotation-system.js';
 import { ArchiveCreator, captureScreenshot, CRYPTO_AVAILABLE } from './modules/archive-creator.js';
-import { CAMERA, TIMING, ASSET_STATE, MESH_LOD } from './modules/constants.js';
+import { CAMERA, TIMING, ASSET_STATE, MESH_LOD, ENVIRONMENT } from './modules/constants.js';
 import { Logger, notify, computeMeshFaceCount, computeMeshVertexCount, disposeObject, fetchWithProgress } from './modules/utilities.js';
 import { FlyControls } from './modules/fly-controls.js';
 import { SceneManager } from './modules/scene-manager.js';
@@ -234,7 +234,10 @@ const state = {
     // Whether the currently displayed mesh is a proxy (display-quality LOD)
     viewingProxy: false,
     // Embedded images for annotation/description markdown
-    imageAssets: new Map()
+    imageAssets: new Map(),
+    // Screenshot captures for archive export
+    screenshots: [],          // Array of { id, blob, dataUrl, timestamp }
+    manualPreviewBlob: null   // If set, overrides auto-capture during export
 };
 
 // Scene manager instance (handles scene, camera, renderer, controls, lighting)
@@ -796,6 +799,13 @@ function setupUIEvents() {
     // Fly camera mode toggle
     addListener('btn-fly-mode', 'click', toggleFlyMode);
 
+    // Auto-rotate toggle
+    addListener('btn-auto-rotate', 'click', () => {
+        controls.autoRotate = !controls.autoRotate;
+        const btn = document.getElementById('btn-auto-rotate');
+        if (btn) btn.classList.toggle('active', controls.autoRotate);
+    });
+
     // Export/archive creation controls
     addListener('btn-export-archive', 'click', showExportPanel);
     addListener('btn-export-cancel', 'click', hideExportPanel);
@@ -803,6 +813,18 @@ function setupUIEvents() {
 
     // Generic viewer download button
     addListener('btn-download-viewer', 'click', downloadGenericViewer);
+
+    // Screenshot controls
+    addListener('btn-capture-screenshot', 'click', captureScreenshotToList);
+    addListener('btn-set-preview', 'click', showViewfinder);
+    addListener('btn-capture-preview', 'click', captureManualPreview);
+    addListener('btn-cancel-preview', 'click', hideViewfinder);
+    addListener('btn-clear-manual-preview', 'click', () => {
+        state.manualPreviewBlob = null;
+        const status = document.getElementById('manual-preview-status');
+        if (status) status.style.display = 'none';
+        notify.success('Manual preview cleared');
+    });
 
     // Metadata panel controls
     addListener('btn-close-sidebar', 'click', hideMetadataPanel);
@@ -829,6 +851,9 @@ function setupUIEvents() {
             // Update color picker
             const picker = document.getElementById('bg-color-picker');
             if (picker) picker.value = color;
+            // Uncheck env-as-background
+            const envBgToggle = document.getElementById('toggle-env-background');
+            if (envBgToggle) envBgToggle.checked = false;
         });
     });
 
@@ -837,6 +862,141 @@ function setupUIEvents() {
         setBackgroundColor(e.target.value);
         // Remove active from presets
         document.querySelectorAll('.color-preset').forEach(b => b.classList.remove('active'));
+        // Uncheck env-as-background
+        const envBgToggle = document.getElementById('toggle-env-background');
+        if (envBgToggle) envBgToggle.checked = false;
+    });
+
+    // Scene settings - Background image
+    addListener('bg-image-input', 'change', async (e) => {
+        const file = e.target.files[0];
+        if (!file || !sceneManager) return;
+        try {
+            await sceneManager.loadBackgroundImageFromFile(file);
+            const filenameEl = document.getElementById('bg-image-filename');
+            if (filenameEl) { filenameEl.textContent = file.name; filenameEl.style.display = ''; }
+            const envBgToggle = document.getElementById('toggle-env-background');
+            if (envBgToggle) envBgToggle.checked = false;
+            document.querySelectorAll('.color-preset').forEach(b => b.classList.remove('active'));
+            const clearBtn = document.getElementById('btn-clear-bg-image');
+            if (clearBtn) clearBtn.style.display = '';
+        } catch (err) {
+            notify.error('Failed to load background image: ' + err.message);
+        }
+    });
+
+    addListener('btn-load-bg-image-url', 'click', async () => {
+        const url = prompt('Enter background image URL:');
+        if (!url || !sceneManager) return;
+        try {
+            await sceneManager.loadBackgroundImage(url);
+            const envBgToggle = document.getElementById('toggle-env-background');
+            if (envBgToggle) envBgToggle.checked = false;
+            document.querySelectorAll('.color-preset').forEach(b => b.classList.remove('active'));
+            const clearBtn = document.getElementById('btn-clear-bg-image');
+            if (clearBtn) clearBtn.style.display = '';
+        } catch (err) {
+            notify.error('Failed to load background image: ' + err.message);
+        }
+    });
+
+    addListener('btn-clear-bg-image', 'click', () => {
+        if (!sceneManager) return;
+        sceneManager.clearBackgroundImage();
+        sceneManager.setBackgroundColor(
+            '#' + (sceneManager.savedBackgroundColor || new THREE.Color(0x1a1a2e)).getHexString()
+        );
+        const filenameEl = document.getElementById('bg-image-filename');
+        if (filenameEl) filenameEl.style.display = 'none';
+        const clearBtn = document.getElementById('btn-clear-bg-image');
+        if (clearBtn) clearBtn.style.display = 'none';
+    });
+
+    // Scene settings - Tone mapping
+    addListener('tone-mapping-select', 'change', (e) => {
+        if (sceneManager) sceneManager.setToneMapping(e.target.value);
+    });
+
+    addListener('tone-mapping-exposure', 'input', (e) => {
+        const val = parseFloat(e.target.value);
+        document.getElementById('tone-mapping-exposure-value').textContent = val.toFixed(1);
+        if (sceneManager) sceneManager.setToneMappingExposure(val);
+    });
+
+    // Scene settings - Environment map (IBL)
+    addListener('env-map-select', 'change', async (e) => {
+        const value = e.target.value;
+        if (!value) {
+            if (sceneManager) sceneManager.clearEnvironment();
+            return;
+        }
+        if (value.startsWith('preset:')) {
+            const index = parseInt(value.split(':')[1]);
+            const presets = ENVIRONMENT.PRESETS.filter(p => p.url);
+            if (presets[index]) {
+                showLoading('Loading HDR environment...');
+                try {
+                    await sceneManager.loadHDREnvironment(presets[index].url);
+                    notify.success('Environment loaded');
+                } catch (err) {
+                    notify.error('Failed to load environment: ' + err.message);
+                } finally {
+                    hideLoading();
+                }
+            }
+        }
+    });
+
+    addListener('hdr-file-input', 'change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        showLoading('Loading HDR environment...');
+        try {
+            await sceneManager.loadHDREnvironmentFromFile(file);
+            const filenameEl = document.getElementById('hdr-filename');
+            if (filenameEl) { filenameEl.textContent = file.name; filenameEl.style.display = ''; }
+            const select = document.getElementById('env-map-select');
+            if (select) select.value = '';
+            notify.success('Environment loaded from file');
+        } catch (err) {
+            notify.error('Failed to load HDR: ' + err.message);
+        } finally {
+            hideLoading();
+        }
+    });
+
+    addListener('btn-load-hdr-url', 'click', async () => {
+        const url = prompt('Enter HDR file URL (.hdr):');
+        if (!url) return;
+        showLoading('Loading HDR environment...');
+        try {
+            await sceneManager.loadHDREnvironment(url);
+            const select = document.getElementById('env-map-select');
+            if (select) select.value = '';
+            notify.success('Environment loaded from URL');
+        } catch (err) {
+            notify.error('Failed to load HDR: ' + err.message);
+        } finally {
+            hideLoading();
+        }
+    });
+
+    // Scene settings - Environment as background
+    addListener('toggle-env-background', 'change', (e) => {
+        if (sceneManager) sceneManager.setEnvironmentAsBackground(e.target.checked);
+    });
+
+    // Scene settings - Shadows
+    addListener('toggle-shadows', 'change', (e) => {
+        if (sceneManager) sceneManager.enableShadows(e.target.checked);
+        const opacityGroup = document.getElementById('shadow-opacity-group');
+        if (opacityGroup) opacityGroup.style.display = e.target.checked ? '' : 'none';
+    });
+
+    addListener('shadow-opacity', 'input', (e) => {
+        const val = parseFloat(e.target.value);
+        document.getElementById('shadow-opacity-value').textContent = val.toFixed(2);
+        if (sceneManager) sceneManager.setShadowCatcherOpacity(val);
     });
 
     // Close annotation popup when clicking outside
@@ -1547,6 +1707,7 @@ async function loadModelFromBlobUrl(blobUrl, fileName) {
 
     if (loadedObject) {
         modelGroup.add(loadedObject);
+        if (sceneManager) sceneManager.applyShadowProperties(loadedObject);
         state.modelLoaded = true;
         updateModelOpacity();
         updateModelWireframe();
@@ -1726,6 +1887,128 @@ function updateArchiveAssetCheckboxes() {
             el.disabled = !loaded;
         }
     });
+}
+
+// =============================================================================
+// SCREENSHOT FUNCTIONS
+// =============================================================================
+
+async function captureScreenshotToList() {
+    if (!renderer) {
+        notify.error('Renderer not ready');
+        return;
+    }
+    try {
+        renderer.render(scene, camera);
+        const blob = await captureScreenshot(renderer.domElement, { width: 1024, height: 1024 });
+        if (!blob) {
+            notify.error('Screenshot capture failed');
+            return;
+        }
+        const dataUrl = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+        });
+        state.screenshots.push({
+            id: Date.now(),
+            blob,
+            dataUrl,
+            timestamp: new Date().toISOString()
+        });
+        renderScreenshotsList();
+        notify.success('Screenshot captured');
+    } catch (e) {
+        log.error('Screenshot capture error:', e);
+        notify.error('Failed to capture screenshot');
+    }
+}
+
+function showViewfinder() {
+    if (!renderer) return;
+    const overlay = document.getElementById('viewfinder-overlay');
+    const frame = document.getElementById('viewfinder-frame');
+    const controls = document.getElementById('viewfinder-controls');
+    const dim = document.getElementById('viewfinder-dim');
+    if (!overlay || !frame || !controls) return;
+
+    const container = document.getElementById('viewer-container');
+    const rect = container.getBoundingClientRect();
+    const cw = rect.width;
+    const ch = rect.height;
+    const size = Math.min(cw, ch) * 0.8;
+    const left = (cw - size) / 2;
+    const top = (ch - size) / 2;
+
+    // Hide the dim layer — the frame's box-shadow creates the dimming effect
+    if (dim) dim.style.display = 'none';
+
+    frame.style.left = left + 'px';
+    frame.style.top = top + 'px';
+    frame.style.width = size + 'px';
+    frame.style.height = size + 'px';
+
+    controls.style.top = (top + size + 15) + 'px';
+
+    overlay.classList.remove('hidden');
+}
+
+function hideViewfinder() {
+    const overlay = document.getElementById('viewfinder-overlay');
+    if (overlay) overlay.classList.add('hidden');
+}
+
+async function captureManualPreview() {
+    if (!renderer) return;
+    try {
+        renderer.render(scene, camera);
+        const blob = await captureScreenshot(renderer.domElement, { width: 512, height: 512 });
+        if (blob) {
+            state.manualPreviewBlob = blob;
+            hideViewfinder();
+            const status = document.getElementById('manual-preview-status');
+            if (status) status.style.display = '';
+            notify.success('Manual preview captured');
+        }
+    } catch (e) {
+        log.error('Manual preview capture error:', e);
+        notify.error('Failed to capture preview');
+    }
+}
+
+function renderScreenshotsList() {
+    const list = document.getElementById('screenshots-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    if (state.screenshots.length === 0) return;
+
+    state.screenshots.forEach((shot) => {
+        const item = document.createElement('div');
+        item.className = 'screenshot-item';
+
+        const img = document.createElement('img');
+        img.src = shot.dataUrl;
+        img.alt = 'Screenshot';
+        item.appendChild(img);
+
+        const del = document.createElement('button');
+        del.className = 'screenshot-delete';
+        del.textContent = '\u00D7';
+        del.title = 'Remove screenshot';
+        del.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeScreenshot(shot.id);
+        });
+        item.appendChild(del);
+
+        list.appendChild(item);
+    });
+}
+
+function removeScreenshot(id) {
+    state.screenshots = state.screenshots.filter(s => s.id !== id);
+    renderScreenshotsList();
 }
 
 // Download archive
@@ -1941,20 +2224,34 @@ async function downloadArchive() {
 
     // Add preview/thumbnail
     if (includePreview && renderer) {
-        log.info(' Capturing preview screenshot');
         try {
-            // Force a render to ensure canvas has current content
-            // WebGL canvases clear after each frame unless preserveDrawingBuffer is set
-            renderer.render(scene, camera);
-
-            const canvas = renderer.domElement;
-            const previewBlob = await captureScreenshot(canvas, { width: 512, height: 512 });
+            let previewBlob;
+            if (state.manualPreviewBlob) {
+                log.info(' Using manual preview');
+                previewBlob = state.manualPreviewBlob;
+            } else {
+                log.info(' Auto-capturing preview screenshot');
+                renderer.render(scene, camera);
+                previewBlob = await captureScreenshot(renderer.domElement, { width: 512, height: 512 });
+            }
             if (previewBlob) {
                 log.info(' Preview captured, adding thumbnail');
                 archiveCreator.addThumbnail(previewBlob, 'preview.jpg');
             }
         } catch (e) {
             log.warn(' Failed to capture preview:', e);
+        }
+    }
+
+    // Add screenshots
+    if (state.screenshots.length > 0) {
+        log.info(` Adding ${state.screenshots.length} screenshot(s) to archive`);
+        for (const screenshot of state.screenshots) {
+            try {
+                archiveCreator.addScreenshot(screenshot.blob, `screenshot_${screenshot.id}.jpg`);
+            } catch (e) {
+                log.warn(' Failed to add screenshot:', e);
+            }
         }
     }
 
@@ -2737,6 +3034,7 @@ async function loadModelFromUrl(url) {
 
         if (loadedObject) {
             modelGroup.add(loadedObject);
+            if (sceneManager) sceneManager.applyShadowProperties(loadedObject);
             state.modelLoaded = true;
             state.currentModelUrl = url;
             updateModelOpacity();
