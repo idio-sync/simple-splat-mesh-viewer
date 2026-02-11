@@ -204,6 +204,17 @@ The viewer is stateless by design. Add an admin panel as a **separate service** 
 - **Phase 2:** Admin panel manages upload, metadata, embed code generation
 - **Phase 3:** Presigned R2 URLs with expiry for access control (no viewer changes needed -- the signed URL IS the authorization)
 
+## Nginx Configuration
+
+The Docker image includes nginx configured with:
+- GZIP compression for text-based assets
+- 1-day cache headers for static files
+- CORS headers for cross-origin file loading
+- Proper MIME types for `.a3d`, `.a3z` (`application/zip`) and `.e57` (`application/octet-stream`) files
+- Content Security Policy and security headers
+
+See [`docker/nginx.conf`](../docker/nginx.conf) for the full configuration.
+
 ## Security Notes
 
 - URL validation prevents loading from untrusted domains (configured via `ALLOWED_DOMAINS`)
