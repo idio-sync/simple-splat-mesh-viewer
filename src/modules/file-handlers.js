@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader } from './archive-loader.js';
 import { TIMING, ASSET_STATE } from './constants.js';
@@ -345,6 +346,140 @@ export function loadOBJFromUrl(url) {
 }
 
 /**
+ * Load STL from a File object
+ * STLLoader returns a BufferGeometry, so we wrap it in a Mesh.
+ * @param {File|string} fileOrUrl - File object or blob URL
+ * @returns {Promise<THREE.Mesh>}
+ */
+export function loadSTL(fileOrUrl) {
+    return new Promise((resolve, reject) => {
+        const loader = new STLLoader();
+        const url = typeof fileOrUrl === 'string' ? fileOrUrl : URL.createObjectURL(fileOrUrl);
+        loader.load(
+            url,
+            (geometry) => {
+                if (typeof fileOrUrl !== 'string') URL.revokeObjectURL(url);
+                geometry.computeVertexNormals();
+                const material = new THREE.MeshStandardMaterial({
+                    color: 0xaaaaaa,
+                    metalness: 0.2,
+                    roughness: 0.6,
+                    flatShading: false
+                });
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.name = typeof fileOrUrl === 'string' ? 'stl_model' : fileOrUrl.name;
+                resolve(mesh);
+            },
+            undefined,
+            (error) => {
+                if (typeof fileOrUrl !== 'string') URL.revokeObjectURL(url);
+                reject(error);
+            }
+        );
+    });
+}
+
+/**
+ * Load STL from URL (no blob URL revocation needed)
+ * @param {string} url - The URL
+ * @returns {Promise<THREE.Mesh>}
+ */
+export function loadSTLFromUrl(url) {
+    return new Promise((resolve, reject) => {
+        const loader = new STLLoader();
+        loader.load(
+            url,
+            (geometry) => {
+                geometry.computeVertexNormals();
+                const material = new THREE.MeshStandardMaterial({
+                    color: 0xaaaaaa,
+                    metalness: 0.2,
+                    roughness: 0.6,
+                    flatShading: false
+                });
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.name = 'stl_model';
+                resolve(mesh);
+            },
+            undefined,
+            (error) => reject(error)
+        );
+    });
+}
+
+/**
+ * Load STL from a file into the STL group (separate asset type)
+ * @param {FileList} files - The file list
+ * @param {Object} deps - Dependencies (must include stlGroup)
+ * @returns {Promise<THREE.Mesh>}
+ */
+export async function loadSTLFile(files, deps) {
+    const { stlGroup, state, callbacks } = deps;
+    const mainFile = files[0];
+
+    // Clear existing STL
+    while (stlGroup.children.length > 0) {
+        const child = stlGroup.children[0];
+        disposeObject(child);
+        stlGroup.remove(child);
+    }
+
+    const loadedObject = await loadSTL(mainFile);
+
+    if (loadedObject) {
+        stlGroup.add(loadedObject);
+        state.stlLoaded = true;
+
+        const faceCount = computeMeshFaceCount(loadedObject);
+
+        if (callbacks.onSTLLoaded) {
+            callbacks.onSTLLoaded(loadedObject, mainFile, faceCount);
+        }
+    }
+
+    return loadedObject;
+}
+
+/**
+ * Load STL from URL into the STL group (separate asset type)
+ * @param {string} url - The STL URL
+ * @param {Object} deps - Dependencies (must include stlGroup)
+ * @returns {Promise<THREE.Mesh>}
+ */
+export async function loadSTLFromUrlWithDeps(url, deps) {
+    const { stlGroup, state, callbacks } = deps;
+
+    log.info('Fetching STL from URL:', url);
+    const blob = await fetchWithProgress(url);
+    log.info('STL blob fetched, size:', blob.size);
+
+    const blobUrl = URL.createObjectURL(blob);
+
+    // Clear existing STL
+    while (stlGroup.children.length > 0) {
+        const child = stlGroup.children[0];
+        disposeObject(child);
+        stlGroup.remove(child);
+    }
+
+    const loadedObject = await loadSTLFromUrl(blobUrl);
+
+    if (loadedObject) {
+        stlGroup.add(loadedObject);
+        state.stlLoaded = true;
+        state.currentStlUrl = url;
+
+        const faceCount = computeMeshFaceCount(loadedObject);
+
+        if (callbacks.onSTLLoaded) {
+            callbacks.onSTLLoaded(loadedObject, blob, faceCount);
+        }
+    }
+
+    return loadedObject;
+}
+
+/**
  * Load model from a file
  * @param {FileList} files - The file list (may include MTL)
  * @param {Object} deps - Dependencies
@@ -375,6 +510,8 @@ export async function loadModelFromFile(files, deps) {
             }
         }
         loadedObject = await loadOBJ(mainFile, mtlFile);
+    } else if (extension === 'stl') {
+        loadedObject = await loadSTL(mainFile);
     }
 
     if (loadedObject) {
@@ -438,6 +575,8 @@ export async function loadModelFromUrl(url, deps, onProgress = null) {
         loadedObject = await loadGLTF(blobUrl);
     } else if (extension === 'obj') {
         loadedObject = await loadOBJFromUrl(blobUrl);
+    } else if (extension === 'stl') {
+        loadedObject = await loadSTLFromUrl(blobUrl);
     }
 
     if (loadedObject) {
@@ -482,6 +621,8 @@ export async function loadModelFromBlobUrl(blobUrl, fileName, deps) {
         loadedObject = await loadGLTF(blobUrl);
     } else if (extension === 'obj') {
         loadedObject = await loadOBJFromUrl(blobUrl);
+    } else if (extension === 'stl') {
+        loadedObject = await loadSTLFromUrl(blobUrl);
     }
 
     if (loadedObject) {
@@ -861,6 +1002,7 @@ export function getAssetTypesForMode(mode) {
         case 'both': return ['splat', 'mesh'];
         case 'split': return ['splat', 'mesh'];
         case 'pointcloud': return ['pointcloud'];
+        case 'stl': return ['stl'];
         default: return ['splat', 'mesh'];
     }
 }
@@ -977,6 +1119,163 @@ export function updateModelTextures(modelGroup, showTextures) {
                 }
                 mat.needsUpdate = true;
             });
+        }
+    });
+}
+
+// =============================================================================
+// MATCAP RENDERING MODE
+// =============================================================================
+
+const _storedMaterials = new WeakMap();
+const _matcapTextureCache = new Map();
+
+/**
+ * Generate a matcap texture procedurally using canvas gradients.
+ * @param {string} style - Preset name ('clay', 'chrome', 'pearl', 'jade', 'copper')
+ * @returns {THREE.CanvasTexture}
+ */
+function generateMatcapTexture(style) {
+    if (_matcapTextureCache.has(style)) return _matcapTextureCache.get(style);
+
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const cx = size / 2, cy = size / 2, r = size / 2;
+
+    const presets = {
+        clay:   { stops: [[0, '#d4c8b8'], [0.5, '#a89880'], [0.85, '#6b5d4f'], [1, '#3a3028']] },
+        chrome: { stops: [[0, '#ffffff'], [0.3, '#e0e0e0'], [0.6, '#888888'], [0.85, '#333333'], [1, '#111111']] },
+        pearl:  { stops: [[0, '#faf0f0'], [0.4, '#e8d8e0'], [0.7, '#c0a8b8'], [0.9, '#8a7088'], [1, '#504058']] },
+        jade:   { stops: [[0, '#c8e8c0'], [0.4, '#80c078'], [0.7, '#488040'], [0.9, '#285828'], [1, '#183818']] },
+        copper: { stops: [[0, '#f0c8a0'], [0.35, '#d89860'], [0.6, '#b07038'], [0.85, '#704020'], [1, '#402010']] },
+    };
+
+    const preset = presets[style] || presets.clay;
+
+    // Radial gradient for the sphere shape
+    const grad = ctx.createRadialGradient(cx * 0.9, cy * 0.85, 0, cx, cy, r);
+    preset.stops.forEach(([offset, color]) => grad.addColorStop(offset, color));
+
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+
+    // Add subtle specular highlight for realism
+    const highlight = ctx.createRadialGradient(cx * 0.7, cy * 0.6, 0, cx * 0.7, cy * 0.6, r * 0.4);
+    highlight.addColorStop(0, 'rgba(255,255,255,0.25)');
+    highlight.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = highlight;
+    ctx.fillRect(0, 0, size, size);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    _matcapTextureCache.set(style, texture);
+    return texture;
+}
+
+/**
+ * Return the list of available matcap preset names.
+ * @returns {string[]}
+ */
+export function getMatcapPresets() {
+    return ['clay', 'chrome', 'pearl', 'jade', 'copper'];
+}
+
+/**
+ * Toggle matcap rendering mode on all meshes in a model group.
+ * When enabled, replaces materials with MeshMatcapMaterial.
+ * When disabled, restores original materials.
+ *
+ * @param {THREE.Group} modelGroup - The model group
+ * @param {boolean} enabled - Whether matcap mode is active
+ * @param {string} [style='clay'] - Matcap preset name
+ */
+export function updateModelMatcap(modelGroup, enabled, style = 'clay') {
+    if (!modelGroup) return;
+    const matcapTexture = enabled ? generateMatcapTexture(style) : null;
+
+    modelGroup.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+
+        const isArray = Array.isArray(child.material);
+        const materials = isArray ? child.material : [child.material];
+
+        if (enabled) {
+            // Store originals (only on first enable, not on style change)
+            if (!_storedMaterials.has(child)) {
+                _storedMaterials.set(child, isArray ? [...materials] : materials[0]);
+            }
+
+            const matcapMats = materials.map(mat => {
+                const matcapMat = new THREE.MeshMatcapMaterial({
+                    matcap: matcapTexture,
+                    color: mat.color ? mat.color.clone() : new THREE.Color(0xffffff),
+                    flatShading: false,
+                });
+                return matcapMat;
+            });
+
+            child.material = isArray ? matcapMats : matcapMats[0];
+        } else {
+            // Restore originals
+            const stored = _storedMaterials.get(child);
+            if (stored) {
+                // Dispose the matcap materials
+                const currentMats = isArray ? child.material : [child.material];
+                currentMats.forEach(m => { if (m && m.dispose) m.dispose(); });
+
+                child.material = stored;
+                _storedMaterials.delete(child);
+            }
+        }
+    });
+}
+
+// =============================================================================
+// VERTEX NORMALS VISUALIZATION
+// =============================================================================
+
+/**
+ * Toggle vertex normals visualization on all meshes in a model group.
+ * When enabled, replaces materials with MeshNormalMaterial (RGB = XYZ normals).
+ * When disabled, restores original materials.
+ * Mutually exclusive with matcap mode (shares _storedMaterials).
+ *
+ * @param {THREE.Group} modelGroup - The model group
+ * @param {boolean} enabled - Whether normals visualization is active
+ */
+export function updateModelNormals(modelGroup, enabled) {
+    if (!modelGroup) return;
+
+    modelGroup.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+
+        const isArray = Array.isArray(child.material);
+        const materials = isArray ? child.material : [child.material];
+
+        if (enabled) {
+            // Store originals (only if not already stored by matcap)
+            if (!_storedMaterials.has(child)) {
+                _storedMaterials.set(child, isArray ? [...materials] : materials[0]);
+            }
+
+            const normalMats = materials.map(() => {
+                return new THREE.MeshNormalMaterial({ flatShading: false });
+            });
+
+            child.material = isArray ? normalMats : normalMats[0];
+        } else {
+            // Restore originals
+            const stored = _storedMaterials.get(child);
+            if (stored) {
+                const currentMats = isArray ? child.material : [child.material];
+                currentMats.forEach(m => { if (m && m.dispose) m.dispose(); });
+
+                child.material = stored;
+                _storedMaterials.delete(child);
+            }
         }
     });
 }

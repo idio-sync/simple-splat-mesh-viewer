@@ -66,6 +66,9 @@ export class SceneManager {
         // Point cloud group
         this.pointcloudGroup = null;
 
+        // STL group
+        this.stlGroup = null;
+
         // FPS tracking
         this.frameCount = 0;
         this.lastFpsTime = performance.now();
@@ -211,6 +214,10 @@ export class SceneManager {
         this.pointcloudGroup = new THREE.Group();
         this.pointcloudGroup.name = 'pointcloudGroup';
         this.scene.add(this.pointcloudGroup);
+
+        this.stlGroup = new THREE.Group();
+        this.stlGroup.name = 'stlGroup';
+        this.scene.add(this.stlGroup);
 
         log.info('Scene initialization complete');
         return true;
@@ -705,30 +712,35 @@ export class SceneManager {
      * @param {THREE.Object3D} splatMesh - Splat mesh object
      * @param {THREE.Group} modelGroup - Model group object
      * @param {THREE.Group} pointcloudGroup - Point cloud group object
+     * @param {THREE.Group} stlGroup - STL group object
      */
-    render(displayMode, splatMesh, modelGroup, pointcloudGroup) {
+    render(displayMode, splatMesh, modelGroup, pointcloudGroup, stlGroup) {
         if (displayMode === 'split') {
-            // Split view - render splat on left, model + pointcloud on right
+            // Split view - render splat on left, model + pointcloud + stl on right
             const splatVisible = splatMesh ? splatMesh.visible : false;
             const modelVisible = modelGroup ? modelGroup.visible : false;
             const pcVisible = pointcloudGroup ? pointcloudGroup.visible : false;
+            const stlVisible = stlGroup ? stlGroup.visible : false;
 
             // Left view - splat only
             if (splatMesh) splatMesh.visible = true;
             if (modelGroup) modelGroup.visible = false;
             if (pointcloudGroup) pointcloudGroup.visible = false;
+            if (stlGroup) stlGroup.visible = false;
             this.renderer.render(this.scene, this.camera);
 
-            // Right view - model + pointcloud
+            // Right view - model + pointcloud + stl
             if (splatMesh) splatMesh.visible = false;
             if (modelGroup) modelGroup.visible = true;
             if (pointcloudGroup) pointcloudGroup.visible = true;
+            if (stlGroup) stlGroup.visible = true;
             this.rendererRight.render(this.scene, this.camera);
 
             // Restore visibility
             if (splatMesh) splatMesh.visible = splatVisible;
             if (modelGroup) modelGroup.visible = modelVisible;
             if (pointcloudGroup) pointcloudGroup.visible = pcVisible;
+            if (stlGroup) stlGroup.visible = stlVisible;
         } else {
             // Normal view
             this.renderer.render(this.scene, this.camera);

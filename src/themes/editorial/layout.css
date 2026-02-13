@@ -224,6 +224,135 @@ body.kiosk-mode.kiosk-editorial .editorial-marker-toggle.off:hover {
     opacity: 0.6;
 }
 
+/* --- Matcap Dropdown Popover --- */
+
+body.kiosk-mode.kiosk-editorial .editorial-matcap-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-matcap-dropdown {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(var(--kiosk-surface-rgb), 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--kiosk-border-subtle);
+    border-radius: 4px;
+    padding: 4px 0;
+    min-width: 80px;
+    z-index: 200;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-matcap-dropdown.open {
+    display: flex;
+    flex-direction: column;
+    animation: editorialDropdownIn 0.15s ease-out;
+}
+
+@keyframes editorialDropdownIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-matcap-item {
+    font-family: var(--kiosk-font-body);
+    font-size: 0.65rem;
+    font-weight: 400;
+    color: var(--kiosk-text-muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: none;
+    border: none;
+    padding: 5px 14px;
+    cursor: pointer;
+    text-align: left;
+    white-space: nowrap;
+    transition: color 0.1s, background 0.1s;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-matcap-item:hover {
+    color: var(--kiosk-text-primary);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-matcap-item.active {
+    color: var(--kiosk-accent);
+    font-weight: 500;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-matcap-off {
+    border-top: 1px solid var(--kiosk-border-subtle);
+    margin-top: 2px;
+    padding-top: 6px;
+    color: var(--kiosk-text-faint);
+    font-size: 0.6rem;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-matcap-off:hover {
+    color: var(--kiosk-text-secondary);
+}
+
+/* --- FOV Slider (inline ribbon control) --- */
+
+body.kiosk-mode.kiosk-editorial .editorial-fov-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 4px;
+    flex-shrink: 0;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-fov-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 60px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-fov-slider:hover {
+    opacity: 1;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-fov-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--kiosk-accent);
+    cursor: pointer;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-fov-slider::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--kiosk-accent);
+    border: none;
+    cursor: pointer;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-fov-label {
+    font-family: var(--kiosk-font-body);
+    font-size: 0.6rem;
+    color: var(--kiosk-text-faint);
+    letter-spacing: 0.02em;
+    min-width: 28px;
+    text-align: center;
+    user-select: none;
+}
+
 /* --- View Mode Separator --- */
 
 body.kiosk-mode.kiosk-editorial .editorial-view-mode-sep {
@@ -392,6 +521,15 @@ body.kiosk-mode.kiosk-editorial .editorial-info-title-bar {
     height: 4px;
     background: var(--kiosk-accent);
     margin-bottom: 20px;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-info-model-stats {
+    font-family: var(--kiosk-font-body);
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: rgba(var(--kiosk-text-dim-rgb), 0.8);
+    letter-spacing: 0.04em;
+    margin: -12px 0 20px 0;
 }
 
 body.kiosk-mode.kiosk-editorial .editorial-info-description {

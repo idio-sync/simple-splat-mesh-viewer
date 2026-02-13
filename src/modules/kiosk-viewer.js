@@ -43,6 +43,8 @@ const CDN_DEPS = {
         'https://esm.sh/three@0.170.0/examples/jsm/loaders/OBJLoader.js?external=three',
     'three/addons/loaders/MTLLoader.js':
         'https://esm.sh/three@0.170.0/examples/jsm/loaders/MTLLoader.js?external=three',
+    'three/addons/loaders/STLLoader.js':
+        'https://esm.sh/three@0.170.0/examples/jsm/loaders/STLLoader.js?external=three',
     '@sparkjsdev/spark':
         'https://sparkjs.dev/releases/spark/0.1.10/spark.module.js',
     'fflate':

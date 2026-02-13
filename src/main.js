@@ -72,8 +72,12 @@ import {
     getPrimaryAssetType,
     updateModelOpacity as updateModelOpacityFn,
     updateModelWireframe as updateModelWireframeFn,
+    updateModelMatcap as updateModelMatcapFn,
+    updateModelNormals as updateModelNormalsFn,
     loadGLTF,
-    loadOBJFromUrl as loadOBJFromUrlFn
+    loadOBJFromUrl as loadOBJFromUrlFn,
+    loadSTLFile as loadSTLFileHandler,
+    loadSTLFromUrlWithDeps as loadSTLFromUrlWithDepsHandler
 } from './modules/file-handlers.js';
 import {
     initShareDialog,
@@ -215,8 +219,12 @@ const state = {
     splatLoaded: false,
     modelLoaded: false,
     pointcloudLoaded: false,
+    stlLoaded: false,
     modelOpacity: 1,
     modelWireframe: false,
+    modelMatcap: false,
+    matcapStyle: 'clay',
+    modelNormals: false,
     pointcloudPointSize: 0.01,
     pointcloudOpacity: 1,
     controlsVisible: config.showControls,
@@ -249,6 +257,7 @@ let flyControls = null;
 let splatMesh = null;
 let modelGroup = null;
 let pointcloudGroup = null;
+let stlGroup = null;
 let ambientLight, hemisphereLight, directionalLight1, directionalLight2;
 
 // Annotation, alignment, and archive creation
@@ -285,6 +294,7 @@ function createFileHandlerDeps() {
     return {
         scene,
         modelGroup,
+        stlGroup,
         getSplatMesh: () => splatMesh,
         setSplatMesh: (mesh) => { splatMesh = mesh; },
         getModelGroup: () => modelGroup,
@@ -337,6 +347,17 @@ function createFileHandlerDeps() {
                     setTimeout(() => centerModelOnGrid(modelGroup), TIMING.AUTO_ALIGN_DELAY);
                 }
                 clearArchiveMetadata();
+            },
+            onSTLLoaded: (object, file, faceCount) => {
+                // Switch to STL display mode
+                setDisplayMode('stl');
+                updateVisibility();
+                updateTransformInputs();
+                storeLastPositions();
+                const filenameEl = document.getElementById('stl-filename');
+                if (filenameEl) filenameEl.textContent = file.name || 'STL loaded';
+                // Center STL on grid
+                setTimeout(() => centerModelOnGrid(stlGroup), TIMING.AUTO_ALIGN_DELAY);
             }
         }
     };
@@ -426,6 +447,7 @@ function init() {
     directionalLight2 = sceneManager.directionalLight2;
     modelGroup = sceneManager.modelGroup;
     pointcloudGroup = sceneManager.pointcloudGroup;
+    stlGroup = sceneManager.stlGroup;
 
     // Initialize fly camera controls (disabled by default, orbit mode is default)
     flyControls = new FlyControls(camera, renderer.domElement);
@@ -611,6 +633,7 @@ function setupUIEvents() {
     addListener('btn-pointcloud', 'click', () => setDisplayMode('pointcloud'));
     addListener('btn-both', 'click', () => setDisplayMode('both'));
     addListener('btn-split', 'click', () => setDisplayMode('split'));
+    addListener('btn-stl', 'click', () => setDisplayMode('stl'));
 
     // File inputs
     addListener('splat-input', 'change', handleSplatFile);
@@ -618,6 +641,8 @@ function setupUIEvents() {
     addListener('archive-input', 'change', handleArchiveFile);
     addListener('pointcloud-input', 'change', handlePointcloudFile);
     addListener('proxy-mesh-input', 'change', handleProxyMeshFile);
+    addListener('stl-input', 'change', handleSTLFile);
+    addListener('btn-load-stl-url', 'click', handleLoadSTLFromUrlPrompt);
     addListener('source-files-input', 'change', handleSourceFilesInput);
     addListener('btn-load-pointcloud-url', 'click', handleLoadPointcloudFromUrlPrompt);
     addListener('btn-load-archive-url', 'click', handleLoadArchiveFromUrlPrompt);
@@ -679,7 +704,72 @@ function setupUIEvents() {
 
     addListener('model-wireframe', 'change', (e) => {
         state.modelWireframe = e.target.checked;
+        if (e.target.checked) {
+            if (state.modelMatcap) {
+                state.modelMatcap = false;
+                const matcapCb = document.getElementById('model-matcap');
+                if (matcapCb) matcapCb.checked = false;
+                const styleGroup = document.getElementById('matcap-style-group');
+                if (styleGroup) styleGroup.style.display = 'none';
+                updateModelMatcap();
+            }
+            if (state.modelNormals) {
+                state.modelNormals = false;
+                const normalsCb = document.getElementById('model-normals');
+                if (normalsCb) normalsCb.checked = false;
+                updateModelNormals();
+            }
+        }
         updateModelWireframe();
+    });
+
+    addListener('model-matcap', 'change', (e) => {
+        state.modelMatcap = e.target.checked;
+        const styleGroup = document.getElementById('matcap-style-group');
+        if (styleGroup) styleGroup.style.display = e.target.checked ? '' : 'none';
+        if (e.target.checked) {
+            if (state.modelWireframe) {
+                state.modelWireframe = false;
+                const wireCb = document.getElementById('model-wireframe');
+                if (wireCb) wireCb.checked = false;
+                updateModelWireframe();
+            }
+            if (state.modelNormals) {
+                state.modelNormals = false;
+                const normalsCb = document.getElementById('model-normals');
+                if (normalsCb) normalsCb.checked = false;
+                updateModelNormals();
+            }
+        }
+        updateModelMatcap();
+    });
+
+    addListener('matcap-style', 'change', (e) => {
+        state.matcapStyle = e.target.value;
+        if (state.modelMatcap) updateModelMatcap();
+    });
+
+    addListener('model-normals', 'change', (e) => {
+        state.modelNormals = e.target.checked;
+        if (e.target.checked) {
+            // Turn off matcap
+            if (state.modelMatcap) {
+                state.modelMatcap = false;
+                const matcapCb = document.getElementById('model-matcap');
+                if (matcapCb) matcapCb.checked = false;
+                const styleGroup = document.getElementById('matcap-style-group');
+                if (styleGroup) styleGroup.style.display = 'none';
+                updateModelMatcap();
+            }
+            // Turn off wireframe
+            if (state.modelWireframe) {
+                state.modelWireframe = false;
+                const wireCb = document.getElementById('model-wireframe');
+                if (wireCb) wireCb.checked = false;
+                updateModelWireframe();
+            }
+        }
+        updateModelNormals();
     });
 
     addListener('model-no-texture', 'change', (e) => {
@@ -834,6 +924,17 @@ function setupUIEvents() {
 
     // Metadata display toggle (toolbar button)
     addListener('btn-metadata', 'click', toggleMetadataDisplay);
+
+    // Scene settings - Camera FOV
+    addListener('camera-fov', 'input', (e) => {
+        const fov = parseInt(e.target.value, 10);
+        const valueEl = document.getElementById('camera-fov-value');
+        if (valueEl) valueEl.textContent = fov;
+        if (camera) {
+            camera.fov = fov;
+            camera.updateProjectionMatrix();
+        }
+    });
 
     // Scene settings - Gridlines
     addListener('toggle-gridlines', 'change', (e) => {
@@ -1236,7 +1337,7 @@ function setTransformMode(mode) {
 }
 
 function updateVisibility() {
-    updateVisibilityHandler(state.displayMode, splatMesh, modelGroup, pointcloudGroup);
+    updateVisibilityHandler(state.displayMode, splatMesh, modelGroup, pointcloudGroup, stlGroup);
 }
 
 function updateTransformInputs() {
@@ -2480,6 +2581,52 @@ async function handleModelFile(event) {
     }
 }
 
+async function handleSTLFile(event) {
+    const files = event.target.files;
+    if (!files.length) return;
+
+    const mainFile = files[0];
+    document.getElementById('stl-filename').textContent = mainFile.name;
+    showLoading('Loading STL Model...');
+
+    try {
+        await loadSTLFileHandler(files, createFileHandlerDeps());
+        hideLoading();
+    } catch (error) {
+        log.error('Error loading STL:', error);
+        hideLoading();
+        notify.error('Error loading STL: ' + error.message);
+    }
+}
+
+function handleLoadSTLFromUrlPrompt() {
+    log.info(' handleLoadSTLFromUrlPrompt called');
+    const url = prompt('Enter STL Model URL (.stl):');
+    log.info(' User entered:', url);
+    if (!url) return;
+
+    const validation = validateUserUrl(url, 'stl');
+    if (!validation.valid) {
+        notify.error('Cannot load STL: ' + validation.error);
+        return;
+    }
+
+    loadSTLFromUrl(validation.url);
+}
+
+async function loadSTLFromUrl(url) {
+    showLoading('Downloading STL Model...', true);
+
+    try {
+        await loadSTLFromUrlWithDepsHandler(url, createFileHandlerDeps());
+        hideLoading();
+    } catch (error) {
+        log.error('Error loading STL from URL:', error);
+        hideLoading();
+        notify.error('Error loading STL: ' + error.message);
+    }
+}
+
 async function handleProxyMeshFile(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -2582,6 +2729,10 @@ async function handleLoadFullResMesh() {
 function updateModelOpacity() { updateModelOpacityFn(modelGroup, state.modelOpacity); }
 
 function updateModelWireframe() { updateModelWireframeFn(modelGroup, state.modelWireframe); }
+
+function updateModelMatcap() { updateModelMatcapFn(modelGroup, state.modelMatcap, state.matcapStyle); }
+
+function updateModelNormals() { updateModelNormalsFn(modelGroup, state.modelNormals); }
 
 function saveAlignment() {
     const alignment = {
@@ -3154,7 +3305,7 @@ function animate() {
         }
 
         // Render using scene manager (handles split view)
-        sceneManager.render(state.displayMode, splatMesh, modelGroup, pointcloudGroup);
+        sceneManager.render(state.displayMode, splatMesh, modelGroup, pointcloudGroup, stlGroup);
 
         // Update annotation marker positions
         if (annotationSystem) {

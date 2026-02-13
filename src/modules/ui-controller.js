@@ -30,7 +30,7 @@ export function setDisplayMode(mode, deps) {
     state.displayMode = mode;
 
     // Update button states
-    ['splat', 'model', 'pointcloud', 'both', 'split'].forEach(m => {
+    ['splat', 'model', 'pointcloud', 'both', 'split', 'stl'].forEach(m => {
         const btn = document.getElementById(`btn-${m}`);
         if (btn) btn.classList.toggle('active', m === mode);
     });
@@ -63,17 +63,20 @@ export function setDisplayMode(mode, deps) {
  * @param {Object} splatMesh - The splat mesh
  * @param {THREE.Group} modelGroup - The model group
  * @param {THREE.Group} [pointcloudGroup] - The point cloud group (optional)
+ * @param {THREE.Group} [stlGroup] - The STL group (optional)
  */
-export function updateVisibility(displayMode, splatMesh, modelGroup, pointcloudGroup) {
+export function updateVisibility(displayMode, splatMesh, modelGroup, pointcloudGroup, stlGroup) {
     if (displayMode === 'split') {
         // In split mode, both are visible but rendered in separate views
         if (splatMesh) splatMesh.visible = true;
         if (modelGroup) modelGroup.visible = true;
         if (pointcloudGroup) pointcloudGroup.visible = true;
+        if (stlGroup) stlGroup.visible = true;
     } else {
         const showSplat = displayMode === 'splat' || displayMode === 'both';
         const showModel = displayMode === 'model' || displayMode === 'both';
         const showPointcloud = displayMode === 'pointcloud';
+        const showSTL = displayMode === 'stl';
 
         if (splatMesh) {
             splatMesh.visible = showSplat;
@@ -85,6 +88,10 @@ export function updateVisibility(displayMode, splatMesh, modelGroup, pointcloudG
 
         if (pointcloudGroup) {
             pointcloudGroup.visible = showPointcloud;
+        }
+
+        if (stlGroup) {
+            stlGroup.visible = showSTL;
         }
     }
 }

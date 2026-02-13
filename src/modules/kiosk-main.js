@@ -24,7 +24,7 @@ import {
     loadArchiveFromFile, processArchive,
     processArchivePhase1, loadArchiveAsset,
     getAssetTypesForMode, getPrimaryAssetType,
-    updateModelOpacity, updateModelWireframe, updateModelTextures,
+    updateModelOpacity, updateModelWireframe, updateModelTextures, updateModelMatcap, updateModelNormals,
     updatePointcloudPointSize, updatePointcloudOpacity
 } from './file-handlers.js';
 import {
@@ -767,6 +767,8 @@ function createLayoutDeps() {
         resolveAssetRefs,
         updateModelTextures,
         updateModelWireframe,
+        updateModelMatcap,
+        updateModelNormals,
         sceneManager,
         state,
         annotationSystem,
@@ -878,10 +880,75 @@ function setupViewerUI() {
         if (label) label.textContent = val.toFixed(1);
     });
     addListener('model-wireframe', 'change', (e) => {
+        if (e.target.checked) {
+            const matcapCb = document.getElementById('model-matcap');
+            if (matcapCb?.checked) {
+                matcapCb.checked = false;
+                const styleGroup = document.getElementById('matcap-style-group');
+                if (styleGroup) styleGroup.style.display = 'none';
+                updateModelMatcap(modelGroup, false);
+            }
+            const normalsCb = document.getElementById('model-normals');
+            if (normalsCb?.checked) {
+                normalsCb.checked = false;
+                updateModelNormals(modelGroup, false);
+            }
+        }
         updateModelWireframe(modelGroup, e.target.checked);
+    });
+    addListener('model-matcap', 'change', (e) => {
+        const styleGroup = document.getElementById('matcap-style-group');
+        if (styleGroup) styleGroup.style.display = e.target.checked ? '' : 'none';
+        if (e.target.checked) {
+            const wireCb = document.getElementById('model-wireframe');
+            if (wireCb?.checked) {
+                wireCb.checked = false;
+                updateModelWireframe(modelGroup, false);
+            }
+            const normalsCb = document.getElementById('model-normals');
+            if (normalsCb?.checked) {
+                normalsCb.checked = false;
+                updateModelNormals(modelGroup, false);
+            }
+        }
+        updateModelMatcap(modelGroup, e.target.checked, document.getElementById('matcap-style')?.value || 'clay');
+    });
+    addListener('matcap-style', 'change', (e) => {
+        const matcapCb = document.getElementById('model-matcap');
+        if (matcapCb?.checked) {
+            updateModelMatcap(modelGroup, true, e.target.value);
+        }
+    });
+    addListener('model-normals', 'change', (e) => {
+        if (e.target.checked) {
+            const wireCb = document.getElementById('model-wireframe');
+            if (wireCb?.checked) {
+                wireCb.checked = false;
+                updateModelWireframe(modelGroup, false);
+            }
+            const matcapCb = document.getElementById('model-matcap');
+            if (matcapCb?.checked) {
+                matcapCb.checked = false;
+                const styleGroup = document.getElementById('matcap-style-group');
+                if (styleGroup) styleGroup.style.display = 'none';
+                updateModelMatcap(modelGroup, false);
+            }
+        }
+        updateModelNormals(modelGroup, e.target.checked);
     });
     addListener('model-no-texture', 'change', (e) => {
         updateModelTextures(modelGroup, !e.target.checked);
+    });
+
+    // Camera FOV
+    addListener('camera-fov', 'input', (e) => {
+        const fov = parseInt(e.target.value, 10);
+        const valueEl = document.getElementById('camera-fov-value');
+        if (valueEl) valueEl.textContent = fov;
+        if (sceneManager && sceneManager.camera) {
+            sceneManager.camera.fov = fov;
+            sceneManager.camera.updateProjectionMatrix();
+        }
     });
 
     // Lighting sliders

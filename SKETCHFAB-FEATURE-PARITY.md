@@ -12,6 +12,9 @@
 | 2026-02-11 | Ranks 1–5: Tone mapping, HDR environment maps (IBL), environment as background, shadow casting, shadow catcher ground plane. Bonus: background image loading from file/URL. | `constants.js`, `index.html`, `scene-manager.js`, `main.js`, `kiosk-main.js` |
 | 2026-02-11 | Rank 7: Auto-rotate toggle. Toolbar button in both main and kiosk. Default on in kiosk (disables on manual interaction), default off in main app. Speed matches Sketchfab (~30s/revolution). | `constants.js`, `index.html`, `scene-manager.js`, `main.js`, `kiosk-main.js` |
 | 2026-02-11 | Rank 6: Screenshot capture. Collapsible sidebar section with capture button, viewfinder-based archive preview override, thumbnail grid with delete, screenshots exported to `/screenshots/` in archive. | `main.js`, `index.html`, `styles.css`, `archive-creator.js` |
+| 2026-02-12 | Rank 16: Matcap rendering mode. Checkbox toggle + 5 procedurally-generated presets (Clay/Chrome/Pearl/Jade/Copper). Mutually exclusive with wireframe. Works in both main app and kiosk. | `file-handlers.js`, `index.html`, `main.js`, `kiosk-main.js` |
+| 2026-02-12 | Rank 26: Normal map visualization. MeshNormalMaterial toggle (RGB = XYZ normals). Mutually exclusive with wireframe and matcap. Works in main app, kiosk, and editorial theme. | `file-handlers.js`, `index.html`, `main.js`, `kiosk-main.js`, `editorial/layout.js` |
+| 2026-02-12 | Rank 9: FOV control slider (10°–120°). Added to Scene Settings in main app, kiosk standard UI, and editorial theme bottom ribbon as compact inline slider. | `index.html`, `main.js`, `kiosk-main.js`, `editorial/layout.js`, `editorial/layout.css` |
 
 ---
 
@@ -59,7 +62,7 @@ These features deliver the most visual/functional parity per hour of work.
 | 6 | **Screenshot capture** | 1x/2x/4x resolution export | **DONE** | LOW | Medium-High | Capture button + viewfinder preview override + thumbnail grid. Screenshots exported to `/screenshots/` in archive. 1024x1024 JPEG. |
 | 7 | **Auto-rotate** | Turntable with speed/direction control | **DONE** | TRIVIAL | Medium | Toolbar toggle button. Default on in kiosk (auto-disables on interaction), off in main app. Speed: 2.0 (~30s/rev). |
 | 8 | **Camera constraints** | Orbit angle limits, zoom min/max, pan bounds | No | LOW | Medium | OrbitControls properties: `minDistance`, `maxDistance`, `minPolarAngle`, `maxPolarAngle`. Prevents going underground. |
-| 9 | **FOV control** | Adjustable field of view slider | No | TRIVIAL | Medium | `camera.fov = value; camera.updateProjectionMatrix()`. One slider. |
+| 9 | **FOV control** | Adjustable field of view slider | **DONE** | TRIVIAL | Medium | Slider (10°–120°) in Scene Settings, kiosk, and editorial ribbon. |
 | 10 | **Orthographic view toggle** | Parallel projection mode | No | LOW | Medium | Swap between `PerspectiveCamera` and `OrthographicCamera`. Useful for architectural viewing. |
 
 **Estimated total effort for Tier 1: ~15-25 hours**
@@ -79,7 +82,7 @@ These are the features that make a 3D viewer feel "professional grade."
 | 13 | **Clipping/section planes** | X/Y/Z axis with position sliders | No | MEDIUM | Very High | `renderer.clippingPlanes`. Critical for architectural/engineering clients to see interiors. Three.js has native support. |
 | 14 | **Distance measurement tool** | Click two points, show distance | No | MEDIUM | Very High | Raycasting (already have) + line geometry + label. Essential for architecture/engineering clients. |
 | 15 | **Guided annotation tours** | Sequential walkthrough with camera animation | No | MEDIUM | High | Extend existing annotation system. Add tween.js for camera interpolation. Auto-play with configurable duration per step. |
-| 16 | **Matcap rendering mode** | Clay/form-study visualization | No | LOW | Medium | `MeshMatcapMaterial`. Add 3-5 preset matcap textures. Good for mesh topology review. |
+| 16 | **Matcap rendering mode** | Clay/form-study visualization | **DONE** | LOW | Medium | `MeshMatcapMaterial` with 5 procedural presets (Clay/Chrome/Pearl/Jade/Copper). Checkbox + dropdown in Model Settings. Mutually exclusive with wireframe. |
 | 17 | **Model inspector panel** | Vertex/face/texture count, memory usage | No | LOW | Medium | Traverse scene graph, count geometry stats. Display in sidebar. |
 | 18 | **Angle measurement** | Three-point angle calculation | No | MEDIUM | High | Extension of distance measurement. Click 3 points, calculate and display angle. |
 | 19 | **Camera position presets / saved viewpoints** | Named camera positions, smooth transitions | No | MEDIUM | Medium-High | Save camera pos/target/up, tween between them. Store in archive metadata. |
@@ -101,7 +104,7 @@ Features that enhance the professional feel but aren't critical for core use cas
 | 23 | **Vignette** | Corner darkening with adjustable falloff | No | LOW | Low-Medium | Simple shader pass. Quick cinematic polish. |
 | 24 | **Chromatic aberration** | RGB channel separation | No | LOW | Low | Custom shader. Subtle cinematic effect. |
 | 25 | **Film grain** | Noise overlay | No | LOW | Low | Custom shader. Very subtle effect. |
-| 26 | **Normal map visualization** | Display normals as RGB | No | LOW | Low-Medium | Custom shader or `VertexNormalsHelper`. Diagnostic tool. |
+| 26 | **Normal map visualization** | Display normals as RGB | **DONE** | LOW | Low-Medium | `MeshNormalMaterial` toggle. RGB = XYZ surface normals. Mutually exclusive with wireframe/matcap. |
 | 27 | **UV checker pattern** | Validate UV unwrapping | No | LOW | Low | Apply checkerboard texture. Diagnostic tool for modelers. |
 | 28 | **Unlit / shadeless mode** | Disable lighting, show base color only | No | LOW | Medium | Set all materials to `MeshBasicMaterial` temporarily. Useful for texture inspection. |
 | 29 | **Double-sided rendering toggle** | Render back faces | Partial | LOW | Low-Medium | `material.side = THREE.DoubleSide`. Already works on some models. Add UI toggle. |
@@ -182,6 +185,8 @@ Features Sketchfab has that are less relevant for 3D scan deliverables.
 | OBJ loading | OBJLoader + MTL | Full |
 | Screenshot capture | 1024x1024 JPEG, viewfinder preview, thumbnail grid, archive `/screenshots/` export | Full |
 | Screenshot (for archives) | Canvas capture for archive thumbnails | Full |
+| Matcap rendering mode | 5 procedural presets (Clay/Chrome/Pearl/Jade/Copper) with dropdown | Full |
+| Normal map visualization | MeshNormalMaterial toggle (RGB = XYZ normals) | Full |
 | URL sharing with state | URL parameters for scene config | Full |
 | Embed/sharing controls | Share dialog with link builder | Partial |
 | Vertex color display | Point cloud vertex colors | Full |
@@ -189,24 +194,28 @@ Features Sketchfab has that are less relevant for 3D scan deliverables.
 | Responsive design | Desktop + mobile/kiosk layouts | Full |
 | Camera reset | Reset to default + fit-to-view | Full |
 | Multiple light controls | 4 lights with independent intensity sliders | Full |
+| FOV control | Slider (10°–120°) in Scene Settings, kiosk, and editorial ribbon | Full |
 
 ---
 
 ## Implementation Roadmap Summary
 
 ```
-Phase 1 (Tier 1):  ~15-25 hrs  →  60% visual parity  [IN PROGRESS — 7/10 done]
+Phase 1 (Tier 1):  ~15-25 hrs  →  60% visual parity  [IN PROGRESS — 8/10 done]
   ✅ Tone mapping, HDR/IBL, env-as-background, shadows, shadow catcher
   ✅ Background image loading (bonus, not in Sketchfab)
   ✅ Auto-rotate (toolbar toggle, kiosk default-on)
   ✅ Screenshot capture (viewfinder preview, thumbnail grid, archive export)
-  ⬜ Camera constraints, FOV, ortho view
+  ✅ FOV control slider (10°–120°)
+  ⬜ Camera constraints, ortho view
 
-Phase 2 (Tier 2):  ~40-60 hrs  →  85% functional parity
+Phase 2 (Tier 2):  ~40-60 hrs  →  85% functional parity  [IN PROGRESS — 1/10 done]
+  ✅ Matcap rendering mode (5 procedural presets, checkbox + dropdown)
   - SSAO, bloom, clipping planes, measurement tools,
-    guided tours, matcap, inspector, saved viewpoints, outlines
+    guided tours, inspector, saved viewpoints, outlines
 
-Phase 3 (Tier 3):  ~25-35 hrs  →  90% polish parity
+Phase 3 (Tier 3):  ~25-35 hrs  →  90% polish parity  [IN PROGRESS — 1/10 done]
+  ✅ Normal map visualization (MeshNormalMaterial toggle)
   - DOF, color grading, vignette, diagnostic overlays,
     unlit mode, area measurement
 

@@ -10,7 +10,7 @@
     <!-- Note: 'unsafe-eval' is required for Spark.js WASM and PLY parser -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self';
-        script-src 'self' https://esm.sh https://*.esm.sh https://sparkjs.dev 'sha256-G7nozbJbEg/+HYDoPNpc8N0qchbwszhwJx3RcJ9E9Tk=' 'sha256-IuiN2EQs1vVueT6Fjp0BBkqVHfALDvUH0p96VVC1GT4=' 'unsafe-eval';
+        script-src 'self' https://esm.sh https://*.esm.sh https://sparkjs.dev 'sha256-/NZOJCG03eCcGHQBnx3BTDU/mNycnBQwr+naJ7szBD4=' 'sha256-IuiN2EQs1vVueT6Fjp0BBkqVHfALDvUH0p96VVC1GT4=' 'unsafe-eval';
         style-src 'self' 'unsafe-inline';
         img-src 'self' blob: data:;
         connect-src 'self' https: blob: data:;
@@ -946,6 +946,7 @@
                     <button id="btn-model" class="toggle-btn active">Model</button>
                     <button id="btn-splat" class="toggle-btn">Splat</button>
                     <button id="btn-pointcloud" class="toggle-btn">Point Cloud</button>
+                    <button id="btn-stl" class="toggle-btn">STL</button>
                     <button id="btn-both" class="toggle-btn">Model/Splat</button>
                     <button id="btn-split" class="toggle-btn">Split M/S</button>
                 </div>
@@ -971,6 +972,15 @@
                         </div>
                         <span id="proxy-mesh-filename" class="filename">No proxy loaded</span>
                         <p class="field-hint">Pre-simplified mesh for mobile/tablet viewers. Full-resolution mesh is preserved in the archive.</p>
+                    </div>
+                    <div class="load-subsection">
+                        <h4>STL Model (.stl)</h4>
+                        <input type="file" id="stl-input" accept=".stl" />
+                        <div class="button-row">
+                            <label for="stl-input" class="file-label">From File</label>
+                            <button id="btn-load-stl-url" class="action-btn">From URL</button>
+                        </div>
+                        <span id="stl-filename" class="filename">No file loaded</span>
                     </div>
                     <div class="load-subsection">
                         <h4>Point Cloud (.e57)</h4>
@@ -1029,6 +1039,10 @@
             <div class="control-section collapsible collapsed" id="scene-settings-section">
                 <h3 class="collapsible-header">Scene Settings <span class="collapse-icon">▶</span></h3>
                 <div class="collapsible-content">
+                    <div class="slider-group">
+                        <label for="camera-fov">FOV: <span id="camera-fov-value">60</span>°</label>
+                        <input type="range" id="camera-fov" min="10" max="120" step="1" value="60" />
+                    </div>
                     <div class="checkbox-group">
                         <input type="checkbox" id="toggle-gridlines" checked>
                         <label for="toggle-gridlines">Show Grid</label>
@@ -1123,6 +1137,24 @@
                     <div class="checkbox-group">
                         <input type="checkbox" id="model-no-texture" />
                         <label for="model-no-texture">Hide Textures</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="model-matcap" />
+                        <label for="model-matcap">Matcap</label>
+                    </div>
+                    <div class="slider-group" id="matcap-style-group" style="display:none;">
+                        <label for="matcap-style">Style:</label>
+                        <select id="matcap-style">
+                            <option value="clay">Clay</option>
+                            <option value="chrome">Chrome</option>
+                            <option value="pearl">Pearl</option>
+                            <option value="jade">Jade</option>
+                            <option value="copper">Copper</option>
+                        </select>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="model-normals" />
+                        <label for="model-normals">Show Normals</label>
                     </div>
                     <div class="position-inputs">
                         <label>Position:</label>
@@ -1317,6 +1349,7 @@
             "three/addons/loaders/OBJLoader.js": "https://esm.sh/three@0.170.0/examples/jsm/loaders/OBJLoader.js?external=three",
             "three/addons/loaders/MTLLoader.js": "https://esm.sh/three@0.170.0/examples/jsm/loaders/MTLLoader.js?external=three",
             "three/addons/loaders/RGBELoader.js": "https://esm.sh/three@0.170.0/examples/jsm/loaders/RGBELoader.js?external=three",
+            "three/addons/loaders/STLLoader.js": "https://esm.sh/three@0.170.0/examples/jsm/loaders/STLLoader.js?external=three",
             "@sparkjsdev/spark": "https://sparkjs.dev/releases/spark/0.1.10/spark.module.js",
             "fflate": "https://esm.sh/fflate@0.8.2",
             "three-e57-loader": "https://esm.sh/three-e57-loader@1.2.0?external=three",

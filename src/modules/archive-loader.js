@@ -18,7 +18,7 @@ const ARCHIVE_EXTENSIONS = ['a3d', 'a3z'];
 // Supported file formats within archives
 const SUPPORTED_FORMATS = {
     splat: ['.ply', '.spz', '.ksplat', '.sog', '.splat'],
-    mesh: ['.glb', '.gltf', '.obj'],
+    mesh: ['.glb', '.gltf', '.obj', '.stl'],
     pointcloud: ['.e57'],
     thumbnail: ['.png', '.jpg', '.jpeg', '.webp']
 };
