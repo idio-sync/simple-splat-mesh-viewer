@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DDI 3D Viewer — Editorial Kiosk Layout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   DDI 3D Viewer — Editorial Kiosk
+   Architectural portfolio aesthetic for iframe embeds
+   ============================================================ */
+:root {
+    --bg-deep:        #0c1f33;
+    --bg-canvas:      #11304e;
+    --bg-canvas-end:  #0d2740;
+    --bg-surface:     #1a3d5c;
+    --bg-hover:       #1f4868;
+
+    --border-subtle:  #182f45;
+    --border-default: #24455f;
+    --border-strong:  #35627e;
+
+    --accent:         #FEC03A;
+    --accent-muted:   rgba(254, 192, 58, 0.12);
+
+    --text-primary:   #e8ecf0;
+    --text-secondary: #8ea3b5;
+    --text-muted:     #5a7488;
+    --text-faint:     #3a5a74;
+
+    --glass-bg:       rgba(12, 31, 51, 0.55);
+
+    /* Typography — matches dirdim.com */
+    --font-sans:      'Source Sans 3', 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono:      'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: var(--font-sans);
+    background: var(--bg-canvas);
+    color: var(--text-primary);
+    overflow-x: hidden;
+    overflow-y: auto;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Two stacked viewport sections for static mockup */
+.mockup-section {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 36px);
+}
+
+.mockup-section-label {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    z-index: 2100;
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 600;
+    color: #999;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: rgba(0,0,0,0.5);
+    padding: 3px 8px;
+    border-radius: 3px;
+}
+
+.mockup-divider {
+    width: 100%;
+    height: 4px;
+    background: #fff;
+    position: relative;
+    z-index: 2000;
+}
+
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* ============================================================
+   Stage — full-bleed scene
+   ============================================================ */
+.stage {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.scene-canvas {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(160deg, var(--bg-canvas) 0%, var(--bg-canvas-end) 100%);
+}
+
+.grid-overlay {
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(42, 84, 120, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(42, 84, 120, 0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+}
+
+.scene-placeholder {
+    width: 320px;
+    height: 320px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at 35% 35%, #2f5f85 0%, #1a3d5c 38%, #0c1f33 80%);
+    box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.3);
+    opacity: 0.4;
+}
+
+/* ============================================================
+   Spine — gold accent line, left edge
+   The magazine spine. The most distinctive editorial element.
+   ============================================================ */
+.spine {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    opacity: 0.6;
+    z-index: 100;
+}
+
+/* ============================================================
+   Title Block — top-left, large serif, editorial anchor
+   Auto-fades after 4s (simulated with CSS animation)
+   ============================================================ */
+.title-block {
+    position: absolute;
+    top: 28px;
+    left: 24px;
+    z-index: 90;
+    animation: editorialFade 10s ease-in-out infinite;
+}
+
+@keyframes editorialFade {
+    0%, 100% { opacity: 1; }
+    35% { opacity: 1; }
+    50% { opacity: 0.15; }
+    85% { opacity: 0.15; }
+    95% { opacity: 1; }
+}
+
+.title-block h1 {
+    font-family: var(--font-sans);
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--text-primary);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+
+/* DDI signature yellow underline bar */
+.title-rule {
+    width: 44px;
+    height: 3px;
+    background: var(--accent);
+    margin-bottom: 10px;
+}
+
+.title-meta {
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* ============================================================
+   Corner Stats — top-right, monospaced technical data
+   ============================================================ */
+.corner-stats {
+    position: absolute;
+    top: 28px;
+    right: 24px;
+    text-align: right;
+    z-index: 90;
+    animation: editorialFade 10s ease-in-out infinite;
+}
+
+.corner-stat-line {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+    line-height: 1.6;
+}
+
+.corner-stat-line .value {
+    color: var(--text-secondary);
+}
+
+/* ============================================================
+   Annotation Markers — editorial oversized serif numerals
+   ============================================================ */
+.ed-marker {
+    position: absolute;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 50;
+    transition: opacity 0.3s, transform 0.2s;
+}
+
+/* Inactive: thin circle outline */
+.ed-marker.inactive {
+    border: 1px solid var(--border-default);
+    background: transparent;
+    opacity: 0.3;
+}
+
+.ed-marker.inactive:hover {
+    opacity: 0.7;
+    border-color: var(--text-muted);
+    transform: scale(1.05);
+}
+
+/* Active: gold fill */
+.ed-marker.active {
+    background: var(--accent);
+    border: none;
+    opacity: 0.85;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4), 0 4px 20px rgba(254, 192, 58, 0.25);
+}
+
+.ed-marker-num {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.ed-marker.inactive .ed-marker-num {
+    color: var(--text-muted);
+}
+
+.ed-marker.active .ed-marker-num {
+    color: var(--bg-deep);
+}
+
+/* ============================================================
+   Annotation Popup — editorial callout
+   Thin gold top rule, sharp feel, serif title
+   ============================================================ */
+.ed-popup {
+    position: absolute;
+    width: 250px;
+    z-index: 60;
+}
+
+/* Gold accent line on top */
+.ed-popup::before {
+    content: '';
+    display: block;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+    margin-bottom: 12px;
+}
+
+.ed-popup-number {
+    font-family: var(--font-sans);
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.ed-popup h4 {
+    font-family: var(--font-sans);
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    line-height: 1.3;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.ed-popup p {
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
+/* Thin hairline from marker to popup */
+.connecting-line {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 55;
+}
+
+/* ============================================================
+   Bottom Ribbon — thin, typographic navigation
+   32px, text-based, no buttons
+   ============================================================ */
+.bottom-ribbon {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    padding: 0 24px 0 24px;
+    background: linear-gradient(90deg, rgba(12, 31, 51, 0.5) 0%, rgba(12, 31, 51, 0.4) 100%);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-top: 1px solid var(--border-subtle);
+    z-index: 100;
+}
+
+/* View modes — text links, not buttons */
+.view-modes {
+    display: flex;
+    gap: 20px;
+    flex-shrink: 0;
+}
+
+.view-mode-link {
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    padding-bottom: 1px;
+    border-bottom: 1px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+}
+
+.view-mode-link:hover {
+    color: var(--text-secondary);
+}
+
+.view-mode-link.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--accent);
+}
+
+/* Thin rule separator */
+.ribbon-rule {
+    width: 1px;
+    height: 14px;
+    background: var(--border-subtle);
+    margin: 0 20px;
+    flex-shrink: 0;
+}
+
+/* Annotation sequence — connected number chain */
+.anno-sequence {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex: 1;
+    justify-content: center;
+}
+
+.anno-seq-num {
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 4px;
+    transition: color 0.15s;
+    letter-spacing: 0.02em;
+}
+
+.anno-seq-num:hover {
+    color: var(--text-secondary);
+}
+
+.anno-seq-num.active {
+    color: var(--accent);
+    font-weight: 500;
+}
+
+.anno-seq-dash {
+    width: 20px;
+    height: 1px;
+    background: var(--border-subtle);
+    flex-shrink: 0;
+}
+
+.anno-seq-num.active + .anno-seq-dash,
+.anno-seq-dash + .anno-seq-num.active {
+    /* subtle glow near active */
+}
+
+/* Branding */
+.ribbon-branding {
+    font-family: var(--font-sans);
+    font-size: 0.62rem;
+    font-weight: 400;
+    color: var(--text-faint);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+/* ============================================================
+   Info Trigger — small "Details" text near title block
+   ============================================================ */
+.info-trigger {
+    position: absolute;
+    bottom: 48px;
+    left: 24px;
+    z-index: 90;
+    font-family: var(--font-sans);
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.15s;
+    border: none;
+    background: none;
+    padding: 0;
+}
+
+.info-trigger:hover {
+    color: var(--text-secondary);
+}
+
+.info-trigger.active {
+    color: var(--accent);
+}
+
+.info-trigger-line {
+    width: 16px;
+    height: 1px;
+    background: currentColor;
+    transition: width 0.2s;
+}
+
+.info-trigger:hover .info-trigger-line {
+    width: 24px;
+}
+
+/* ============================================================
+   Info Overlay — magazine spread, two-column
+   ============================================================ */
+.info-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 24, 40, 0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: overlayIn 0.4s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+@keyframes overlayIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Close button */
+.info-close {
+    position: absolute;
+    top: 20px;
+    right: 24px;
+    font-size: 24px;
+    color: var(--text-muted);
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: var(--font-sans);
+    font-weight: 300;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.12s;
+    z-index: 10;
+}
+
+.info-close:hover {
+    color: var(--text-primary);
+}
+
+/* Content area */
+.info-spread {
+    display: flex;
+    width: 88%;
+    max-width: 960px;
+    gap: 0;
+    height: 75%;
+    max-height: 440px;
+}
+
+/* Left column — title & description */
+.info-col-left {
+    flex: 0 0 38%;
+    padding-right: 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+/* Vertical rule between columns */
+.info-col-rule {
+    width: 1px;
+    background: linear-gradient(180deg, transparent 0%, var(--border-default) 15%, var(--border-default) 85%, transparent 100%);
+    flex-shrink: 0;
+}
+
+/* Right column — details & stats */
+.info-col-right {
+    flex: 1;
+    padding-left: 40px;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+.info-col-right::-webkit-scrollbar { display: none; }
+
+/* Editorial typography in overlay */
+.info-eyebrow {
+    font-family: var(--font-sans);
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+}
+
+.info-title {
+    font-family: var(--font-sans);
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+/* DDI yellow underline bar in overlay */
+.info-title-bar {
+    width: 50px;
+    height: 4px;
+    background: var(--accent);
+    margin-bottom: 20px;
+}
+
+.info-description {
+    font-family: var(--font-sans);
+    font-size: 0.88rem;
+    font-weight: 300;
+    line-height: 1.8;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+}
+
+.info-license {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    padding: 6px 0;
+    border-top: 1px solid var(--border-subtle);
+    letter-spacing: 0.04em;
+}
+
+/* Right column detail grid */
+.info-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 32px;
+    margin-bottom: 24px;
+}
+
+.info-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.info-detail-label {
+    font-family: var(--font-sans);
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.info-detail-value {
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--text-primary);
+}
+
+/* Section headers in right column */
+.info-section-header {
+    font-family: var(--font-sans);
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    margin-top: 8px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Stats row — horizontal, compact */
+.info-stats-row {
+    display: flex;
+    gap: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-subtle);
+    margin-top: 24px;
+}
+
+.info-stat {
+    text-align: center;
+    flex: 1;
+}
+
+.info-stat-number {
+    font-family: var(--font-sans);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.info-stat-label {
+    font-family: var(--font-sans);
+    font-size: 0.58rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+/* ============================================================
+   Comparison Banner (mockup chrome only)
+   ============================================================ */
+.comparison-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 36px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    z-index: 2000;
+    border-bottom: 1px solid #ddd;
+    font-family: var(--font-sans);
+}
+
+.comparison-banner .tag {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+}
+
+.comparison-banner .tag.title { color: #13385E; }
+.comparison-banner .tag.sub { color: #999; font-weight: 400; }
+.comparison-banner .sep { color: #ddd; }
+
+/* ============================================================
+   Behavior Legend (mockup-only)
+   ============================================================ */
+.behavior-legend {
+    position: fixed;
+    bottom: 12px;
+    right: 12px;
+    z-index: 2100;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 12px 16px;
+    max-width: 260px;
+    font-size: 0.68rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.behavior-legend strong {
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.72rem;
+}
+
+.behavior-legend ul {
+    list-style: none;
+    padding: 0;
+}
+
+.behavior-legend li {
+    padding: 2px 0 2px 12px;
+    position: relative;
+}
+
+.behavior-legend li::before {
+    content: '—';
+    position: absolute;
+    left: 0;
+    color: rgba(255, 255, 255, 0.25);
+}
+
+.embed-indicator {
+    position: fixed;
+    top: 44px;
+    right: 12px;
+    z-index: 2100;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-muted);
+    opacity: 0.5;
+    letter-spacing: 0.04em;
+    font-family: var(--font-mono);
+}
+</style>
+</head>
+<body>
+
+<!-- Comparison Banner (mockup chrome) -->
+<div class="comparison-banner">
+    <span class="tag title">DDI 3D Viewer — Editorial Kiosk</span>
+    <span class="sep">|</span>
+    <span class="tag sub">Architectural Portfolio Aesthetic</span>
+    <span class="sep">|</span>
+    <span class="tag sub">Static Mockup</span>
+</div>
+
+<div class="embed-indicator">Target: ~1200 &times; 600 iframe</div>
+
+<!-- ============================================================
+     Behavior Legend (mockup-only)
+     ============================================================ -->
+<div class="behavior-legend">
+    <strong>Interactive Behavior</strong>
+    <ul>
+        <li>Title block + corner stats fade to 15% after 4s idle; return on mousemove</li>
+        <li>"Details" trigger opens the magazine-spread overlay</li>
+        <li>Bottom ribbon sequence numbers navigate annotations</li>
+        <li>Clicking markers or sequence numbers reveals editorial callouts</li>
+    </ul>
+</div>
+
+<!-- ============================================================
+     STATE 1: 3D Scene with editorial chrome
+     ============================================================ -->
+<div class="mockup-section" style="margin-top: 36px;">
+    <div class="mockup-section-label">State 1 — Default View</div>
+
+    <div class="stage">
+        <!-- 3D Scene (full viewport) -->
+        <div class="scene-canvas">
+            <div class="grid-overlay"></div>
+            <div class="scene-placeholder"></div>
+
+            <!-- Annotation Markers — editorial style -->
+            <div class="ed-marker inactive" style="top: 28%; left: 28%;">
+                <span class="ed-marker-num">1</span>
+            </div>
+            <div class="ed-marker active" style="top: 44%; left: 42%;">
+                <span class="ed-marker-num">2</span>
+            </div>
+            <div class="ed-marker inactive" style="top: 33%; left: 56%;">
+                <span class="ed-marker-num">3</span>
+            </div>
+            <div class="ed-marker inactive" style="top: 56%; left: 34%;">
+                <span class="ed-marker-num">4</span>
+            </div>
+
+            <!-- Hairline connecting marker 2 to popup -->
+            <svg class="connecting-line" viewBox="0 0 1200 600" preserveAspectRatio="none">
+                <line x1="510" y1="268" x2="580" y2="210"
+                      stroke="var(--border-default)" stroke-width="0.8" opacity="0.5"/>
+            </svg>
+
+            <!-- Annotation Popup — editorial callout -->
+            <div class="ed-popup" style="top: 22%; left: 48%;">
+                <span class="ed-popup-number">Annotation 02</span>
+                <h4>Foundation Crack</h4>
+                <p>Structural crack running NE-SW along the foundation wall. Approximately 2.3m in length, widening to 4mm at the eastern end. Recommend monitoring.</p>
+            </div>
+        </div>
+
+        <!-- Gold Spine -->
+        <div class="spine"></div>
+
+        <!-- Title Block (top-left) -->
+        <div class="title-block" style="animation: none; opacity: 1;">
+            <h1>Historic Building<br>Facade</h1>
+            <div class="title-rule"></div>
+            <span class="title-meta">Oxford, UK &middot; January 2026</span>
+        </div>
+
+        <!-- Corner Stats (top-right) -->
+        <div class="corner-stats" style="animation: none; opacity: 1;">
+            <div class="corner-stat-line">Tier 2 &middot; Grade <span class="value">A</span></div>
+            <div class="corner-stat-line"><span class="value">0.5mm</span> RMSE &middot; <span class="value">2mm</span> GSD</div>
+        </div>
+
+        <!-- Details Trigger (bottom-left) -->
+        <button class="info-trigger">
+            <span class="info-trigger-line"></span>
+            Details
+        </button>
+
+        <!-- Bottom Ribbon -->
+        <div class="bottom-ribbon">
+            <div class="view-modes">
+                <button class="view-mode-link">Splat</button>
+                <button class="view-mode-link">Model</button>
+                <button class="view-mode-link active">Both</button>
+                <button class="view-mode-link">Split</button>
+            </div>
+
+            <div class="ribbon-rule"></div>
+
+            <div class="anno-sequence">
+                <span class="anno-seq-num">01</span>
+                <span class="anno-seq-dash"></span>
+                <span class="anno-seq-num active">02</span>
+                <span class="anno-seq-dash"></span>
+                <span class="anno-seq-num">03</span>
+                <span class="anno-seq-dash"></span>
+                <span class="anno-seq-num">04</span>
+            </div>
+
+            <span class="ribbon-branding">Direct Dimensions</span>
+        </div>
+    </div>
+</div>
+
+<!-- White divider between states -->
+<div class="mockup-divider"></div>
+
+<!-- ============================================================
+     STATE 2: Details overlay (triggered by clicking "Details")
+     ============================================================ -->
+<div class="mockup-section">
+    <div class="mockup-section-label">State 2 — Details Overlay</div>
+
+    <div class="stage">
+        <!-- 3D Scene underneath (dimmed by overlay) -->
+        <div class="scene-canvas">
+            <div class="grid-overlay"></div>
+            <div class="scene-placeholder"></div>
+        </div>
+
+        <!-- Gold Spine (persists) -->
+        <div class="spine"></div>
+
+        <!-- Info Overlay — magazine spread -->
+        <div class="info-overlay" style="animation: none;">
+            <button class="info-close">&times;</button>
+
+            <div class="info-spread">
+                <!-- Left Column — Title & Narrative -->
+                <div class="info-col-left">
+                    <div class="info-eyebrow">Scan Deliverable</div>
+                    <h2 class="info-title">Historic<br>Building<br>Facade</h2>
+                    <div class="info-title-bar"></div>
+                    <p class="info-description">
+                        Photogrammetric capture of the east facade of St. Mary's Church, Oxford.
+                        847 images processed through Reality Capture and CloudCompare, producing a
+                        detailed mesh and Gaussian splat representation.
+                    </p>
+                    <div class="info-license">CC-BY 4.0 International</div>
+                </div>
+
+                <!-- Vertical Rule -->
+                <div class="info-col-rule"></div>
+
+                <!-- Right Column — Data & Metrics -->
+                <div class="info-col-right">
+                    <div class="info-section-header">Capture</div>
+                    <div class="info-detail-grid">
+                        <div class="info-detail">
+                            <span class="info-detail-label">Date</span>
+                            <span class="info-detail-value">2026-01-15</span>
+                        </div>
+                        <div class="info-detail">
+                            <span class="info-detail-label">Device</span>
+                            <span class="info-detail-value">Leica RTC360</span>
+                        </div>
+                        <div class="info-detail">
+                            <span class="info-detail-label">Operator</span>
+                            <span class="info-detail-value">Jane Smith</span>
+                        </div>
+                        <div class="info-detail">
+                            <span class="info-detail-label">Location</span>
+                            <span class="info-detail-value">Oxford, UK</span>
+                        </div>
+                    </div>
+
+                    <div class="info-section-header">Quality</div>
+                    <div class="info-detail-grid">
+                        <div class="info-detail">
+                            <span class="info-detail-label">Tier</span>
+                            <span class="info-detail-value">Tier 2 — Reference</span>
+                        </div>
+                        <div class="info-detail">
+                            <span class="info-detail-label">Accuracy</span>
+                            <span class="info-detail-value">Grade A</span>
+                        </div>
+                        <div class="info-detail">
+                            <span class="info-detail-label">Resolution</span>
+                            <span class="info-detail-value">2mm GSD</span>
+                        </div>
+                        <div class="info-detail">
+                            <span class="info-detail-label">Alignment</span>
+                            <span class="info-detail-value">0.5mm RMSE</span>
+                        </div>
+                    </div>
+
+                    <!-- Stats -->
+                    <div class="info-stats-row">
+                        <div class="info-stat">
+                            <div class="info-stat-number">1</div>
+                            <div class="info-stat-label">Splat</div>
+                        </div>
+                        <div class="info-stat">
+                            <div class="info-stat-number">1</div>
+                            <div class="info-stat-label">Mesh</div>
+                        </div>
+                        <div class="info-stat">
+                            <div class="info-stat-number">1</div>
+                            <div class="info-stat-label">Point Cloud</div>
+                        </div>
+                        <div class="info-stat">
+                            <div class="info-stat-number">4</div>
+                            <div class="info-stat-label">Annotations</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

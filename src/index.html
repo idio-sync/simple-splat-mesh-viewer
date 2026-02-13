@@ -43,6 +43,20 @@
         </div>
     </div>
 
+    <!-- Click-to-load gate (shown when ?autoload=false) -->
+    <div id="kiosk-click-gate" class="hidden">
+        <img id="kiosk-gate-poster" alt="" />
+        <div class="kiosk-gate-content">
+            <h2 id="kiosk-gate-title"></h2>
+            <button id="kiosk-gate-play" type="button" aria-label="Load 3D viewer">
+                <svg viewBox="0 0 24 24" width="32" height="32">
+                    <polygon points="6,3 20,12 6,21" />
+                </svg>
+            </button>
+            <p id="kiosk-gate-types"></p>
+        </div>
+    </div>
+
     <div id="app">
         <div id="viewer-container">
             <canvas id="viewer-canvas"></canvas>
@@ -1226,7 +1240,7 @@
                 </div>
             </div>
 
-            <div class="control-section collapsible collapsed">
+            <div id="section-screenshots" class="control-section collapsible collapsed">
                 <h3 class="collapsible-header">Screenshots <span class="collapse-icon">▶</span></h3>
                 <div class="collapsible-content">
                     <button id="btn-capture-screenshot" class="action-btn">Capture Screenshot</button>

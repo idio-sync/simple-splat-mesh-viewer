@@ -1701,10 +1701,15 @@ export function updateAnnotationPopupPosition(currentPopupAnnotationId) {
     }
 
     // Vertical: align with marker center, clamped to viewport
+    // In editorial mode, avoid title zone (top) and bottom ribbon
+    const isEditorial = document.body.classList.contains('kiosk-editorial');
+    const topZone = isEditorial ? 95 : padding;
+    const bottomZone = isEditorial ? 48 : padding;
+
     let top = markerRect.top + markerRect.height / 2 - popupHeight / 2;
-    if (top < padding) top = padding;
-    if (top + popupHeight > window.innerHeight - padding) {
-        top = window.innerHeight - popupHeight - padding;
+    if (top < topZone) top = topZone;
+    if (top + popupHeight > window.innerHeight - bottomZone) {
+        top = window.innerHeight - popupHeight - bottomZone;
     }
 
     popup.style.left = left + 'px';

@@ -3188,6 +3188,13 @@ function animate() {
 log.info(' Setting up initialization, readyState:', document.readyState);
 
 async function startApp() {
+    // Belt-and-suspenders: if kioskLock is active server-side but kiosk flag
+    // was somehow cleared (e.g., config tampering), force kiosk mode anyway
+    if (window.APP_CONFIG?.kioskLock && !window.APP_CONFIG?.kiosk) {
+        console.warn('[main] kioskLock active but kiosk flag was false — forcing kiosk mode');
+        window.APP_CONFIG.kiosk = true;
+    }
+
     // In kiosk mode, delegate to kiosk-main.js (slim viewer-only entry point)
     if (window.APP_CONFIG?.kiosk) {
         log.info(' Kiosk mode detected, loading kiosk-main.js');

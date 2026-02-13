@@ -33,8 +33,47 @@ import {
     populateMetadataDisplay, updateArchiveMetadataUI,
     showAnnotationPopup, hideAnnotationPopup, updateAnnotationPopupPosition
 } from './metadata-manager.js';
+import { loadTheme } from './theme-loader.js';
+import { ArchiveLoader } from './archive-loader.js';
 
 const log = Logger.getLogger('kiosk-main');
+
+// =============================================================================
+// MANIFEST NORMALIZATION
+// =============================================================================
+
+/** Convert a camelCase string to snake_case */
+function camelToSnake(str) {
+    return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+}
+
+/** Recursively convert all object keys from camelCase to snake_case */
+function deepSnakeKeys(obj) {
+    if (Array.isArray(obj)) return obj.map(deepSnakeKeys);
+    if (obj !== null && typeof obj === 'object') {
+        const result = {};
+        for (const [key, value] of Object.entries(obj)) {
+            result[camelToSnake(key)] = deepSnakeKeys(value);
+        }
+        return result;
+    }
+    return obj;
+}
+
+/**
+ * Normalize a manifest to canonical snake_case keys and lift common fields.
+ * Handles manifests created with either camelCase or snake_case conventions.
+ */
+function normalizeManifest(raw) {
+    const m = deepSnakeKeys(raw);
+    // Lift project fields to top level for convenient access
+    if (m.project) {
+        if (m.project.title && !m.title) m.title = m.project.title;
+        if (m.project.description && !m.description) m.description = m.project.description;
+        if (m.project.license && !m.license) m.license = m.project.license;
+    }
+    return m;
+}
 
 // =============================================================================
 // MODULE STATE
@@ -117,12 +156,19 @@ export async function init() {
             annotationSystem.selectedAnnotation = null;
             document.querySelectorAll('.annotation-marker.selected').forEach(m => m.classList.remove('selected'));
             document.querySelectorAll('.kiosk-anno-item.active').forEach(c => c.classList.remove('active'));
+            // Clear editorial sequence highlight
+            document.querySelectorAll('.editorial-anno-seq-num.active').forEach(n => n.classList.remove('active'));
             return;
         }
         // Highlight the corresponding sidebar item
         document.querySelectorAll('.kiosk-anno-item.active').forEach(c => c.classList.remove('active'));
         const item = document.querySelector(`.kiosk-anno-item[data-anno-id="${annotation.id}"]`);
         if (item) item.classList.add('active');
+
+        // Highlight editorial sequence number
+        document.querySelectorAll('.editorial-anno-seq-num.active').forEach(n => n.classList.remove('active'));
+        const seqNum = document.querySelector(`.editorial-anno-seq-num[data-anno-id="${annotation.id}"]`);
+        if (seqNum) seqNum.classList.add('active');
 
         if (isMobileKiosk()) {
             currentPopupAnnotationId = annotation.id;
@@ -132,14 +178,59 @@ export async function init() {
         }
     };
 
+    // Load theme and determine layout
+    const config = window.APP_CONFIG || {};
+    const themeMeta = await loadTheme(config.theme, { layoutOverride: config.layout || undefined });
+
+    // ?layout= overrides theme's @layout; theme overrides default 'sidebar'
+    const requestedLayout = config.layout || themeMeta.layout || 'sidebar';
+
+    // Only commit to editorial if the layout module is actually available
+    const hasEditorialModule = requestedLayout === 'editorial' && themeMeta.layoutModule;
+    const layoutStyle = hasEditorialModule ? 'editorial' : (requestedLayout === 'editorial' ? 'sidebar' : requestedLayout);
+    const isEditorial = layoutStyle === 'editorial';
+
+    // Store resolved layout for other code paths
+    config._resolvedLayout = layoutStyle;
+    config._themeMeta = themeMeta;
+
+    if (isEditorial) {
+        document.body.classList.add('kiosk-editorial');
+        log.info('Editorial layout enabled');
+
+        // Let editorial layout customize loading screen before any archive loading
+        if (themeMeta.layoutModule?.initLoadingScreen) {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                themeMeta.layoutModule.initLoadingScreen(overlay, {
+                    themeAssets: themeMeta.themeAssets || {},
+                    themeBaseUrl: `themes/${config.theme}/`
+                });
+            }
+        }
+
+        // Let editorial layout customize click gate
+        if (themeMeta.layoutModule?.initClickGate) {
+            const gate = document.getElementById('kiosk-click-gate');
+            if (gate) {
+                themeMeta.layoutModule.initClickGate(gate, {
+                    themeAssets: themeMeta.themeAssets || {},
+                    themeBaseUrl: `themes/${config.theme}/`
+                });
+            }
+        }
+    } else if (requestedLayout === 'editorial' && !hasEditorialModule) {
+        log.warn('Editorial layout requested but no layout module available — using sidebar');
+    }
+
     // Wire up UI
     setupViewerUI();
+    // Always set up sidebar (editorial hides it via CSS but needs it as mobile fallback)
     setupMetadataSidebar({ state, annotationSystem, imageAssets: state.imageAssets });
     setupCollapsibles();
     setupViewerKeyboardShortcuts();
 
     // Apply initial display mode from config
-    const config = window.APP_CONFIG || {};
     if (config.initialViewMode) {
         state.displayMode = config.initialViewMode;
     }
@@ -151,7 +242,7 @@ export async function init() {
     // Handle window resize
     window.addEventListener('resize', onWindowResize);
 
-    // Setup mobile bottom sheet drag
+    // Setup mobile bottom sheet drag (always — editorial uses sidebar as mobile fallback)
     setupBottomSheetDrag();
     if (isMobileKiosk()) setSheetSnap('peek');
 
@@ -174,6 +265,10 @@ function setupFilePicker() {
     // Check for URL-based archive loading (e.g. ?kiosk=true&archive=URL)
     const config = window.APP_CONFIG || {};
     if (config.defaultArchiveUrl) {
+        if (config.autoload === false) {
+            showClickGate(config.defaultArchiveUrl);
+            return;
+        }
         log.info('Loading archive from URL:', config.defaultArchiveUrl);
         loadArchiveFromUrl(config.defaultArchiveUrl);
         return;
@@ -221,6 +316,66 @@ function setupFilePicker() {
     function hidePicker() {
         if (picker) picker.classList.add('hidden');
     }
+}
+
+/**
+ * Show click-to-load overlay with poster extracted from archive via Range requests.
+ * Only downloads the ZIP central directory + thumbnail (~100KB), not the full archive.
+ */
+async function showClickGate(archiveUrl) {
+    const gate = document.getElementById('kiosk-click-gate');
+    if (!gate) {
+        log.warn('Click gate element not found, falling back to auto-load');
+        loadArchiveFromUrl(archiveUrl);
+        return;
+    }
+
+    // Try to extract poster and metadata from archive via Range requests
+    try {
+        const loader = new ArchiveLoader();
+        await loader.loadRemoteIndex(archiveUrl);
+
+        // Parse manifest for title + content types
+        const manifest = await loader.parseManifest();
+        const contentInfo = loader.getContentInfo();
+
+        // Set title
+        const titleEl = document.getElementById('kiosk-gate-title');
+        const title = manifest?.project?.title || manifest?._meta?.title || '';
+        if (titleEl && title) titleEl.textContent = title;
+
+        // Extract thumbnail for poster
+        const thumbEntry = loader.getThumbnailEntry();
+        if (thumbEntry) {
+            const thumbData = await loader.extractFile(thumbEntry.file_name);
+            if (thumbData) {
+                const posterImg = document.getElementById('kiosk-gate-poster');
+                if (posterImg) posterImg.src = thumbData.url;
+            }
+        }
+
+        // Show content types
+        const typesEl = document.getElementById('kiosk-gate-types');
+        const types = [];
+        if (contentInfo.hasSplat) types.push('Gaussian Splat');
+        if (contentInfo.hasMesh) types.push('Mesh');
+        if (contentInfo.hasPointcloud) types.push('Point Cloud');
+        if (typesEl && types.length) typesEl.textContent = types.join(' + ');
+
+        loader.dispose();
+    } catch (e) {
+        log.warn('Could not extract poster via Range requests:', e.message);
+        // Fallback: generic play button without poster (still functional)
+    }
+
+    gate.classList.remove('hidden');
+
+    // Click anywhere on the gate to start full download
+    gate.addEventListener('click', () => {
+        gate.classList.add('hidden');
+        log.info('Click gate dismissed, loading archive:', archiveUrl);
+        loadArchiveFromUrl(archiveUrl);
+    }, { once: true });
 }
 
 async function loadArchiveFromUrl(url) {
@@ -321,7 +476,8 @@ async function handleArchiveFile(file) {
         // Parse manifest + extract thumbnail (small files only)
         updateProgress(15, 'Reading metadata...');
         const phase1 = await processArchivePhase1(archiveLoader, file.name, { state });
-        const { manifest, contentInfo } = phase1;
+        const { contentInfo } = phase1;
+        const manifest = normalizeManifest(phase1.manifest);
 
         // Show branded loading screen with thumbnail, title, and content types
         await showBrandedLoading(archiveLoader);
@@ -389,6 +545,37 @@ async function handleArchiveFile(file) {
         updateArchiveMetadataUI(manifest, archiveLoader);
         prefillMetadataFromArchive(manifest);
         populateMetadataDisplay({ state, annotationSystem, imageAssets: state.imageAssets });
+
+        // In kiosk/offline mode the edit form fields (#meta-title etc.) are stripped,
+        // so populateMetadataDisplay reads empty values from collectMetadata().
+        // Override display fields directly from the manifest.
+        const displayTitle = document.getElementById('display-title');
+        if (displayTitle && manifest.project?.title) displayTitle.textContent = manifest.project.title;
+        const displayDesc = document.getElementById('display-description');
+        if (displayDesc && manifest.project?.description) {
+            displayDesc.innerHTML = parseMarkdown(resolveAssetRefs(manifest.project.description, state.imageAssets));
+            displayDesc.style.display = '';
+        }
+        const displayCreator = document.getElementById('display-creator');
+        const displayCreatorRow = document.getElementById('display-creator-row');
+        if (displayCreator && displayCreatorRow && manifest.provenance?.operator) {
+            displayCreator.textContent = manifest.provenance.operator;
+            displayCreatorRow.style.display = '';
+        }
+        const displayDate = document.getElementById('display-date');
+        const displayDateRow = document.getElementById('display-date-row');
+        if (displayDate && displayDateRow && manifest.provenance?.captureDate) {
+            const d = new Date(manifest.provenance.captureDate);
+            displayDate.textContent = isNaN(d.getTime()) ? manifest.provenance.captureDate : d.toLocaleDateString();
+            displayDateRow.style.display = '';
+        }
+        const displayLocation = document.getElementById('display-location');
+        const displayLocationRow = document.getElementById('display-location-row');
+        if (displayLocation && displayLocationRow && manifest.provenance?.location) {
+            displayLocation.textContent = manifest.provenance.location;
+            displayLocationRow.style.display = '';
+        }
+
         populateDetailedMetadata(manifest);
         populateSourceFilesList(archiveLoader);
         reorderKioskSidebar();
@@ -407,9 +594,6 @@ async function handleArchiveFile(file) {
         // Show only relevant settings
         showRelevantSettings(state.splatLoaded, state.modelLoaded, state.pointcloudLoaded);
 
-        // Create view switcher pill (only if 2+ asset types)
-        createViewSwitcher();
-
         // Fit camera to loaded content
         fitCameraToScene();
 
@@ -422,38 +606,59 @@ async function handleArchiveFile(file) {
         const autoRotateBtn = document.getElementById('btn-auto-rotate');
         if (autoRotateBtn) autoRotateBtn.classList.add('active');
 
-        // Update info panel
-        updateInfoPanel();
+        // Branch UI setup based on resolved layout (theme + ?layout= override)
+        const isEditorial = (window.APP_CONFIG || {})._resolvedLayout === 'editorial';
 
-        // Show archive info section
-        const archiveSection = document.getElementById('archive-metadata-section');
-        if (archiveSection) archiveSection.style.display = '';
+        if (isEditorial) {
+            // Delegate to theme's layout module
+            const appConfig = window.APP_CONFIG || {};
+            const layoutModule = (appConfig._themeMeta && appConfig._themeMeta.layoutModule);
+            layoutModule.setup(manifest, createLayoutDeps());
+
+            // Also populate the sidebar content as a mobile fallback
+            // (editorial CSS hides it on desktop, media query shows it on mobile)
+            createViewSwitcher();
+            updateInfoPanel();
+        } else {
+            // Sidebar layout: standard kiosk UI
+            createViewSwitcher();
+            updateInfoPanel();
+
+            const archiveSection = document.getElementById('archive-metadata-section');
+            if (archiveSection) archiveSection.style.display = '';
+        }
 
         updateProgress(100, 'Complete');
 
         // Smooth entry transition: fade overlay + camera ease-in
         smoothTransitionIn();
 
-        // Show toolbar now that archive is loaded
-        const toolbar = document.getElementById('left-toolbar');
-        if (toolbar) toolbar.style.display = 'flex';
+        if (isEditorial) {
+            // Populate sidebar content for mobile fallback (hidden on desktop by CSS)
+            showMetadataSidebar('view', { state, annotationSystem, imageAssets: state.imageAssets });
+            populateAnnotationList();
+        } else {
+            // Show toolbar now that archive is loaded
+            const toolbar = document.getElementById('left-toolbar');
+            if (toolbar) toolbar.style.display = 'flex';
 
-        // Add export section to settings tab now that archive data is available
-        createExportSection();
+            // Add export section to settings tab now that archive data is available
+            createExportSection();
 
-        // Show annotation toggle button if annotations exist, active by default
-        if (annotationSystem.hasAnnotations()) {
-            const annoBtn = document.getElementById('btn-toggle-annotations');
-            if (annoBtn) {
-                annoBtn.style.display = '';
-                annoBtn.classList.add('active');
+            // Show annotation toggle button if annotations exist, active by default
+            if (annotationSystem.hasAnnotations()) {
+                const annoBtn = document.getElementById('btn-toggle-annotations');
+                if (annoBtn) {
+                    annoBtn.style.display = '';
+                    annoBtn.classList.add('active');
+                }
+                // Trigger intro glow on markers
+                triggerMarkerGlowIntro();
             }
-            // Trigger intro glow on markers
-            triggerMarkerGlowIntro();
-        }
 
-        // Open metadata sidebar by default
-        showMetadataSidebar('view', { state, annotationSystem, imageAssets: state.imageAssets });
+            // Open metadata sidebar by default
+            showMetadataSidebar('view', { state, annotationSystem, imageAssets: state.imageAssets });
+        }
 
         log.info('Archive loaded successfully:', file.name);
         notify.success(`Loaded: ${file.name}`);
@@ -547,6 +752,35 @@ function createDisplayModeDeps() {
             if (modelGroup) modelGroup.visible = showModel;
             if (pointcloudGroup) pointcloudGroup.visible = showPointcloud;
         }
+    };
+}
+
+/**
+ * Build the dependency object for theme layout modules.
+ * Layout modules receive everything via this object — no ES imports.
+ */
+function createLayoutDeps() {
+    return {
+        Logger,
+        escapeHtml,
+        parseMarkdown,
+        resolveAssetRefs,
+        updateModelTextures,
+        updateModelWireframe,
+        sceneManager,
+        state,
+        annotationSystem,
+        modelGroup,
+        setDisplayMode,
+        createDisplayModeDeps,
+        triggerLazyLoad,
+        showAnnotationPopup,
+        hideAnnotationPopup,
+        hideAnnotationLine,
+        getCurrentPopupId: () => currentPopupAnnotationId,
+        setCurrentPopupId: (id) => { currentPopupAnnotationId = id; },
+        themeBaseUrl: (window.APP_CONFIG?.theme) ? `themes/${window.APP_CONFIG.theme}/` : '',
+        themeAssets: window.__KIOSK_THEME_ASSETS__ || {}
     };
 }
 
@@ -735,15 +969,32 @@ function setupViewerUI() {
     repositionAnnotationToggle();
 }
 
+// =============================================================================
+// EDITORIAL LAYOUT — Moved to src/themes/editorial/layout.js
+// Layout CSS, JS, and color tokens are now part of the editorial theme package.
+// See: themes/editorial/layout.css, layout.js, theme.css
+// =============================================================================
+
 function setupViewerKeyboardShortcuts() {
+    const isEditorial = (window.APP_CONFIG || {})._resolvedLayout === 'editorial';
     setupKeyboardShortcuts({
         'f': () => toggleFlyMode(),
         'm': () => {
-            const sidebar = document.getElementById('metadata-sidebar');
-            if (sidebar && !sidebar.classList.contains('hidden')) {
-                hideMetadataSidebar();
+            if (isEditorial) {
+                // Toggle editorial info overlay
+                const panel = document.querySelector('.editorial-info-overlay');
+                const detailsBtn = document.querySelector('.editorial-details-link');
+                if (panel) {
+                    const isOpen = panel.classList.toggle('open');
+                    if (detailsBtn) detailsBtn.classList.toggle('active', isOpen);
+                }
             } else {
-                showMetadataSidebar('view', { state, annotationSystem, imageAssets: state.imageAssets });
+                const sidebar = document.getElementById('metadata-sidebar');
+                if (sidebar && !sidebar.classList.contains('hidden')) {
+                    hideMetadataSidebar();
+                } else {
+                    showMetadataSidebar('view', { state, annotationSystem, imageAssets: state.imageAssets });
+                }
             }
         },
         '1': () => switchViewMode('model'),
@@ -754,6 +1005,15 @@ function setupViewerKeyboardShortcuts() {
             if (cb) { cb.checked = !cb.checked; sceneManager.toggleGrid(cb.checked); }
         },
         'escape': () => {
+            if (isEditorial) {
+                // Close info overlay and annotation popup
+                const panel = document.querySelector('.editorial-info-overlay');
+                const detailsBtn = document.querySelector('.editorial-details-link');
+                if (panel && panel.classList.contains('open')) {
+                    panel.classList.remove('open');
+                    if (detailsBtn) detailsBtn.classList.remove('active');
+                }
+            }
             hideAnnotationPopup();
             currentPopupAnnotationId = null;
         }
@@ -769,9 +1029,13 @@ function switchViewMode(mode) {
     setDisplayMode(mode, createDisplayModeDeps());
     triggerLazyLoad(mode);
 
-    // Update active button state
+    // Update active button state (sidebar layout)
     document.querySelectorAll('.kiosk-view-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+    // Update active state (editorial layout)
+    document.querySelectorAll('.editorial-view-mode-link').forEach(link => {
+        link.classList.toggle('active', link.dataset.mode === mode);
     });
 }
 
@@ -2167,20 +2431,35 @@ function updateAnnotationLine(annotationId) {
     const mx = markerRect.left + markerRect.width / 2;
     const my = markerRect.top + markerRect.height / 2;
 
-    // Connect to the nearest edge of the popup
+    // Connect to the nearest edge of the popup with margin gap
+    const lineMargin = 12; // gap between line end and marker/popup
     let px, py;
+    let lx1, ly1; // line start (near marker)
     if (popupRect.left > mx) {
         // Popup is to the right of marker
-        px = popupRect.left;
+        px = popupRect.left - lineMargin;
         py = Math.max(popupRect.top, Math.min(my, popupRect.bottom));
     } else {
         // Popup is to the left of marker
-        px = popupRect.right;
+        px = popupRect.right + lineMargin;
         py = Math.max(popupRect.top, Math.min(my, popupRect.bottom));
     }
 
-    annotationLineEl.setAttribute('x1', mx);
-    annotationLineEl.setAttribute('y1', my);
+    // Offset line start away from marker center toward popup
+    const dx = px - mx;
+    const dy = py - my;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > lineMargin * 3) {
+        const ratio = lineMargin / dist;
+        lx1 = mx + dx * ratio;
+        ly1 = my + dy * ratio;
+    } else {
+        lx1 = mx;
+        ly1 = my;
+    }
+
+    annotationLineEl.setAttribute('x1', lx1);
+    annotationLineEl.setAttribute('y1', ly1);
     annotationLineEl.setAttribute('x2', px);
     annotationLineEl.setAttribute('y2', py);
     annotationLineEl.style.display = '';

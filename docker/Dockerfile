@@ -32,6 +32,10 @@ COPY src/modules/share-dialog.js /usr/share/nginx/html/modules/
 COPY src/modules/fly-controls.js /usr/share/nginx/html/modules/
 COPY src/modules/kiosk-viewer.js /usr/share/nginx/html/modules/
 COPY src/modules/kiosk-main.js /usr/share/nginx/html/modules/
+COPY src/modules/theme-loader.js /usr/share/nginx/html/modules/
+
+# Copy theme files
+COPY src/themes/ /usr/share/nginx/html/themes/
 
 # Copy the config template and entrypoint script
 COPY docker/config.js.template /usr/share/nginx/html/config.js.template
@@ -47,6 +51,11 @@ ENV DEFAULT_ALIGNMENT_URL=""
 ENV SHOW_CONTROLS="true"
 ENV ALLOWED_DOMAINS=""
 ENV FRAME_ANCESTORS="'self'"
+
+# Kiosk embed security (see docs/KIOSK-VIEWER.md for details)
+ENV KIOSK_LOCK=""
+ENV ARCHIVE_PATH_PREFIX=""
+ENV EMBED_REFERERS=""
 
 EXPOSE 80
 

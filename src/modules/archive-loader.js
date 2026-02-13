@@ -142,6 +142,8 @@ export class ArchiveLoader {
     constructor() {
         this._file = null;          // File/Blob reference for slice-based reading (from loadFromFile)
         this._rawData = null;       // Uint8Array - raw ZIP bytes (from loadFromArrayBuffer/loadFromUrl)
+        this._url = null;           // URL for Range-request-based reading (from loadRemoteIndex)
+        this._fileSize = 0;         // Total file size in bytes (used with _url source)
         this._fileCache = new Map(); // Map<string, Uint8Array> - decompressed file cache
         this._fileIndex = [];       // Array<{name, originalSize}> - from central directory scan
         this._centralDir = null;    // Map<string, {offset, compressedSize, uncompressedSize, method}>
@@ -153,7 +155,7 @@ export class ArchiveLoader {
      * Check if archive data is available (either File reference or raw buffer).
      */
     get _hasData() {
-        return !!(this._file || this._rawData);
+        return !!(this._file || this._rawData || this._url);
     }
 
     /**
@@ -231,6 +233,30 @@ export class ArchiveLoader {
     }
 
     /**
+     * Load only the ZIP central directory from a remote URL via HTTP Range requests.
+     * After calling this, parseManifest() and extractFile() work via on-demand
+     * Range requests — no full download needed. Total transfer is ~100KB.
+     * @param {string} url - The archive URL
+     * @returns {Promise<number>} The total file size in bytes
+     */
+    async loadRemoteIndex(url) {
+        const head = await fetch(url, { method: 'HEAD' });
+        if (!head.ok) throw new Error(`HTTP ${head.status}: ${head.statusText}`);
+
+        const size = parseInt(head.headers.get('content-length'), 10);
+        if (!size || isNaN(size)) throw new Error('Server did not return Content-Length');
+
+        this._url = url;
+        this._fileSize = size;
+        this._file = null;
+        this._rawData = null;
+        this._fileCache = new Map();
+
+        await this._parseCentralDirectory();
+        return size;
+    }
+
+    /**
      * Load archive from an ArrayBuffer.
      * Only scans the central directory — no files are decompressed.
      * @param {ArrayBuffer} arrayBuffer - The archive data
@@ -272,6 +298,16 @@ export class ArchiveLoader {
         if (this._rawData) {
             return this._rawData.subarray(offset, offset + length);
         }
+        if (this._url) {
+            const end = offset + length - 1;
+            const resp = await fetch(this._url, {
+                headers: { 'Range': `bytes=${offset}-${end}` }
+            });
+            if (!resp.ok && resp.status !== 206) {
+                throw new Error(`Range request failed: HTTP ${resp.status}`);
+            }
+            return new Uint8Array(await resp.arrayBuffer());
+        }
         throw new Error('No archive data available');
     }
 
@@ -282,7 +318,7 @@ export class ArchiveLoader {
      * @private
      */
     async _parseCentralDirectory() {
-        const fileSize = this._file ? this._file.size : this._rawData.length;
+        const fileSize = this._file ? this._file.size : (this._rawData ? this._rawData.length : this._fileSize);
 
         // Read last ~65KB to find End of Central Directory record.
         // EOCD is 22 bytes minimum; with a ZIP comment it can be up to 22 + 65535 bytes.
@@ -833,6 +869,8 @@ export class ArchiveLoader {
         this.cleanup();
         this._rawData = null;
         this._file = null;
+        this._url = null;
+        this._fileSize = 0;
         this._centralDir = null;
         this._fileCache?.clear();
         this._fileCache = null;

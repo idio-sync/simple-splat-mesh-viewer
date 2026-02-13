@@ -1,0 +1,32 @@
+/*
+ * @theme    Minimal White
+ * @layout   sidebar
+ * @scene-bg #2a2a3e
+ * @description Clean neutral palette with white accent. Sidebar layout.
+ */
+
+body.kiosk-mode {
+    /* Neutral white accent */
+    --kiosk-accent: #e0e0e8;
+    --kiosk-accent-rgb: 224, 224, 232;
+
+    /* Slightly warmer dark surfaces */
+    --kiosk-surface-rgb: 18, 18, 24;
+    --kiosk-elevated-rgb: 38, 38, 50;
+    --kiosk-bg-deep-rgb: 12, 12, 18;
+
+    /* Softer text */
+    --kiosk-text-bright-rgb: 210, 210, 220;
+    --kiosk-text-body-rgb: 170, 170, 185;
+    --kiosk-text-dim-rgb: 130, 130, 150;
+    --kiosk-text-heading-rgb: 230, 230, 240;
+
+    /* Typography — system sans throughout */
+    --kiosk-font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+    /* Deep background (must match --kiosk-bg-deep-rgb) */
+    --kiosk-bg-deep: #0c0c12;
+
+    /* Scene background */
+    --kiosk-scene-bg: #2a2a3e;
+}

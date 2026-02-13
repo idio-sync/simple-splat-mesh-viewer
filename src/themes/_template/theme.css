@@ -1,0 +1,51 @@
+/*
+ * @theme    My Custom Theme
+ * @layout   sidebar
+ * @scene-bg #1a1a2e
+ * @description Copy this folder, rename it, and customize the variables below.
+ *
+ * Usage: Add ?theme=your-folder-name to the viewer URL.
+ * Only override the variables you want to change — the rest inherit defaults.
+ *
+ * Available layouts:
+ *   sidebar    — Side panel with metadata and annotations (default)
+ *   editorial  — Full-bleed scene with edge-anchored overlays
+ */
+
+body.kiosk-mode {
+    /* Accent color — used for buttons, links, highlights, markers */
+    /* --kiosk-accent: #4ecdc4; */
+    /* --kiosk-accent-rgb: 78, 205, 196; */
+
+    /* Surface backgrounds (RGB triplets — used at varying opacity) */
+    /* --kiosk-surface-rgb: 15, 15, 26; */
+    /* --kiosk-elevated-rgb: 42, 42, 74; */
+    /* --kiosk-bg-deep-rgb: 10, 10, 20; */
+
+    /* Text colors (RGB triplets — used at varying opacity) */
+    /* --kiosk-text-bright-rgb: 220, 220, 235; */
+    /* --kiosk-text-body-rgb: 180, 180, 200; */
+    /* --kiosk-text-dim-rgb: 150, 150, 170; */
+    /* --kiosk-text-heading-rgb: 240, 240, 250; */
+
+    /* Named text aliases (override if you change the RGB triplets above) */
+    /* --kiosk-text-primary: rgba(var(--kiosk-text-bright-rgb), 0.95); */
+    /* --kiosk-text-secondary: rgba(var(--kiosk-text-body-rgb), 0.9); */
+    /* --kiosk-text-muted: rgba(var(--kiosk-text-dim-rgb), 0.7); */
+    /* --kiosk-text-faint: rgba(var(--kiosk-text-dim-rgb), 0.5); */
+
+    /* Borders */
+    /* --kiosk-border-subtle: rgba(255, 255, 255, 0.06); */
+    /* --kiosk-border-default: rgba(var(--kiosk-accent-rgb), 0.15); */
+
+    /* Typography */
+    /* --kiosk-font-display: Georgia, 'Times New Roman', serif; */
+    /* --kiosk-font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; */
+    /* --kiosk-font-mono: 'SF Mono', Consolas, monospace; */
+
+    /* Deep background (solid color behind panels) */
+    /* --kiosk-bg-deep: #0f0f1a; */
+
+    /* Scene background (Three.js scene — read by JS) */
+    /* --kiosk-scene-bg: #1a1a2e; */
+}

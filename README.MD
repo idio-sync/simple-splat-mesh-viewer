@@ -18,6 +18,7 @@ A web-based viewer for viewing Gaussian splats, 3D models, and E57 point clouds,
 - **Annotation system** for placing spatial notes on 3D surfaces, with image attachments and depth-aware markers
 - **Metadata editor** with 8 tabs covering project info, provenance, archival records, quality metrics, preservation, and more — with inline field validation
 - **Offline kiosk viewer** — generate a self-contained ~1 MB HTML file for client delivery, fully functional with zero network access
+- **Kiosk themes** — customizable color palettes and layouts via self-contained theme packages (`?theme=editorial`, `?theme=minimal`, or create your own)
 - **Lazy archive loading** — only the manifest is decompressed on open; individual assets load on demand
 - **Image support** in annotations and project descriptions via an `asset:` protocol, stored as separate entries in the archive
 - **Version history** tracking within archives for recording changes across exports
@@ -25,6 +26,16 @@ A web-based viewer for viewing Gaussian splats, 3D models, and E57 point clouds,
 - **Shareable URLs** with embedded alignment, display settings, and UI presets
 - **Docker deployment** with environment-variable configuration and kiosk mode support
 - **Digital preservation metadata** aligned with Dublin Core, PRONOM, and Smithsonian EDAN standards
+
+## Kiosk Themes
+
+The kiosk viewer supports themes — self-contained packages that control colors, typography, and layout. Built-in themes include `editorial` (gold/navy with full-bleed layout) and `minimal` (neutral white sidebar). Create your own by copying `src/themes/_template/` and customizing the CSS variables. See the [Kiosk Viewer docs](docs/KIOSK-VIEWER.md#themes) for full details.
+
+```
+?theme=editorial    → Gold/navy editorial layout
+?theme=minimal      → Neutral white sidebar
+?theme=your-theme   → Any custom theme folder
+```
 
 ## Quick Start
 
@@ -106,21 +117,31 @@ simple-splat-mesh-viewer/
 │   ├── config.js                   # Runtime configuration (URL params, kiosk detection)
 │   ├── pre-module.js               # Pre-module initialization
 │   ├── styles.css                  # UI styles (dark theme + kiosk-mode overrides)
-│   └── modules/
-│       ├── constants.js            # Application constants and defaults
-│       ├── utilities.js            # Logging, hashing, markdown, image asset resolution
-│       ├── scene-manager.js        # Three.js scene, camera, renderer setup
-│       ├── file-handlers.js        # File loading with lazy archive extraction
-│       ├── archive-loader.js       # Archive ZIP parsing, lazy on-demand extraction
-│       ├── archive-creator.js      # Archive creation, manifest, image bundling
-│       ├── alignment.js            # Auto-align, ICP, fit-to-view
-│       ├── annotation-system.js    # 3D annotation placement with depth awareness
-│       ├── metadata-manager.js     # Metadata editing, validation, and display
-│       ├── share-dialog.js         # Share URL generation
-│       ├── fly-controls.js         # First-person fly camera
-│       ├── ui-controller.js        # UI state management
-│       ├── kiosk-viewer.js         # Offline viewer HTML generator
-│       └── kiosk-main.js           # Kiosk viewer entry point (viewer-only mode)
+│   ├── modules/
+│   │   ├── constants.js            # Application constants and defaults
+│   │   ├── utilities.js            # Logging, hashing, markdown, image asset resolution
+│   │   ├── scene-manager.js        # Three.js scene, camera, renderer setup
+│   │   ├── file-handlers.js        # File loading with lazy archive extraction
+│   │   ├── archive-loader.js       # Archive ZIP parsing, lazy on-demand extraction
+│   │   ├── archive-creator.js      # Archive creation, manifest, image bundling
+│   │   ├── alignment.js            # Auto-align, ICP, fit-to-view
+│   │   ├── annotation-system.js    # 3D annotation placement with depth awareness
+│   │   ├── metadata-manager.js     # Metadata editing, validation, and display
+│   │   ├── share-dialog.js         # Share URL generation
+│   │   ├── fly-controls.js         # First-person fly camera
+│   │   ├── ui-controller.js        # UI state management
+│   │   ├── theme-loader.js         # Theme CSS/layout loading and metadata parsing
+│   │   ├── kiosk-viewer.js         # Offline viewer HTML generator
+│   │   └── kiosk-main.js           # Kiosk viewer entry point (viewer-only mode)
+│   └── themes/
+│       ├── _template/              # Copy this folder to create a new theme
+│       │   └── theme.css
+│       ├── editorial/              # Gold/navy editorial layout theme
+│       │   ├── theme.css           # Color and typography variables
+│       │   ├── layout.css          # Editorial layout CSS rules
+│       │   └── layout.js           # Editorial DOM creation module
+│       └── minimal/                # Neutral white sidebar theme
+│           └── theme.css
 ├── docker/
 │   ├── Dockerfile                  # nginx:alpine-based container
 │   ├── nginx.conf                  # Nginx configuration

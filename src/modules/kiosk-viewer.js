@@ -65,6 +65,7 @@ const LOCAL_MODULES = [
     { specifier: './annotation-system.js', path: 'annotation-system.js' },
     { specifier: './file-handlers.js',     path: 'file-handlers.js' },
     { specifier: './metadata-manager.js',  path: 'metadata-manager.js' },
+    { specifier: './theme-loader.js',      path: 'theme-loader.js' },
     { specifier: './kiosk-main.js',        path: 'kiosk-main.js' },
 ];
 
@@ -111,6 +112,18 @@ async function fetchResolved(url) {
  */
 function toBase64(str) {
     return btoa(unescape(encodeURIComponent(str)));
+}
+
+/**
+ * Convert a Blob to a data: URL.
+ */
+function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
 }
 
 // =============================================================================
@@ -166,12 +179,57 @@ export async function fetchDependencies(onProgress) {
     progress('Fetching pre-module.js...');
     const preModuleJS = await fetchText(new URL('pre-module.js', baseUrl).href);
 
+    // 4. Fetch theme files if a theme is active
+    const config = window.APP_CONFIG || {};
+    const themeName = config.theme || '';
+    let themeCSS = null;
+    let layoutCSS = null;
+    let layoutJS = null;
+    const themeAssets = {};
+    if (themeName) {
+        try {
+            progress(`Fetching theme: ${themeName}...`);
+            themeCSS = await fetchText(new URL(`themes/${themeName}/theme.css`, baseUrl).href);
+            log.info(`Fetched theme CSS: ${themeName} (${(themeCSS.length / 1024).toFixed(1)} KB)`);
+        } catch (err) {
+            log.warn(`Theme "${themeName}" not found, skipping: ${err.message}`);
+        }
+
+        // Try to fetch layout.css and layout.js (optional — only custom layouts have these)
+        if (themeCSS) {
+            try {
+                layoutCSS = await fetchText(new URL(`themes/${themeName}/layout.css`, baseUrl).href);
+                log.info(`Fetched layout CSS: ${themeName} (${(layoutCSS.length / 1024).toFixed(1)} KB)`);
+            } catch (e) { /* no layout.css — fine */ }
+
+            try {
+                layoutJS = await fetchText(new URL(`themes/${themeName}/layout.js`, baseUrl).href);
+                log.info(`Fetched layout JS: ${themeName} (${(layoutJS.length / 1024).toFixed(1)} KB)`);
+            } catch (e) { /* no layout.js — fine */ }
+
+            // Try to fetch theme image assets (logo, etc.) as data URLs for offline use
+            try {
+                const logoResp = await fetch(new URL(`themes/${themeName}/logo.png`, baseUrl).href);
+                if (logoResp.ok) {
+                    const blob = await logoResp.blob();
+                    themeAssets['logo.png'] = await blobToDataUrl(blob);
+                    log.info(`Fetched theme logo: ${themeName}`);
+                }
+            } catch (e) { /* no logo — fine */ }
+        }
+    }
+
     log.info('All dependencies fetched successfully');
 
     return {
         indexHTML,
         stylesCSS,
         preModuleJS,
+        themeCSS,
+        layoutCSS,
+        layoutJS,
+        themeAssets,
+        themeName,
         bundleData: { cdn, modules }
     };
 }
@@ -180,7 +238,10 @@ export async function fetchDependencies(onProgress) {
 // KIOSK CONFIG (replaces config.js in the generated HTML)
 // =============================================================================
 
-const KIOSK_CONFIG = `(function() {
+function makeKioskConfig(themeName) {
+    const escaped = (themeName || '').replace(/'/g, "\\'");
+    return `(function() {
+    var params = new URLSearchParams(window.location.search);
     window.APP_CONFIG = {
         kiosk: true,
         defaultArchiveUrl: '',
@@ -193,9 +254,12 @@ const KIOSK_CONFIG = `(function() {
         controlsMode: 'none',
         initialViewMode: 'both',
         showToolbar: true,
-        sidebarMode: 'closed'
+        sidebarMode: 'closed',
+        theme: params.get('theme') || '${escaped}',
+        layout: params.get('layout') || ''
     };
 })();`;
+}
 
 // =============================================================================
 // KIOSK BOOTSTRAP SCRIPT
@@ -271,6 +335,15 @@ const KIOSK_BOOTSTRAP = `(async function() {
             console.log('[Kiosk] Module: ' + mod.specifier);
         }
 
+        // Phase 2.5: Load layout module if present (self-registers on window.__KIOSK_LAYOUTS__)
+        if (DEPS.layoutModule) {
+            console.log('[Kiosk] Loading layout module...');
+            var layoutSrc = decode(DEPS.layoutModule);
+            var layoutBlob = makeBlob(layoutSrc);
+            await import(layoutBlob);
+            console.log('[Kiosk] Layout module registered');
+        }
+
         // Phase 3: Import kiosk-main.js and start the viewer
         console.log('[Kiosk] Starting viewer...');
         var kioskModule = await import(blobMap['./kiosk-main.js']);
@@ -329,16 +402,25 @@ export function generateGenericViewer(deps) {
         '">'
     );
 
-    // 4. Inline CSS (replace stylesheet link)
+    // 4. Inline CSS (replace stylesheet link) + theme/layout CSS if present
+    const themeBlock = deps.themeCSS
+        ? '\n<style id="kiosk-theme">\n' + deps.themeCSS + '\n</style>'
+        : '';
+    const layoutBlock = deps.layoutCSS
+        ? '\n<style id="kiosk-layout">\n' + deps.layoutCSS + '\n</style>'
+        : '';
     html = html.replace(
         /<link\s+rel="stylesheet"\s+href="styles\.css"\s*\/?>/,
-        '<style>\n' + deps.stylesCSS + '\n</style>'
+        '<style>\n' + deps.stylesCSS + '\n</style>' + themeBlock + layoutBlock
     );
 
-    // 5. Inline kiosk config (replace config.js)
+    // 5. Inline kiosk config (replace config.js) + theme assets for offline use
+    const themeAssetsScript = (deps.themeAssets && Object.keys(deps.themeAssets).length > 0)
+        ? '\nwindow.__KIOSK_THEME_ASSETS__ = ' + JSON.stringify(deps.themeAssets) + ';\n'
+        : '';
     html = html.replace(
         /<script\s+src="config\.js"\s*><\/script>/,
-        '<script>\n' + KIOSK_CONFIG + '\n<\/script>'
+        '<script>\n' + makeKioskConfig(deps.themeName) + themeAssetsScript + '\n<\/script>'
     );
 
     // 6. Remove import map (blob URLs replace it)
@@ -351,7 +433,11 @@ export function generateGenericViewer(deps) {
     );
 
     // 8. Replace main.js module with deps data + bootstrap script
-    const bundleJSON = JSON.stringify(deps.bundleData);
+    const bundlePayload = { ...deps.bundleData };
+    if (deps.layoutJS) {
+        bundlePayload.layoutModule = toBase64(deps.layoutJS);
+    }
+    const bundleJSON = JSON.stringify(bundlePayload);
     html = html.replace(
         /<script\s+type="module"\s+src="main\.js"\s*><\/script>/,
         '<script>\nwindow.__KIOSK_DEPS__ = ' + bundleJSON + ';\n<\/script>\n' +

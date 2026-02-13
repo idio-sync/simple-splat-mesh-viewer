@@ -1,4 +1,11 @@
-// Runtime configuration
+// Runtime configuration (local dev version — no env var substitution)
+//
+// Docker-only env vars (enforced in docker/config.js.template, not here):
+//   KIOSK_LOCK=true          Forces kiosk mode, ignores privilege-escalating URL params
+//   ARCHIVE_PATH_PREFIX=path  Restricts archives to a path prefix (e.g., "/archives/")
+//   EMBED_REFERERS=domains    nginx valid_referers check (e.g., "client.com *.client.com")
+//   FRAME_ANCESTORS=origins   CSP frame-ancestors for iframe embedding
+//
 // Supports URL parameters for embedding:
 //   ?archive=URL     - Archive container file (.a3d, .a3z) - takes priority over splat/model
 //   ?splat=URL       - Default splat file to load
@@ -9,6 +16,9 @@
 //   ?mode=VIEW       - Initial view mode: splat, model, pointcloud, both, split
 //   ?toolbar=STATE   - Toolbar visibility: show, hide
 //   ?sidebar=STATE   - Metadata sidebar state: closed, view, edit
+//   ?theme=NAME      - Kiosk theme folder name (e.g., editorial, minimal)
+//   ?layout=STYLE    - Kiosk layout override: sidebar, editorial (overrides theme default)
+//   ?autoload=BOOL   - Auto-load archive on page load: true (default), false (show click-to-load gate)
 //
 // Inline alignment params (alternative to alignment JSON file):
 //   ?sp=x,y,z        - Splat position
@@ -127,6 +137,9 @@
     const viewMode = params.get('mode') || (kioskMode ? 'both' : 'model'); // splat, model, pointcloud, both, split
     const toolbarMode = kioskMode ? 'show' : (params.get('toolbar') || 'show'); // show, hide
     const sidebarMode = kioskMode ? 'closed' : (params.get('sidebar') || 'closed'); // closed, view, edit
+    const themeName = params.get('theme') || '';
+    const layoutStyle = params.get('layout') || ''; // optional override; theme provides default
+    const autoload = params.get('autoload') !== 'false'; // default true; false defers archive download until click
 
     // Parse inline alignment params
     const splatPos = parseVec3(params.get('sp'));
@@ -185,6 +198,9 @@
         // Viewer mode settings
         showToolbar: toolbarMode !== 'hide',
         sidebarMode: sidebarMode, // closed, view, edit
+        theme: themeName, // theme folder name
+        layout: layoutStyle, // optional layout override
+        autoload: autoload, // false = show click-to-load gate before downloading
 
         // Allowed external domains (shared with main.js URL validation)
         allowedDomains: ALLOWED_EXTERNAL_DOMAINS
