@@ -71,7 +71,9 @@ export async function openFileDialog({ filterKey = 'all', multiple = false } = {
     const files = await Promise.all(paths.map(async (filePath) => {
         const contents = await readFile(filePath);
         const name = filePath.split(/[\\/]/).pop();
-        return new File([contents], name);
+        const file = new File([contents], name);
+        file._tauriPath = filePath; // Preserve native path for direct filesystem access
+        return file;
     }));
 
     log.info(`Native dialog: ${files.length} file(s) selected via ${filterKey} filter`);

@@ -312,6 +312,14 @@ function setupFilePicker() {
             showClickGate(config.defaultArchiveUrl);
             return;
         }
+
+        // In Tauri, read local archive directly from filesystem (no HTTP fetch)
+        if (window.__TAURI__) {
+            log.info('Tauri: loading archive directly from filesystem:', config.defaultArchiveUrl);
+            loadArchiveFromTauri(config.defaultArchiveUrl);
+            return;
+        }
+
         log.info('Loading archive from URL:', config.defaultArchiveUrl);
         loadArchiveFromUrl(config.defaultArchiveUrl);
         return;
@@ -332,7 +340,24 @@ function setupFilePicker() {
     const dropZone = document.getElementById('kiosk-drop-zone');
 
     if (btn && input) {
-        btn.addEventListener('click', () => input.click());
+        // In Tauri, use native OS file dialog instead of browser file input
+        if (window.__TAURI__) {
+            btn.addEventListener('click', async () => {
+                try {
+                    const { openFileDialog } = await import('./tauri-bridge.js');
+                    const files = await openFileDialog({ filterKey: 'all', multiple: false });
+                    if (files && files.length > 0) {
+                        handlePickedFiles(files, picker);
+                    }
+                } catch (err) {
+                    log.warn('Native file dialog failed, falling back to browser input:', err.message);
+                    input.click();
+                }
+            });
+        } else {
+            btn.addEventListener('click', () => input.click());
+        }
+        // Browser file input still needed as fallback
         input.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
                 handlePickedFiles(e.target.files, picker);
@@ -649,6 +674,30 @@ async function loadArchiveFromUrl(url) {
         hideLoading();
         notify.error(`Failed to load archive: ${err.message}`);
         // Fall back to showing file picker
+        const picker = document.getElementById('kiosk-file-picker');
+        if (picker) picker.classList.remove('hidden');
+    }
+}
+
+/**
+ * Load an archive directly from the local filesystem via Tauri FS plugin.
+ * Bypasses HTTP fetch entirely — no "Downloading..." phase.
+ * @param {string} filePath - Local filesystem path to the archive
+ */
+async function loadArchiveFromTauri(filePath) {
+    showLoading('Loading archive...', true);
+    try {
+        const { readFile } = window.__TAURI__.fs;
+        updateProgress(5, 'Reading file...');
+        const contents = await readFile(filePath);
+        const fileName = filePath.split(/[\\/]/).pop() || 'archive.a3d';
+        const file = new File([contents], fileName);
+        state.archiveSourceUrl = null;
+        handleArchiveFile(file);
+    } catch (err) {
+        log.error('Failed to load archive from filesystem:', err);
+        hideLoading();
+        notify.error(`Failed to load archive: ${err.message}`);
         const picker = document.getElementById('kiosk-file-picker');
         if (picker) picker.classList.remove('hidden');
     }
