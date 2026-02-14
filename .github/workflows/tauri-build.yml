@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -47,13 +50,23 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
+      - name: Determine release tag
+        id: release_tag
+        shell: bash
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=v$(jq -r .version src-tauri/tauri.conf.json)" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: '3D Archive Viewer ${{ github.ref_name }}'
+          tagName: ${{ steps.release_tag.outputs.tag }}
+          releaseName: '3D Archive Viewer ${{ steps.release_tag.outputs.tag }}'
           releaseBody: 'Desktop release for Windows, Linux, and macOS.'
           releaseDraft: true
           prerelease: false
