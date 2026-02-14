@@ -7,6 +7,7 @@
   "scripts": {
     "start": "npx http-server src -p 8080 --cors -c-1",
     "dev": "npx http-server src -p 8080 --cors -c-1",
+    "tauri": "tauri",
     "tauri:dev": "npx tauri dev",
     "tauri:build": "npx tauri build",
     "vendor": "node scripts/vendor-deps.mjs",
