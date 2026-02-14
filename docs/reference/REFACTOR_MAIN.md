@@ -1,0 +1,220 @@
+# Refactoring main.js — Extraction Plan
+
+`main.js` is currently ~3,640 lines and handles too many concerns. This document identifies 9 extractable modules, ordered by impact and separation difficulty.
+
+After all extractions, main.js would shrink to ~1,245 lines — primarily `init()`, state/variable declarations, deps factories, the animation loop, thin delegation wrappers, and bootstrap code. A proper glue layer.
+
+---
+
+## New Modules
+
+### 1. `archive-pipeline.js` — ~650 lines (biggest win)
+
+**Source lines:** 1429–1946, 2846–2894, 2953–2984
+
+**Functions to extract:**
+- `processArchive()`
+- `ensureAssetLoaded()`
+- `loadSplatFromBlobUrl()`
+- `loadModelFromBlobUrl()`
+- `loadArchiveFromUrl()`
+- `handleArchiveFile()`
+- `updateArchiveMetadataUI()`
+- `clearArchiveMetadata()`
+- `switchQualityTier()`
+- `handleLoadFullResMesh()`
+
+**What it is:** The entire archive loading and processing pipeline — load archive, parse manifest, lazy-extract assets, apply transforms, update UI. These functions form a cohesive flow and share heavy coupling to `state.archiveLoader`, `state.assetStates`, and the blob variables (`currentSplatBlob`, `currentMeshBlob`, etc.).
+
+**Separation difficulty:** Medium. Needs access to blob variables, state, and several loader functions from file-handlers.js. Would receive those via a deps object.
+
+---
+
+### 2. `export-controller.js` — ~330 lines
+
+**Source lines:** 2005–2486
+
+**Functions to extract:**
+- `downloadArchive()` (290 lines alone — single largest function in main.js)
+- `downloadGenericViewer()`
+- `updateArchiveAssetCheckboxes()`
+- `showExportPanel()`
+
+**What it is:** Archive export assembly. `downloadArchive()` collects metadata, assembles all assets with transforms, adds screenshots/images/source-files, validates, and triggers the download.
+
+**Separation difficulty:** Medium. Reads from many state variables and blob references, but only reads — it doesn't mutate main.js state. Clean consumer boundary.
+
+---
+
+### 3. `screenshot-manager.js` — ~120 lines
+
+**Source lines:** 2030–2150
+
+**Functions to extract:**
+- `captureScreenshotToList()`
+- `showViewfinder()`
+- `hideViewfinder()`
+- `captureManualPreview()`
+- `renderScreenshotsList()`
+- `removeScreenshot()`
+
+**What it is:** Screenshot capture, viewfinder overlay, and screenshot list management. Entirely self-contained — manages `state.screenshots` and `state.manualPreviewBlob`, interacts with the renderer for captures, and manages the viewfinder overlay DOM.
+
+**Separation difficulty:** Easy. Only needs `renderer`, `scene`, `camera`, and the `state.screenshots`/`state.manualPreviewBlob` references. Cleanest extraction candidate.
+
+---
+
+### 4. `transform-controller.js` — ~150 lines
+
+**Source lines:** 1219–1368
+
+**Functions to extract:**
+- `setSelectedObject()`
+- `syncBothObjects()`
+- `storeLastPositions()`
+- `setTransformMode()`
+
+**State to move:**
+- 9 tracking vectors: `lastSplatPosition`, `lastSplatRotation`, `lastSplatScale`, `lastModelPosition`, `lastModelRotation`, `lastModelScale`, `lastPointcloudPosition`, `lastPointcloudRotation`, `lastPointcloudScale`
+
+**What it is:** Transform gizmo orchestration — attaching/detaching controls, syncing paired objects in "both" mode, and tracking delta movements for multi-object sync.
+
+**Separation difficulty:** Easy. Needs `transformControls`, `splatMesh`, `modelGroup`, `pointcloudGroup`, and `state`. Well-defined inputs/outputs.
+
+---
+
+### 5. `event-wiring.js` — ~560 lines
+
+**Source lines:** 617–1179
+
+**Functions to extract:**
+- `setupUIEvents()` (the entire function)
+
+**What it is:** The massive event wiring function. Purely declarative — binding DOM element IDs to handler functions. Contains sub-concerns:
+
+| Sub-concern | Lines |
+|-------------|-------|
+| Scene settings (background, tone mapping, HDR, shadows) | ~170 |
+| Model/splat/pointcloud sliders and position inputs | ~160 |
+| File input bindings | ~50 |
+| Lighting controls | ~30 |
+| Keyboard shortcuts | ~25 |
+| Everything else (annotation, export, camera buttons) | ~125 |
+
+**Separation difficulty:** Hard. References ~40 functions from main.js scope. Would need a large deps/callbacks object, making the extraction mechanically straightforward but the API surface wide. Could be split further (e.g., scene settings wiring vs. asset settings wiring).
+
+---
+
+## Extend Existing Modules
+
+### 6. Alignment I/O → fold into `alignment.js` — ~90 lines
+
+**Source lines:** 2994–3081
+
+**Functions to move:**
+- `saveAlignment()`
+- `applyAlignmentData()`
+- `loadAlignment()`
+- `loadAlignmentFromUrl()`
+
+**What it is:** Alignment persistence — saving/loading alignment JSON files and applying transform data to scene objects. Currently `alignment.js` handles the computation (ICP, auto-center); these handle the I/O. They logically belong together.
+
+**Separation difficulty:** Easy. `applyAlignmentData()` just sets position/rotation/scale on objects. Pure data application.
+
+---
+
+### 7. URL asset loaders → fold into `file-handlers.js` — ~235 lines
+
+**Source lines:** 3287–3522
+
+**Functions to move:**
+- `loadSplatFromUrl()`
+- `loadModelFromUrl()`
+- `loadPointcloudFromUrl()`
+- `loadDefaultFiles()` (may stay in main.js as boot orchestration)
+
+**What it is:** URL-based asset loading. These duplicate significant logic with the blob URL loaders already in file-handlers.js — both do: fetch blob, create blob URL, clear existing object, load, update state, update UI. Consolidating would eliminate code duplication between `loadSplatFromBlobUrl()` and `loadSplatFromUrl()`.
+
+**Separation difficulty:** Medium. `loadDefaultFiles()` orchestrates the boot sequence and may want to stay in main.js, but the individual URL loaders could move.
+
+---
+
+### 8. Controls/viewer mode → fold into `ui-controller.js` — ~130 lines
+
+**Source lines:** 3151–3284
+
+**Functions to move:**
+- `toggleControlsPanel()`
+- `applyControlsVisibility()`
+- `ensureToolbarVisibility()`
+- `applyViewerModeSettings()`
+
+**What it is:** Controls panel show/hide, toolbar visibility safeguards, and sidebar initial state management. Already closely related to what `ui-controller.js` does.
+
+**Separation difficulty:** Easy. Mostly DOM manipulation with `config` and `state.controlsVisible` as inputs.
+
+---
+
+### 9. Tauri file dialog wiring → fold into `tauri-bridge.js` — ~130 lines
+
+**Source lines:** 2615–2745
+
+**Functions to move:**
+- `wireNativeFileDialogs()`
+- `wireInput()` (helper)
+
+**What it is:** Overrides browser file inputs with native Tauri OS dialogs. Platform-specific concern that belongs with the existing Tauri bridge module.
+
+**Separation difficulty:** Medium. Each `wireInput` call references a specific handler from main.js. Could take the handlers as a config map.
+
+---
+
+## Summary
+
+| # | Module | Lines | Difficulty | Strategy |
+|---|--------|-------|------------|----------|
+| 1 | `archive-pipeline.js` | ~650 | Medium | New module |
+| 2 | `export-controller.js` | ~330 | Medium | New module |
+| 3 | `screenshot-manager.js` | ~120 | Easy | New module |
+| 4 | `transform-controller.js` | ~150 | Easy | New module |
+| 5 | `event-wiring.js` | ~560 | Hard | New module |
+| 6 | Alignment I/O → `alignment.js` | ~90 | Easy | Extend existing |
+| 7 | URL loaders → `file-handlers.js` | ~235 | Medium | Extend existing |
+| 8 | Controls/viewer → `ui-controller.js` | ~130 | Easy | Extend existing |
+| 9 | Tauri dialogs → `tauri-bridge.js` | ~130 | Medium | Extend existing |
+| | **Total extractable** | **~2,395** | | |
+
+**Remaining in main.js (~1,245 lines):**
+- `init()` — scene setup, system initialization, boot orchestration
+- State object and module-scope variable declarations
+- Dependency factory functions (`createFileHandlerDeps()`, etc.)
+- Animation loop (`animate()`)
+- Thin one-liner delegation wrappers (annotation, metadata, etc.)
+- App bootstrap (`startApp()`, DOMContentLoaded)
+
+## Recommended Order
+
+Start with the **easy, clean-boundary** extractions to build confidence:
+
+1. `screenshot-manager.js` — most self-contained, minimal deps
+2. `transform-controller.js` — clean inputs/outputs, easy to test
+3. Alignment I/O → `alignment.js` — natural home, easy merge
+4. Controls/viewer → `ui-controller.js` — pure DOM, low risk
+
+Then tackle the **medium-difficulty, high-value** extractions:
+
+5. `archive-pipeline.js` — biggest single win
+6. `export-controller.js` — second biggest, read-only consumer
+7. URL loaders → `file-handlers.js` — eliminates duplication
+8. Tauri dialogs → `tauri-bridge.js` — platform concern
+
+Save the **hardest** for last:
+
+9. `event-wiring.js` — wide API surface, but biggest remaining chunk
+
+## Notes
+
+- All new modules should follow existing conventions: create a logger via `Logger.getLogger('module-name')`, export functions that receive deps objects, use `notify()` for user-facing messages.
+- Each new module added to `src/modules/` requires a corresponding `COPY` line in `docker/Dockerfile`.
+- The deps pattern is already established — new modules should follow it rather than importing main.js.
+- No build step changes needed — all modules are ES modules loaded via import.
