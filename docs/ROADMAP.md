@@ -1,13 +1,13 @@
 # Roadmap
 
-Prioritized list of future work, drawn from the [code review](CODE_REVIEW.md), [shortcomings analysis](SHORTCOMINGS_AND_SOLUTIONS.md), and general codebase assessment. Items marked **Done** were completed during the initial development cycle and are listed for context.
+Prioritized list of future work, drawn from the [code review](reference/CODE_REVIEW.md), [shortcomings analysis](reference/SHORTCOMINGS_AND_SOLUTIONS.md), and general codebase assessment. Items marked **Done** were completed during the initial development cycle and are listed for context.
 
 ---
 
 ## Critical
 
 ### Format Specification & Independence
-- [x] **Done** — Write a standalone specification document for the `.a3d`/`.a3z` format, independent of the viewer implementation (see [SPECIFICATION.md](SPECIFICATION.md))
+- [x] **Done** — Write a standalone specification document for the `.a3d`/`.a3z` format, independent of the viewer implementation (see [SPECIFICATION.md](archive/SPECIFICATION.md))
 - [ ] Create a formal JSON Schema for `manifest.json` and include schema version in the manifest
 - [ ] Define forward/backward compatibility rules (readers MUST ignore unknown fields, major version bump for new required fields)
 - [ ] Decouple the format identity from the viewer — add `format` and `format_spec` fields alongside `packer`
@@ -76,7 +76,7 @@ Prioritized list of future work, drawn from the [code review](CODE_REVIEW.md), [
 
 ### Type Safety
 - [ ] Add comprehensive JSDoc type annotations to all exported functions
-- [ ] Consider TypeScript migration (see [feasibility analysis](TYPESCRIPT_CONVERSION_FEASIBILITY.md))
+- [ ] Consider TypeScript migration (see [feasibility analysis](reference/TYPESCRIPT_CONVERSION_FEASIBILITY.md))
 
 ### Versioning & Collaboration
 - [x] **Done** — Version history array in manifest with UI for adding entries

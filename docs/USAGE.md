@@ -13,7 +13,8 @@
 | Mode | Description |
 |------|-------------|
 | **Splat** | Show only the Gaussian splat |
-| **Model** | Show only the 3D model (point cloud follows model visibility) |
+| **Model** | Show only the 3D model |
+| **Point Cloud** | Show only the point cloud |
 | **Both** | Overlay all assets for comparison |
 | **Split** | Side-by-side: splat on left, model + point cloud on right, with synced camera |
 
@@ -105,8 +106,8 @@ The left-side toolbar provides quick access to:
 | Toggle Controls (hamburger icon) | Show/hide the controls panel |
 | Metadata | Open the metadata sidebar for viewing or editing |
 | Annotate | Enter annotation placement mode |
+| Toggle Annotations | Show/hide annotation markers (visible when annotations exist) |
 | Fly Camera | Switch to first-person fly camera |
 | Auto-Rotate | Toggle turntable auto-rotation (disabled by default in main app) |
-| Toggle Annotations | Show/hide annotation markers (visible when annotations exist) |
+| Load Full Resolution | Swap LOD proxy mesh for the full-resolution version (appears only when a proxy mesh is loaded) |
 | Export Archive | Export the current scene as an .a3d or .a3z archive |
-| Download Viewer | Generate a self-contained offline kiosk HTML file |

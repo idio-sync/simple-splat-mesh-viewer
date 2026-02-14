@@ -12,29 +12,40 @@ There is **no build step**. The `src/` directory is served directly by nginx (Do
 
 ```
 src/
-  index.html           - Single-page app shell (HTML + import map)
-  config.js             - URL-parameter parsing, security validation
-  pre-module.js         - Non-module error catcher loaded before ES modules
-  main.js               - Application controller (~3,900 lines)
-  styles.css            - All styling (~2,600 lines)
+  index.html              - Single-page app shell (HTML + import map)
+  config.js               - URL-parameter parsing, security validation
+  pre-module.js           - Non-module error catcher loaded before ES modules
+  main.js                 - Application controller (~3,640 lines)
+  styles.css              - All styling (~4,370 lines)
   modules/
-    constants.js        - Shared numeric/string constants
-    utilities.js        - Logger, notifications, mesh helpers
-    scene-manager.js    - Three.js scene, camera, renderers, animation
-    ui-controller.js    - Display-mode switching, progress overlay, keyboard shortcuts
-    file-handlers.js    - Asset loading (splat, mesh, point cloud, archive)
-    archive-loader.js   - ZIP extraction and manifest parsing
-    archive-creator.js  - Archive creation with SHA-256 hashing
-    alignment.js        - KD-tree, ICP algorithm, auto-align, fit-to-view
-    annotation-system.js- 3D annotation markers and raycasting
-    metadata-manager.js - Metadata sidebar (view/edit), Dublin Core schema
-    fly-controls.js     - WASD + mouse-look first-person camera
-    share-dialog.js     - Share-link builder with URL parameters
-    kiosk-viewer.js     - Offline viewer generator (fetches deps from CDN)
+    constants.js          - Shared numeric/string constants
+    utilities.js          - Logger, notifications, mesh helpers
+    scene-manager.js      - Three.js scene, camera, renderers, animation
+    ui-controller.js      - Display-mode switching, progress overlay, keyboard shortcuts
+    file-handlers.js      - Asset loading (splat, mesh, point cloud, archive)
+    archive-loader.js     - ZIP extraction and manifest parsing
+    archive-creator.js    - Archive creation with SHA-256 hashing
+    alignment.js          - KD-tree, ICP algorithm, auto-align, fit-to-view
+    annotation-system.js  - 3D annotation markers and raycasting
+    annotation-controller.js - Annotation creation/editing UI (extracted from main.js)
+    metadata-manager.js   - Metadata sidebar (view/edit), Dublin Core schema
+    fly-controls.js       - WASD + mouse-look first-person camera
+    share-dialog.js       - Share-link builder with URL parameters
+    kiosk-viewer.js       - Offline viewer generator (fetches deps from CDN)
+    kiosk-main.js         - Kiosk viewer entry point (viewer-only mode)
+    quality-tier.js       - Device capability detection for SD/HD asset selection
+    theme-loader.js       - Kiosk theme CSS/layout loading and metadata parsing
+    tauri-bridge.js       - Tauri v2 native OS integration with browser fallback
+  themes/
+    _template/            - Copy to create a new theme
+    editorial/            - Gold/navy editorial layout theme
+    minimal/              - Neutral white sidebar theme
+    lincoln-memorial/     - Lincoln Memorial showcase theme
 
-docker/                 - Dockerfile (nginx:alpine), nginx.conf, entrypoint
-docs/                   - Specifications, code review, known issues
-samples/                - Example archive manifest
+docker/                   - Dockerfile (nginx:alpine), nginx.conf, entrypoint
+docs/
+  archive/                - Archive format spec, guide, and metadata editor docs
+  reference/              - Architecture, code review, shortcomings, feasibility analyses
 ```
 
 ---
@@ -59,20 +70,28 @@ constants.js  (no imports — pure config values)
      |
 utilities.js  (imports constants, THREE)
      |
-     +---> scene-manager.js   (THREE, OrbitControls, TransformControls, constants, utilities)
-     +---> file-handlers.js   (THREE, GLTFLoader, OBJLoader, MTLLoader, SplatMesh, E57Loader,
-     |                         fflate via archive-loader, constants, utilities)
-     +---> archive-loader.js  (fflate, utilities)
-     +---> archive-creator.js (fflate, utilities)
-     +---> alignment.js       (THREE, utilities)
-     +---> annotation-system.js (THREE — no utility imports)
-     +---> metadata-manager.js  (utilities)
-     +---> fly-controls.js    (THREE, utilities)
-     +---> share-dialog.js    (utilities)
-     +---> kiosk-viewer.js    (utilities)
-     +---> ui-controller.js   (utilities)
+     +---> scene-manager.js       (THREE, OrbitControls, TransformControls, constants, utilities)
+     +---> file-handlers.js       (THREE, GLTFLoader, OBJLoader, MTLLoader, SplatMesh, E57Loader,
+     |                             fflate via archive-loader, constants, utilities)
+     +---> archive-loader.js      (fflate, utilities)
+     +---> archive-creator.js     (fflate, utilities)
+     +---> alignment.js           (THREE, utilities)
+     +---> annotation-system.js   (THREE — no utility imports)
+     +---> annotation-controller.js (utilities)
+     +---> metadata-manager.js    (utilities)
+     +---> fly-controls.js        (THREE, utilities)
+     +---> share-dialog.js        (utilities)
+     +---> kiosk-viewer.js        (utilities)
+     +---> ui-controller.js       (utilities)
+     +---> quality-tier.js        (constants, utilities)
+     +---> theme-loader.js        (utilities)
+     +---> tauri-bridge.js        (utilities)
 
 main.js  (imports everything above and orchestrates it all)
+
+kiosk-main.js  (slim viewer entry point — imports scene-manager, file-handlers,
+                annotation-system, metadata-manager, fly-controls, quality-tier,
+                theme-loader, ui-controller, utilities)
 ```
 
 All third-party libraries (Three.js, Spark.js, fflate, three-e57-loader) are resolved at runtime through the import map in `index.html`, pointing to jsDelivr/sparkjs.dev CDN URLs. There are no `node_modules` used at runtime — `package.json` only has `serve` as a dev dependency.
@@ -132,7 +151,7 @@ IIFE that runs before any ES module. Parses every supported URL parameter (`?arc
 Tiny non-module script. Installs global error handlers and a 5-second timeout that logs a warning if `main.js` never sets `window.moduleLoaded = true`. Purely diagnostic.
 
 ### `src/main.js`
-The application controller. At ~3,900 lines this is the largest file and acts as the glue layer. It:
+The application controller. At ~3,640 lines this is the largest file and acts as the glue layer. It:
 - Holds all global state in a single `state` object (display mode, loaded flags, opacity settings, etc.)
 - Creates `SceneManager`, `AnnotationSystem`, `ArchiveCreator`, `FlyControls`
 - Wires every DOM button/input to the appropriate handler function
@@ -201,10 +220,11 @@ Spatial alignment tools:
 - Supports placement mode toggle, annotation selection, and camera-preset navigation.
 
 ### `src/modules/metadata-manager.js`
-The largest module (~1,450 lines). Manages the metadata sidebar:
+The largest module (~1,730 lines). Manages the metadata sidebar:
 - Three modes: **view** (museum-style read-only display), **edit** (8-tab form), **annotations** (list of placed annotations).
-- Edit tabs cover: Basic info, Origin/Provenance, Dates, Technical, Legal, Relationships, Custom Fields, Processing Notes.
+- Edit tabs: Project, Provenance, Archival, Quality, Material, Preservation, Assets, Integrity.
 - Schema aligns with Dublin Core, PRONOM format registry, and Smithsonian EDAN standards.
+- Inline field validation for ORCID, coordinates, dates, and PRONOM IDs.
 - `collectMetadata()` scrapes form inputs into a structured object for archive export.
 - `prefillFromManifest()` populates the form when loading an archive.
 
@@ -231,6 +251,34 @@ Utility functions for UI state:
 - `addListener()` — safe DOM event binding with null checks.
 - Display-mode helpers.
 
+### `src/modules/annotation-controller.js`
+Annotation UI orchestration extracted from `main.js`:
+- Manages popup display, dismissal, and selection state.
+- Handles annotation creation, editing, and deletion workflows.
+- Receives dependencies via the deps pattern (`annotationSystem`, `showAnnotationPopup`, `hideAnnotationPopup`).
+
+### `src/modules/kiosk-main.js`
+Slim viewer entry point for kiosk/offline mode. Imports from real application modules so that visual and functional changes propagate automatically. Viewer-only — no archive creation, metadata editing, or alignment tools. Handles archive loading, display mode switching, annotations, and theme application in the generated offline HTML.
+
+### `src/modules/quality-tier.js`
+Device capability detection for SD/HD asset selection:
+- `detectDeviceTier()` scores 5 hardware heuristics (device memory, CPU cores, screen width, GPU info via WebGL) to classify as SD or HD.
+- `resolveQualityTier()` / `hasAnyProxy()` — helpers for choosing between full-resolution and proxy assets.
+- Used by both `main.js` and `kiosk-main.js`.
+
+### `src/modules/theme-loader.js`
+Runtime theme loading for kiosk viewer:
+- Fetches `theme.css` (required), `layout.css` (optional), and `layout.js` (optional) from `themes/{name}/`.
+- `parseThemeMeta()` extracts `@theme`, `@layout`, and `@scene-bg` directives from CSS comment blocks.
+- Supports sidebar and editorial layout modes.
+
+### `src/modules/tauri-bridge.js`
+Native OS integration when running inside Tauri v2, with browser fallback:
+- `isTauri()` — detects `window.__TAURI__` for feature gating.
+- Native file dialogs with format-specific filters (splats, meshes, point clouds, archives, images).
+- Native save dialogs for archive export and kiosk viewer download.
+- Falls back to standard browser file input / download when not in Tauri.
+
 ---
 
 ## Inconsistencies and Fragile Spots
@@ -253,7 +301,7 @@ Modules like `alignment.js` and `file-handlers.js` don't hold references to the 
 After `sceneManager = new SceneManager()`, `init()` immediately copies `sceneManager.scene`, `.camera`, `.renderer`, etc. into module-scope `let` variables (`scene`, `camera`, `renderer`, etc.) "for backward compatibility." This creates two sources of truth — if anything ever re-initializes the SceneManager, the loose variables go stale.
 
 ### 4. `main.js` is oversized and acts as a God Module
-At ~3,900 lines, `main.js` handles event wiring, state management, file loading callbacks, alignment wrappers, annotation callbacks, archive loading/saving orchestration, display mode switching, transform input syncing, and the render loop. A significant portion is DOM event listener setup (`setupUIEvents()` alone is hundreds of lines). This makes it hard to understand the overall flow.
+At ~3,640 lines, `main.js` handles event wiring, state management, file loading callbacks, alignment wrappers, annotation callbacks, archive loading/saving orchestration, display mode switching, transform input syncing, and the render loop. A significant portion is DOM event listener setup (`setupUIEvents()` alone is hundreds of lines). This makes it hard to understand the overall flow.
 
 ### 5. State is a plain mutable object with no change tracking
 `const state = { ... }` is mutated freely from dozens of functions. There's no setter, no event emission on change, and no validation. Any function can set `state.displayMode` to an invalid string and nothing will catch it until rendering breaks.
@@ -271,7 +319,7 @@ There are no unit tests, integration tests, or end-to-end tests. The KD-tree, IC
 The CSP in `index.html` includes `'unsafe-eval'` because Spark.js uses WASM that requires it. This weakens XSS protections for the entire page. If Spark.js ever supports `'wasm-unsafe-eval'` (a narrower permission), it should be switched.
 
 ### 10. Point cloud memory management
-`E57Loader` uses a WASM-based parser. There are no explicit limits on point count, so loading a very large E57 file can exhaust browser memory with no graceful degradation. The `disposeObject()` utility handles cleanup, but there's a known shortcoming (documented in `SHORTCOMINGS_AND_SOLUTIONS.md`) around memory leaks during point cloud disposal.
+`E57Loader` uses a WASM-based parser. There are no explicit limits on point count, so loading a very large E57 file can exhaust browser memory with no graceful degradation. The `disposeObject()` utility handles cleanup, but there's a known shortcoming (documented in [SHORTCOMINGS_AND_SOLUTIONS.md](SHORTCOMINGS_AND_SOLUTIONS.md)) around memory leaks during point cloud disposal.
 
 ### 11. Import map pinned to exact CDN versions with no lockfile
 The import map in `index.html` pins Three.js 0.170.0, Spark 0.1.10, fflate 0.8.2, etc. via CDN URLs. The kiosk-viewer.js has its own matching list of CDN URLs. If one is updated but not the other, the kiosk viewer will bundle a different Three.js version than the main app uses, which can cause subtle breakage (this has already caused bugs per the git history).

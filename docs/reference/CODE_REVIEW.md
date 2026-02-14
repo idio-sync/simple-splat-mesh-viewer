@@ -71,7 +71,7 @@ function init(): void {
 > - Integrated `SceneManager` into `main.js` for scene/camera/renderer management
 > - Migrated file loading to use `file-handlers.js` module
 > - Replaced duplicate alignment functions with wrappers calling `alignment.js`
-> - `main.js` reduced from ~4,300 lines to ~3,100 lines (28% reduction)
+> - `main.js` reduced from ~4,300 lines to ~3,100 lines initially (28% reduction); currently ~3,640 lines after feature additions
 >
 > **Modules integrated:**
 > - `scene-manager.js` - SceneManager class handles Three.js scene, camera, renderers, lighting
@@ -141,7 +141,7 @@ log.debug('[DIAG] === applyControlsVisibilityDirect ===');
 
 **Issue:** Extensive inline style manipulation instead of CSS classes.
 
-**Location:** `main.js:3161-3181`
+**Location:** `main.js:3165-3185`
 
 ```javascript
 // Anti-pattern
@@ -221,10 +221,10 @@ notify.error('Error loading Gaussian Splat: ' + error.message);
 
 **Issue:** Using `setTimeout` with Promises as a hack for async initialization.
 
-**Location:** `main.js:1085, 2530, 3300`
+**Location:** `main.js:1811, 3313, 3380`
 
 ```javascript
-// main.js:1085
+// main.js:1811
 await new Promise(resolve => setTimeout(resolve, 100));
 ```
 
@@ -266,7 +266,7 @@ processMeshMaterials(gltf.scene);
 
 **Issue:** Event listeners added without cleanup tracking.
 
-**Location:** `main.js:220-224, annotation-system.js:83`
+**Location:** `main.js:512-515, annotation-system.js`
 
 ```javascript
 // No cleanup mechanism for these listeners
@@ -376,23 +376,27 @@ keyInput.className = 'custom-field-key';
 row.appendChild(keyInput);
 ```
 
-### 3.4 Crypto API Degradation (MEDIUM Priority)
+### 3.4 Crypto API Degradation (MEDIUM Priority) — Partially Addressed
 
-**Issue:** SHA-256 hashing silently fails on HTTP connections, but archive integrity is compromised.
+**Issue:** SHA-256 hashing is unavailable on HTTP connections, compromising archive integrity.
 
-**Location:** `archive-creator.js:24-28`
+**Location:** `archive-creator.js:19-31`
 
 ```javascript
 if (!CRYPTO_AVAILABLE) {
-    console.warn('[archive-creator] crypto.subtle not available (requires HTTPS). Skipping hash.');
+    log.warn(' crypto.subtle not available (requires HTTPS). Skipping hash.');
     return null;
 }
 ```
 
-**Recommendation:**
-- Display a warning to users that integrity verification is unavailable
-- Consider a fallback hashing library for HTTP development environments
-- Enforce HTTPS in production
+**Mitigations implemented:**
+- UI warning banner displayed in the metadata Integrity tab when HTTPS is unavailable
+- Toast notification shown on page load
+- Logger-based console warnings (replaced raw `console.warn`)
+
+**Remaining recommendations:**
+- Consider a pure-JavaScript SHA-256 fallback for HTTP development environments
+- Enforce HTTPS in production deployments (nginx redirect)
 
 ### ~~3.5 Missing Content Security Policy (MEDIUM Priority)~~ ✅ FIXED
 
@@ -553,9 +557,10 @@ The codebase shows solid foundational work with good 3D visualization capabiliti
 The application is now ready for production from both a security and code quality standpoint.
 
 **Modularization completed:**
-- ✅ Five modules created and integrated (`alignment.js`, `scene-manager.js`, `file-handlers.js`, `ui-controller.js`, `metadata-manager.js`)
+- ✅ 18 modules now in `src/modules/`, up from the original 5 (`alignment.js`, `scene-manager.js`, `file-handlers.js`, `ui-controller.js`, `metadata-manager.js`)
+- ✅ Additional modules added since review: `annotation-controller.js`, `kiosk-main.js`, `quality-tier.js`, `theme-loader.js`, `tauri-bridge.js`
 - ✅ Modules use dependency injection for testability
-- ✅ `main.js` reduced from ~4,300 lines to ~3,100 lines (28% reduction)
+- ✅ `main.js` reduced from ~4,300 lines to ~3,640 lines
 - ✅ `main.js` now acts as orchestrator with helper functions for dependency injection
 
 Remaining items are longer-term maintainability improvements: adding a testing framework and adding file size limits for uploads.

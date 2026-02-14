@@ -28,181 +28,26 @@ scene.a3d/
     calibration_report.pdf
 ```
 
-## Manifest Schema
+## Manifest Overview
 
-The `manifest.json` file is the heart of the archive, containing structured metadata across several domains:
+The `manifest.json` file is the heart of the archive. It contains structured metadata organized into these sections:
 
-```json
-{
-  "container_version": "1.0",
-  "packer": "simple-splat-mesh-viewer",
-  "packer_version": "1.0.0",
-  "_creation_date": "2026-02-05T12:00:00.000Z",
+| Section | Purpose |
+|---------|---------|
+| `project` | Title, description, license, project ID |
+| `relationships` | Links to parent collections, related objects, superseded archives |
+| `provenance` | Capture date, device, operator, processing software chain |
+| `quality_metrics` | Accuracy tier, alignment error, capture resolution, data quality notes |
+| `archival_record` | Dublin Core / VRA Core cataloging metadata for the physical subject |
+| `material_standard` | PBR workflow, color space, normal map convention |
+| `preservation` | PRONOM format registry IDs, significant properties, rendering requirements |
+| `data_entries` | Asset file manifest with spatial transforms (`_parameters`) and roles |
+| `annotations` | 3D spatial annotations with camera viewpoints |
+| `integrity` | SHA-256 per-asset and manifest-level hashes |
+| `version_history` | Chronological list of archive revisions |
+| `_meta` | Implementation-specific data (asset statistics, custom fields) |
 
-  "project": {
-    "title": "Historic Building Facade",
-    "id": "historic-building-facade",
-    "description": "Photogrammetric capture of the east facade",
-    "license": "CC-BY 4.0"
-  },
-
-  "relationships": {
-    "part_of": "building-survey-2026",
-    "derived_from": "raw-scan-001",
-    "replaces": "",
-    "related_objects": ["west-facade", "interior-scan"]
-  },
-
-  "provenance": {
-    "capture_date": "2026-01-15",
-    "capture_device": "Leica RTC360",
-    "device_serial": "SN-12345",
-    "operator": "Jane Smith",
-    "operator_orcid": "0000-0002-1234-5678",
-    "location": "Oxford, UK",
-    "convention_hints": ["arxiv:2312.13299"],
-    "processing_software": [
-      { "name": "Reality Capture", "version": "1.4" },
-      { "name": "CloudCompare", "version": "2.13" }
-    ],
-    "processing_notes": "Aligned from 847 images, cleaned and decimated"
-  },
-
-  "quality_metrics": {
-    "tier": "reference",
-    "accuracy_grade": "A",
-    "capture_resolution": { "value": "2", "unit": "mm", "type": "GSD" },
-    "alignment_error": { "value": "0.5", "unit": "mm", "method": "RMSE" },
-    "scale_verification": "Verified with calibrated scale bar",
-    "data_quality": {
-      "coverage_gaps": "Minor occlusion behind downpipe",
-      "reconstruction_areas": "None",
-      "color_calibration": "X-Rite ColorChecker used",
-      "measurement_uncertainty": "0.3mm"
-    }
-  },
-
-  "archival_record": {
-    "standard": "Dublin Core / Smithsonian EDAN",
-    "title": "East Facade of St. Mary's Church",
-    "ids": {
-      "accession_number": "2026.001.0042",
-      "uri": "https://collection.example.org/objects/42"
-    },
-    "creation": {
-      "creator": "Heritage Survey Team",
-      "date_created": "2026-01-15",
-      "period": "Gothic Revival",
-      "culture": "English"
-    },
-    "physical_description": {
-      "medium": "Limestone ashlar with flint infill",
-      "dimensions": { "height": "15m", "width": "22m", "depth": "1.2m" },
-      "condition": "Fair — weathering to upper tracery"
-    },
-    "rights": {
-      "copyright_status": "CC-BY 4.0",
-      "credit_line": "Heritage Survey Team, 2026"
-    },
-    "coverage": {
-      "spatial": { "location_name": "Oxford, UK", "coordinates": { "latitude": "51.752", "longitude": "-1.258" } },
-      "temporal": { "subject_period": "1860-1875", "subject_date_circa": true }
-    }
-  },
-
-  "material_standard": {
-    "workflow": "metalness-roughness",
-    "color_space": "sRGB",
-    "normal_space": "OpenGL (+Y up)"
-  },
-
-  "preservation": {
-    "format_registry": {
-      "glb": "fmt/861",
-      "obj": "fmt/935",
-      "ply": "fmt/831",
-      "e57": "fmt/643"
-    },
-    "significant_properties": [
-      "geometry_mesh_structure",
-      "vertex_colors",
-      "real_world_scale",
-      "gaussian_splat_data",
-      "e57_point_cloud_data"
-    ],
-    "rendering_requirements": "WebGL 2.0",
-    "rendering_notes": ""
-  },
-
-  "version_history": [
-    {
-      "version": "1.0",
-      "date": "2026-01-15T08:30:00Z",
-      "description": "Initial capture and processing"
-    },
-    {
-      "version": "1.1",
-      "date": "2026-03-20T14:00:00Z",
-      "description": "Added condition annotations, updated mesh with gap-filled regions"
-    }
-  ],
-
-  "data_entries": {
-    "scene_0": {
-      "file_name": "scene.ply",
-      "role": "derived",
-      "created_by": "nerfstudio",
-      "_created_by_version": "1.1.0",
-      "_source_notes": "Trained for 30k iterations",
-      "_parameters": { "position": [0, 0, 0], "rotation": [0, 0, 0], "scale": 1 },
-      "_hash": "sha256:abc123..."
-    },
-    "mesh_0": {
-      "file_name": "model.glb",
-      "role": "derived",
-      "created_by": "Reality Capture",
-      "_parameters": { "position": [0.1, 0, -0.2], "rotation": [0, 0, 0], "scale": 1 },
-      "_hash": "sha256:def456..."
-    },
-    "pointcloud_0": {
-      "file_name": "scan.e57",
-      "role": "primary",
-      "created_by": "Leica Cyclone",
-      "_parameters": { "position": [0, 0, 0], "rotation": [0, 0, 0], "scale": 1 },
-      "_hash": "sha256:789ghi..."
-    },
-    "thumbnail_0": {
-      "file_name": "preview.jpg",
-      "created_by": "simple-splat-mesh-viewer"
-    }
-  },
-
-  "annotations": [
-    {
-      "id": "anno_1",
-      "title": "Crack in tracery",
-      "body": "Structural crack running NE-SW, approx 2.3m\n\n![Detail](asset:images/crack_detail.jpg)",
-      "position": { "x": 1.2, "y": 3.4, "z": -0.1 },
-      "camera_position": { "x": 2.0, "y": 4.0, "z": 3.0 },
-      "camera_target": { "x": 1.2, "y": 3.4, "z": -0.1 }
-    }
-  ],
-
-  "integrity": {
-    "algorithm": "SHA-256",
-    "manifest_hash": "a1b2c3d4e5f6...",
-    "assets": {
-      "assets/scene_0.ply": "sha256:abc123...",
-      "assets/mesh_0.glb": "sha256:def456...",
-      "assets/pointcloud_0.e57": "sha256:789ghi..."
-    }
-  },
-
-  "_meta": {
-    "custom_fields": {}
-  }
-}
-```
+For field-by-field documentation, types, and requirement levels, see [SPECIFICATION.md — Section 5](SPECIFICATION.md#5-manifest-specification). A complete manifest example is in [SPECIFICATION.md — Section 13](SPECIFICATION.md#13-complete-manifest-example).
 
 ## Loading Archives
 

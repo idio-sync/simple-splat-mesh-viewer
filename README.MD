@@ -99,12 +99,12 @@ docker run -p 8080:80 \
 |-------|-------------|
 | [Usage Guide](docs/USAGE.md) | Controls, camera, alignment, annotations, scene settings, keyboard shortcuts |
 | [Configuration](docs/CONFIGURATION.md) | URL parameters, share/embed, URL security |
-| [Archive Format](docs/ARCHIVE-GUIDE.md) | Container structure, manifest schema, loading/exporting, preservation |
-| [Metadata Editor](docs/METADATA.md) | 8-tab editor, field validation, Dublin Core alignment |
+| [Archive Format](docs/archive/ARCHIVE-GUIDE.md) | Container structure, manifest schema, loading/exporting, preservation |
+| [Metadata Editor](docs/archive/METADATA.md) | 8-tab editor, field validation, Dublin Core alignment |
 | [Kiosk Viewer](docs/KIOSK-VIEWER.md) | Offline self-contained HTML viewer generation |
 | [Deployment](docs/DEPLOYMENT.md) | Docker env vars, compose, nginx, production setup |
-| [Architecture](docs/ARCHITECTURE.md) | Codebase structure and module relationships |
-| [Specification](docs/SPECIFICATION.md) | Formal archive-3d container format spec |
+| [Architecture](docs/reference/ARCHITECTURE.md) | Codebase structure and module relationships |
+| [Specification](docs/archive/SPECIFICATION.md) | Formal archive-3d container format spec |
 | [Roadmap](docs/ROADMAP.md) | Planned features and priorities |
 
 ## Project Structure
@@ -148,16 +148,21 @@ simple-splat-mesh-viewer/
 │   ├── config.js.template          # Docker config with env var substitution
 │   └── docker-entrypoint.sh        # Startup script
 ├── docs/
-│   ├── ARCHITECTURE.md             # Plain-English architecture overview
-│   ├── ARCHIVE-GUIDE.md            # Archive format user guide
-│   ├── CODE_REVIEW.md              # Code review findings and remediation status
+│   ├── archive/
+│   │   ├── ARCHIVE-GUIDE.md        # Archive format user guide
+│   │   ├── METADATA.md             # Metadata editor documentation
+│   │   └── SPECIFICATION.md        # Archive format specification
+│   ├── reference/
+│   │   ├── ARCHITECTURE.md         # Plain-English architecture overview
+│   │   ├── CODE_REVIEW.md          # Code review findings and remediation status
+│   │   ├── SHORTCOMINGS_AND_SOLUTIONS.md # Known gaps and proposed solutions
+│   │   ├── THREEJS_FORMATS_REFERENCE.md  # Three.js format support reference
+│   │   ├── TYPESCRIPT_CONVERSION_FEASIBILITY.md # TypeScript migration analysis
+│   │   └── tauri_application.md    # Tauri desktop application docs
 │   ├── CONFIGURATION.md            # URL parameters, share/embed, security
 │   ├── DEPLOYMENT.md               # Docker and production deployment
 │   ├── KIOSK-VIEWER.md             # Offline kiosk viewer documentation
-│   ├── METADATA.md                 # Metadata editor documentation
-│   ├── ROADMAP.md                  # Prioritized future work
-│   ├── SHORTCOMINGS_AND_SOLUTIONS.md # Known gaps and proposed solutions
-│   └── SPECIFICATION.md            # Archive format specification
+│   └── ROADMAP.md                  # Prioritized future work
 └── README.md
 ```
 

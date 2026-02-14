@@ -17,9 +17,12 @@
 | Parameter | Values | Description |
 |-----------|--------|-------------|
 | `controls` | `full`, `minimal`, `none` | Control panel mode |
-| `mode` | `splat`, `model`, `both`, `split` | Initial display mode |
+| `mode` | `splat`, `model`, `pointcloud`, `both`, `split` | Initial display mode |
 | `toolbar` | `show`, `hide` | Toolbar visibility |
 | `sidebar` | `closed`, `view`, `edit` | Metadata sidebar state |
+| `theme` | theme folder name | Kiosk theme (e.g., `editorial`, `minimal`) |
+| `layout` | `sidebar`, `editorial` | Layout override (overrides theme default) |
+| `autoload` | `true`, `false` | Auto-load archive on page load (default `true`; `false` shows a click-to-load gate) |
 
 ### Inline Alignment
 
@@ -48,6 +51,12 @@ https://viewer.example.com?archive=/scene.a3d&controls=none&toolbar=hide&sidebar
 
 # Point cloud with model comparison
 https://viewer.example.com?model=/model.glb&pointcloud=/scan.e57&mode=both
+
+# Kiosk with editorial theme
+https://viewer.example.com?archive=/scene.a3d&controls=none&theme=editorial
+
+# Deferred loading (click-to-load gate)
+https://viewer.example.com?archive=/scene.a3d&autoload=false
 ```
 
 ## Share & Embed

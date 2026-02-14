@@ -15,10 +15,13 @@ The **Download Viewer** button generates a self-contained HTML file (~1 MB befor
 - Orbit and fly camera controls
 - Auto-rotate turntable (enabled by default, auto-disables on manual interaction)
 - Shadow casting with shadow catcher ground plane
-- Annotation viewing with depth-aware markers, popups, and connecting lines
+- Annotation viewing with depth-aware markers, popups, connecting lines, and image attachments via `asset:` protocol
+- Image support in project descriptions via `asset:` protocol
 - Metadata sidebar (view-only)
 - Scene settings (background color, lighting, grid)
 - Asset-specific controls (opacity, wireframe, point size)
+- LOD proxy mesh support — automatically loads pre-simplified proxy meshes when available, with SD/HD quality tier toggle
+- Mobile-responsive layout with bottom sheet navigation and swipe-based annotation browsing
 - Lazy asset loading — the manifest loads first, then individual assets load on demand with inline progress indicators
 - Click-to-load gate for deferred archive download (`?autoload=false`)
 

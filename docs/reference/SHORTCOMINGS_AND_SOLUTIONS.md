@@ -78,6 +78,12 @@
   ```
   The viewer loads the appropriate LOD based on device capability. Potree-style tiled point cloud formats could replace monolithic E57 files for web display.
 
+  **Status: Partially Implemented (2026-02-08)**
+  - LOD proxy system added to archives: upload a pre-simplified mesh as `mesh_0_proxy` with `lod: "proxy"` and `derived_from: "mesh_0"`
+  - Kiosk viewer auto-loads proxy mesh when available (mobile/bandwidth-constrained scenarios)
+  - Quality tier detection (`quality-tier.js`) adapts asset loading to device capability
+  - Full multi-resolution LOD chain (multiple levels) and in-browser decimation not yet implemented
+
 ---
 
 ## 2. Technology — Alignment & Analysis
@@ -101,6 +107,11 @@
 
 **Solutions:**
 - **Short-term:** Write a standalone specification document (`SPECIFICATION.md` or a versioned PDF) that defines the archive structure, manifest schema, required and optional fields, data types, and processing rules independent of any implementation. Publish it in the `archive-3d` repository.
+
+  **Status: Implemented (2026-02-06)**
+  - Standalone [SPECIFICATION.md](../archive/SPECIFICATION.md) written (~1,000 lines, RFC-style)
+  - Covers archive structure, manifest schema, field types, requirement levels, and processing rules
+  - Published independently of viewer implementation
 - **Medium-term:** Create a formal JSON Schema for `manifest.json` and include it in the archive itself (or reference it by URL). Validators can then check any manifest against the schema without running the viewer. Version the schema and include the schema version in the manifest:
   ```json
   {
@@ -121,6 +132,11 @@
   - New required fields bump the major version
   - New optional fields bump the minor version
   - Underscore-prefixed fields are implementation-specific and MUST NOT be required for basic parsing
+
+  **Status: Implemented (2026-02-06)**
+  - Specification Section 8 defines forward/backward compatibility rules
+  - Underscore-prefix convention documented for implementation-specific fields
+  - Versioning contract (MUST ignore unknown fields, major/minor bump rules) codified in spec
 - **Medium-term:** Add a `minimum_reader_version` field so archives can declare the oldest reader version that can process them. Add a `extensions` array for optional capability declarations.
 - **Long-term:** Consider adopting a linked-data approach (JSON-LD context) so fields are self-describing and new vocabularies can be mixed in without schema conflicts.
 
@@ -134,6 +150,11 @@
 
 **Solutions:**
 - **Short-term:** Add a mapping table to the specification document showing exactly which manifest field corresponds to which Dublin Core element and qualifier. This lets humans do the crosswalk even if machines can't.
+
+  **Status: Implemented (2026-02-06)**
+  - Specification Section 12 contains a standards crosswalk table
+  - Maps manifest fields to Dublin Core, VRA Core, PREMIS, and PRONOM standards
+  - Covers all major metadata sections (project, provenance, archival, preservation)
 - **Medium-term:** Add an optional `@context` field (JSON-LD) that provides machine-readable mappings to Dublin Core, Schema.org, and other vocabularies:
   ```json
   {
@@ -419,7 +440,13 @@
   - **Area annotations** — define a polygon on the surface to mark a region (loss area, biological growth zone)
   - **Measurement annotations** — store two endpoints and the computed distance
   - **Cross-reference annotations** — link two annotations together (e.g., "this crack is the same feature as anno_5")
-- **Long-term:** Support image attachments on annotations (e.g., a close-up photograph taken during the survey). Support annotation import/export in the Web Annotation Data Model format for interoperability with IIIF, Mirador, and other cultural heritage annotation tools.
+- **Long-term:** ~~Support image attachments on annotations (e.g., a close-up photograph taken during the survey).~~ Support annotation import/export in the Web Annotation Data Model format for interoperability with IIIF, Mirador, and other cultural heritage annotation tools.
+
+  **Status: Partially Implemented (2026-02-08)**
+  - Image attachments in annotations implemented via `asset:` protocol
+  - Images stored as separate entries in the archive, referenced by `asset:filename.jpg` in annotation body
+  - Rendered inline in annotation display with markdown support
+  - Annotation types, polyline/area annotations, and W3C Web Annotation export not yet implemented
 
 ---
 
@@ -462,6 +489,11 @@
     preview.jpg   - Thumbnail image
   For the specification, see: https://archive-3d.org/spec
   ```
+
+  **Status: Implemented (2026-02-08)**
+  - `README.txt` auto-generated and included in every archive on export
+  - Explains that the file is a standard ZIP, how to extract, and describes contents
+  - Includes link to the format specification
 - **Long-term:** Provide export to established institutional formats:
   - **BagIt** (Library of Congress) — a standard packaging format used by digital preservation repositories
   - **OCFL** (Oxford Common File Layout) — used by institutional repositories for versioned digital objects
@@ -512,41 +544,41 @@
 
 ## Priority Matrix
 
-| # | Issue | Impact | Effort | Priority |
-|---|-------|--------|--------|----------|
-| 3.1 | No formal specification | High | Medium | **Critical** |
-| 11.1 | Format coupled to viewer | High | Medium | **Critical** |
-| 12.1 | No data hierarchy | High | Low | **Critical** |
-| 4.2 | PRONOM IDs misleading | Medium | Low | **High** |
-| 5.2 | SHA-256 fails on HTTP | Medium | Low | **High** |
-| 7.1 | No measurement tools | High | Medium | **High** |
-| 8.1 | Metadata UI overwhelming | Medium | Medium | **High** |
-| 3.2 | No compatibility strategy | Medium | Low | **High** |
-| 10.1 | Annotations text-only | Medium | Medium | **High** |
-| 9.2 | No collaboration model | Medium | Medium | **Medium** |
-| 5.1 | No digital signatures | Medium | High | **Medium** |
-| 1.1 | Splat format instability | High | Low (document) | **Medium** |
-| 1.2 | WebGL 2.0 lifespan | Medium | High | **Medium** |
-| 6.1 | Polyglot format fragile | Medium | Medium | **Medium** |
-| 4.1 | Dublin Core informal | Medium | Medium | **Medium** |
-| 4.3 | No OAIS mapping | Low | Medium | **Medium** |
-| 1.4 | No LOD loading | Medium | High | **Medium** |
-| 8.2 | No metadata validation | Medium | Medium | **Medium** |
-| 9.1 | No versioning | Medium | Medium | **Medium** |
-| 1.3 | CDN dependency | Low | Low | **Low** |
-| 2.1 | ICP alignment naive | Low | High | **Low** |
-| 6.2 | Embedded JS will age | Low | High | **Low** |
+| # | Issue | Impact | Effort | Priority | Status |
+|---|-------|--------|--------|----------|--------|
+| 3.1 | No formal specification | High | Medium | **Critical** | **Done** |
+| 11.1 | Format coupled to viewer | High | Medium | **Critical** | |
+| 12.1 | No data hierarchy | High | Low | **Critical** | **Done** |
+| 4.2 | PRONOM IDs misleading | Medium | Low | **High** | |
+| 5.2 | SHA-256 fails on HTTP | Medium | Low | **High** | **Done** |
+| 7.1 | No measurement tools | High | Medium | **High** | |
+| 8.1 | Metadata UI overwhelming | Medium | Medium | **High** | |
+| 3.2 | No compatibility strategy | Medium | Low | **High** | **Done** |
+| 10.1 | Annotations text-only | Medium | Medium | **High** | Partial |
+| 9.2 | No collaboration model | Medium | Medium | **Medium** | |
+| 5.1 | No digital signatures | Medium | High | **Medium** | |
+| 1.1 | Splat format instability | High | Low (document) | **Medium** | |
+| 1.2 | WebGL 2.0 lifespan | Medium | High | **Medium** | |
+| 6.1 | Polyglot format fragile | Medium | Medium | **Medium** | |
+| 4.1 | Dublin Core informal | Medium | Medium | **Medium** | **Done** |
+| 4.3 | No OAIS mapping | Low | Medium | **Medium** | |
+| 1.4 | No LOD loading | Medium | High | **Medium** | Partial |
+| 8.2 | No metadata validation | Medium | Medium | **Medium** | **Done** |
+| 9.1 | No versioning | Medium | Medium | **Medium** | **Done** |
+| 1.3 | CDN dependency | Low | Low | **Low** | |
+| 2.1 | ICP alignment naive | Low | High | **Low** | |
+| 6.2 | Embedded JS will age | Low | High | **Low** | |
 
 ---
 
 ## Summary
 
-The three most impactful areas of work are:
+The three most impactful areas of work were:
 
-1. **Write a standalone format specification** (3.1, 3.2, 11.1) — this unlocks everything else. Without a spec, the format can't gain institutional trust, independent implementations, or standards recognition.
+1. **~~Write a standalone format specification~~ (3.1, 3.2, 11.1) — Done.** The [SPECIFICATION.md](../archive/SPECIFICATION.md) covers archive structure, manifest schema, versioning rules, and standards crosswalks. The format is now independently documented. Remaining work: JSON Schema for machine validation, PRONOM/IANA registration, and further decoupling the format identity from the viewer (11.1).
 
-2. **Add data hierarchy and role classification** (12.1, 4.2, 1.1) — distinguish primary records from derived products. This is essential for preservation systems to make correct decisions about what to preserve and what can be regenerated.
+2. **~~Add data hierarchy and role classification~~ (12.1, 4.2, 1.1) — Partially done.** Data entries now support `role` (primary/derived) classification. PRONOM variant annotations (4.2) and splat format stability documentation (1.1) remain open.
 
-3. **Add measurement and structured annotation tools** (7.1, 10.1) — this is what makes the viewer genuinely useful for heritage and survey professionals, rather than just a pretty display.
+3. **Add measurement and structured annotation tools** (7.1, 10.1) — image attachments in annotations are implemented via the `asset:` protocol; measurement tools, annotation types, and polyline/area annotations remain the largest open feature gap.
 
-Everything else is important but secondary to these three foundations.
+Of the 22 items tracked, 7 are fully implemented and 2 are partially implemented. The highest-impact remaining work is measurement tools (7.1), format independence from the viewer (11.1), and structured annotation types (10.1).

@@ -134,9 +134,12 @@ Embed the viewer on your company website using existing URL parameters:
 | `archive` | URL | Archive file to load |
 | `kiosk` | `true` | Kiosk mode (read-only, simplified UI) |
 | `controls` | `full`, `minimal`, `none` | Control panel visibility |
-| `mode` | `splat`, `model`, `both`, `split` | Initial display mode |
+| `mode` | `splat`, `model`, `pointcloud`, `both`, `split` | Initial display mode |
 | `toolbar` | `show`, `hide` | Toolbar visibility |
 | `sidebar` | `closed`, `view`, `edit` | Metadata sidebar state |
+| `theme` | theme folder name | Kiosk theme (e.g., `editorial`, `minimal`) |
+| `layout` | `sidebar`, `editorial` | Layout override (overrides theme default) |
+| `autoload` | `true`, `false` | Auto-load archive (default `true`; `false` shows click-to-load gate) |
 
 ### Required Configuration
 
@@ -217,7 +220,7 @@ See [`docker/nginx.conf`](../docker/nginx.conf) for the full configuration.
 
 ## Security
 
-This section consolidates all deployment-relevant security controls. For security-related code review history, see [`CODE_REVIEW.md`](CODE_REVIEW.md) section 3. For future security roadmap items (digital signatures, JS SHA-256 fallback), see [`SHORTCOMINGS_AND_SOLUTIONS.md`](SHORTCOMINGS_AND_SOLUTIONS.md) section 5.
+This section consolidates all deployment-relevant security controls. For security-related code review history, see [`CODE_REVIEW.md`](reference/CODE_REVIEW.md) section 3. For future security roadmap items (digital signatures, JS SHA-256 fallback), see [`SHORTCOMINGS_AND_SOLUTIONS.md`](reference/SHORTCOMINGS_AND_SOLUTIONS.md) section 5.
 
 ### Content Security Policy (CSP)
 
@@ -284,16 +287,15 @@ const ALLOWED_EXTERNAL_DOMAINS = [
 ];
 ```
 
-**Important: URL validation is implemented three separate times** with three separate domain allowlists:
+**Important: URL validation is implemented in two places** with separate domain allowlists:
 - `config.js` (line 56) — validates URL parameters at boot
-- `main.js` (line 155) — validates URLs entered via prompt dialogs
-- `file-handlers.js` (line 35) — validates programmatic URL loads
+- `main.js` (line 157) — validates URLs entered via prompt dialogs
 
-In Docker deployments, all three share the list from `ALLOWED_DOMAINS` because `config.js.template` merges the env var into `ALLOWED_EXTERNAL_DOMAINS` and passes it to `main.js` via `window.APP_CONFIG.allowedDomains`. In local development, `main.js` and `file-handlers.js` read from `APP_CONFIG` as well, but if you hardcode domains directly into `config.js`, the other two files must also be updated.
+In Docker deployments, both share the list from `ALLOWED_DOMAINS` because `config.js.template` merges the env var into `ALLOWED_EXTERNAL_DOMAINS` and passes it to `main.js` via `window.APP_CONFIG.allowedDomains`. In local development, `main.js` reads from `APP_CONFIG` as well, but if you hardcode domains directly into `config.js`, `main.js` must also be updated.
 
 ### Archive Filename Sanitization
 
-When extracting files from `.a3d`/`.a3z` archives, all filenames are sanitized by `sanitizeArchiveFilename()` in `archive-loader.js` (lines 25–99). This prevents:
+When extracting files from `.a3d`/`.a3z` archives, all filenames are sanitized by `sanitizeArchiveFilename()` in `archive-loader.js` (lines 37–99). This prevents:
 
 | Attack | Protection |
 |--------|-----------|
@@ -399,14 +401,14 @@ Archives include SHA-256 hashes for all contained files, computed via the Web Cr
 
 For production deployments, **always serve over HTTPS** to ensure integrity hashing works. See [SSL / HTTPS](#ssl--https) above.
 
-**Limitation:** SHA-256 hashes detect accidental corruption but not intentional tampering. There are no digital signatures. For future work on cryptographic signing, see [`SHORTCOMINGS_AND_SOLUTIONS.md`](SHORTCOMINGS_AND_SOLUTIONS.md) section 5.1.
+**Limitation:** SHA-256 hashes detect accidental corruption but not intentional tampering. There are no digital signatures. For future work on cryptographic signing, see [`SHORTCOMINGS_AND_SOLUTIONS.md`](reference/SHORTCOMINGS_AND_SOLUTIONS.md) section 5.1.
 
 ### Known Security Limitations
 
 | Limitation | Impact | Mitigation |
 |-----------|--------|-----------|
 | `'unsafe-eval'` in CSP | Weakens XSS protections for the entire page | Required for Spark.js WASM. Switch to `'wasm-unsafe-eval'` when Spark.js supports it. |
-| No digital signatures | SHA-256 detects corruption but not tampering | Planned: ECDSA signing via Web Crypto API (see [SHORTCOMINGS_AND_SOLUTIONS.md](SHORTCOMINGS_AND_SOLUTIONS.md) section 5.1) |
+| No digital signatures | SHA-256 detects corruption but not tampering | Planned: ECDSA signing via Web Crypto API (see [SHORTCOMINGS_AND_SOLUTIONS.md](reference/SHORTCOMINGS_AND_SOLUTIONS.md) section 5.1) |
 | No rate limiting on file operations | No protection against resource exhaustion from large files | Planned: file size limits (see [ROADMAP.md](ROADMAP.md)) |
 | No point cloud size limits | Large E57 files can exhaust browser memory | Planned: file size warnings for assets >100 MB |
 | SHA-256 unavailable on HTTP | Archives created over HTTP have no integrity data | Deploy over HTTPS in production |
