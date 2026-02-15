@@ -9,38 +9,9 @@ import { captureScreenshot } from './archive-creator.js';
 import { Logger, notify } from './utilities.js';
 import { formatFileSize } from './metadata-manager.js';
 import { getStore } from './asset-store.js';
+import type { ExportDeps } from '../types.js';
 
 const log = Logger.getLogger('export-controller');
-
-// Deps interface — passed by main.js wrapper
-interface ExportDeps {
-    sceneRefs: {
-        renderer: any;
-        scene: any;
-        camera: any;
-        splatMesh: any;
-        modelGroup: any;
-        pointcloudGroup: any;
-        annotationSystem: any;
-        archiveCreator: any;
-    };
-    state: any;
-    tauriBridge: any | null;
-    ui: {
-        showLoading: (msg: string, withProgress?: boolean) => void;
-        hideLoading: () => void;
-        updateProgress: (percent: number, stage?: string) => void;
-        hideExportPanel: () => void;
-        showExportPanelHandler: () => void;
-        showMetadataPanel: () => void;
-    };
-    metadata: {
-        collectMetadata: () => any;
-        prefillMetadataFromArchive: (manifest: any) => void;
-        populateMetadataDisplay: () => void;
-        loadAnnotationsFromArchive: (annotations: any[]) => void;
-    };
-}
 
 /**
  * Show the export panel and sync asset checkboxes.

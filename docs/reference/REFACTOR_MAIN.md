@@ -227,38 +227,47 @@ After all extractions, main.js would shrink to ~1,450 lines — primarily `init(
 | — | `sceneRefs` getter (structural prep) | ~15 | Easy | Refactor in main.js | **Done** |
 | | **Total extractable** | **~2,395** | | | **9/9 done + structural prep** |
 
-**Remaining in main.js (1,725 lines):**
+**Remaining in main.js (~1,680 lines):**
 - `init()` — scene setup, system initialization, boot orchestration
 - State object and module-scope variable declarations
-- Dependency factory functions (`createFileHandlerDeps()`, `createExportDeps()`, `createArchivePipelineDeps()`, `createEventWiringDeps()`, etc.)
+- `sceneRefs` getter object (live references to mutable Three.js objects)
+- Dependency factory functions (`createFileHandlerDeps()`, `createExportDeps()`, `createArchivePipelineDeps()`, `createEventWiringDeps()`, etc.) — all with JSDoc `@returns` annotations pointing to shared types
 - Animation loop (`animate()`)
 - Thin one-liner delegation wrappers (annotation, metadata, file handlers, etc.)
-- URL validation (`validateUserUrl()`)
+- `validateUserUrl()` — thin wrapper around `url-validation.ts` (core logic extracted)
 - App bootstrap (`startApp()`, DOMContentLoaded)
 
-## Recommended Order
+---
 
-Start with the **easy, clean-boundary** extractions to build confidence:
+## Phase 3 — Quality Infrastructure (2025-02-15)
 
-1. `screenshot-manager.js` — most self-contained, minimal deps
-2. `transform-controller.js` — clean inputs/outputs, easy to test
-3. Alignment I/O → `alignment.js` — natural home, easy merge
-4. Controls/viewer → `ui-controller.js` — pure DOM, low risk
+Phase 3 added linting, testing, shared types, and typed deps interfaces. No functional changes — purely infrastructure and developer experience improvements.
 
-Then tackle the **medium-difficulty, high-value** extractions:
+| Step | What | Status |
+|------|------|--------|
+| 3.1 | ESLint 9 flat config + Prettier | **Done** |
+| 3.2 | Shared types (`src/types.ts`) | **Done** |
+| 3.3 | Vitest + 3 test suites + `url-validation.ts` extraction | **Done** |
+| 3.4 | Deps typing migration (interfaces → shared types) | **Done** |
 
-5. `archive-pipeline.js` — biggest single win
-6. `export-controller.js` — second biggest, read-only consumer
-7. URL loaders → `file-handlers.js` — eliminates duplication
-8. Tauri dialogs → `tauri-bridge.js` — platform concern
-
-Save the **hardest** for last:
-
-9. `event-wiring.js` — wide API surface, but biggest remaining chunk
+**Phase 3 notes:**
+- `eslint.config.js`: ESLint 9 flat config with `typescript-eslint`, `eslint-config-prettier`. Lenient baseline — `no-explicit-any: off`, `no-unused-vars: warn`, `no-console: off`. Browser globals configured. Ignores `config.js`, `pre-module.js`, `layout.js`.
+- `.prettierrc`: Single quotes, 4-space indent, no trailing commas, 120 line width.
+- `src/types.ts`: Union types (`DisplayMode`, `SelectedObject`, `TransformMode`, `QualityTier`, `AssetStateValue`), interfaces (`AppState` with 33+ properties + index signature, `SceneRefs` with 17 getters, `UICallbacks`, `AssetStore`, `ExportDeps`, `ArchivePipelineDeps`, `EventWiringDeps`). Uses `any` for Three.js types with documentation comments.
+- `vitest.config.ts`: Minimal config with Vite alias support. Theme tests use `@vitest-environment jsdom`.
+- `url-validation.ts`: Extracted `validateUserUrl()` from main.js into a standalone, testable module. Takes `options: { allowedDomains, currentOrigin, currentProtocol }` instead of reading `window` directly. main.js retains a thin wrapper that passes browser context.
+- **31 tests** across 3 suites:
+  - `url-validation.test.ts` (12 tests) — protocol blocking, domain allowlists, wildcard matching, HTTPS enforcement
+  - `theme-loader.test.ts` (6 tests) — CSS metadata parsing, CRLF handling, whitespace trimming
+  - `archive-loader.test.ts` (13 tests) — path traversal, null bytes, length limits, hidden files, character validation
+- Deps interfaces moved from `export-controller.ts`, `archive-pipeline.ts`, `event-wiring.ts` to `src/types.ts`. `state: any` replaced with `state: AppState`, inline sceneRefs replaced with `Pick<SceneRefs, ...>`.
+- JSDoc `@returns {import('./types.js').ExportDeps}` annotations added to all three main.js factory functions.
+- `@types/three` intentionally NOT installed — would surface hundreds of errors in existing `.js` files.
 
 ## Notes
 
-- **Phase 2+ extractions should be written as TypeScript (`.ts`)** — Vite + `allowJs: true` means new `.ts` modules interop seamlessly with existing `.js` modules.
+- **New TypeScript modules** use `.ts` extension — Vite + `allowJs: true` means they interop seamlessly with existing `.js` modules. Import paths use `.js` extension (Vite resolves `.ts` from `.js` imports).
 - All new modules should follow existing conventions: create a logger via `Logger.getLogger('module-name')`, export functions that receive deps objects, use `notify()` for user-facing messages.
 - Docker uses `COPY dist/` — no per-file Dockerfile updates needed. New modules that the kiosk viewer fetches as raw text must be added to the `KIOSK_MODULES` list in `vite.config.ts`.
 - The deps pattern is already established — new modules should follow it rather than importing main.js.
+- **Deps interfaces live in `src/types.ts`** — add new deps interfaces there, not inline in individual modules.

@@ -9,6 +9,7 @@ import { CAMERA, TIMING, ASSET_STATE, MESH_LOD } from './modules/constants.js';
 import { Logger, notify } from './modules/utilities.js';
 import { FlyControls } from './modules/fly-controls.js';
 import { getStore } from './modules/asset-store.js';
+import { validateUserUrl as validateUserUrlCore } from './modules/url-validation.js';
 import { SceneManager } from './modules/scene-manager.js';
 import {
     LandmarkAlignment,
@@ -192,70 +193,22 @@ const ALLOWED_EXTERNAL_DOMAINS = window.APP_CONFIG?.allowedDomains || [];
 
 /**
  * Validates a URL to prevent loading from untrusted sources.
- * Used for URLs entered by users via prompt dialogs.
+ * Thin wrapper around url-validation.ts that provides browser context.
  *
  * @param {string} urlString - The URL string to validate
  * @param {string} resourceType - Type of resource (for error messages)
  * @returns {{valid: boolean, url: string, error: string}} - Validation result
  */
 function validateUserUrl(urlString, resourceType) {
-    if (!urlString || urlString.trim() === '') {
-        return { valid: false, url: '', error: 'URL is empty' };
+    const result = validateUserUrlCore(urlString, resourceType, {
+        allowedDomains: ALLOWED_EXTERNAL_DOMAINS,
+        currentOrigin: window.location.origin,
+        currentProtocol: window.location.protocol
+    });
+    if (result.valid) {
+        console.info(`[main.js] Validated ${resourceType} URL:`, result.url);
     }
-
-    try {
-        // Parse the URL (relative URLs resolved against current origin)
-        const url = new URL(urlString.trim(), window.location.origin);
-
-        // Block dangerous protocols
-        const allowedProtocols = ['http:', 'https:'];
-        if (!allowedProtocols.includes(url.protocol)) {
-            return {
-                valid: false,
-                url: '',
-                error: `Unsafe protocol "${url.protocol}" is not allowed. Use http: or https:`
-            };
-        }
-
-        // Check if same-origin
-        const isSameOrigin = url.origin === window.location.origin;
-
-        // Check if domain is in allowed list
-        const isAllowedExternal = ALLOWED_EXTERNAL_DOMAINS.some(domain => {
-            if (domain.startsWith('*.')) {
-                const baseDomain = domain.slice(2);
-                return url.hostname === baseDomain || url.hostname.endsWith('.' + baseDomain);
-            }
-            return url.hostname === domain;
-        });
-
-        if (!isSameOrigin && !isAllowedExternal) {
-            return {
-                valid: false,
-                url: '',
-                error: `External domain "${url.hostname}" is not allowed.\n\nOnly same-origin URLs are permitted by default. Contact the administrator to allow this domain.`
-            };
-        }
-
-        // Enforce HTTPS for external URLs when page is served over HTTPS
-        if (!isSameOrigin && window.location.protocol === 'https:' && url.protocol !== 'https:') {
-            return {
-                valid: false,
-                url: '',
-                error: 'External URLs must use HTTPS when the viewer is served over HTTPS.'
-            };
-        }
-
-        console.info(`[main.js] Validated ${resourceType} URL:`, url.href);
-        return { valid: true, url: url.href, error: '' };
-
-    } catch (e) {
-        return {
-            valid: false,
-            url: '',
-            error: `Invalid URL format: ${e.message}`
-        };
-    }
+    return result;
 }
 
 // Global state
@@ -485,6 +438,7 @@ function createMetadataDeps() {
 }
 
 // Helper function to create dependencies object for export-controller.ts
+/** @returns {import('./types.js').ExportDeps} */
 function createExportDeps() {
     return {
         sceneRefs,
@@ -508,6 +462,7 @@ function createExportDeps() {
 }
 
 // Helper function to create dependencies object for archive-pipeline.ts
+/** @returns {import('./types.js').ArchivePipelineDeps} */
 function createArchivePipelineDeps() {
     return {
         sceneRefs,
@@ -543,6 +498,7 @@ function createArchivePipelineDeps() {
 }
 
 // Helper function to create dependencies object for event-wiring.ts
+/** @returns {import('./types.js').EventWiringDeps} */
 function createEventWiringDeps() {
     return {
         sceneRefs,

@@ -27,22 +27,35 @@ src/
   index.html              Entry point. CSP, all HTML structure (~1100 lines)
   config.js               IIFE (non-module). Parses URL params, sets window.APP_CONFIG
   pre-module.js           Error watchdog. Loaded before ES modules
-  main.js                 App controller / glue layer (~3,900 lines)
+  main.js                 App controller / glue layer (~1,680 lines, refactored from ~3,900)
+  types.ts                Shared TypeScript types (AppState, SceneRefs, deps interfaces)
   styles.css              All CSS (~2,600 lines)
   modules/
     constants.js          Shared config values (camera, lighting, timing, extensions)
     utilities.js          Logger, notify(), mesh helpers, disposeObject(), fetchWithProgress()
+    logger.js             Standalone Logger class (extracted from utilities.js)
     scene-manager.js      Three.js scene/camera/renderer/controls/lighting setup
     ui-controller.js      Loading overlay, display-mode helpers, addListener()
     file-handlers.js      Asset loading: splat, mesh, point cloud, archive
     archive-loader.js     ZIP extraction, manifest parsing, filename sanitization
     archive-creator.js    Archive creation, SHA-256 hashing, screenshot capture
-    alignment.js          KD-tree, ICP algorithm, auto-align, fit-to-view
+    archive-pipeline.ts   Archive loading/processing pipeline (extracted from main.js)
+    export-controller.ts  Archive export, generic viewer download, metadata manifests
+    event-wiring.ts       Central UI event binding — setupUIEvents()
+    asset-store.js        ES module singleton for blob references (splat, mesh, pointcloud)
+    screenshot-manager.js Screenshot capture, viewfinder, screenshot list management
+    transform-controller.js Transform gizmo orchestration, object sync, delta tracking
+    url-validation.ts     URL validation for user-entered URLs (extracted, testable)
+    alignment.js          KD-tree, ICP algorithm, auto-align, fit-to-view, alignment I/O
     annotation-system.js  3D annotation placement via raycasting
     metadata-manager.js   Metadata sidebar (view/edit/annotations), Dublin Core schema
     fly-controls.js       WASD + mouse-look first-person camera
     share-dialog.js       Share link builder with URL parameters
+    quality-tier.js       SD/HD quality detection and switching
+    theme-loader.js       Theme CSS/layout loading for kiosk mode
     kiosk-viewer.js       Offline viewer generator — fetches CDN deps, base64-inlines them
+    kiosk-main.js         Kiosk mode entry point (embedded into offline HTML)
+    __tests__/            Vitest test suites (url-validation, theme-loader, archive-loader)
 docker/
   Dockerfile              nginx:alpine, serves Vite build output from dist/
   nginx.conf              Gzip, CORS, caching, CSP headers
@@ -59,9 +72,13 @@ npm run preview            # Preview production build locally
 npm run docker:build       # Vite build + Docker image
 npm run docker:run         # runs on http://localhost:8080 (port 80 inside container)
 npx tauri dev              # Desktop app (Tauri, requires Rust)
+npm run lint               # ESLint check (0 errors expected, warnings OK)
+npm run lint:fix           # ESLint auto-fix
+npm run format:check       # Prettier formatting check
+npm run format             # Prettier auto-format
+npm test                   # Vitest — run all test suites
+npm run test:watch         # Vitest in watch mode
 ```
-
-There are no tests. There is no linter configured.
 
 ## Boot Sequence
 
@@ -75,12 +92,13 @@ There are no tests. There is no linter configured.
 ### The "deps pattern"
 Modules don't store references to shared objects. Instead, `main.js` builds a fresh dependency object on each call:
 ```js
-function createAlignmentDeps() {
-    return { splatMesh, modelGroup, camera, controls, state, ... };
+/** @returns {import('./types.js').ExportDeps} */
+function createExportDeps() {
+    return { sceneRefs, state, tauriBridge, ui: { ... }, metadata: { ... } };
 }
-icpAlignObjectsHandler(createAlignmentDeps());
+downloadArchive(createExportDeps());
 ```
-This means module functions receive current state but there's no type checking or validation on the shape of these objects.
+Deps interfaces for the three largest extracted modules (`ExportDeps`, `ArchivePipelineDeps`, `EventWiringDeps`) are defined in `src/types.ts` with typed `state: AppState` and `Pick<SceneRefs, ...>` for scene references. The main.js factory functions have JSDoc `@returns` annotations pointing to these types.
 
 ### SceneManager extraction
 After creating `SceneManager`, `init()` copies all its properties into loose `let` variables (`scene`, `camera`, `renderer`, etc.) at module scope in `main.js`. These loose variables are what the rest of `main.js` actually uses. Two sources of truth — be aware.
@@ -89,12 +107,12 @@ After creating `SceneManager`, `init()` copies all its properties into loose `le
 A single mutable `const state = { ... }` object in `main.js`. No setters, no events, no validation. Any function can mutate it directly.
 
 ### URL validation
-Implemented **three separate times** with **three separate domain allowlists**:
-- `config.js` line 58 — validates URL params at boot
-- `main.js` line 109 — validates URLs from prompt dialogs
-- `file-handlers.js` line 35 — validates programmatic URL loads
+The core validation logic is in `url-validation.ts` (extracted, testable). It is used by:
+- `main.js` — thin wrapper that passes `window.location` context and `ALLOWED_EXTERNAL_DOMAINS`
+- `config.js` line 58 — validates URL params at boot (separate implementation)
+- `file-handlers.js` line 35 — validates programmatic URL loads (separate implementation)
 
-When adding allowed domains, all three must be updated or loads will be silently blocked.
+When adding allowed domains, all three locations must be updated or loads will be silently blocked.
 
 ### Timing-based sequencing
 Several post-load operations use `setTimeout` with delays from `constants.js` TIMING (e.g., `AUTO_ALIGN_DELAY: 500`). These are not promise-based — they assume assets finish loading within the delay window.
@@ -131,10 +149,11 @@ All DOM structure lives in `index.html`. Modules query elements by ID. If you ne
 
 ## Known Fragile Areas
 
-- **`main.js` is ~3,500 lines** and handles too many concerns. Active refactoring in progress (see `docs/reference/REFACTOR_MAIN.md`). Tread carefully when modifying — changes can have non-obvious side effects.
-- **No tests.** Manual testing is the only verification. Security-critical code (archive filename sanitization, URL validation) has no automated coverage.
+- **`main.js` is ~1,680 lines** — reduced from ~3,900 via Phase 1-2 refactoring (see `docs/reference/REFACTOR_MAIN.md`). It's now a glue layer: `init()`, state declarations, deps factories, animation loop, and thin delegation wrappers.
+- **Tests cover security-critical code only.** 31 tests across 3 suites: URL validation, theme metadata parsing, archive filename sanitization. No E2E or integration tests yet.
 - **Point cloud memory.** No size limits on E57 loading. Large files can OOM the browser.
 - **`annotation-system.js`** is the only module that doesn't use Logger — it has no structured logging.
+- **`@types/three` is NOT installed.** Using `any` with documentation comments for Three.js types. Installing it would surface hundreds of errors in existing `.js` files.
 
 ## When changes are made
 - Update ROADMAP.MD if changed item is present

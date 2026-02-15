@@ -63,6 +63,8 @@ Prioritized list of future work, drawn from the [code review](reference/CODE_REV
 ## Medium Priority
 
 ### Code Quality (from Code Review)
+- [x] **Done** — Add ESLint 9 + Prettier linting (lenient baseline, 0 errors)
+- [x] **Done** — Refactor main.js from ~3,900 to ~1,680 lines (9 module extractions across Phase 1-2)
 - [ ] Add file size limits for uploaded/downloaded files (e.g., 500 MB max)
 - [ ] Replace inline style manipulation with CSS classes and custom properties
 - [ ] Add WebGL context loss handler with user-friendly recovery message
@@ -70,13 +72,16 @@ Prioritized list of future work, drawn from the [code review](reference/CODE_REV
 - [ ] Replace `setTimeout`-based async sequencing with proper promise chains or event-driven patterns
 
 ### Testing
-- [ ] Add a testing framework (Vitest or Playwright)
-- [ ] Prioritize tests for: archive parsing/creation, filename sanitization, URL validation, alignment algorithms
+- [x] **Done** — Add a testing framework (Vitest) with 31 tests across 3 suites (url-validation, theme-loader, archive-loader)
+- [x] **Done** — Prioritize tests for: filename sanitization, URL validation, theme metadata parsing
+- [ ] Add tests for: archive parsing/creation, alignment algorithms
 - [ ] Add E2E smoke tests for archive round-trip (create, load, verify metadata)
 
 ### Type Safety
-- [ ] Add comprehensive JSDoc type annotations to all exported functions
-- [ ] Consider TypeScript migration (see [feasibility analysis](reference/TYPESCRIPT_CONVERSION_FEASIBILITY.md))
+- [x] **Done** — Add shared TypeScript types (`src/types.ts`): `AppState`, `SceneRefs`, deps interfaces with JSDoc `@returns` on factory functions
+- [x] **Done** — TypeScript migration in progress: 4 new `.ts` modules (`export-controller`, `archive-pipeline`, `event-wiring`, `url-validation`), hybrid `allowJs: true` setup
+- [ ] Add comprehensive JSDoc type annotations to remaining `.js` exported functions
+- [ ] Install `@types/three` and progressively fix type errors (currently blocked — would surface hundreds of errors)
 
 ### Versioning & Collaboration
 - [x] **Done** — Version history array in manifest with UI for adding entries

@@ -22,48 +22,9 @@ import {
     getPrimaryAssetType
 } from './file-handlers.js';
 import { centerModelOnGrid } from './alignment.js';
+import type { ArchivePipelineDeps } from '../types.js';
 
 const log = Logger.getLogger('archive-pipeline');
-
-// Deps interface — passed by main.js wrapper
-interface ArchivePipelineDeps {
-    sceneRefs: {
-        scene: any;
-        camera: any;
-        renderer: any;
-        splatMesh: any;
-        modelGroup: any;
-        pointcloudGroup: any;
-    };
-    state: any;
-    sceneManager: any;
-    setSplatMesh: (mesh: any) => void;
-    createFileHandlerDeps: () => any;
-    ui: {
-        showLoading: (msg: string, withProgress?: boolean) => void;
-        hideLoading: () => void;
-        showInlineLoading: (type: string) => void;
-        hideInlineLoading: (type: string) => void;
-        updateVisibility: () => void;
-        updateTransformInputs: () => void;
-        updateModelOpacity: () => void;
-        updateModelWireframe: () => void;
-    };
-    alignment: {
-        applyAlignmentData: (data: any) => void;
-        storeLastPositions: () => void;
-    };
-    annotations: {
-        loadAnnotationsFromArchive: (annotations: any[]) => void;
-    };
-    metadata: {
-        prefillMetadataFromArchive: (manifest: any) => void;
-        clearArchiveMetadataHandler: () => void;
-    };
-    sourceFiles: {
-        updateSourceFilesUI: () => void;
-    };
-}
 
 // ==================== Private Helpers ====================
 
