@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Main App — Professional Redesign Mockup</title>
+<style>
+/* ============================================================
+   Main App — Professional / Utilitarian Redesign
+
+   Key changes from current:
+   - Removed "Proof of Concept" heading
+   - Tighter spacing throughout (14px base padding vs 20px)
+   - Desaturated palette: muted slate/teal instead of purple/neon
+   - Flatter buttons (2px radius, less color contrast)
+   - 3-tier typography (11px labels, 12px body, 13px headers)
+   - Segmented display mode control
+   - Compact professional tool aesthetic
+   ============================================================ */
+
+:root {
+    --bg-deep:       #111318;
+    --bg-panel:      #16181d;
+    --bg-surface:    #1c1f25;
+    --bg-elevated:   #22252c;
+    --bg-input:      #1a1d23;
+    --bg-hover:      #282b33;
+    --bg-active:     #2e323b;
+
+    --border-subtle: #24272e;
+    --border-default:#2e323a;
+    --border-strong: #3a3f49;
+
+    --accent:        #5a9e97;
+    --accent-hover:  #6bb3ab;
+    --accent-muted:  rgba(90, 158, 151, 0.15);
+    --accent-text:   #7cc4bc;
+
+    --text-primary:  #c8ccd4;
+    --text-secondary:#8a8f9a;
+    --text-muted:    #5c6170;
+    --text-faint:    #3e4350;
+
+    --danger:        #c45c5c;
+    --warning:       #c4a05c;
+
+    --font-sans:     -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+    --font-mono:     'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+
+    --radius-sm:     2px;
+    --radius-md:     3px;
+
+    --panel-width:   260px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: var(--font-sans);
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    overflow: hidden;
+    height: 100vh;
+    font-size: 12px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   Layout
+   ============================================================ */
+.app {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* ============================================================
+   Left Controls Panel
+   ============================================================ */
+.controls-panel {
+    width: var(--panel-width);
+    min-width: var(--panel-width);
+    flex-shrink: 0;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border-subtle);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Scrollbar styling */
+.controls-panel::-webkit-scrollbar {
+    width: 4px;
+}
+.controls-panel::-webkit-scrollbar-track {
+    background: transparent;
+}
+.controls-panel::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border-radius: 2px;
+}
+
+/* Panel header */
+.panel-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    background: var(--bg-panel);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.panel-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.panel-version {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+
+/* ============================================================
+   Display Mode — Segmented Control
+   ============================================================ */
+.display-mode {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+}
+
+.display-mode-label {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.segmented-control {
+    display: flex;
+    background: var(--bg-deep);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.segment {
+    flex: 1;
+    padding: 5px 0;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--border-default);
+    cursor: pointer;
+    transition: all 0.1s;
+    font-family: inherit;
+}
+
+.segment:last-child {
+    border-right: none;
+}
+
+.segment:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.segment.active {
+    background: var(--accent-muted);
+    color: var(--accent-text);
+}
+
+/* ============================================================
+   Control Sections
+   ============================================================ */
+.panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 20px;
+}
+
+.section {
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.section:last-child {
+    border-bottom: none;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.1s;
+}
+
+.section-header:hover {
+    background: var(--bg-surface);
+}
+
+.section-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.section-chevron {
+    font-size: 9px;
+    color: var(--text-muted);
+    transition: transform 0.15s;
+    width: 12px;
+    text-align: center;
+}
+
+.section.expanded .section-chevron {
+    transform: rotate(90deg);
+}
+
+.section-body {
+    padding: 0 14px 10px 14px;
+}
+
+/* ============================================================
+   Form Controls
+   ============================================================ */
+
+/* Slider */
+.slider-row {
+    margin-bottom: 8px;
+}
+
+.slider-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3px;
+}
+
+.slider-label span {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.slider-label .slider-value {
+    font-size: 11px;
+    color: var(--accent-text);
+    font-family: var(--font-mono);
+    font-weight: 500;
+}
+
+input[type="range"] {
+    width: 100%;
+    height: 3px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--bg-deep);
+    border-radius: 1px;
+    outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    background: var(--accent-hover);
+}
+
+/* Checkbox */
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.checkbox-row input[type="checkbox"] {
+    width: 12px;
+    height: 12px;
+    cursor: pointer;
+    accent-color: var(--accent);
+}
+
+.checkbox-row label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+/* Buttons */
+.btn {
+    display: block;
+    width: 100%;
+    padding: 5px 10px;
+    margin-bottom: 4px;
+    border: 1px solid var(--border-default);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-family: inherit;
+    text-align: center;
+    transition: all 0.1s;
+}
+
+.btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+}
+
+.btn:last-child {
+    margin-bottom: 0;
+}
+
+.btn-row {
+    display: flex;
+    gap: 4px;
+}
+
+.btn-row .btn {
+    flex: 1;
+}
+
+/* XYZ inputs */
+.xyz-row {
+    margin-bottom: 6px;
+}
+
+.xyz-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 3px;
+}
+
+.xyz-inputs {
+    display: flex;
+    gap: 3px;
+}
+
+.xyz-inputs input {
+    flex: 1;
+    width: 100%;
+    padding: 3px 6px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    text-align: center;
+}
+
+.xyz-inputs input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* Color presets */
+.color-row {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.color-swatch {
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.color-swatch.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* File load subsection */
+.load-item {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.load-item:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.load-item-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.load-item-status {
+    font-size: 10px;
+    color: var(--text-faint);
+    margin-top: 3px;
+    font-style: italic;
+}
+
+/* ============================================================
+   Info bar (bottom of panel)
+   ============================================================ */
+.info-bar {
+    padding: 8px 14px;
+    border-top: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+    background: var(--bg-panel);
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+}
+
+.info-row:last-child {
+    margin-bottom: 0;
+}
+
+.info-label {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.info-value {
+    font-size: 10px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+
+/* ============================================================
+   Viewport
+   ============================================================ */
+.viewport {
+    flex: 1;
+    position: relative;
+    background: linear-gradient(145deg, #1a1d24 0%, #141720 100%);
+    overflow: hidden;
+}
+
+.viewport-canvas {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.viewport-placeholder {
+    text-align: center;
+    color: var(--text-faint);
+}
+
+.viewport-placeholder .grid-icon {
+    font-size: 64px;
+    opacity: 0.15;
+    margin-bottom: 12px;
+}
+
+.viewport-placeholder p {
+    font-size: 12px;
+    opacity: 0.5;
+}
+
+/* Toolbar overlay (top-left of viewport) */
+.toolbar {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: flex;
+    gap: 4px;
+    z-index: 100;
+}
+
+.toolbar-btn {
+    width: 32px;
+    height: 32px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: all 0.1s;
+    backdrop-filter: blur(8px);
+}
+
+.toolbar-btn:hover {
+    background: rgba(0, 0, 0, 0.7);
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+}
+
+.toolbar-btn.active {
+    background: var(--accent-muted);
+    border-color: var(--accent);
+    color: var(--accent-text);
+}
+
+/* Bottom status bar */
+.status-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 22px;
+    background: rgba(0, 0, 0, 0.4);
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    font-size: 10px;
+    color: var(--text-muted);
+    backdrop-filter: blur(8px);
+    z-index: 50;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.status-item span {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+
+/* ============================================================
+   Right Metadata Sidebar (when open)
+   ============================================================ */
+.metadata-sidebar {
+    width: 320px;
+    min-width: 320px;
+    flex-shrink: 0;
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.sidebar-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+}
+
+.sidebar-tab {
+    flex: 1;
+    padding: 9px 0;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+
+.sidebar-tab:hover {
+    color: var(--text-secondary);
+    background: var(--bg-surface);
+}
+
+.sidebar-tab.active {
+    color: var(--accent-text);
+    border-bottom-color: var(--accent);
+}
+
+.sidebar-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+}
+
+.sidebar-body::-webkit-scrollbar {
+    width: 4px;
+}
+.sidebar-body::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border-radius: 2px;
+}
+
+/* Metadata display */
+.meta-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    line-height: 1.3;
+}
+
+.meta-description {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 14px;
+}
+
+.meta-divider {
+    height: 1px;
+    background: var(--border-subtle);
+    margin: 12px 0;
+}
+
+.meta-detail {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 4px 0;
+}
+
+.meta-detail-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.meta-detail-value {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.meta-stats {
+    display: flex;
+    gap: 1px;
+    margin-top: 14px;
+    background: var(--border-subtle);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.meta-stat {
+    flex: 1;
+    text-align: center;
+    padding: 8px 4px;
+    background: var(--bg-surface);
+}
+
+.meta-stat-number {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent-text);
+    font-family: var(--font-mono);
+    line-height: 1;
+}
+
+.meta-stat-label {
+    display: block;
+    font-size: 9px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-top: 3px;
+}
+
+/* Edit fields */
+.field {
+    margin-bottom: 10px;
+}
+
+.field label {
+    display: block;
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 4px;
+}
+
+.field input,
+.field textarea,
+.field select {
+    width: 100%;
+    padding: 6px 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-family: inherit;
+}
+
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.field textarea {
+    min-height: 48px;
+    resize: vertical;
+}
+
+.field-hint {
+    font-size: 10px;
+    color: var(--text-faint);
+    margin-top: 2px;
+}
+
+/* Edit sub-tabs */
+.edit-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-bottom: 10px;
+}
+
+.edit-pill {
+    padding: 3px 8px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.edit-pill.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg-deep);
+}
+
+/* ============================================================
+   Mockup annotations
+   ============================================================ */
+.mockup-note {
+    position: absolute;
+    background: rgba(200, 160, 60, 0.12);
+    border: 1px dashed rgba(200, 160, 60, 0.4);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 10px;
+    color: #c4a05c;
+    line-height: 1.4;
+    max-width: 220px;
+    z-index: 500;
+    pointer-events: none;
+}
+
+.mockup-note strong {
+    color: #dbb86c;
+}
+
+/* Mockup divider label */
+.mockup-banner {
+    background: var(--bg-deep);
+    text-align: center;
+    padding: 16px;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     MOCKUP: Main App — Professional Redesign
+     ============================================================ -->
+
+<div class="mockup-banner">Main App Redesign Mockup &mdash; Professional / Utilitarian</div>
+
+<div class="app">
+
+    <!-- ============================
+         Left Controls Panel
+         ============================ -->
+    <div class="controls-panel">
+
+        <!-- Panel Header — clean, no "Proof of Concept" -->
+        <div class="panel-header">
+            <span class="panel-title">Scene</span>
+            <span class="panel-version">v0.9</span>
+        </div>
+
+        <!-- Display Mode — proper segmented control -->
+        <div class="display-mode">
+            <div class="display-mode-label">Display</div>
+            <div class="segmented-control">
+                <button class="segment active">Model</button>
+                <button class="segment">Splat</button>
+                <button class="segment">Cloud</button>
+                <button class="segment">Both</button>
+                <button class="segment">Split</button>
+            </div>
+        </div>
+
+        <div class="panel-body">
+
+            <!-- Load Files — collapsed by default -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-title">Load Files</span>
+                    <span class="section-chevron">&#9654;</span>
+                </div>
+            </div>
+
+            <!-- Scene Settings — expanded -->
+            <div class="section expanded">
+                <div class="section-header">
+                    <span class="section-title">Scene</span>
+                    <span class="section-chevron">&#9654;</span>
+                </div>
+                <div class="section-body">
+                    <div class="slider-row">
+                        <div class="slider-label">
+                            <span>FOV</span>
+                            <span class="slider-value">60&deg;</span>
+                        </div>
+                        <input type="range" min="10" max="120" value="60">
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="grid" checked>
+                        <label for="grid">Grid</label>
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="shadows">
+                        <label for="shadows">Shadows</label>
+                    </div>
+                    <div style="margin-top: 8px;">
+                        <div class="xyz-label">Background</div>
+                        <div class="color-row">
+                            <div class="color-swatch active" style="background: #1a1d24;"></div>
+                            <div class="color-swatch" style="background: #0a0a0a;"></div>
+                            <div class="color-swatch" style="background: #2d2d2d;"></div>
+                            <div class="color-swatch" style="background: #4a4a4a;"></div>
+                            <div class="color-swatch" style="background: #808080;"></div>
+                            <div class="color-swatch" style="background: #f0f0f0; border-color: #555;"></div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 6px;">
+                        <div class="xyz-label">Tone Mapping</div>
+                        <select style="width:100%; padding:4px 6px; background:var(--bg-input); color:var(--text-secondary); border:1px solid var(--border-default); border-radius:2px; font-size:11px; font-family:inherit;">
+                            <option>None</option>
+                            <option>Linear</option>
+                            <option>Reinhard</option>
+                            <option>ACES Filmic</option>
+                            <option>AgX</option>
+                        </select>
+                    </div>
+                    <div class="slider-row" style="margin-top: 6px;">
+                        <div class="slider-label">
+                            <span>Exposure</span>
+                            <span class="slider-value">1.0</span>
+                        </div>
+                        <input type="range" min="0.1" max="3" step="0.1" value="1">
+                    </div>
+                    <div style="margin-top: 6px;">
+                        <div class="xyz-label">Environment</div>
+                        <select style="width:100%; padding:4px 6px; background:var(--bg-input); color:var(--text-secondary); border:1px solid var(--border-default); border-radius:2px; font-size:11px; font-family:inherit;">
+                            <option>None</option>
+                            <option>Outdoor</option>
+                            <option>Studio</option>
+                            <option>Sunset</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Model Settings -->
+            <div class="section expanded">
+                <div class="section-header">
+                    <span class="section-title">Model</span>
+                    <span class="section-chevron">&#9654;</span>
+                </div>
+                <div class="section-body">
+                    <div class="slider-row">
+                        <div class="slider-label">
+                            <span>Scale</span>
+                            <span class="slider-value">1.0</span>
+                        </div>
+                        <input type="range" min="0.1" max="5" step="0.1" value="1">
+                    </div>
+                    <div class="slider-row">
+                        <div class="slider-label">
+                            <span>Opacity</span>
+                            <span class="slider-value">1.0</span>
+                        </div>
+                        <input type="range" min="0" max="1" step="0.05" value="1">
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="wire">
+                        <label for="wire">Wireframe</label>
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="notex">
+                        <label for="notex">Hide textures</label>
+                    </div>
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="matcap">
+                        <label for="matcap">Matcap</label>
+                    </div>
+                    <div class="xyz-row">
+                        <div class="xyz-label">Position</div>
+                        <div class="xyz-inputs">
+                            <input type="number" value="0" step="0.1">
+                            <input type="number" value="0" step="0.1">
+                            <input type="number" value="0" step="0.1">
+                        </div>
+                    </div>
+                    <div class="xyz-row">
+                        <div class="xyz-label">Rotation</div>
+                        <div class="xyz-inputs">
+                            <input type="number" value="0" step="1">
+                            <input type="number" value="0" step="1">
+                            <input type="number" value="0" step="1">
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-subtle);">
+                        <div class="xyz-label" style="margin-bottom: 4px;">Lighting</div>
+                        <div class="slider-row">
+                            <div class="slider-label">
+                                <span>Ambient</span>
+                                <span class="slider-value">0.8</span>
+                            </div>
+                            <input type="range" min="0" max="2" step="0.1" value="0.8">
+                        </div>
+                        <div class="slider-row">
+                            <div class="slider-label">
+                                <span>Directional</span>
+                                <span class="slider-value">1.5</span>
+                            </div>
+                            <input type="range" min="0" max="3" step="0.1" value="1.5">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Splat / Point Cloud — collapsed -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-title">Splat</span>
+                    <span class="section-chevron">&#9654;</span>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-title">Point Cloud</span>
+                    <span class="section-chevron">&#9654;</span>
+                </div>
+            </div>
+
+            <!-- Alignment -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-title">Alignment</span>
+                    <span class="section-chevron">&#9654;</span>
+                </div>
+            </div>
+
+            <!-- Camera -->
+            <div class="section expanded">
+                <div class="section-header">
+                    <span class="section-title">Camera</span>
+                    <span class="section-chevron">&#9654;</span>
+                </div>
+                <div class="section-body">
+                    <div class="btn-row">
+                        <button class="btn">Reset</button>
+                        <button class="btn">Fit View</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Screenshots -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-title">Screenshots</span>
+                    <span class="section-chevron">&#9654;</span>
+                </div>
+            </div>
+
+            <!-- Share -->
+            <div class="section expanded">
+                <div class="section-header">
+                    <span class="section-title">Share</span>
+                    <span class="section-chevron">&#9654;</span>
+                </div>
+                <div class="section-body">
+                    <button class="btn">Copy Share Link</button>
+                    <button class="btn" style="margin-top: 4px;">Preview Kiosk</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Bar — always visible at bottom -->
+        <div class="info-bar">
+            <div class="info-row">
+                <span class="info-label">Splats</span>
+                <span class="info-value">2,412,847</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Faces</span>
+                <span class="info-value">1,204,312</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">FPS</span>
+                <span class="info-value">58</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================
+         Viewport
+         ============================ -->
+    <div class="viewport">
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <!-- Controls toggle (hamburger) -->
+            <button class="toolbar-btn" title="Toggle Controls">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="4" y1="21" x2="4" y2="14"></line>
+                    <line x1="4" y1="10" x2="4" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12" y2="3"></line>
+                    <line x1="20" y1="21" x2="20" y2="16"></line>
+                    <line x1="20" y1="12" x2="20" y2="3"></line>
+                    <line x1="1" y1="14" x2="7" y2="14"></line>
+                    <line x1="9" y1="8" x2="15" y2="8"></line>
+                    <line x1="17" y1="16" x2="23" y2="16"></line>
+                </svg>
+            </button>
+            <!-- Metadata -->
+            <button class="toolbar-btn" title="Metadata (M)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+            </button>
+            <!-- Annotate -->
+            <button class="toolbar-btn" title="Annotate (A)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+            </button>
+            <!-- Fly mode -->
+            <button class="toolbar-btn" title="Fly Mode (F)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                </svg>
+            </button>
+            <!-- Auto-rotate -->
+            <button class="toolbar-btn" title="Auto-Rotate">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+            </button>
+            <!-- Export -->
+            <button class="toolbar-btn" title="Export Archive">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Viewport placeholder -->
+        <div class="viewport-canvas">
+            <div class="viewport-placeholder">
+                <div class="grid-icon">
+                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.5" opacity="0.2">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                        <polyline points="2 17 12 22 22 17"></polyline>
+                        <polyline points="2 12 12 17 22 12"></polyline>
+                    </svg>
+                </div>
+                <p>3D Viewport</p>
+            </div>
+        </div>
+
+        <!-- Status bar -->
+        <div class="status-bar">
+            <div class="status-item">
+                <span><span class="status-dot"></span> Ready</span>
+                <span>Orbit mode</span>
+            </div>
+            <div class="status-item">
+                <span>Model + Splat loaded</span>
+            </div>
+        </div>
+
+        <!-- Design annotations -->
+        <div class="mockup-note" style="top: 52px; left: 220px;">
+            <strong>Toolbar:</strong> Smaller (32px), tighter gap (4px), backdrop blur. Same icons but reduced from 40px &rarr; 32px.
+        </div>
+
+        <div class="mockup-note" style="bottom: 32px; left: 220px;">
+            <strong>Status bar:</strong> New. Shows connection state, camera mode, loaded assets. Replaces the floating hints.
+        </div>
+    </div>
+
+    <!-- ============================
+         Right Metadata Sidebar
+         ============================ -->
+    <div class="metadata-sidebar">
+
+        <!-- Tabs -->
+        <div class="sidebar-tabs">
+            <button class="sidebar-tab active">View</button>
+            <button class="sidebar-tab">Edit</button>
+            <button class="sidebar-tab">Annotations</button>
+        </div>
+
+        <!-- View tab content -->
+        <div class="sidebar-body">
+            <div class="meta-title">Lincoln Memorial Scan</div>
+            <div class="meta-description">High-resolution 3D scan of the Lincoln Memorial interior chamber, captured November 2025.</div>
+
+            <div class="meta-divider"></div>
+
+            <div class="meta-detail">
+                <span class="meta-detail-label">Creator</span>
+                <span class="meta-detail-value">DirDim Scanning</span>
+            </div>
+            <div class="meta-detail">
+                <span class="meta-detail-label">Captured</span>
+                <span class="meta-detail-value">2025-11-14</span>
+            </div>
+            <div class="meta-detail">
+                <span class="meta-detail-label">Location</span>
+                <span class="meta-detail-value">Washington, DC</span>
+            </div>
+            <div class="meta-detail">
+                <span class="meta-detail-label">Device</span>
+                <span class="meta-detail-value">Faro Focus S350</span>
+            </div>
+
+            <div class="meta-divider"></div>
+
+            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">License</div>
+            <div style="font-size: 11px; color: var(--accent-text); background: var(--accent-muted); padding: 5px 8px; border-radius: 2px; text-align: center; margin-bottom: 4px;">CC-BY 4.0</div>
+
+            <div class="meta-stats">
+                <div class="meta-stat">
+                    <span class="meta-stat-number">2.4M</span>
+                    <span class="meta-stat-label">Gaussians</span>
+                </div>
+                <div class="meta-stat">
+                    <span class="meta-stat-number">1.2M</span>
+                    <span class="meta-stat-label">Polygons</span>
+                </div>
+                <div class="meta-stat">
+                    <span class="meta-stat-number">5</span>
+                    <span class="meta-stat-label">Annotations</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Design notes overlay -->
+<div style="position: fixed; top: 40px; right: 340px; z-index: 1000;">
+    <div class="mockup-note" style="position: relative; max-width: 260px;">
+        <strong>Key changes from current:</strong><br>
+        &bull; "Proof of Concept" &rarr; just "Scene"<br>
+        &bull; Panel padding: 20px &rarr; 14px<br>
+        &bull; Section margins: 20px &rarr; 0 (border only)<br>
+        &bull; Font sizes: 3 tiers (10/11/12px)<br>
+        &bull; Buttons: 2px radius, flat, less contrast<br>
+        &bull; Colors: desaturated slate/teal palette<br>
+        &bull; Display mode: segmented control<br>
+        &bull; Info bar: pinned stats at panel bottom<br>
+        &bull; Status bar: replaces floating hints<br>
+        &bull; Toolbar icons: 32px (down from 40px)
+    </div>
+</div>
+
+</body>
+</html>
