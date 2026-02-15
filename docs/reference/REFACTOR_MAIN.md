@@ -1,8 +1,43 @@
 # Refactoring main.js — Extraction Plan
 
-`main.js` is currently ~3,640 lines and handles too many concerns. This document identifies 9 extractable modules, ordered by impact and separation difficulty.
+`main.js` started at ~3,889 lines and handles too many concerns. This document identifies 9 extractable modules, ordered by impact and separation difficulty.
 
-After all extractions, main.js would shrink to ~1,245 lines — primarily `init()`, state/variable declarations, deps factories, the animation loop, thin delegation wrappers, and bootstrap code. A proper glue layer.
+After all extractions, main.js would shrink to ~1,450 lines — primarily `init()`, state/variable declarations, deps factories, the animation loop, thin delegation wrappers, and bootstrap code. A proper glue layer.
+
+## Progress
+
+**Phase 1 complete** (2025-02-14). main.js reduced from 3,889 → 3,507 lines (382 lines removed).
+**Phase 1.5 complete** (2025-02-14). Structural prep — main.js at 3,522 lines (net +15 from `sceneRefs` block; no line-reduction goal).
+
+| Step | Module | Status | Lines Removed |
+|------|--------|--------|---------------|
+| 1.1 | `screenshot-manager.js` (new) | Done | 86 |
+| 1.2 | `transform-controller.js` (new) | Done | 128 |
+| 1.3 | Alignment I/O → `alignment.js` | Done | 61 |
+| 1.4 | Controls/viewer → `ui-controller.js` | Done | 107 |
+| 1.5a | `asset-store.js` (new singleton) | Done | — (structural) |
+| 1.5b | `sceneRefs` getter object in main.js | Done | — (structural) |
+| 2.1 | `export-controller.js` (new) | Planned | ~330 |
+| 2.2 | `archive-pipeline.js` (new) | Planned | ~650 |
+| 2.3 | URL loaders → `file-handlers.js` | Planned | ~235 |
+| 2.4 | Tauri dialogs → `tauri-bridge.js` | Planned | ~130 |
+| 3.1 | `event-wiring.js` (new) | Planned | ~560 |
+
+**Phase 1 notes:**
+- `screenshot-manager.js`: 6 functions extracted, each receives deps via `{ renderer, scene, camera, state }`. Imports `captureScreenshot` directly from `archive-creator.js`.
+- `transform-controller.js`: 4 functions + 9 tracking vectors (now encapsulated as private module state). Receives deps per call.
+- `alignment.js`: Extended with `saveAlignment`, `loadAlignment`, `loadAlignmentFromUrl`. Updated existing `applyAlignmentData` to handle `pointcloudGroup` and call `storeLastPositions`.
+- `ui-controller.js`: Replaced simpler `toggleControlsPanel`/`applyControlsVisibility` with richer main.js versions (handle controlsMode, width/padding styles, resize callback). Added `ensureToolbarVisibility`, `applyViewerModeSettings`.
+- Dockerfile updated with COPY lines for 2 new modules.
+
+**Phase 1.5 notes:**
+- `asset-store.js`: ES module singleton exporting `getStore()` and `resetBlobs()`. Replaces 6 scattered `let` blob variables (`currentSplatBlob`, `currentMeshBlob`, `currentProxyMeshBlob`, `currentProxySplatBlob`, `currentPointcloudBlob`) and `sourceFiles` array. All references in main.js updated to `assets.splatBlob`, `assets.meshBlob`, etc. via `const assets = getStore()`. Property names in `createMetadataDeps()` preserved for `metadata-manager.js` compatibility.
+- `sceneRefs`: Getter object in main.js wrapping all mutable Three.js references (`splatMesh`, `modelGroup`, `pointcloudGroup`, `scene`, `camera`, `renderer`, `controls`, `transformControls`, etc.). Getters prevent stale-reference bugs when objects are reassigned after loading new files. Ready for Phase 2 modules to consume instead of individual object deps.
+- Dockerfile updated with COPY line for `asset-store.js`.
+
+**Phase 2 planned approach (from Gemini architect review):**
+- Namespaced deps for `event-wiring.js` (group by domain: files, scene, edit, export, transform)
+- Full execution plan at `.claude/plans/toasty-sparking-gray.md`
 
 ---
 
@@ -171,18 +206,20 @@ After all extractions, main.js would shrink to ~1,245 lines — primarily `init(
 
 ## Summary
 
-| # | Module | Lines | Difficulty | Strategy |
-|---|--------|-------|------------|----------|
-| 1 | `archive-pipeline.js` | ~650 | Medium | New module |
-| 2 | `export-controller.js` | ~330 | Medium | New module |
-| 3 | `screenshot-manager.js` | ~120 | Easy | New module |
-| 4 | `transform-controller.js` | ~150 | Easy | New module |
-| 5 | `event-wiring.js` | ~560 | Hard | New module |
-| 6 | Alignment I/O → `alignment.js` | ~90 | Easy | Extend existing |
-| 7 | URL loaders → `file-handlers.js` | ~235 | Medium | Extend existing |
-| 8 | Controls/viewer → `ui-controller.js` | ~130 | Easy | Extend existing |
-| 9 | Tauri dialogs → `tauri-bridge.js` | ~130 | Medium | Extend existing |
-| | **Total extractable** | **~2,395** | | |
+| # | Module | Lines | Difficulty | Strategy | Status |
+|---|--------|-------|------------|----------|--------|
+| 1 | `archive-pipeline.js` | ~650 | Medium | New module | Planned |
+| 2 | `export-controller.js` | ~330 | Medium | New module | Planned |
+| 3 | `screenshot-manager.js` | ~120 | Easy | New module | **Done** |
+| 4 | `transform-controller.js` | ~150 | Easy | New module | **Done** |
+| 5 | `event-wiring.js` | ~560 | Hard | New module | Planned |
+| 6 | Alignment I/O → `alignment.js` | ~90 | Easy | Extend existing | **Done** |
+| 7 | URL loaders → `file-handlers.js` | ~235 | Medium | Extend existing | Planned |
+| 8 | Controls/viewer → `ui-controller.js` | ~130 | Easy | Extend existing | **Done** |
+| 9 | Tauri dialogs → `tauri-bridge.js` | ~130 | Medium | Extend existing | Planned |
+| — | `asset-store.js` (structural prep) | ~50 | Easy | New singleton | **Done** |
+| — | `sceneRefs` getter (structural prep) | ~15 | Easy | Refactor in main.js | **Done** |
+| | **Total extractable** | **~2,395** | | | **4/9 done + structural prep** |
 
 **Remaining in main.js (~1,245 lines):**
 - `init()` — scene setup, system initialization, boot orchestration

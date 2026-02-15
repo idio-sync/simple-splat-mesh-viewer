@@ -170,57 +170,149 @@ export function hideLoading() {
 
 /**
  * Toggle controls panel visibility
- * @param {Object} state - Application state
+ * @param {Object} deps - { state, config, onWindowResize }
  */
-export function toggleControlsPanel(state) {
+export function toggleControlsPanel(deps) {
+    const { state } = deps;
     state.controlsVisible = !state.controlsVisible;
-    applyControlsVisibility(state.controlsVisible);
+    applyControlsVisibility(deps);
 }
 
 /**
- * Apply controls panel visibility
- * @param {boolean} visible - Whether panel should be visible
+ * Apply controls panel visibility. Handles controlsMode (full/minimal/none),
+ * width/padding styles, toggle button class management, and resize callback.
+ * @param {Object} deps - { state, config, onWindowResize }
+ * @param {boolean} [shouldShowOverride] - Override for visibility state
  */
-export function applyControlsVisibility(visible) {
+export function applyControlsVisibility(deps, shouldShowOverride) {
+    const { state, config, onWindowResize } = deps;
     const controlsPanel = document.getElementById('controls-panel');
-    if (!controlsPanel) {
-        log.warn('Controls panel not found');
+    if (!controlsPanel) return;
+
+    const toggleBtn = document.getElementById('btn-toggle-controls');
+    const shouldShow = shouldShowOverride !== undefined ? shouldShowOverride : state.controlsVisible;
+    const mode = (config && config.controlsMode) || 'full';
+
+    if (mode === 'none') {
+        controlsPanel.style.display = 'none';
+        if (toggleBtn) toggleBtn.style.display = 'none';
         return;
     }
 
-    log.debug('applyControlsVisibility:', visible);
+    // Clear any inline display/visibility styles
+    controlsPanel.style.display = '';
+    controlsPanel.style.visibility = '';
+    controlsPanel.style.opacity = '';
 
-    if (visible) {
-        controlsPanel.classList.remove('panel-hidden');
-        controlsPanel.style.width = '';
-        controlsPanel.style.minWidth = '';
-        controlsPanel.style.padding = '';
-        controlsPanel.style.overflow = '';
-        controlsPanel.style.borderLeftWidth = '';
-        controlsPanel.style.pointerEvents = '';
+    if (shouldShow) {
+        controlsPanel.classList.remove('panel-hidden', 'hidden');
+
+        const targetWidth = (mode === 'minimal') ? '200px' : '280px';
+        controlsPanel.style.width = targetWidth;
+        controlsPanel.style.minWidth = targetWidth;
+        controlsPanel.style.padding = '20px';
+        controlsPanel.style.overflow = 'visible';
+        controlsPanel.style.overflowY = 'auto';
+        controlsPanel.style.borderLeftWidth = '1px';
+        controlsPanel.style.pointerEvents = 'auto';
+
+        if (toggleBtn) toggleBtn.classList.remove('controls-hidden');
     } else {
         controlsPanel.classList.add('panel-hidden');
-        controlsPanel.style.width = '0';
-        controlsPanel.style.minWidth = '0';
-        controlsPanel.style.padding = '0';
-        controlsPanel.style.overflow = 'hidden';
-        controlsPanel.style.borderLeftWidth = '0';
-        controlsPanel.style.pointerEvents = 'none';
+        if (toggleBtn) toggleBtn.classList.add('controls-hidden');
     }
 
-    // Update toggle button icon
-    const toggleBtn = document.getElementById('btn-toggle-controls');
-    if (toggleBtn) {
-        const icon = toggleBtn.querySelector('span');
-        if (icon) {
-            icon.textContent = visible ? '▶' : '◀';
+    setTimeout(() => {
+        try { if (onWindowResize) onWindowResize(); } catch (e) { /* ignore */ }
+    }, 200);
+}
+
+/**
+ * Ensure toolbar visibility is maintained (safeguard against race conditions).
+ * @param {Object} config - App config with showToolbar property
+ */
+export function ensureToolbarVisibility(config) {
+    // Only hide toolbar if explicitly set to false (not undefined)
+    if (config.showToolbar === false) {
+        return; // Toolbar intentionally hidden via URL parameter
+    }
+
+    const toolbar = document.getElementById('left-toolbar');
+    if (!toolbar) return;
+
+    // Force toolbar to be visible
+    toolbar.style.display = 'flex';
+    toolbar.style.visibility = 'visible';
+    toolbar.style.zIndex = '10000';
+
+    // Re-check after file loading completes (delayed checks)
+    setTimeout(() => {
+        const tb = document.getElementById('left-toolbar');
+        if (tb && config.showToolbar !== false) {
+            tb.style.display = 'flex';
+            tb.style.visibility = 'visible';
+            tb.style.zIndex = '10000';
+        }
+    }, 1000);
+
+    setTimeout(() => {
+        const tb = document.getElementById('left-toolbar');
+        if (tb && config.showToolbar !== false) {
+            tb.style.display = 'flex';
+            tb.style.visibility = 'visible';
+            tb.style.zIndex = '10000';
+        }
+    }, 3000);
+}
+
+/**
+ * Apply viewer mode settings (toolbar visibility, sidebar state).
+ * @param {Object} config - App config
+ */
+export function applyViewerModeSettings(config) {
+    // Apply toolbar visibility - only hide if explicitly set to false
+    if (config.showToolbar === false) {
+        const toolbar = document.getElementById('left-toolbar');
+        if (toolbar) {
+            toolbar.style.display = 'none';
+            log.info('Toolbar hidden via URL parameter');
         }
     }
 
-    // Update annotation bar position to match panel visibility
-    const annotationBar = document.getElementById('annotation-bar');
-    if (annotationBar) {
-        annotationBar.style.left = visible ? '280px' : '0';
+    // Apply sidebar state (after a short delay to ensure DOM is ready)
+    if (config.sidebarMode && config.sidebarMode !== 'closed') {
+        setTimeout(() => {
+            const sidebar = document.getElementById('metadata-sidebar');
+            if (sidebar) {
+                sidebar.classList.remove('hidden');
+                log.info('Metadata sidebar shown via URL parameter');
+
+                // If view-only mode, hide the Edit tab
+                if (config.sidebarMode === 'view') {
+                    const editTab = document.querySelector('.sidebar-mode-tab[data-mode="edit"]');
+                    if (editTab) {
+                        editTab.style.display = 'none';
+                        log.info('Edit tab hidden for view-only mode');
+                    }
+
+                    // Also hide the annotations tab if in pure view mode
+                    const annotationsTab = document.querySelector('.sidebar-mode-tab[data-mode="annotations"]');
+                    if (annotationsTab) {
+                        annotationsTab.style.display = 'none';
+                    }
+                }
+
+                // Activate View tab by default
+                const viewTab = document.querySelector('.sidebar-mode-tab[data-mode="view"]');
+                const viewContent = document.getElementById('sidebar-view');
+                if (viewTab && viewContent) {
+                    document.querySelectorAll('.sidebar-mode-tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.sidebar-mode-content').forEach(c => c.classList.remove('active'));
+                    viewTab.classList.add('active');
+                    viewContent.classList.add('active');
+                }
+            }
+        }, 100);
     }
 }
 

@@ -36,6 +36,9 @@ COPY src/modules/kiosk-main.js /usr/share/nginx/html/modules/
 COPY src/modules/theme-loader.js /usr/share/nginx/html/modules/
 COPY src/modules/tauri-bridge.js /usr/share/nginx/html/modules/
 COPY src/modules/quality-tier.js /usr/share/nginx/html/modules/
+COPY src/modules/screenshot-manager.js /usr/share/nginx/html/modules/
+COPY src/modules/transform-controller.js /usr/share/nginx/html/modules/
+COPY src/modules/asset-store.js /usr/share/nginx/html/modules/
 
 # Copy theme files
 COPY src/themes/ /usr/share/nginx/html/themes/

@@ -743,25 +743,32 @@ export function fitToView(deps) {
 
 /**
  * Apply alignment data to objects
- * @param {Object} data - Alignment data
+ * @param {Object} data - Alignment data with splat/model/pointcloud transforms
  * @param {Object} deps - Dependencies object
  */
 export function applyAlignmentData(data, deps) {
-    const { splatMesh, modelGroup, updateTransformInputs } = deps;
+    const { splatMesh, modelGroup, pointcloudGroup, updateTransformInputs, storeLastPositions } = deps;
 
     if (data.splat && splatMesh) {
-        splatMesh.position.set(...data.splat.position);
+        splatMesh.position.fromArray(data.splat.position);
         splatMesh.rotation.set(...data.splat.rotation);
         splatMesh.scale.setScalar(data.splat.scale);
     }
 
     if (data.model && modelGroup) {
-        modelGroup.position.set(...data.model.position);
+        modelGroup.position.fromArray(data.model.position);
         modelGroup.rotation.set(...data.model.rotation);
         modelGroup.scale.setScalar(data.model.scale);
     }
 
+    if (data.pointcloud && pointcloudGroup) {
+        pointcloudGroup.position.fromArray(data.pointcloud.position);
+        pointcloudGroup.rotation.set(...data.pointcloud.rotation);
+        pointcloudGroup.scale.setScalar(data.pointcloud.scale);
+    }
+
     updateTransformInputs();
+    if (storeLastPositions) storeLastPositions();
 }
 
 /**
@@ -804,6 +811,96 @@ export function resetCamera(deps) {
     camera.lookAt(0, 0, 0);
     controls.target.set(0, 0, 0);
     controls.update();
+}
+
+// =============================================================================
+// ALIGNMENT I/O (extracted from main.js)
+// =============================================================================
+
+/**
+ * Save current alignment transforms to a JSON file.
+ * @param {Object} deps - { splatMesh, modelGroup, pointcloudGroup, tauriBridge }
+ */
+export async function saveAlignment(deps) {
+    const { splatMesh, modelGroup, pointcloudGroup, tauriBridge } = deps;
+
+    const alignment = {
+        version: 1,
+        splat: splatMesh ? {
+            position: splatMesh.position.toArray(),
+            rotation: [splatMesh.rotation.x, splatMesh.rotation.y, splatMesh.rotation.z],
+            scale: splatMesh.scale.x
+        } : null,
+        model: modelGroup ? {
+            position: modelGroup.position.toArray(),
+            rotation: [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z],
+            scale: modelGroup.scale.x
+        } : null,
+        pointcloud: pointcloudGroup ? {
+            position: pointcloudGroup.position.toArray(),
+            rotation: [pointcloudGroup.rotation.x, pointcloudGroup.rotation.y, pointcloudGroup.rotation.z],
+            scale: pointcloudGroup.scale.x
+        } : null
+    };
+
+    const blob = new Blob([JSON.stringify(alignment, null, 2)], { type: 'application/json' });
+    if (tauriBridge) {
+        await tauriBridge.download(blob, 'alignment.json', { name: 'JSON Files', extensions: ['json'] });
+    } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'alignment.json';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+}
+
+/**
+ * Load alignment from a file input event and apply it.
+ * @param {Event} event - File input change event
+ * @param {Object} deps - Dependencies for applyAlignmentData
+ */
+export function loadAlignment(event, deps) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const alignment = JSON.parse(e.target.result);
+            applyAlignmentData(alignment, deps);
+        } catch (error) {
+            notify('Error loading alignment file: ' + error.message, 'error');
+        }
+    };
+    reader.readAsText(file);
+
+    // Reset input so same file can be loaded again
+    event.target.value = '';
+}
+
+/**
+ * Load alignment from a URL and apply it.
+ * @param {string} url - URL to fetch alignment JSON from
+ * @param {Object} deps - Dependencies for applyAlignmentData
+ * @returns {Promise<boolean>} true if loaded successfully
+ */
+export async function loadAlignmentFromUrl(url, deps) {
+    try {
+        log.info('Loading alignment from URL:', url);
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const alignment = await response.json();
+        applyAlignmentData(alignment, deps);
+        log.info('Alignment loaded successfully from URL');
+        return true;
+    } catch (error) {
+        log.error('Error loading alignment from URL:', error);
+        return false;
+    }
 }
 
 // =============================================================================

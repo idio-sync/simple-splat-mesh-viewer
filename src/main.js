@@ -8,6 +8,7 @@ import { ArchiveCreator, captureScreenshot, CRYPTO_AVAILABLE } from './modules/a
 import { CAMERA, TIMING, ASSET_STATE, MESH_LOD, ENVIRONMENT } from './modules/constants.js';
 import { Logger, notify, computeMeshFaceCount, computeMeshVertexCount, disposeObject, fetchWithProgress } from './modules/utilities.js';
 import { FlyControls } from './modules/fly-controls.js';
+import { getStore } from './modules/asset-store.js';
 import { SceneManager } from './modules/scene-manager.js';
 import {
     LandmarkAlignment,
@@ -15,7 +16,11 @@ import {
     fitToView as fitToViewHandler,
     resetAlignment as resetAlignmentHandler,
     resetCamera as resetCameraHandler,
-    centerModelOnGrid
+    centerModelOnGrid,
+    saveAlignment as saveAlignmentHandler,
+    applyAlignmentData as applyAlignmentDataHandler,
+    loadAlignment as loadAlignmentHandler,
+    loadAlignmentFromUrl as loadAlignmentFromUrlHandler
 } from './modules/alignment.js';
 import {
     showLoading,
@@ -30,7 +35,11 @@ import {
     updateVisibility as updateVisibilityHandler,
     updateTransformInputs as updateTransformInputsHandler,
     showExportPanel as showExportPanelHandler,
-    applyControlsMode as applyControlsModeHandler
+    applyControlsMode as applyControlsModeHandler,
+    toggleControlsPanel as toggleControlsPanelHandler,
+    applyControlsVisibility as applyControlsVisibilityHandler,
+    ensureToolbarVisibility as ensureToolbarVisibilityHandler,
+    applyViewerModeSettings as applyViewerModeSettingsHandler
 } from './modules/ui-controller.js';
 import {
     formatFileSize,
@@ -88,6 +97,20 @@ import {
     initShareDialog,
     showShareDialog
 } from './modules/share-dialog.js';
+import {
+    captureScreenshotToList as captureScreenshotToListHandler,
+    showViewfinder as showViewfinderHandler,
+    hideViewfinder as hideViewfinderHandler,
+    captureManualPreview as captureManualPreviewHandler,
+    renderScreenshotsList as renderScreenshotsListHandler,
+    removeScreenshot as removeScreenshotHandler
+} from './modules/screenshot-manager.js';
+import {
+    setSelectedObject as setSelectedObjectHandler,
+    syncBothObjects as syncBothObjectsHandler,
+    storeLastPositions as storeLastPositionsHandler,
+    setTransformMode as setTransformModeHandler
+} from './modules/transform-controller.js';
 import {
     getCurrentPopupAnnotationId,
     dismissPopup as dismissPopupHandler,
@@ -287,13 +310,27 @@ let annotationSystem = null;
 let landmarkAlignment = null;
 let archiveCreator = null;
 
-// Blob data for archive export (stored when loading files)
-let currentSplatBlob = null;
-let currentMeshBlob = null;
-let currentProxyMeshBlob = null;
-let currentProxySplatBlob = null;
-let currentPointcloudBlob = null;
-let sourceFiles = []; // Array of { file: File|null, name: string, size: number, category: string, fromArchive: boolean }
+// Asset blob store (ES module singleton — shared with archive-pipeline, export-controller, etc.)
+const assets = getStore();
+
+// Dynamic getter object for mutable Three.js references — prevents stale-reference bugs
+// when splatMesh/modelGroup etc. are reassigned after loading new files.
+// Pass to extracted modules instead of individual objects.
+const sceneRefs = {
+    get scene() { return scene; },
+    get camera() { return camera; },
+    get renderer() { return renderer; },
+    get controls() { return controls; },
+    get transformControls() { return transformControls; },
+    get splatMesh() { return splatMesh; },
+    get modelGroup() { return modelGroup; },
+    get pointcloudGroup() { return pointcloudGroup; },
+    get stlGroup() { return stlGroup; },
+    get flyControls() { return flyControls; },
+    get annotationSystem() { return annotationSystem; },
+    get archiveCreator() { return archiveCreator; },
+    get landmarkAlignment() { return landmarkAlignment; }
+};
 
 // Three.js objects - Split view (right side)
 let rendererRight = null;
@@ -334,7 +371,7 @@ function createFileHandlerDeps() {
                 updateVisibility();
                 updateTransformInputs();
                 storeLastPositions();
-                currentSplatBlob = file;
+                assets.splatBlob = file;
                 document.getElementById('splat-vertices').textContent = 'Loaded';
                 // Auto center-align if model is already loaded
                 if (state.modelLoaded) {
@@ -354,7 +391,7 @@ function createFileHandlerDeps() {
                 updateVisibility();
                 updateTransformInputs();
                 storeLastPositions();
-                currentMeshBlob = file;
+                assets.meshBlob = file;
                 document.getElementById('model-faces').textContent = (faceCount || 0).toLocaleString();
                 // Advisory face count warnings
                 if (faceCount > MESH_LOD.DESKTOP_WARNING_FACES) {
@@ -424,9 +461,9 @@ function createMetadataDeps() {
         state,
         annotationSystem,
         imageAssets: state.imageAssets,
-        currentSplatBlob,
-        currentMeshBlob,
-        currentPointcloudBlob,
+        currentSplatBlob: assets.splatBlob,
+        currentMeshBlob: assets.meshBlob,
+        currentPointcloudBlob: assets.pointcloudBlob,
         updateAnnotationsList: updateSidebarAnnotationsList,
         onAddAnnotation: toggleAnnotationMode,
         onUpdateAnnotationCamera: updateSelectedAnnotationCamera,
@@ -1411,155 +1448,21 @@ function setBackgroundColor(hexColor) {
     }
 }
 
+// Transform controls (delegated to transform-controller.js)
 function setSelectedObject(selection) {
-    state.selectedObject = selection;
-
-    // Update button states
-    ['splat', 'model', 'both', 'none'].forEach(s => {
-        const btn = document.getElementById(`btn-select-${s}`);
-        if (btn) btn.classList.toggle('active', s === selection);
-    });
-
-    // Attach transform controls with error handling
-    try {
-        transformControls.detach();
-    } catch (e) {
-        log.warn(' Error detaching transform controls:', e);
-    }
-
-    try {
-        if (selection === 'splat' && splatMesh) {
-            transformControls.attach(splatMesh);
-        } else if (selection === 'model' && modelGroup && modelGroup.children.length > 0) {
-            transformControls.attach(modelGroup);
-        } else if (selection === 'both') {
-            // For both, attach to splat and sync model
-            if (splatMesh) {
-                transformControls.attach(splatMesh);
-            } else if (modelGroup && modelGroup.children.length > 0) {
-                transformControls.attach(modelGroup);
-            }
-        }
-    } catch (attachError) {
-        log.error(' Error attaching transform controls:', attachError);
-        log.error(' This may be due to THREE.js instance mismatch.');
-        // Don't re-throw - allow the rest of the application to continue
-    }
+    setSelectedObjectHandler(selection, { transformControls, splatMesh, modelGroup, state });
 }
-
-// Sync both objects when moving in "both" mode
-let lastSplatPosition = new THREE.Vector3();
-let lastSplatRotation = new THREE.Euler();
-let lastSplatScale = new THREE.Vector3(1, 1, 1);
-let lastModelPosition = new THREE.Vector3();
-let lastModelRotation = new THREE.Euler();
-let lastModelScale = new THREE.Vector3(1, 1, 1);
-let lastPointcloudPosition = new THREE.Vector3();
-let lastPointcloudRotation = new THREE.Euler();
-let lastPointcloudScale = new THREE.Vector3(1, 1, 1);
 
 function syncBothObjects() {
-    if (!splatMesh || !modelGroup) return;
-
-    // Calculate the delta movement based on which object is attached
-    if (transformControls.object === splatMesh) {
-        const deltaPos = new THREE.Vector3().subVectors(splatMesh.position, lastSplatPosition);
-        const deltaRot = new THREE.Euler(
-            splatMesh.rotation.x - lastSplatRotation.x,
-            splatMesh.rotation.y - lastSplatRotation.y,
-            splatMesh.rotation.z - lastSplatRotation.z
-        );
-        // Calculate scale ratio to apply proportionally
-        const scaleRatio = lastSplatScale.x !== 0 ? splatMesh.scale.x / lastSplatScale.x : 1;
-
-        modelGroup.position.add(deltaPos);
-        modelGroup.rotation.x += deltaRot.x;
-        modelGroup.rotation.y += deltaRot.y;
-        modelGroup.rotation.z += deltaRot.z;
-        modelGroup.scale.multiplyScalar(scaleRatio);
-
-        if (pointcloudGroup) {
-            pointcloudGroup.position.add(deltaPos);
-            pointcloudGroup.rotation.x += deltaRot.x;
-            pointcloudGroup.rotation.y += deltaRot.y;
-            pointcloudGroup.rotation.z += deltaRot.z;
-            pointcloudGroup.scale.multiplyScalar(scaleRatio);
-        }
-    } else if (transformControls.object === modelGroup) {
-        const deltaPos = new THREE.Vector3().subVectors(modelGroup.position, lastModelPosition);
-        const deltaRot = new THREE.Euler(
-            modelGroup.rotation.x - lastModelRotation.x,
-            modelGroup.rotation.y - lastModelRotation.y,
-            modelGroup.rotation.z - lastModelRotation.z
-        );
-        // Calculate scale ratio to apply proportionally
-        const scaleRatio = lastModelScale.x !== 0 ? modelGroup.scale.x / lastModelScale.x : 1;
-
-        splatMesh.position.add(deltaPos);
-        splatMesh.rotation.x += deltaRot.x;
-        splatMesh.rotation.y += deltaRot.y;
-        splatMesh.rotation.z += deltaRot.z;
-        splatMesh.scale.multiplyScalar(scaleRatio);
-
-        if (pointcloudGroup) {
-            pointcloudGroup.position.add(deltaPos);
-            pointcloudGroup.rotation.x += deltaRot.x;
-            pointcloudGroup.rotation.y += deltaRot.y;
-            pointcloudGroup.rotation.z += deltaRot.z;
-            pointcloudGroup.scale.multiplyScalar(scaleRatio);
-        }
-    }
-
-    // Update last positions and scales
-    if (splatMesh) {
-        lastSplatPosition.copy(splatMesh.position);
-        lastSplatRotation.copy(splatMesh.rotation);
-        lastSplatScale.copy(splatMesh.scale);
-    }
-    if (modelGroup) {
-        lastModelPosition.copy(modelGroup.position);
-        lastModelRotation.copy(modelGroup.rotation);
-        lastModelScale.copy(modelGroup.scale);
-    }
-    if (pointcloudGroup) {
-        lastPointcloudPosition.copy(pointcloudGroup.position);
-        lastPointcloudRotation.copy(pointcloudGroup.rotation);
-        lastPointcloudScale.copy(pointcloudGroup.scale);
-    }
+    syncBothObjectsHandler({ transformControls, splatMesh, modelGroup, pointcloudGroup });
 }
 
-// Store last positions, rotations, and scales when selection changes
 function storeLastPositions() {
-    if (splatMesh) {
-        lastSplatPosition.copy(splatMesh.position);
-        lastSplatRotation.copy(splatMesh.rotation);
-        lastSplatScale.copy(splatMesh.scale);
-    }
-    if (modelGroup) {
-        lastModelPosition.copy(modelGroup.position);
-        lastModelRotation.copy(modelGroup.rotation);
-        lastModelScale.copy(modelGroup.scale);
-    }
-    if (pointcloudGroup) {
-        lastPointcloudPosition.copy(pointcloudGroup.position);
-        lastPointcloudRotation.copy(pointcloudGroup.rotation);
-        lastPointcloudScale.copy(pointcloudGroup.scale);
-    }
+    storeLastPositionsHandler({ splatMesh, modelGroup, pointcloudGroup });
 }
 
 function setTransformMode(mode) {
-    state.transformMode = mode;
-    transformControls.setMode(mode);
-
-    // Update button states
-    ['translate', 'rotate', 'scale'].forEach(m => {
-        const btnId = m === 'translate' ? 'btn-translate' : m === 'rotate' ? 'btn-rotate' : 'btn-scale';
-        const btn = document.getElementById(btnId);
-        if (btn) btn.classList.toggle('active', m === mode);
-    });
-
-    // Store positions when changing mode
-    storeLastPositions();
+    setTransformModeHandler(mode, { transformControls, state, splatMesh, modelGroup, pointcloudGroup });
 }
 
 function updateVisibility() {
@@ -1751,7 +1654,7 @@ async function ensureAssetLoaded(assetType) {
                 splatMesh.rotation.set(...transform.rotation);
                 splatMesh.scale.setScalar(transform.scale);
             }
-            currentSplatBlob = splatData.blob;
+            assets.splatBlob = splatData.blob;
             state.assetStates[assetType] = ASSET_STATE.LOADED;
             return true;
 
@@ -1779,19 +1682,19 @@ async function ensureAssetLoaded(assetType) {
             }
             if (useProxy) {
                 // Store the proxy blob for re-export, extract full-res blob in background
-                currentProxyMeshBlob = meshData.blob;
+                assets.proxyMeshBlob = meshData.blob;
                 const proxyName = entryToLoad.file_name.split('/').pop();
                 const proxyFilenameEl = document.getElementById('proxy-mesh-filename');
                 if (proxyFilenameEl) proxyFilenameEl.textContent = proxyName;
                 archiveLoader.extractFile(meshEntry.file_name).then(fullData => {
-                    if (fullData) currentMeshBlob = fullData.blob;
+                    if (fullData) assets.meshBlob = fullData.blob;
                 }).catch(() => {});
                 state.viewingProxy = true;
                 document.getElementById('proxy-mesh-indicator')?.classList.remove('hidden');
                 const fullResBtn = document.getElementById('btn-load-full-res');
                 if (fullResBtn) fullResBtn.style.display = '';
             } else {
-                currentMeshBlob = meshData.blob;
+                assets.meshBlob = meshData.blob;
             }
             state.assetStates[assetType] = ASSET_STATE.LOADED;
             return true;
@@ -1817,7 +1720,7 @@ async function ensureAssetLoaded(assetType) {
             }
             document.getElementById('pointcloud-filename').textContent = pointcloudEntry.file_name.split('/').pop();
             document.getElementById('pointcloud-points').textContent = result.pointCount.toLocaleString();
-            currentPointcloudBlob = pcData.blob;
+            assets.pointcloudBlob = pcData.blob;
             state.assetStates[assetType] = ASSET_STATE.LOADED;
             return true;
         }
@@ -1885,7 +1788,7 @@ async function processArchive(archiveLoader, archiveName) {
         const archiveSourceEntries = archiveLoader.getSourceFileEntries();
         if (archiveSourceEntries.length > 0) {
             for (const { entry } of archiveSourceEntries) {
-                sourceFiles.push({
+                assets.sourceFiles.push({
                     file: null,
                     name: entry.original_name || entry.file_name.split('/').pop(),
                     size: entry.size_bytes || 0,
@@ -2181,7 +2084,7 @@ function clearArchiveMetadata() {
     if (section) section.style.display = 'none';
 
     // Clear source files from previous archive
-    sourceFiles = [];
+    assets.sourceFiles = [];
     updateSourceFilesUI();
 }
 
@@ -2268,125 +2171,31 @@ function updateArchiveAssetCheckboxes() {
 }
 
 // =============================================================================
-// SCREENSHOT FUNCTIONS
+// SCREENSHOT FUNCTIONS (delegated to screenshot-manager.js)
 // =============================================================================
 
-async function captureScreenshotToList() {
-    if (!renderer) {
-        notify.error('Renderer not ready');
-        return;
-    }
-    try {
-        renderer.render(scene, camera);
-        const blob = await captureScreenshot(renderer.domElement, { width: 1024, height: 1024 });
-        if (!blob) {
-            notify.error('Screenshot capture failed');
-            return;
-        }
-        const dataUrl = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.readAsDataURL(blob);
-        });
-        state.screenshots.push({
-            id: Date.now(),
-            blob,
-            dataUrl,
-            timestamp: new Date().toISOString()
-        });
-        renderScreenshotsList();
-        notify.success('Screenshot captured');
-    } catch (e) {
-        log.error('Screenshot capture error:', e);
-        notify.error('Failed to capture screenshot');
-    }
+function captureScreenshotToList() {
+    return captureScreenshotToListHandler({ renderer, scene, camera, state });
 }
 
 function showViewfinder() {
-    if (!renderer) return;
-    const overlay = document.getElementById('viewfinder-overlay');
-    const frame = document.getElementById('viewfinder-frame');
-    const controls = document.getElementById('viewfinder-controls');
-    const dim = document.getElementById('viewfinder-dim');
-    if (!overlay || !frame || !controls) return;
-
-    const container = document.getElementById('viewer-container');
-    const rect = container.getBoundingClientRect();
-    const cw = rect.width;
-    const ch = rect.height;
-    const size = Math.min(cw, ch) * 0.8;
-    const left = (cw - size) / 2;
-    const top = (ch - size) / 2;
-
-    // Hide the dim layer — the frame's box-shadow creates the dimming effect
-    if (dim) dim.style.display = 'none';
-
-    frame.style.left = left + 'px';
-    frame.style.top = top + 'px';
-    frame.style.width = size + 'px';
-    frame.style.height = size + 'px';
-
-    controls.style.top = (top + size + 15) + 'px';
-
-    overlay.classList.remove('hidden');
+    showViewfinderHandler();
 }
 
 function hideViewfinder() {
-    const overlay = document.getElementById('viewfinder-overlay');
-    if (overlay) overlay.classList.add('hidden');
+    hideViewfinderHandler();
 }
 
-async function captureManualPreview() {
-    if (!renderer) return;
-    try {
-        renderer.render(scene, camera);
-        const blob = await captureScreenshot(renderer.domElement, { width: 512, height: 512 });
-        if (blob) {
-            state.manualPreviewBlob = blob;
-            hideViewfinder();
-            const status = document.getElementById('manual-preview-status');
-            if (status) status.style.display = '';
-            notify.success('Manual preview captured');
-        }
-    } catch (e) {
-        log.error('Manual preview capture error:', e);
-        notify.error('Failed to capture preview');
-    }
+function captureManualPreview() {
+    return captureManualPreviewHandler({ renderer, scene, camera, state });
 }
 
 function renderScreenshotsList() {
-    const list = document.getElementById('screenshots-list');
-    if (!list) return;
-    list.innerHTML = '';
-
-    if (state.screenshots.length === 0) return;
-
-    state.screenshots.forEach((shot) => {
-        const item = document.createElement('div');
-        item.className = 'screenshot-item';
-
-        const img = document.createElement('img');
-        img.src = shot.dataUrl;
-        img.alt = 'Screenshot';
-        item.appendChild(img);
-
-        const del = document.createElement('button');
-        del.className = 'screenshot-delete';
-        del.textContent = '\u00D7';
-        del.title = 'Remove screenshot';
-        del.addEventListener('click', (e) => {
-            e.stopPropagation();
-            removeScreenshot(shot.id);
-        });
-        item.appendChild(del);
-
-        list.appendChild(item);
-    });
+    renderScreenshotsListHandler(state);
 }
 
 function removeScreenshot(id) {
-    state.screenshots = state.screenshots.filter(s => s.id !== id);
-    renderScreenshotsList();
+    removeScreenshotHandler(id, state);
 }
 
 // Download archive
@@ -2473,15 +2282,15 @@ async function downloadArchive() {
     const includeAnnotations = document.getElementById('archive-include-annotations')?.checked;
 
     // Add splat if loaded and selected
-    log.info(' Checking splat:', { currentSplatBlob: !!currentSplatBlob, splatLoaded: state.splatLoaded });
-    if (includeSplat && currentSplatBlob && state.splatLoaded) {
+    log.info(' Checking splat:', { splatBlob: !!assets.splatBlob, splatLoaded: state.splatLoaded });
+    if (includeSplat && assets.splatBlob && state.splatLoaded) {
         const fileName = document.getElementById('splat-filename')?.textContent || 'scene.ply';
         const position = splatMesh ? [splatMesh.position.x, splatMesh.position.y, splatMesh.position.z] : [0, 0, 0];
         const rotation = splatMesh ? [splatMesh.rotation.x, splatMesh.rotation.y, splatMesh.rotation.z] : [0, 0, 0];
         const scale = splatMesh ? splatMesh.scale.x : 1;
 
         log.info(' Adding scene:', { fileName, position, rotation, scale });
-        archiveCreator.addScene(currentSplatBlob, fileName, {
+        archiveCreator.addScene(assets.splatBlob, fileName, {
             position, rotation, scale,
             created_by: metadata.splatMetadata.createdBy || 'unknown',
             created_by_version: metadata.splatMetadata.version || '',
@@ -2491,23 +2300,23 @@ async function downloadArchive() {
     }
 
     // Add mesh if loaded and selected
-    log.info(' Checking mesh:', { currentMeshBlob: !!currentMeshBlob, modelLoaded: state.modelLoaded });
+    log.info(' Checking mesh:', { meshBlob: !!assets.meshBlob, modelLoaded: state.modelLoaded });
     // If viewing a proxy and full-res blob hasn't been extracted yet, extract now
-    if (includeModel && state.modelLoaded && !currentMeshBlob && state.viewingProxy && state.archiveLoader) {
+    if (includeModel && state.modelLoaded && !assets.meshBlob && state.viewingProxy && state.archiveLoader) {
         const meshEntry = state.archiveLoader.getMeshEntry();
         if (meshEntry) {
             const fullData = await state.archiveLoader.extractFile(meshEntry.file_name);
-            if (fullData) currentMeshBlob = fullData.blob;
+            if (fullData) assets.meshBlob = fullData.blob;
         }
     }
-    if (includeModel && currentMeshBlob && state.modelLoaded) {
+    if (includeModel && assets.meshBlob && state.modelLoaded) {
         const fileName = document.getElementById('model-filename')?.textContent || 'mesh.glb';
         const position = modelGroup ? [modelGroup.position.x, modelGroup.position.y, modelGroup.position.z] : [0, 0, 0];
         const rotation = modelGroup ? [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z] : [0, 0, 0];
         const scale = modelGroup ? modelGroup.scale.x : 1;
 
         log.info(' Adding mesh:', { fileName, position, rotation, scale });
-        archiveCreator.addMesh(currentMeshBlob, fileName, {
+        archiveCreator.addMesh(assets.meshBlob, fileName, {
             position, rotation, scale,
             created_by: metadata.meshMetadata.createdBy || 'unknown',
             created_by_version: metadata.meshMetadata.version || '',
@@ -2517,43 +2326,43 @@ async function downloadArchive() {
     }
 
     // Add display proxy mesh if available
-    if (includeModel && currentProxyMeshBlob) {
+    if (includeModel && assets.proxyMeshBlob) {
         const proxyFileName = document.getElementById('proxy-mesh-filename')?.textContent || 'mesh_proxy.glb';
         const position = modelGroup ? [modelGroup.position.x, modelGroup.position.y, modelGroup.position.z] : [0, 0, 0];
         const rotation = modelGroup ? [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z] : [0, 0, 0];
         const scale = modelGroup ? modelGroup.scale.x : 1;
 
         log.info(' Adding mesh proxy:', { proxyFileName });
-        archiveCreator.addMeshProxy(currentProxyMeshBlob, proxyFileName, {
+        archiveCreator.addMeshProxy(assets.proxyMeshBlob, proxyFileName, {
             position, rotation, scale,
             derived_from: 'mesh_0'
         });
     }
 
     // Add display proxy splat if available
-    if (currentProxySplatBlob) {
+    if (assets.proxySplatBlob) {
         const proxySplatFileName = document.getElementById('proxy-splat-filename')?.textContent || 'scene_proxy.spz';
         const splatPosition = splatMesh ? [splatMesh.position.x, splatMesh.position.y, splatMesh.position.z] : [0, 0, 0];
         const splatRotation = splatMesh ? [splatMesh.rotation.x, splatMesh.rotation.y, splatMesh.rotation.z] : [0, 0, 0];
         const splatScale = splatMesh ? splatMesh.scale.x : 1;
 
         log.info(' Adding splat proxy:', { proxySplatFileName });
-        archiveCreator.addSceneProxy(currentProxySplatBlob, proxySplatFileName, {
+        archiveCreator.addSceneProxy(assets.proxySplatBlob, proxySplatFileName, {
             position: splatPosition, rotation: splatRotation, scale: splatScale,
             derived_from: 'scene_0'
         });
     }
 
     // Add point cloud if loaded and selected
-    log.info(' Checking pointcloud:', { currentPointcloudBlob: !!currentPointcloudBlob, pointcloudLoaded: state.pointcloudLoaded });
-    if (includePointcloud && currentPointcloudBlob && state.pointcloudLoaded) {
+    log.info(' Checking pointcloud:', { pointcloudBlob: !!assets.pointcloudBlob, pointcloudLoaded: state.pointcloudLoaded });
+    if (includePointcloud && assets.pointcloudBlob && state.pointcloudLoaded) {
         const fileName = document.getElementById('pointcloud-filename')?.textContent || 'pointcloud.e57';
         const position = pointcloudGroup ? [pointcloudGroup.position.x, pointcloudGroup.position.y, pointcloudGroup.position.z] : [0, 0, 0];
         const rotation = pointcloudGroup ? [pointcloudGroup.rotation.x, pointcloudGroup.rotation.y, pointcloudGroup.rotation.z] : [0, 0, 0];
         const scale = pointcloudGroup ? pointcloudGroup.scale.x : 1;
 
         log.info(' Adding pointcloud:', { fileName, position, rotation, scale });
-        archiveCreator.addPointcloud(currentPointcloudBlob, fileName, {
+        archiveCreator.addPointcloud(assets.pointcloudBlob, fileName, {
             position, rotation, scale,
             created_by: metadata.pointcloudMetadata?.createdBy || 'unknown',
             created_by_version: metadata.pointcloudMetadata?.version || '',
@@ -2577,7 +2386,7 @@ async function downloadArchive() {
     }
 
     // Add user-added source files (have blobs, not from archive)
-    const sourceFilesWithBlobs = sourceFiles.filter(sf => sf.file && !sf.fromArchive);
+    const sourceFilesWithBlobs = assets.sourceFiles.filter(sf => sf.file && !sf.fromArchive);
     if (sourceFilesWithBlobs.length > 0) {
         const totalSourceSize = sourceFilesWithBlobs.reduce((sum, sf) => sum + sf.size, 0);
         if (totalSourceSize > 2 * 1024 * 1024 * 1024) {
@@ -2612,10 +2421,10 @@ async function downloadArchive() {
         splatCount: (includeSplat && state.splatLoaded) ? parseInt(document.getElementById('splat-vertices')?.textContent) || 0 : 0,
         meshPolys: (includeModel && state.modelLoaded) ? parseInt(document.getElementById('model-faces')?.textContent) || 0 : 0,
         meshVerts: (includeModel && state.modelLoaded) ? (state.meshVertexCount || 0) : 0,
-        splatFileSize: (includeSplat && currentSplatBlob) ? currentSplatBlob.size : 0,
-        meshFileSize: (includeModel && currentMeshBlob) ? currentMeshBlob.size : 0,
+        splatFileSize: (includeSplat && assets.splatBlob) ? assets.splatBlob.size : 0,
+        meshFileSize: (includeModel && assets.meshBlob) ? assets.meshBlob.size : 0,
         pointcloudPoints: (includePointcloud && state.pointcloudLoaded) ? parseInt(document.getElementById('pointcloud-points')?.textContent?.replace(/,/g, '')) || 0 : 0,
-        pointcloudFileSize: (includePointcloud && currentPointcloudBlob) ? currentPointcloudBlob.size : 0
+        pointcloudFileSize: (includePointcloud && assets.pointcloudBlob) ? assets.pointcloudBlob.size : 0
     });
 
     // Add preview/thumbnail
@@ -2941,7 +2750,7 @@ function wireNativeFileDialogs() {
     });
 
     wireInput('proxy-mesh-input', 'model', false, async (files) => {
-        currentProxyMeshBlob = files[0];
+        assets.proxyMeshBlob = files[0];
         document.getElementById('proxy-mesh-filename').textContent = files[0].name;
         notify.info(`Display proxy "${files[0].name}" ready — will be included in archive exports.`);
     });
@@ -2949,7 +2758,7 @@ function wireNativeFileDialogs() {
     wireInput('source-files-input', 'all', true, async (files) => {
         const category = document.getElementById('source-files-category')?.value || '';
         for (const file of files) {
-            sourceFiles.push({ file, name: file.name, size: file.size, category, fromArchive: false });
+            assets.sourceFiles.push({ file, name: file.name, size: file.size, category, fromArchive: false });
         }
         updateSourceFilesUI();
         notify.info(`Added ${files.length} source file(s) for archival.`);
@@ -3073,7 +2882,7 @@ async function handleProxyMeshFile(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    currentProxyMeshBlob = file;
+    assets.proxyMeshBlob = file;
     document.getElementById('proxy-mesh-filename').textContent = file.name;
     notify.info(`Display proxy "${file.name}" ready — will be included in archive exports.`);
 }
@@ -3082,7 +2891,7 @@ async function handleProxySplatFile(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    currentProxySplatBlob = file;
+    assets.proxySplatBlob = file;
     document.getElementById('proxy-splat-filename').textContent = file.name;
     notify.info(`Splat display proxy "${file.name}" ready — will be included in archive exports.`);
 }
@@ -3115,7 +2924,7 @@ async function switchQualityTier(newTier) {
             if (newTier === 'hd') {
                 const result = await loadArchiveFullResMesh(archiveLoader, deps);
                 if (result.loaded) {
-                    currentMeshBlob = result.blob;
+                    assets.meshBlob = result.blob;
                     state.viewingProxy = false;
                     document.getElementById('proxy-mesh-indicator')?.classList.add('hidden');
                 }
@@ -3146,7 +2955,7 @@ function handleSourceFilesInput(event) {
     const category = document.getElementById('source-files-category')?.value || '';
 
     for (const file of files) {
-        sourceFiles.push({ file, name: file.name, size: file.size, category, fromArchive: false });
+        assets.sourceFiles.push({ file, name: file.name, size: file.size, category, fromArchive: false });
     }
 
     updateSourceFilesUI();
@@ -3157,7 +2966,7 @@ function handleSourceFilesInput(event) {
 }
 
 function removeSourceFile(index) {
-    sourceFiles.splice(index, 1);
+    assets.sourceFiles.splice(index, 1);
     updateSourceFilesUI();
 }
 
@@ -3171,7 +2980,7 @@ function updateSourceFilesUI() {
 
     listEl.innerHTML = '';
 
-    sourceFiles.forEach((sf, i) => {
+    assets.sourceFiles.forEach((sf, i) => {
         const item = document.createElement('div');
         item.className = 'source-file-item';
         item.innerHTML = `<span class="source-file-name" title="${sf.name}">${sf.name}</span>` +
@@ -3185,12 +2994,12 @@ function updateSourceFilesUI() {
         btn.addEventListener('click', () => removeSourceFile(parseInt(btn.dataset.index)));
     });
 
-    const totalSize = sourceFiles.reduce((sum, sf) => sum + sf.size, 0);
+    const totalSize = assets.sourceFiles.reduce((sum, sf) => sum + sf.size, 0);
 
     if (summaryEl) {
-        summaryEl.style.display = sourceFiles.length > 0 ? '' : 'none';
+        summaryEl.style.display = assets.sourceFiles.length > 0 ? '' : 'none';
     }
-    if (countEl) countEl.textContent = sourceFiles.length;
+    if (countEl) countEl.textContent = assets.sourceFiles.length;
     if (sizeEl) sizeEl.textContent = formatFileSize(totalSize);
 }
 
@@ -3205,7 +3014,7 @@ async function handleLoadFullResMesh() {
     try {
         const result = await loadArchiveFullResMesh(archiveLoader, createFileHandlerDeps());
         if (result.loaded) {
-            currentMeshBlob = result.blob;
+            assets.meshBlob = result.blob;
             state.viewingProxy = false;
             document.getElementById('model-faces').textContent = (result.faceCount || 0).toLocaleString();
             // Hide proxy indicator and Load Full Res button
@@ -3241,93 +3050,28 @@ function updateModelMetalnessView() { updateModelMetalnessFn(modelGroup, state.m
 
 function updateModelSpecularF0View() { updateModelSpecularF0Fn(modelGroup, state.modelSpecularF0); }
 
-async function saveAlignment() {
-    const alignment = {
-        version: 1,
-        splat: splatMesh ? {
-            position: splatMesh.position.toArray(),
-            rotation: [splatMesh.rotation.x, splatMesh.rotation.y, splatMesh.rotation.z],
-            scale: splatMesh.scale.x
-        } : null,
-        model: modelGroup ? {
-            position: modelGroup.position.toArray(),
-            rotation: [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z],
-            scale: modelGroup.scale.x
-        } : null
+// Alignment I/O (delegated to alignment.js)
+function createAlignmentIODeps() {
+    return {
+        splatMesh, modelGroup, pointcloudGroup, tauriBridge,
+        updateTransformInputs, storeLastPositions
     };
-
-    const blob = new Blob([JSON.stringify(alignment, null, 2)], { type: 'application/json' });
-    if (tauriBridge) {
-        await tauriBridge.download(blob, 'alignment.json', { name: 'JSON Files', extensions: ['json'] });
-    } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'alignment.json';
-        a.click();
-        URL.revokeObjectURL(url);
-    }
 }
 
-// Apply alignment data to splat and model objects
+function saveAlignment() {
+    return saveAlignmentHandler(createAlignmentIODeps());
+}
+
 function applyAlignmentData(data) {
-    if (data.splat && splatMesh) {
-        splatMesh.position.fromArray(data.splat.position);
-        splatMesh.rotation.set(...data.splat.rotation);
-        splatMesh.scale.setScalar(data.splat.scale);
-    }
-
-    if (data.model && modelGroup) {
-        modelGroup.position.fromArray(data.model.position);
-        modelGroup.rotation.set(...data.model.rotation);
-        modelGroup.scale.setScalar(data.model.scale);
-    }
-
-    if (data.pointcloud && pointcloudGroup) {
-        pointcloudGroup.position.fromArray(data.pointcloud.position);
-        pointcloudGroup.rotation.set(...data.pointcloud.rotation);
-        pointcloudGroup.scale.setScalar(data.pointcloud.scale);
-    }
-
-    updateTransformInputs();
-    storeLastPositions();
+    applyAlignmentDataHandler(data, createAlignmentIODeps());
 }
 
 function loadAlignment(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            const alignment = JSON.parse(e.target.result);
-            applyAlignmentData(alignment);
-        } catch (error) {
-            notify.error('Error loading alignment file: ' + error.message);
-        }
-    };
-    reader.readAsText(file);
-
-    // Reset input so same file can be loaded again
-    event.target.value = '';
+    loadAlignmentHandler(event, createAlignmentIODeps());
 }
 
-// Load alignment from a URL
-async function loadAlignmentFromUrl(url) {
-    try {
-        log.info(' Loading alignment from URL:', url);
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const alignment = await response.json();
-        applyAlignmentData(alignment);
-        log.info(' Alignment loaded successfully from URL');
-        return true;
-    } catch (error) {
-        log.error(' Error loading alignment from URL:', error);
-        return false;
-    }
+function loadAlignmentFromUrl(url) {
+    return loadAlignmentFromUrlHandler(url, createAlignmentIODeps());
 }
 
 // Open share dialog with current state
@@ -3397,140 +3141,29 @@ function fitToView() {
     }
 }
 
-// Controls panel visibility
+// Controls panel visibility (delegated to ui-controller.js)
+function createControlsDeps() {
+    return { state, config, onWindowResize };
+}
+
 function toggleControlsPanel() {
-    state.controlsVisible = !state.controlsVisible;
-    applyControlsVisibility(state.controlsVisible);
+    toggleControlsPanelHandler(createControlsDeps());
 }
 
 function applyControlsVisibility(shouldShowOverride) {
-    const controlsPanel = document.getElementById('controls-panel');
-    if (!controlsPanel) return;
-
-    const toggleBtn = document.getElementById('btn-toggle-controls');
-    const shouldShow = shouldShowOverride !== undefined ? shouldShowOverride : state.controlsVisible;
-    const mode = config.controlsMode || 'full';
-
-    if (mode === 'none') {
-        controlsPanel.style.display = 'none';
-        if (toggleBtn) toggleBtn.style.display = 'none';
-        return;
-    }
-
-    // Clear any inline display/visibility styles
-    controlsPanel.style.display = '';
-    controlsPanel.style.visibility = '';
-    controlsPanel.style.opacity = '';
-
-    if (shouldShow) {
-        controlsPanel.classList.remove('panel-hidden', 'hidden');
-
-        const targetWidth = (mode === 'minimal') ? '200px' : '280px';
-        controlsPanel.style.width = targetWidth;
-        controlsPanel.style.minWidth = targetWidth;
-        controlsPanel.style.padding = '20px';
-        controlsPanel.style.overflow = 'visible';
-        controlsPanel.style.overflowY = 'auto';
-        controlsPanel.style.borderLeftWidth = '1px';
-        controlsPanel.style.pointerEvents = 'auto';
-
-        if (toggleBtn) toggleBtn.classList.remove('controls-hidden');
-    } else {
-        controlsPanel.classList.add('panel-hidden');
-        if (toggleBtn) toggleBtn.classList.add('controls-hidden');
-    }
-
-    setTimeout(() => {
-        try { onWindowResize(); } catch (e) { /* ignore */ }
-    }, 200);
+    applyControlsVisibilityHandler(createControlsDeps(), shouldShowOverride);
 }
+
 function applyControlsMode() {
     applyControlsModeHandler(config.controlsMode || 'full');
 }
 
-// Ensure toolbar visibility is maintained (safeguard against race conditions)
 function ensureToolbarVisibility() {
-    // Only hide toolbar if explicitly set to false (not undefined)
-    if (config.showToolbar === false) {
-        return; // Toolbar intentionally hidden via URL parameter
-    }
-
-    const toolbar = document.getElementById('left-toolbar');
-    if (!toolbar) {
-        return;
-    }
-
-    // Force toolbar to be visible
-    toolbar.style.display = 'flex';
-    toolbar.style.visibility = 'visible';
-    toolbar.style.zIndex = '10000';
-
-    // Re-check after file loading completes (delayed checks)
-    setTimeout(() => {
-        const tb = document.getElementById('left-toolbar');
-        if (tb && config.showToolbar !== false) {
-            tb.style.display = 'flex';
-            tb.style.visibility = 'visible';
-            tb.style.zIndex = '10000';
-        }
-    }, 1000);
-
-    setTimeout(() => {
-        const tb = document.getElementById('left-toolbar');
-        if (tb && config.showToolbar !== false) {
-            tb.style.display = 'flex';
-            tb.style.visibility = 'visible';
-            tb.style.zIndex = '10000';
-        }
-    }, 3000);
+    ensureToolbarVisibilityHandler(config);
 }
 
-// Apply viewer mode settings (toolbar visibility, sidebar state)
 function applyViewerModeSettings() {
-    // Apply toolbar visibility - only hide if explicitly set to false
-    if (config.showToolbar === false) {
-        const toolbar = document.getElementById('left-toolbar');
-        if (toolbar) {
-            toolbar.style.display = 'none';
-            log.info('Toolbar hidden via URL parameter');
-        }
-    }
-
-    // Apply sidebar state (after a short delay to ensure DOM is ready)
-    if (config.sidebarMode && config.sidebarMode !== 'closed') {
-        setTimeout(() => {
-            const sidebar = document.getElementById('metadata-sidebar');
-            if (sidebar) {
-                sidebar.classList.remove('hidden');
-                log.info('Metadata sidebar shown via URL parameter');
-
-                // If view-only mode, hide the Edit tab
-                if (config.sidebarMode === 'view') {
-                    const editTab = document.querySelector('.sidebar-mode-tab[data-mode="edit"]');
-                    if (editTab) {
-                        editTab.style.display = 'none';
-                        log.info('Edit tab hidden for view-only mode');
-                    }
-
-                    // Also hide the annotations tab if in pure view mode
-                    const annotationsTab = document.querySelector('.sidebar-mode-tab[data-mode="annotations"]');
-                    if (annotationsTab) {
-                        annotationsTab.style.display = 'none';
-                    }
-                }
-
-                // Activate View tab by default
-                const viewTab = document.querySelector('.sidebar-mode-tab[data-mode="view"]');
-                const viewContent = document.getElementById('sidebar-view');
-                if (viewTab && viewContent) {
-                    document.querySelectorAll('.sidebar-mode-tab').forEach(t => t.classList.remove('active'));
-                    document.querySelectorAll('.sidebar-mode-content').forEach(c => c.classList.remove('active'));
-                    viewTab.classList.add('active');
-                    viewContent.classList.add('active');
-                }
-            }
-        }, 100);
-    }
+    applyViewerModeSettingsHandler(config);
 }
 
 // Load default files from configuration
@@ -3592,7 +3225,7 @@ async function loadSplatFromUrl(url) {
             const percent = Math.round((received / total) * 90); // 0-90% for download
             updateProgress(percent, `Downloading Gaussian Splat... ${formatFileSize(received)} / ${formatFileSize(total)}`);
         });
-        currentSplatBlob = blob;
+        assets.splatBlob = blob;
         log.info(' Splat blob stored, size:', blob.size);
         updateProgress(90, 'Processing Gaussian Splat...');
 
@@ -3664,7 +3297,7 @@ async function loadModelFromUrl(url) {
             const percent = Math.round((received / total) * 90); // 0-90% for download
             updateProgress(percent, `Downloading 3D Model... ${formatFileSize(received)} / ${formatFileSize(total)}`);
         });
-        currentMeshBlob = blob;
+        assets.meshBlob = blob;
         log.info(' Mesh blob stored, size:', blob.size);
         updateProgress(90, 'Processing 3D Model...');
 
@@ -3739,7 +3372,7 @@ function createPointcloudDeps() {
         archiveCreator,
         callbacks: {
             onPointcloudLoaded: (object, file, pointCount, blob) => {
-                currentPointcloudBlob = blob;
+                assets.pointcloudBlob = blob;
                 updateVisibility();
                 updateTransformInputs();
                 storeLastPositions();
