@@ -3,29 +3,81 @@
 // Based on the U3DP annotation viewer pattern
 
 import * as THREE from 'three';
+import type { Annotation } from '../types.js';
 
-/**
- * Annotation data structure
- * @typedef {Object} Annotation
- * @property {string} id - Unique identifier
- * @property {string} title - Display title
- * @property {string} body - Description text
- * @property {{x: number, y: number, z: number}} position - 3D world position
- * @property {{x: number, y: number, z: number}} camera_target - Where camera looks
- * @property {{x: number, y: number, z: number}} camera_position - Where camera is placed
- */
+// TODO: type when @types/three is installed
+type Vector3 = any;
+type Scene = any;
+type Camera = any;
+type WebGLRenderer = any;
+type Raycaster = any;
+type Vector2 = any;
+type Group = any;
+type OrbitControls = any;
+
+interface MarkerObject {
+    element: HTMLDivElement;
+    annotation: Annotation;
+    position: Vector3;
+}
+
+interface DragState {
+    marker: MarkerObject;
+    originalPos: Vector3;
+}
+
+interface CameraState {
+    camera_target: { x: number; y: number; z: number };
+    camera_position: { x: number; y: number; z: number };
+}
 
 /**
  * AnnotationSystem class - manages annotations in 3D space
  */
 export class AnnotationSystem {
-    /**
-     * @param {THREE.Scene} scene - Three.js scene
-     * @param {THREE.Camera} camera - Three.js camera
-     * @param {THREE.WebGLRenderer} renderer - Three.js renderer
-     * @param {OrbitControls} controls - Orbit controls
-     */
-    constructor(scene, camera, renderer, controls) {
+    // TODO: type when @types/three is installed
+    scene: Scene;
+    camera: Camera;
+    renderer: WebGLRenderer;
+    controls: OrbitControls;
+
+    annotations: Annotation[];
+    markers: MarkerObject[];
+    markerGroup: Group;
+
+    // State
+    placementMode: boolean;
+    pendingPosition: { x: number; y: number; z: number } | null;
+    selectedAnnotation: Annotation | null;
+    annotationCount: number;
+
+    // Raycaster for click detection
+    raycaster: Raycaster;
+    mouse: Vector2;
+
+    // DOM elements for 2D markers
+    markerContainer: HTMLDivElement | null;
+    pendingMarkerEl: HTMLDivElement | null;
+
+    // Callbacks
+    onAnnotationCreated: ((position: { x: number; y: number; z: number }, cameraState: CameraState) => void) | null;
+    onAnnotationSelected: ((annotation: Annotation) => void) | null;
+    onAnnotationUpdated: ((annotation: Annotation) => void) | null;
+    onPlacementModeChanged: ((isEnabled: boolean) => void) | null;
+
+    // Reusable vectors for occlusion checks
+    _surfaceNormal: Vector3;
+    _viewDir: Vector3;
+
+    // Drag state
+    _dragging: DragState | null;
+
+    // Bound methods
+    _onClick: (event: MouseEvent) => void;
+    _onDragMove: (event: MouseEvent) => void;
+    _onDragEnd: (event: MouseEvent) => void;
+
+    constructor(scene: Scene, camera: Camera, renderer: WebGLRenderer, controls: OrbitControls) {
         this.scene = scene;
         this.camera = camera;
         this.renderer = renderer;
@@ -65,9 +117,9 @@ export class AnnotationSystem {
         this._dragging = null;
 
         // Bind methods
-        this._onClick = this._onClick.bind(this);
-        this._onDragMove = this._onDragMove.bind(this);
-        this._onDragEnd = this._onDragEnd.bind(this);
+        this._onClick = this._onClickHandler.bind(this);
+        this._onDragMove = this._onDragMoveHandler.bind(this);
+        this._onDragEnd = this._onDragEndHandler.bind(this);
 
         this._createMarkerContainer();
     }
@@ -75,8 +127,8 @@ export class AnnotationSystem {
     /**
      * Create the DOM container for 2D annotation markers
      */
-    _createMarkerContainer() {
-        this.markerContainer = document.getElementById('annotation-markers');
+    _createMarkerContainer(): void {
+        this.markerContainer = document.getElementById('annotation-markers') as HTMLDivElement | null;
         if (!this.markerContainer) {
             this.markerContainer = document.createElement('div');
             this.markerContainer.id = 'annotation-markers';
@@ -87,7 +139,7 @@ export class AnnotationSystem {
     /**
      * Enable annotation placement mode
      */
-    enablePlacementMode() {
+    enablePlacementMode(): void {
         this.placementMode = true;
         this.renderer.domElement.style.cursor = 'crosshair';
         this.renderer.domElement.addEventListener('click', this._onClick);
@@ -100,7 +152,7 @@ export class AnnotationSystem {
     /**
      * Disable annotation placement mode
      */
-    disablePlacementMode() {
+    disablePlacementMode(): void {
         this.placementMode = false;
         this.renderer.domElement.style.cursor = 'default';
         this.renderer.domElement.removeEventListener('click', this._onClick);
@@ -115,7 +167,7 @@ export class AnnotationSystem {
     /**
      * Toggle placement mode
      */
-    togglePlacementMode() {
+    togglePlacementMode(): void {
         if (this.placementMode) {
             this.disablePlacementMode();
         } else {
@@ -126,7 +178,7 @@ export class AnnotationSystem {
     /**
      * Handle click events for annotation placement
      */
-    _onClick(event) {
+    _onClickHandler(event: MouseEvent): void {
         if (!this.placementMode) return;
 
         // Don't process if clicking on UI elements
@@ -142,7 +194,7 @@ export class AnnotationSystem {
         const intersects = this.raycaster.intersectObjects(this.scene.children, true);
 
         // Filter out markers and helpers
-        const validIntersects = intersects.filter(hit => {
+        const validIntersects = intersects.filter((hit: any) => {
             let obj = hit.object;
             while (obj) {
                 if (obj.name === 'annotationMarkers' ||
@@ -176,7 +228,7 @@ export class AnnotationSystem {
     /**
      * Get current camera position and target
      */
-    _getCurrentCameraState() {
+    _getCurrentCameraState(): CameraState {
         return {
             camera_target: {
                 x: parseFloat(this.controls.target.x.toFixed(4)),
@@ -194,7 +246,7 @@ export class AnnotationSystem {
     /**
      * Show pending marker at screen position
      */
-    _showPendingMarker(screenX, screenY) {
+    _showPendingMarker(screenX: number, screenY: number): void {
         this._removePendingMarker();
 
         this.pendingMarkerEl = document.createElement('div');
@@ -202,13 +254,13 @@ export class AnnotationSystem {
         this.pendingMarkerEl.textContent = '?';
         this.pendingMarkerEl.style.left = screenX + 'px';
         this.pendingMarkerEl.style.top = screenY + 'px';
-        this.markerContainer.appendChild(this.pendingMarkerEl);
+        this.markerContainer?.appendChild(this.pendingMarkerEl);
     }
 
     /**
      * Remove pending marker
      */
-    _removePendingMarker() {
+    _removePendingMarker(): void {
         if (this.pendingMarkerEl) {
             this.pendingMarkerEl.remove();
             this.pendingMarkerEl = null;
@@ -217,17 +269,13 @@ export class AnnotationSystem {
 
     /**
      * Confirm pending annotation with title and body
-     * @param {string} id - Annotation ID
-     * @param {string} title - Annotation title
-     * @param {string} body - Annotation description
-     * @returns {Annotation|null} The created annotation or null
      */
-    confirmAnnotation(id, title, body) {
+    confirmAnnotation(id: string, title: string, body: string): Annotation | null {
         if (!this.pendingPosition) return null;
 
         const cameraState = this._getCurrentCameraState();
 
-        const annotation = {
+        const annotation: Annotation = {
             id: id || `anno_${++this.annotationCount}`,
             title: title || 'Untitled',
             body: body || '',
@@ -249,7 +297,7 @@ export class AnnotationSystem {
     /**
      * Cancel pending annotation
      */
-    cancelAnnotation() {
+    cancelAnnotation(): void {
         this._removePendingMarker();
         this.pendingPosition = null;
     }
@@ -257,16 +305,16 @@ export class AnnotationSystem {
     /**
      * Create a marker for an annotation
      */
-    _createMarker(annotation, number) {
+    _createMarker(annotation: Annotation, number: number): void {
         const markerEl = document.createElement('div');
         markerEl.className = 'annotation-marker';
-        markerEl.textContent = number;
+        markerEl.textContent = number.toString();
         markerEl.dataset.annotationId = annotation.id;
         markerEl.addEventListener('click', () => this.selectAnnotation(annotation.id));
 
-        this.markerContainer.appendChild(markerEl);
+        this.markerContainer?.appendChild(markerEl);
 
-        const markerObj = {
+        const markerObj: MarkerObject = {
             element: markerEl,
             annotation: annotation,
             position: new THREE.Vector3(
@@ -277,7 +325,7 @@ export class AnnotationSystem {
         };
 
         // Shift+mousedown starts drag to reposition
-        markerEl.addEventListener('mousedown', (e) => {
+        markerEl.addEventListener('mousedown', (e: MouseEvent) => {
             if (e.shiftKey) this._onMarkerShiftDown(e, markerObj);
         });
 
@@ -287,7 +335,7 @@ export class AnnotationSystem {
     /**
      * Start dragging a marker to reposition it (shift+mousedown)
      */
-    _onMarkerShiftDown(event, marker) {
+    _onMarkerShiftDown(event: MouseEvent, marker: MarkerObject): void {
         event.preventDefault();
         event.stopPropagation();
 
@@ -308,7 +356,7 @@ export class AnnotationSystem {
     /**
      * Handle drag movement — raycast to find new surface position
      */
-    _onDragMove(event) {
+    _onDragMoveHandler(event: MouseEvent): void {
         if (!this._dragging) return;
 
         const rect = this.renderer.domElement.getBoundingClientRect();
@@ -319,7 +367,7 @@ export class AnnotationSystem {
         const intersects = this.raycaster.intersectObjects(this.scene.children, true);
 
         // Same filter as _onClick — exclude markers, grid, axes
-        const validHit = intersects.find(hit => {
+        const validHit = intersects.find((hit: any) => {
             let obj = hit.object;
             while (obj) {
                 if (obj.name === 'annotationMarkers' ||
@@ -349,7 +397,7 @@ export class AnnotationSystem {
     /**
      * End drag — finalize position and re-enable controls
      */
-    _onDragEnd(event) {
+    _onDragEndHandler(_event: MouseEvent): void {
         if (!this._dragging) return;
 
         const marker = this._dragging.marker;
@@ -383,7 +431,7 @@ export class AnnotationSystem {
      * Update all marker screen positions
      * Call this in the animation loop
      */
-    updateMarkerPositions() {
+    updateMarkerPositions(): void {
         const rect = this.renderer.domElement.getBoundingClientRect();
 
         this.markers.forEach(marker => {
@@ -426,9 +474,8 @@ export class AnnotationSystem {
 
     /**
      * Select an annotation
-     * @param {string} id - Annotation ID
      */
-    selectAnnotation(id) {
+    selectAnnotation(id: string): void {
         const annotation = this.annotations.find(a => a.id === id);
         if (!annotation) return;
 
@@ -446,10 +493,8 @@ export class AnnotationSystem {
 
     /**
      * Navigate camera to annotation viewpoint
-     * @param {string} id - Annotation ID
-     * @param {number} duration - Animation duration in ms
      */
-    goToAnnotation(id, duration = 1000) {
+    goToAnnotation(id: string, duration: number = 1000): void {
         const annotation = this.annotations.find(a => a.id === id);
         if (!annotation) return;
 
@@ -471,7 +516,7 @@ export class AnnotationSystem {
 
         const startTime = performance.now();
 
-        const animate = () => {
+        const animate = (): void => {
             const elapsed = performance.now() - startTime;
             const t = Math.min(elapsed / duration, 1);
 
@@ -494,10 +539,8 @@ export class AnnotationSystem {
 
     /**
      * Update an existing annotation
-     * @param {string} id - Annotation ID
-     * @param {Object} updates - Fields to update
      */
-    updateAnnotation(id, updates) {
+    updateAnnotation(id: string, updates: Partial<Annotation>): Annotation | null {
         const annotation = this.annotations.find(a => a.id === id);
         if (!annotation) return null;
 
@@ -520,18 +563,16 @@ export class AnnotationSystem {
 
     /**
      * Update annotation camera from current view
-     * @param {string} id - Annotation ID
      */
-    updateAnnotationCamera(id) {
+    updateAnnotationCamera(id: string): Annotation | null {
         const cameraState = this._getCurrentCameraState();
         return this.updateAnnotation(id, cameraState);
     }
 
     /**
      * Delete an annotation
-     * @param {string} id - Annotation ID
      */
-    deleteAnnotation(id) {
+    deleteAnnotation(id: string): boolean {
         const index = this.annotations.findIndex(a => a.id === id);
         if (index === -1) return false;
 
@@ -546,7 +587,7 @@ export class AnnotationSystem {
 
         // Renumber remaining markers
         this.markers.forEach((m, i) => {
-            m.element.textContent = i + 1;
+            m.element.textContent = (i + 1).toString();
         });
 
         if (this.selectedAnnotation?.id === id) {
@@ -559,7 +600,7 @@ export class AnnotationSystem {
     /**
      * Clear all annotations
      */
-    clearAnnotations() {
+    clearAnnotations(): void {
         this.markers.forEach(m => m.element.remove());
         this.markers = [];
         this.annotations = [];
@@ -569,17 +610,15 @@ export class AnnotationSystem {
 
     /**
      * Get all annotations
-     * @returns {Annotation[]}
      */
-    getAnnotations() {
+    getAnnotations(): Annotation[] {
         return [...this.annotations];
     }
 
     /**
      * Set annotations from array (e.g., loaded from archive)
-     * @param {Annotation[]} annotations
      */
-    setAnnotations(annotations) {
+    setAnnotations(annotations: Annotation[]): void {
         this.clearAnnotations();
 
         annotations.forEach((anno, index) => {
@@ -592,9 +631,8 @@ export class AnnotationSystem {
 
     /**
      * Export annotations to JSON
-     * @returns {Annotation[]}
      */
-    toJSON() {
+    toJSON(): Annotation[] {
         return this.annotations.map(a => ({
             id: a.id,
             title: a.title,
@@ -607,9 +645,8 @@ export class AnnotationSystem {
 
     /**
      * Import annotations from JSON
-     * @param {Annotation[]} data
      */
-    fromJSON(data) {
+    fromJSON(data: Annotation[]): void {
         if (Array.isArray(data)) {
             this.setAnnotations(data);
         }
@@ -617,32 +654,31 @@ export class AnnotationSystem {
 
     /**
      * Show/hide all markers
-     * @param {boolean} visible
      */
-    setMarkersVisible(visible) {
-        this.markerContainer.style.display = visible ? 'block' : 'none';
+    setMarkersVisible(visible: boolean): void {
+        if (this.markerContainer) {
+            this.markerContainer.style.display = visible ? 'block' : 'none';
+        }
     }
 
     /**
      * Check if there are any annotations
-     * @returns {boolean}
      */
-    hasAnnotations() {
+    hasAnnotations(): boolean {
         return this.annotations.length > 0;
     }
 
     /**
      * Get annotation count
-     * @returns {number}
      */
-    getCount() {
+    getCount(): number {
         return this.annotations.length;
     }
 
     /**
      * Dispose of resources
      */
-    dispose() {
+    dispose(): void {
         this.disablePlacementMode();
         this.clearAnnotations();
         if (this.markerContainer) {

@@ -12,6 +12,7 @@
 
 import * as THREE from 'three';
 import { Logger, notify } from './utilities.js';
+import type { AppState, DisplayMode } from '../types.js';
 
 const log = Logger.getLogger('ui-controller');
 
@@ -19,12 +20,17 @@ const log = Logger.getLogger('ui-controller');
 // DISPLAY MODE MANAGEMENT
 // =============================================================================
 
+interface SetDisplayModeDeps {
+    state: AppState;
+    canvasRight: HTMLCanvasElement | null;
+    onResize?: () => void;
+    updateVisibility?: () => void;
+}
+
 /**
  * Set the display mode and update UI accordingly
- * @param {string} mode - Display mode: 'splat', 'model', 'both', 'split'
- * @param {Object} deps - Dependencies
  */
-export function setDisplayMode(mode, deps) {
+export function setDisplayMode(mode: DisplayMode, deps: SetDisplayModeDeps): void {
     const { state, canvasRight, onResize, updateVisibility } = deps;
 
     state.displayMode = mode;
@@ -59,13 +65,14 @@ export function setDisplayMode(mode, deps) {
 
 /**
  * Update object visibility based on display mode
- * @param {string} displayMode - Current display mode
- * @param {Object} splatMesh - The splat mesh
- * @param {THREE.Group} modelGroup - The model group
- * @param {THREE.Group} [pointcloudGroup] - The point cloud group (optional)
- * @param {THREE.Group} [stlGroup] - The STL group (optional)
  */
-export function updateVisibility(displayMode, splatMesh, modelGroup, pointcloudGroup, stlGroup) {
+export function updateVisibility(
+    displayMode: DisplayMode,
+    splatMesh: any, // TODO: type when @types/three is installed
+    modelGroup: any, // TODO: type when @types/three is installed (THREE.Group)
+    pointcloudGroup?: any, // TODO: type when @types/three is installed (THREE.Group)
+    stlGroup?: any // TODO: type when @types/three is installed (THREE.Group)
+): void {
     if (displayMode === 'split') {
         // In split mode, both are visible but rendered in separate views
         if (splatMesh) splatMesh.visible = true;
@@ -102,10 +109,8 @@ export function updateVisibility(displayMode, splatMesh, modelGroup, pointcloudG
 
 /**
  * Show loading overlay
- * @param {string} text - Loading text
- * @param {boolean} showProgress - Whether to show progress bar
  */
-export function showLoading(text = 'Loading...', showProgress = false) {
+export function showLoading(text: string = 'Loading...', showProgress: boolean = false): void {
     const loadingOverlay = document.getElementById('loading-overlay');
     const loadingText = document.getElementById('loading-text');
 
@@ -129,11 +134,9 @@ export function showLoading(text = 'Loading...', showProgress = false) {
 
 /**
  * Update loading progress
- * @param {number} percent - Progress percentage (0-100)
- * @param {string} stage - Optional stage description
  */
-export function updateProgress(percent, stage = null) {
-    const progressBar = document.getElementById('loading-progress-bar');
+export function updateProgress(percent: number, stage: string | null = null): void {
+    const progressBar = document.getElementById('loading-progress-bar') as HTMLDivElement | null;
     const progressText = document.getElementById('loading-progress-text');
     const loadingText = document.getElementById('loading-text');
 
@@ -151,14 +154,14 @@ export function updateProgress(percent, stage = null) {
 /**
  * Hide loading overlay
  */
-export function hideLoading() {
+export function hideLoading(): void {
     const loadingOverlay = document.getElementById('loading-overlay');
     if (loadingOverlay) loadingOverlay.classList.add('hidden');
 
     // Reset progress bar
     const progressContainer = document.getElementById('loading-progress-container');
     const progressText = document.getElementById('loading-progress-text');
-    const progressBar = document.getElementById('loading-progress-bar');
+    const progressBar = document.getElementById('loading-progress-bar') as HTMLDivElement | null;
     if (progressContainer) progressContainer.classList.add('hidden');
     if (progressText) progressText.classList.add('hidden');
     if (progressBar) progressBar.style.width = '0%';
@@ -168,11 +171,16 @@ export function hideLoading() {
 // CONTROLS PANEL
 // =============================================================================
 
+interface ControlsPanelDeps {
+    state: AppState;
+    config?: { controlsMode?: string; showControls?: boolean };
+    onWindowResize?: () => void;
+}
+
 /**
  * Toggle controls panel visibility
- * @param {Object} deps - { state, config, onWindowResize }
  */
-export function toggleControlsPanel(deps) {
+export function toggleControlsPanel(deps: ControlsPanelDeps): void {
     const { state } = deps;
     state.controlsVisible = !state.controlsVisible;
     applyControlsVisibility(deps);
@@ -181,12 +189,10 @@ export function toggleControlsPanel(deps) {
 /**
  * Apply controls panel visibility. Handles controlsMode (full/minimal/none),
  * width/padding styles, toggle button class management, and resize callback.
- * @param {Object} deps - { state, config, onWindowResize }
- * @param {boolean} [shouldShowOverride] - Override for visibility state
  */
-export function applyControlsVisibility(deps, shouldShowOverride) {
+export function applyControlsVisibility(deps: ControlsPanelDeps, shouldShowOverride?: boolean): void {
     const { state, config, onWindowResize } = deps;
-    const controlsPanel = document.getElementById('controls-panel');
+    const controlsPanel = document.getElementById('controls-panel') as HTMLDivElement | null;
     if (!controlsPanel) return;
 
     const toggleBtn = document.getElementById('btn-toggle-controls');
@@ -229,15 +235,14 @@ export function applyControlsVisibility(deps, shouldShowOverride) {
 
 /**
  * Ensure toolbar visibility is maintained (safeguard against race conditions).
- * @param {Object} config - App config with showToolbar property
  */
-export function ensureToolbarVisibility(config) {
+export function ensureToolbarVisibility(config: { showToolbar?: boolean }): void {
     // Only hide toolbar if explicitly set to false (not undefined)
     if (config.showToolbar === false) {
         return; // Toolbar intentionally hidden via URL parameter
     }
 
-    const toolbar = document.getElementById('left-toolbar');
+    const toolbar = document.getElementById('left-toolbar') as HTMLDivElement | null;
     if (!toolbar) return;
 
     // Force toolbar to be visible
@@ -247,7 +252,7 @@ export function ensureToolbarVisibility(config) {
 
     // Re-check after file loading completes (delayed checks)
     setTimeout(() => {
-        const tb = document.getElementById('left-toolbar');
+        const tb = document.getElementById('left-toolbar') as HTMLDivElement | null;
         if (tb && config.showToolbar !== false) {
             tb.style.display = 'flex';
             tb.style.visibility = 'visible';
@@ -256,7 +261,7 @@ export function ensureToolbarVisibility(config) {
     }, 1000);
 
     setTimeout(() => {
-        const tb = document.getElementById('left-toolbar');
+        const tb = document.getElementById('left-toolbar') as HTMLDivElement | null;
         if (tb && config.showToolbar !== false) {
             tb.style.display = 'flex';
             tb.style.visibility = 'visible';
@@ -267,9 +272,12 @@ export function ensureToolbarVisibility(config) {
 
 /**
  * Apply viewer mode settings (toolbar visibility, sidebar state).
- * @param {Object} config - App config
  */
-export function applyViewerModeSettings(config) {
+export function applyViewerModeSettings(config: {
+    showToolbar?: boolean;
+    sidebarMode?: string;
+    controlsMode?: string;
+}): void {
     // Apply toolbar visibility - only hide if explicitly set to false
     if (config.showToolbar === false) {
         const toolbar = document.getElementById('left-toolbar');
@@ -289,21 +297,21 @@ export function applyViewerModeSettings(config) {
 
                 // If view-only mode, hide the Edit tab
                 if (config.sidebarMode === 'view') {
-                    const editTab = document.querySelector('.sidebar-mode-tab[data-mode="edit"]');
+                    const editTab = document.querySelector('.sidebar-mode-tab[data-mode="edit"]') as HTMLElement | null;
                     if (editTab) {
                         editTab.style.display = 'none';
                         log.info('Edit tab hidden for view-only mode');
                     }
 
                     // Also hide the annotations tab if in pure view mode
-                    const annotationsTab = document.querySelector('.sidebar-mode-tab[data-mode="annotations"]');
+                    const annotationsTab = document.querySelector('.sidebar-mode-tab[data-mode="annotations"]') as HTMLElement | null;
                     if (annotationsTab) {
                         annotationsTab.style.display = 'none';
                     }
                 }
 
                 // Activate View tab by default
-                const viewTab = document.querySelector('.sidebar-mode-tab[data-mode="view"]');
+                const viewTab = document.querySelector('.sidebar-mode-tab[data-mode="view"]') as HTMLElement | null;
                 const viewContent = document.getElementById('sidebar-view');
                 if (viewTab && viewContent) {
                     document.querySelectorAll('.sidebar-mode-tab').forEach(t => t.classList.remove('active'));
@@ -318,10 +326,9 @@ export function applyViewerModeSettings(config) {
 
 /**
  * Apply controls mode (full, minimal, none)
- * @param {string} mode - Controls mode
  */
-export function applyControlsMode(mode) {
-    const controlsPanel = document.getElementById('controls-panel');
+export function applyControlsMode(mode: string): void {
+    const controlsPanel = document.getElementById('controls-panel') as HTMLDivElement | null;
 
     if (mode === 'none') {
         // Hide panel completely
@@ -344,12 +351,12 @@ export function applyControlsMode(mode) {
             const headerText = header?.textContent?.toLowerCase() || '';
             // Keep only display mode section
             if (!headerText.includes('display')) {
-                section.style.display = 'none';
+                (section as HTMLElement).style.display = 'none';
             }
         });
 
         // Hide the main title
-        const title = controlsPanel?.querySelector('h2');
+        const title = controlsPanel?.querySelector('h2') as HTMLElement | null;
         if (title) title.style.display = 'none';
 
         // Make the panel narrower for minimal mode
@@ -364,19 +371,20 @@ export function applyControlsMode(mode) {
 
 /**
  * Update transform input fields from object transforms
- * @param {Object} splatMesh - The splat mesh
- * @param {THREE.Group} modelGroup - The model group
- * @param {THREE.Group} [pointcloudGroup] - The point cloud group (optional)
  */
-export function updateTransformInputs(splatMesh, modelGroup, pointcloudGroup) {
+export function updateTransformInputs(
+    splatMesh: any, // TODO: type when @types/three is installed
+    modelGroup: any, // TODO: type when @types/three is installed (THREE.Group)
+    pointcloudGroup?: any // TODO: type when @types/three is installed (THREE.Group)
+): void {
     // Helper to safely set input value
-    const setInputValue = (id, value) => {
-        const el = document.getElementById(id);
-        if (el) el.value = value;
+    const setInputValue = (id: string, value: string | number): void => {
+        const el = document.getElementById(id) as HTMLInputElement | null;
+        if (el) el.value = String(value);
     };
-    const setTextContent = (id, value) => {
+    const setTextContent = (id: string, value: string | number): void => {
         const el = document.getElementById(id);
-        if (el) el.textContent = value;
+        if (el) el.textContent = String(value);
     };
 
     // Update splat inputs
@@ -418,20 +426,16 @@ export function updateTransformInputs(splatMesh, modelGroup, pointcloudGroup) {
 
 /**
  * Update filename display
- * @param {string} elementId - Element ID to update
- * @param {string} filename - Filename to display
  */
-export function updateFilename(elementId, filename) {
+export function updateFilename(elementId: string, filename: string): void {
     const el = document.getElementById(elementId);
     if (el) el.textContent = filename;
 }
 
 /**
  * Update status text
- * @param {string} elementId - Element ID to update
- * @param {string} text - Status text
  */
-export function updateStatusText(elementId, text) {
+export function updateStatusText(elementId: string, text: string): void {
     const el = document.getElementById(elementId);
     if (el) el.textContent = text;
 }
@@ -443,14 +447,14 @@ export function updateStatusText(elementId, text) {
 /**
  * Setup collapsible section handlers
  */
-export function setupCollapsibles() {
+export function setupCollapsibles(): void {
     const collapsibles = document.querySelectorAll('.collapsible-header');
 
     collapsibles.forEach(header => {
         header.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
-            const section = header.closest('.control-section.collapsible');
+            const section = (header as HTMLElement).closest('.control-section.collapsible');
             if (section) {
                 section.classList.toggle('collapsed');
                 const icon = header.querySelector('.collapse-icon');
@@ -470,12 +474,8 @@ export function setupCollapsibles() {
 
 /**
  * Safely add event listener with null check
- * @param {string} id - Element ID
- * @param {string} event - Event type
- * @param {Function} handler - Event handler
- * @returns {boolean} Whether listener was added
  */
-export function addListener(id, event, handler) {
+export function addListener(id: string, event: string, handler: EventListener): boolean {
     const el = document.getElementById(id);
     if (el) {
         el.addEventListener(event, handler);
@@ -488,9 +488,8 @@ export function addListener(id, event, handler) {
 
 /**
  * Setup keyboard shortcuts
- * @param {Object} handlers - Object with key -> handler mappings
  */
-export function setupKeyboardShortcuts(handlers) {
+export function setupKeyboardShortcuts(handlers: Record<string, (e: KeyboardEvent) => void>): void {
     window.addEventListener('keydown', (e) => {
         const activeEl = document.activeElement;
         // Don't trigger if typing in input
@@ -518,7 +517,7 @@ export function setupKeyboardShortcuts(handlers) {
 /**
  * Show export panel
  */
-export function showExportPanel() {
+export function showExportPanel(): void {
     const panel = document.getElementById('export-panel');
     if (panel) panel.classList.remove('hidden');
 }
@@ -526,7 +525,7 @@ export function showExportPanel() {
 /**
  * Hide export panel
  */
-export function hideExportPanel() {
+export function hideExportPanel(): void {
     const panel = document.getElementById('export-panel');
     if (panel) panel.classList.add('hidden');
 }
@@ -535,11 +534,17 @@ export function hideExportPanel() {
 // SHARE LINK
 // =============================================================================
 
+interface CopyShareLinkDeps {
+    state: AppState;
+    config: { showControls?: boolean; controlsMode?: string };
+    splatMesh: any; // TODO: type when @types/three is installed
+    modelGroup: any; // TODO: type when @types/three is installed (THREE.Group)
+}
+
 /**
  * Copy share link to clipboard
- * @param {Object} deps - Dependencies (state, config, splatMesh, modelGroup)
  */
-export function copyShareLink(deps) {
+export function copyShareLink(deps: CopyShareLinkDeps): void {
     const { state, config, splatMesh, modelGroup } = deps;
 
     // Check if at least one URL is present
@@ -569,7 +574,7 @@ export function copyShareLink(deps) {
             notify.success('Share link copied to clipboard!');
         }).catch((err) => {
             log.error('Failed to copy share link:', err);
-            notify.info('Share link: ' + shareUrl, { duration: 10000 });
+            notify.info('Share link: ' + shareUrl);
         });
         return;
     }
@@ -595,7 +600,7 @@ export function copyShareLink(deps) {
     }
 
     // Helper to format vec3
-    const formatVec3 = (arr) => arr.map(n => parseFloat(n.toFixed(4))).join(',');
+    const formatVec3 = (arr: number[]): string => arr.map(n => parseFloat(n.toFixed(4))).join(',');
 
     // Add inline alignment data
     if (splatMesh) {
@@ -610,7 +615,7 @@ export function copyShareLink(deps) {
             params.set('sr', formatVec3([rot.x, rot.y, rot.z]));
         }
         if (scale !== 1) {
-            params.set('ss', parseFloat(scale.toFixed(4)));
+            params.set('ss', parseFloat(scale.toFixed(4)).toString());
         }
     }
 
@@ -626,7 +631,7 @@ export function copyShareLink(deps) {
             params.set('mr', formatVec3([rot.x, rot.y, rot.z]));
         }
         if (scale !== 1) {
-            params.set('ms', parseFloat(scale.toFixed(4)));
+            params.set('ms', parseFloat(scale.toFixed(4)).toString());
         }
     }
 
@@ -638,7 +643,7 @@ export function copyShareLink(deps) {
         notify.success('Share link copied to clipboard!');
     }).catch((err) => {
         log.error('Failed to copy share link:', err);
-        notify.info('Share link: ' + shareUrl, { duration: 10000 });
+        notify.info('Share link: ' + shareUrl);
     });
 }
 
@@ -649,7 +654,7 @@ export function copyShareLink(deps) {
 /**
  * Asset type → display mode button ID mapping
  */
-const ASSET_BUTTON_MAP = {
+const ASSET_BUTTON_MAP: Record<string, string> = {
     splat: 'btn-splat',
     mesh: 'btn-model',
     pointcloud: 'btn-pointcloud'
@@ -657,9 +662,8 @@ const ASSET_BUTTON_MAP = {
 
 /**
  * Show an inline loading spinner on the button for a given asset type.
- * @param {string} assetType - 'splat' | 'mesh' | 'pointcloud'
  */
-export function showInlineLoading(assetType) {
+export function showInlineLoading(assetType: string): void {
     const btnId = ASSET_BUTTON_MAP[assetType];
     if (!btnId) return;
     const btn = document.getElementById(btnId);
@@ -670,9 +674,8 @@ export function showInlineLoading(assetType) {
 
 /**
  * Hide the inline loading spinner on the button for a given asset type.
- * @param {string} assetType - 'splat' | 'mesh' | 'pointcloud'
  */
-export function hideInlineLoading(assetType) {
+export function hideInlineLoading(assetType: string): void {
     const btnId = ASSET_BUTTON_MAP[assetType];
     if (!btnId) return;
     const btn = document.getElementById(btnId);
@@ -680,4 +683,3 @@ export function hideInlineLoading(assetType) {
         btn.classList.remove('asset-loading');
     }
 }
-

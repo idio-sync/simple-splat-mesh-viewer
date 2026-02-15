@@ -14,6 +14,7 @@
  */
 
 import { Logger } from './utilities.js';
+import type { AppState, Transform } from '../types.js';
 
 const log = Logger.getLogger('ShareDialog');
 
@@ -21,8 +22,40 @@ const log = Logger.getLogger('ShareDialog');
 // STATE
 // =============================================================================
 
-let dialogElement = null;
-let currentState = null;  // Will be set when showing dialog
+let dialogElement: HTMLElement | null = null;
+let currentState: ShareState | null = null;  // Will be set when showing dialog
+
+// =============================================================================
+// TYPES
+// =============================================================================
+
+interface ShareState {
+    archiveUrl?: string | null;
+    splatUrl?: string | null;
+    modelUrl?: string | null;
+    pointcloudUrl?: string | null;
+    displayMode?: string;
+    splatTransform?: Transform | null;
+    modelTransform?: Transform | null;
+    pointcloudTransform?: Transform | null;
+}
+
+interface ShareOption {
+    param: string;
+    label: string;
+    type: 'select';
+    options: Array<{ value: string; label: string }>;
+    default: string;
+}
+
+interface UIPreset {
+    label: string;
+    description: string;
+    settings: Record<string, string>;
+}
+
+type ShareOptions = Record<string, ShareOption>;
+type UIPresets = Record<string, UIPreset>;
 
 // =============================================================================
 // URL PARAMETER DEFINITIONS
@@ -31,7 +64,7 @@ let currentState = null;  // Will be set when showing dialog
 /**
  * Available share link options with their URL parameter mappings
  */
-const SHARE_OPTIONS = {
+const SHARE_OPTIONS: ShareOptions = {
     // Display mode
     displayMode: {
         param: 'mode',
@@ -89,7 +122,7 @@ const SHARE_OPTIONS = {
 /**
  * Preset UI modes for quick configuration
  */
-const UI_PRESETS = {
+const UI_PRESETS: UIPresets = {
     full: {
         label: 'Full Editor',
         description: 'All controls and editing features',
@@ -135,7 +168,7 @@ const UI_PRESETS = {
 /**
  * Create the share dialog HTML structure
  */
-function createDialogHTML() {
+function createDialogHTML(): HTMLElement {
     const dialog = document.createElement('div');
     dialog.id = 'share-dialog';
     dialog.className = 'share-dialog hidden';
@@ -224,7 +257,7 @@ function createDialogHTML() {
 /**
  * Build share URL based on current options
  */
-function buildShareUrl() {
+function buildShareUrl(): string {
     if (!currentState) return '';
 
     const baseUrl = window.location.origin + window.location.pathname;
@@ -267,7 +300,7 @@ function buildShareUrl() {
     }
 
     // Add alignment data if checkbox is checked and we have transforms
-    const includeAlignment = document.getElementById('share-include-alignment')?.checked;
+    const includeAlignment = (document.getElementById('share-include-alignment') as HTMLInputElement | null)?.checked;
     if (includeAlignment && !currentState.archiveUrl) {
         addAlignmentParams(params);
     }
@@ -278,45 +311,54 @@ function buildShareUrl() {
 /**
  * Add alignment/transform parameters to URL
  */
-function addAlignmentParams(params) {
-    const formatVec3 = (arr) => arr.map(n => parseFloat(n.toFixed(4))).join(',');
+function addAlignmentParams(params: URLSearchParams): void {
+    const formatVec3 = (arr: [number, number, number]): string => arr.map(n => parseFloat(n.toFixed(4))).join(',');
 
-    if (currentState.splatTransform) {
+    if (currentState?.splatTransform) {
         const t = currentState.splatTransform;
-        if (t.position && (t.position[0] !== 0 || t.position[1] !== 0 || t.position[2] !== 0)) {
-            params.set('sp', formatVec3(t.position));
+        const pos: [number, number, number] = [t.position.x, t.position.y, t.position.z];
+        const rot: [number, number, number] = [t.rotation.x, t.rotation.y, t.rotation.z];
+
+        if (pos[0] !== 0 || pos[1] !== 0 || pos[2] !== 0) {
+            params.set('sp', formatVec3(pos));
         }
-        if (t.rotation && (t.rotation[0] !== 0 || t.rotation[1] !== 0 || t.rotation[2] !== 0)) {
-            params.set('sr', formatVec3(t.rotation));
+        if (rot[0] !== 0 || rot[1] !== 0 || rot[2] !== 0) {
+            params.set('sr', formatVec3(rot));
         }
         if (t.scale !== undefined && t.scale !== 1) {
-            params.set('ss', parseFloat(t.scale.toFixed(4)));
+            params.set('ss', parseFloat(t.scale.toFixed(4)).toString());
         }
     }
 
-    if (currentState.modelTransform) {
+    if (currentState?.modelTransform) {
         const t = currentState.modelTransform;
-        if (t.position && (t.position[0] !== 0 || t.position[1] !== 0 || t.position[2] !== 0)) {
-            params.set('mp', formatVec3(t.position));
+        const pos: [number, number, number] = [t.position.x, t.position.y, t.position.z];
+        const rot: [number, number, number] = [t.rotation.x, t.rotation.y, t.rotation.z];
+
+        if (pos[0] !== 0 || pos[1] !== 0 || pos[2] !== 0) {
+            params.set('mp', formatVec3(pos));
         }
-        if (t.rotation && (t.rotation[0] !== 0 || t.rotation[1] !== 0 || t.rotation[2] !== 0)) {
-            params.set('mr', formatVec3(t.rotation));
+        if (rot[0] !== 0 || rot[1] !== 0 || rot[2] !== 0) {
+            params.set('mr', formatVec3(rot));
         }
         if (t.scale !== undefined && t.scale !== 1) {
-            params.set('ms', parseFloat(t.scale.toFixed(4)));
+            params.set('ms', parseFloat(t.scale.toFixed(4)).toString());
         }
     }
 
-    if (currentState.pointcloudTransform) {
+    if (currentState?.pointcloudTransform) {
         const t = currentState.pointcloudTransform;
-        if (t.position && (t.position[0] !== 0 || t.position[1] !== 0 || t.position[2] !== 0)) {
-            params.set('pp', formatVec3(t.position));
+        const pos: [number, number, number] = [t.position.x, t.position.y, t.position.z];
+        const rot: [number, number, number] = [t.rotation.x, t.rotation.y, t.rotation.z];
+
+        if (pos[0] !== 0 || pos[1] !== 0 || pos[2] !== 0) {
+            params.set('pp', formatVec3(pos));
         }
-        if (t.rotation && (t.rotation[0] !== 0 || t.rotation[1] !== 0 || t.rotation[2] !== 0)) {
-            params.set('pr', formatVec3(t.rotation));
+        if (rot[0] !== 0 || rot[1] !== 0 || rot[2] !== 0) {
+            params.set('pr', formatVec3(rot));
         }
         if (t.scale !== undefined && t.scale !== 1) {
-            params.set('ps', parseFloat(t.scale.toFixed(4)));
+            params.set('ps', parseFloat(t.scale.toFixed(4)).toString());
         }
     }
 }
@@ -324,11 +366,11 @@ function addAlignmentParams(params) {
 /**
  * Get currently selected options from the form
  */
-function getSelectedOptions() {
-    const options = {};
+function getSelectedOptions(): Record<string, string> {
+    const options: Record<string, string> = {};
 
     Object.keys(SHARE_OPTIONS).forEach(key => {
-        const select = document.getElementById(`share-${key}`);
+        const select = document.getElementById(`share-${key}`) as HTMLSelectElement | null;
         options[key] = select ? select.value : SHARE_OPTIONS[key].default;
     });
 
@@ -338,8 +380,8 @@ function getSelectedOptions() {
 /**
  * Update URL preview
  */
-function updateUrlPreview() {
-    const preview = document.getElementById('share-url-preview');
+function updateUrlPreview(): void {
+    const preview = document.getElementById('share-url-preview') as HTMLInputElement | null;
     if (preview) {
         preview.value = buildShareUrl();
     }
@@ -352,13 +394,13 @@ function updateUrlPreview() {
 /**
  * Apply a preset configuration
  */
-function applyPreset(presetKey) {
+function applyPreset(presetKey: string): void {
     const preset = UI_PRESETS[presetKey];
     if (!preset) return;
 
     // Update form values
     Object.entries(preset.settings).forEach(([optionKey, value]) => {
-        const select = document.getElementById(`share-${optionKey}`);
+        const select = document.getElementById(`share-${optionKey}`) as HTMLSelectElement | null;
         if (select) {
             select.value = value;
         }
@@ -366,7 +408,7 @@ function applyPreset(presetKey) {
 
     // Update preset button states
     document.querySelectorAll('.share-preset-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.preset === presetKey);
+        btn.classList.toggle('active', (btn as HTMLElement).dataset.preset === presetKey);
     });
 
     updateUrlPreview();
@@ -375,7 +417,7 @@ function applyPreset(presetKey) {
 /**
  * Copy URL to clipboard
  */
-async function copyToClipboard() {
+async function copyToClipboard(): Promise<boolean> {
     const url = buildShareUrl();
 
     try {
@@ -409,7 +451,7 @@ async function copyToClipboard() {
 /**
  * Set up event listeners for the dialog
  */
-function setupEventListeners() {
+function setupEventListeners(): void {
     if (!dialogElement) return;
 
     // Close button
@@ -426,8 +468,8 @@ function setupEventListeners() {
         if (await copyToClipboard()) {
             hideShareDialog();
             // Trigger notification if available
-            if (window.notify) {
-                window.notify.success('Share link copied to clipboard!');
+            if ((window as any).notify) {
+                (window as any).notify.success('Share link copied to clipboard!');
             }
         }
     });
@@ -437,7 +479,7 @@ function setupEventListeners() {
 
     // Preset buttons
     dialogElement.querySelectorAll('.share-preset-btn').forEach(btn => {
-        btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+        btn.addEventListener('click', () => applyPreset((btn as HTMLElement).dataset.preset || ''));
     });
 
     // Option changes update URL preview
@@ -459,7 +501,7 @@ function setupEventListeners() {
     document.addEventListener('keydown', handleEscapeKey);
 }
 
-function handleEscapeKey(e) {
+function handleEscapeKey(e: KeyboardEvent): void {
     if (e.key === 'Escape' && dialogElement && !dialogElement.classList.contains('hidden')) {
         hideShareDialog();
     }
@@ -472,7 +514,7 @@ function handleEscapeKey(e) {
 /**
  * Initialize the share dialog (call once on app startup)
  */
-export function initShareDialog() {
+export function initShareDialog(): void {
     if (dialogElement) return; // Already initialized
 
     dialogElement = createDialogHTML();
@@ -484,35 +526,40 @@ export function initShareDialog() {
 
 /**
  * Show the share dialog
- * @param {Object} state - Current app state with URLs and transforms
+ * @param state - Current app state with URLs and transforms
  */
-export function showShareDialog(state) {
+export function showShareDialog(state: ShareState | AppState): void {
     if (!dialogElement) {
         initShareDialog();
     }
 
     // Validate that we have shareable content
     if (!state.archiveUrl && !state.splatUrl && !state.modelUrl) {
-        if (window.notify) {
-            window.notify.warning('Cannot share: No files loaded from URL. Share links only work for files loaded via URL, not local uploads.');
+        if ((window as any).notify) {
+            (window as any).notify.warning('Cannot share: No files loaded from URL. Share links only work for files loaded via URL, not local uploads.');
         }
         return;
     }
 
     // Store state for URL generation
-    currentState = state;
+    currentState = state as ShareState;
 
     // Reset form to current state
-    const displayModeSelect = document.getElementById('share-displayMode');
+    const displayModeSelect = document.getElementById('share-displayMode') as HTMLSelectElement | null;
     if (displayModeSelect && state.displayMode) {
         displayModeSelect.value = state.displayMode;
     }
 
     // Reset other options to defaults
-    document.getElementById('share-controlsPanel').value = 'full';
-    document.getElementById('share-toolbar').value = 'show';
-    document.getElementById('share-sidebar').value = 'closed';
-    document.getElementById('share-include-alignment').checked = true;
+    const controlsPanelSelect = document.getElementById('share-controlsPanel') as HTMLSelectElement | null;
+    const toolbarSelect = document.getElementById('share-toolbar') as HTMLSelectElement | null;
+    const sidebarSelect = document.getElementById('share-sidebar') as HTMLSelectElement | null;
+    const alignmentCheckbox = document.getElementById('share-include-alignment') as HTMLInputElement | null;
+
+    if (controlsPanelSelect) controlsPanelSelect.value = 'full';
+    if (toolbarSelect) toolbarSelect.value = 'show';
+    if (sidebarSelect) sidebarSelect.value = 'closed';
+    if (alignmentCheckbox) alignmentCheckbox.checked = true;
 
     // Clear preset selection
     document.querySelectorAll('.share-preset-btn').forEach(btn => {
@@ -527,17 +574,17 @@ export function showShareDialog(state) {
 
     // Focus URL input for easy copying
     setTimeout(() => {
-        document.getElementById('share-url-preview')?.select();
+        const preview = document.getElementById('share-url-preview') as HTMLInputElement | null;
+        preview?.select();
     }, 100);
 }
 
 /**
  * Hide the share dialog
  */
-function hideShareDialog() {
+function hideShareDialog(): void {
     if (dialogElement) {
         dialogElement.classList.add('hidden');
     }
     currentState = null;
 }
-
