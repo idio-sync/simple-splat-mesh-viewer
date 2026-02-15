@@ -19,6 +19,42 @@ const log = Logger.getLogger('theme-loader');
 const DEFAULT_META = { layout: 'sidebar', sceneBg: null, name: null, layoutModule: null };
 
 /**
+ * Fetch raw CSS text from a URL.
+ *
+ * Vite's dev server transforms CSS files into JS modules (for HMR), so a plain
+ * fetch() returns JavaScript, not CSS. This helper detects that case and uses
+ * dynamic import with ?raw to retrieve the actual CSS content.
+ *
+ * In production (nginx, static hosting), the response is plain CSS and is
+ * returned directly.
+ *
+ * @param {string} url - Relative or absolute URL to a .css file
+ * @returns {Promise<string|null>} Raw CSS text, or null if not found
+ */
+async function fetchRawCSS(url) {
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+
+    const contentType = resp.headers.get('content-type') || '';
+
+    // Direct CSS response (production servers, nginx, static hosting)
+    if (contentType.includes('text/css') || contentType.includes('text/plain')) {
+        return resp.text();
+    }
+
+    // Vite dev server transforms CSS → JS module for HMR support.
+    // Use dynamic import with ?raw suffix to get the raw CSS text.
+    try {
+        const rawUrl = new URL(url + '?raw', window.location.href).href;
+        const mod = await import(/* @vite-ignore */ rawUrl);
+        return mod.default;
+    } catch {
+        log.warn(`CSS returned non-CSS content-type (${contentType}) and ?raw import failed: ${url}`);
+        return null;
+    }
+}
+
+/**
  * Parse theme metadata from the first CSS block comment.
  * @param {string} css - Raw CSS text
  * @returns {{ layout: string, sceneBg: string|null, name: string|null }}
@@ -33,8 +69,8 @@ export function parseThemeMeta(css) {
     const sceneBgMatch = comment.match(/@scene-bg\s+(#[0-9a-fA-F]{3,8})/);
     const nameMatch = comment.match(/@theme\s+(.+)/);
 
-    if (layoutMatch) meta.layout = layoutMatch[1];
-    if (sceneBgMatch) meta.sceneBg = sceneBgMatch[1];
+    if (layoutMatch) meta.layout = layoutMatch[1].trim();
+    if (sceneBgMatch) meta.sceneBg = sceneBgMatch[1].trim();
     if (nameMatch) meta.name = nameMatch[1].trim();
 
     return meta;
@@ -54,9 +90,8 @@ function getLayoutModule(layoutName) {
 async function loadLayoutFiles(baseUrl, meta) {
     // Try to load layout.css
     try {
-        const resp = await fetch(baseUrl + 'layout.css');
-        if (resp.ok) {
-            const css = await resp.text();
+        const css = await fetchRawCSS(baseUrl + 'layout.css');
+        if (css) {
             let el = document.getElementById('kiosk-layout');
             if (!el) {
                 el = document.createElement('style');
@@ -65,9 +100,11 @@ async function loadLayoutFiles(baseUrl, meta) {
             }
             el.textContent = css;
             log.info('Layout CSS loaded');
+        } else {
+            log.warn(`Layout CSS not found: ${baseUrl}layout.css`);
         }
     } catch (e) {
-        // No layout.css — that's fine
+        log.warn(`Layout CSS fetch error: ${e.message}`);
     }
 
     // Check for pre-registered layout module first (offline kiosk)
@@ -82,13 +119,15 @@ async function loadLayoutFiles(baseUrl, meta) {
     // location (/modules/), not the document root where themes/ lives.
     try {
         const layoutUrl = new URL(baseUrl + 'layout.js', window.location.href).href;
-        await import(layoutUrl);
+        await import(/* @vite-ignore */ layoutUrl);
         meta.layoutModule = getLayoutModule(meta.layout);
         if (meta.layoutModule) {
             log.info(`Layout module loaded: ${meta.layout}`);
+        } else {
+            log.warn(`layout.js loaded but no module registered for "${meta.layout}"`);
         }
     } catch (e) {
-        // No layout.js — that's fine
+        log.warn(`Layout JS import error: ${e.message}`);
     }
 }
 
@@ -100,7 +139,10 @@ async function loadLayoutFiles(baseUrl, meta) {
  * @returns {Promise<{ layout: string, sceneBg: string|null, name: string|null, layoutModule: object|null }>}
  */
 export async function loadTheme(name, options) {
-    if (!name) return { ...DEFAULT_META };
+    if (!name) {
+        log.info('No theme specified, using defaults');
+        return { ...DEFAULT_META };
+    }
 
     const layoutOverride = options && options.layoutOverride;
 
@@ -127,13 +169,12 @@ export async function loadTheme(name, options) {
     log.info(`Loading theme: ${name}`);
 
     try {
-        const response = await fetch(baseUrl + 'theme.css');
-        if (!response.ok) {
-            log.warn(`Theme "${name}" not found (${response.status}), using defaults`);
+        const css = await fetchRawCSS(baseUrl + 'theme.css');
+        if (!css) {
+            log.warn(`Theme "${name}" not found, using defaults`);
             return { ...DEFAULT_META };
         }
 
-        const css = await response.text();
         const meta = parseThemeMeta(css);
 
         // Inject theme CSS

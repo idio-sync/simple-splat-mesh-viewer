@@ -2,11 +2,11 @@
 import * as THREE from 'three';
 import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader, isArchiveFile } from './modules/archive-loader.js';
-import { hasAnyProxy } from './modules/quality-tier.js';
+// hasAnyProxy moved to archive-pipeline.ts (Phase 2.2)
 import { AnnotationSystem } from './modules/annotation-system.js';
 import { ArchiveCreator, captureScreenshot, CRYPTO_AVAILABLE } from './modules/archive-creator.js';
-import { CAMERA, TIMING, ASSET_STATE, MESH_LOD, ENVIRONMENT } from './modules/constants.js';
-import { Logger, notify, computeMeshFaceCount, computeMeshVertexCount, disposeObject, fetchWithProgress } from './modules/utilities.js';
+import { CAMERA, TIMING, ASSET_STATE, MESH_LOD } from './modules/constants.js';
+import { Logger, notify } from './modules/utilities.js';
 import { FlyControls } from './modules/fly-controls.js';
 import { getStore } from './modules/asset-store.js';
 import { SceneManager } from './modules/scene-manager.js';
@@ -29,7 +29,6 @@ import {
     addListener,
     showInlineLoading,
     hideInlineLoading,
-    setupCollapsibles,
     hideExportPanel,
     setDisplayMode as setDisplayModeHandler,
     updateVisibility as updateVisibilityHandler,
@@ -44,17 +43,14 @@ import {
 import {
     formatFileSize,
     switchEditTab,
-    addCustomField,
     addProcessingSoftware,
     addRelatedObject,
     collectMetadata,
-    setupLicenseField,
     hideMetadataSidebar,
     addVersionEntry,
     setupFieldValidation,
     showMetadataSidebar as showMetadataSidebarHandler,
     switchSidebarMode as switchSidebarModeHandler,
-    setupMetadataTabs,
     toggleMetadataDisplay as toggleMetadataDisplayHandler,
     populateMetadataDisplay as populateMetadataDisplayHandler,
     updateMetadataStats as updateMetadataStatsHandler,
@@ -73,14 +69,7 @@ import {
     loadModelFromUrl as loadModelFromUrlHandler,
     loadPointcloudFromFile as loadPointcloudFromFileHandler,
     loadPointcloudFromUrl as loadPointcloudFromUrlHandler,
-    loadPointcloudFromBlobUrl as loadPointcloudFromBlobUrlHandler,
-    loadArchiveFullResMesh, loadArchiveFullResSplat,
-    loadArchiveProxyMesh, loadArchiveProxySplat,
-    updatePointcloudPointSize,
-    updatePointcloudOpacity,
-    updateModelTextures,
     getAssetTypesForMode,
-    getPrimaryAssetType,
     updateModelOpacity as updateModelOpacityFn,
     updateModelWireframe as updateModelWireframeFn,
     updateModelMatcap as updateModelMatcapFn,
@@ -88,8 +77,6 @@ import {
     updateModelRoughness as updateModelRoughnessFn,
     updateModelMetalness as updateModelMetalnessFn,
     updateModelSpecularF0 as updateModelSpecularF0Fn,
-    loadGLTF,
-    loadOBJFromUrl as loadOBJFromUrlFn,
     loadSTLFile as loadSTLFileHandler,
     loadSTLFromUrlWithDeps as loadSTLFromUrlWithDepsHandler
 } from './modules/file-handlers.js';
@@ -126,6 +113,27 @@ import {
     updateSidebarAnnotationsList as updateSidebarAnnotationsListHandler,
     loadAnnotationsFromArchive as loadAnnotationsFromArchiveHandler
 } from './modules/annotation-controller.js';
+import {
+    showExportPanel as showExportPanelCtrl,
+    updateArchiveAssetCheckboxes as updateArchiveAssetCheckboxesCtrl,
+    downloadArchive as downloadArchiveCtrl,
+    downloadGenericViewer as downloadGenericViewerCtrl,
+    exportMetadataManifest as exportMetadataManifestCtrl,
+    importMetadataManifest as importMetadataManifestCtrl
+} from './modules/export-controller.js';
+import {
+    handleArchiveFile as handleArchiveFileCtrl,
+    loadArchiveFromUrl as loadArchiveFromUrlCtrl,
+    ensureAssetLoaded as ensureAssetLoadedCtrl,
+    processArchive as processArchiveCtrl,
+    applyViewerSettings as applyViewerSettingsCtrl,
+    clearArchiveMetadata as clearArchiveMetadataCtrl,
+    switchQualityTier as switchQualityTierCtrl,
+    handleLoadFullResMesh as handleLoadFullResMeshCtrl
+} from './modules/archive-pipeline.js';
+import {
+    setupUIEvents as setupUIEventsCtrl
+} from './modules/event-wiring.js';
 // kiosk-viewer.js is loaded dynamically in downloadGenericViewer() to avoid
 // blocking the main application if the module fails to load.
 
@@ -329,7 +337,11 @@ const sceneRefs = {
     get flyControls() { return flyControls; },
     get annotationSystem() { return annotationSystem; },
     get archiveCreator() { return archiveCreator; },
-    get landmarkAlignment() { return landmarkAlignment; }
+    get landmarkAlignment() { return landmarkAlignment; },
+    get ambientLight() { return ambientLight; },
+    get hemisphereLight() { return hemisphereLight; },
+    get directionalLight1() { return directionalLight1; },
+    get directionalLight2() { return directionalLight2; }
 };
 
 // Three.js objects - Split view (right side)
@@ -472,6 +484,111 @@ function createMetadataDeps() {
     };
 }
 
+// Helper function to create dependencies object for export-controller.ts
+function createExportDeps() {
+    return {
+        sceneRefs,
+        state,
+        tauriBridge,
+        ui: {
+            showLoading,
+            hideLoading,
+            updateProgress,
+            hideExportPanel,
+            showExportPanelHandler,
+            showMetadataPanel
+        },
+        metadata: {
+            collectMetadata,
+            prefillMetadataFromArchive,
+            populateMetadataDisplay,
+            loadAnnotationsFromArchive
+        }
+    };
+}
+
+// Helper function to create dependencies object for archive-pipeline.ts
+function createArchivePipelineDeps() {
+    return {
+        sceneRefs,
+        state,
+        sceneManager,
+        setSplatMesh: (mesh) => { splatMesh = mesh; },
+        createFileHandlerDeps,
+        ui: {
+            showLoading,
+            hideLoading,
+            showInlineLoading,
+            hideInlineLoading,
+            updateVisibility,
+            updateTransformInputs,
+            updateModelOpacity,
+            updateModelWireframe
+        },
+        alignment: {
+            applyAlignmentData,
+            storeLastPositions
+        },
+        annotations: {
+            loadAnnotationsFromArchive
+        },
+        metadata: {
+            prefillMetadataFromArchive,
+            clearArchiveMetadataHandler
+        },
+        sourceFiles: {
+            updateSourceFilesUI
+        }
+    };
+}
+
+// Helper function to create dependencies object for event-wiring.ts
+function createEventWiringDeps() {
+    return {
+        sceneRefs,
+        state,
+        sceneManager,
+        files: {
+            handleSplatFile, handleModelFile, handleArchiveFile,
+            handlePointcloudFile, handleProxyMeshFile, handleProxySplatFile,
+            handleSTLFile, handleSourceFilesInput,
+            handleLoadSplatFromUrlPrompt, handleLoadModelFromUrlPrompt,
+            handleLoadPointcloudFromUrlPrompt, handleLoadArchiveFromUrlPrompt,
+            handleLoadSTLFromUrlPrompt, handleLoadFullResMesh, switchQualityTier
+        },
+        display: {
+            setDisplayMode, updateModelOpacity, updateModelWireframe,
+            updateModelMatcap, updateModelNormals, updateModelRoughnessView,
+            updateModelMetalnessView, updateModelSpecularF0View,
+            toggleGridlines, setBackgroundColor
+        },
+        camera: { resetCamera, fitToView, toggleFlyMode },
+        alignment: { resetAlignment, toggleAlignment },
+        annotations: {
+            toggleAnnotationMode, saveAnnotation, cancelAnnotation,
+            updateSelectedAnnotationCamera, deleteSelectedAnnotation,
+            dismissPopup: () => dismissPopupHandler(createAnnotationControllerDeps())
+        },
+        export: { showExportPanel, downloadArchive, downloadGenericViewer },
+        screenshots: { captureScreenshotToList, showViewfinder, captureManualPreview, hideViewfinder },
+        metadata: { hideMetadataPanel, toggleMetadataDisplay, setupMetadataSidebar },
+        share: { copyShareLink },
+        controls: { toggleControlsPanel },
+        tauri: {
+            wireNativeDialogsIfAvailable: () => {
+                if (window.__TAURI__ && tauriBridge) {
+                    wireNativeFileDialogs();
+                } else if (window.__TAURI__) {
+                    import('./modules/tauri-bridge.js').then(mod => {
+                        tauriBridge = mod;
+                        wireNativeFileDialogs();
+                    }).catch(() => {});
+                }
+            }
+        }
+    };
+}
+
 // Initialize the scene
 function init() {
     log.info(' init() starting...');
@@ -557,8 +674,8 @@ function init() {
     // Keyboard shortcuts
     window.addEventListener('keydown', onKeyDown);
 
-    // Setup UI events
-    setupUIEvents();
+    // Setup UI events (delegated to event-wiring.ts)
+    setupUIEventsCtrl(createEventWiringDeps());
 
     // Initialize share dialog
     initShareDialog();
@@ -657,758 +774,7 @@ function toggleFlyMode() {
     }
 }
 
-function setupUIEvents() {
-    log.info(' Setting up UI events...');
-
-    // Controls panel toggle
-    const toggleBtn = document.getElementById('btn-toggle-controls');
-    log.info(' Toggle button found:', !!toggleBtn);
-    if (toggleBtn) {
-        toggleBtn.onclick = function(e) {
-            log.info(' Toggle button clicked');
-            e.preventDefault();
-            e.stopPropagation();
-            try {
-                toggleControlsPanel();
-            } catch (err) {
-                log.error(' Error in toggleControlsPanel:', err);
-                // Fallback: use class-based toggle (no inline display styles)
-                const panel = document.getElementById('controls-panel');
-                if (panel) {
-                    const isHidden = panel.classList.contains('panel-hidden');
-                    if (isHidden) {
-                        panel.classList.remove('panel-hidden');
-                    } else {
-                        panel.classList.add('panel-hidden');
-                    }
-                    state.controlsVisible = !isHidden;
-                }
-            }
-        };
-    }
-
-    // Display mode toggles
-    addListener('btn-splat', 'click', () => setDisplayMode('splat'));
-    addListener('btn-model', 'click', () => setDisplayMode('model'));
-    addListener('btn-pointcloud', 'click', () => setDisplayMode('pointcloud'));
-    addListener('btn-both', 'click', () => setDisplayMode('both'));
-    addListener('btn-split', 'click', () => setDisplayMode('split'));
-    addListener('btn-stl', 'click', () => setDisplayMode('stl'));
-
-    // File inputs
-    addListener('splat-input', 'change', handleSplatFile);
-    addListener('model-input', 'change', handleModelFile);
-    addListener('archive-input', 'change', handleArchiveFile);
-    addListener('pointcloud-input', 'change', handlePointcloudFile);
-    addListener('proxy-mesh-input', 'change', handleProxyMeshFile);
-    addListener('proxy-splat-input', 'change', handleProxySplatFile);
-    addListener('stl-input', 'change', handleSTLFile);
-    addListener('btn-load-stl-url', 'click', handleLoadSTLFromUrlPrompt);
-    addListener('source-files-input', 'change', handleSourceFilesInput);
-    addListener('btn-load-pointcloud-url', 'click', handleLoadPointcloudFromUrlPrompt);
-    addListener('btn-load-archive-url', 'click', handleLoadArchiveFromUrlPrompt);
-    addListener('btn-load-full-res', 'click', handleLoadFullResMesh);
-    addListener('proxy-load-full-link', 'click', (e) => { e.preventDefault(); handleLoadFullResMesh(); });
-    addListener('btn-quality-sd', 'click', () => switchQualityTier('sd'));
-    addListener('btn-quality-hd', 'click', () => switchQualityTier('hd'));
-
-    // Tauri native file dialogs — override label clicks to use OS dialogs
-    if (window.__TAURI__ && tauriBridge) {
-        wireNativeFileDialogs();
-    } else if (window.__TAURI__) {
-        // Bridge may not be loaded yet (async import); retry once ready
-        import('./modules/tauri-bridge.js').then(mod => {
-            tauriBridge = mod;
-            wireNativeFileDialogs();
-        }).catch(() => {});
-    }
-
-    // URL load buttons (using prompt)
-    const splatUrlBtn = document.getElementById('btn-load-splat-url');
-    const modelUrlBtn = document.getElementById('btn-load-model-url');
-    log.info(' URL buttons found - splat:', !!splatUrlBtn, 'model:', !!modelUrlBtn);
-
-    if (splatUrlBtn) {
-        splatUrlBtn.addEventListener('click', handleLoadSplatFromUrlPrompt);
-    }
-    if (modelUrlBtn) {
-        modelUrlBtn.addEventListener('click', handleLoadModelFromUrlPrompt);
-    }
-
-    // Splat settings
-    addListener('splat-scale', 'input', (e) => {
-        const scale = parseFloat(e.target.value);
-        const valueEl = document.getElementById('splat-scale-value');
-        if (valueEl) valueEl.textContent = scale.toFixed(1);
-        if (splatMesh) {
-            splatMesh.scale.setScalar(scale);
-        }
-    });
-
-    // Splat position inputs
-    ['x', 'y', 'z'].forEach(axis => {
-        addListener(`splat-pos-${axis}`, 'change', (e) => {
-            if (splatMesh) {
-                splatMesh.position[axis] = parseFloat(e.target.value) || 0;
-            }
-        });
-        addListener(`splat-rot-${axis}`, 'change', (e) => {
-            if (splatMesh) {
-                splatMesh.rotation[axis] = THREE.MathUtils.degToRad(parseFloat(e.target.value) || 0);
-            }
-        });
-    });
-
-    // Model settings
-    addListener('model-scale', 'input', (e) => {
-        const scale = parseFloat(e.target.value);
-        const valueEl = document.getElementById('model-scale-value');
-        if (valueEl) valueEl.textContent = scale.toFixed(1);
-        if (modelGroup) {
-            modelGroup.scale.setScalar(scale);
-        }
-    });
-
-    addListener('model-opacity', 'input', (e) => {
-        state.modelOpacity = parseFloat(e.target.value);
-        const valueEl = document.getElementById('model-opacity-value');
-        if (valueEl) valueEl.textContent = state.modelOpacity.toFixed(2);
-        updateModelOpacity();
-    });
-
-    addListener('model-wireframe', 'change', (e) => {
-        state.modelWireframe = e.target.checked;
-        if (e.target.checked) {
-            if (state.modelMatcap) {
-                state.modelMatcap = false;
-                const matcapCb = document.getElementById('model-matcap');
-                if (matcapCb) matcapCb.checked = false;
-                const styleGroup = document.getElementById('matcap-style-group');
-                if (styleGroup) styleGroup.style.display = 'none';
-                updateModelMatcap();
-            }
-            if (state.modelNormals) {
-                state.modelNormals = false;
-                const normalsCb = document.getElementById('model-normals');
-                if (normalsCb) normalsCb.checked = false;
-                updateModelNormals();
-            }
-            if (state.modelRoughness) {
-                state.modelRoughness = false;
-                const cb = document.getElementById('model-roughness');
-                if (cb) cb.checked = false;
-                updateModelRoughnessView();
-            }
-            if (state.modelMetalness) {
-                state.modelMetalness = false;
-                const cb = document.getElementById('model-metalness');
-                if (cb) cb.checked = false;
-                updateModelMetalnessView();
-            }
-            if (state.modelSpecularF0) {
-                state.modelSpecularF0 = false;
-                const cb = document.getElementById('model-specular-f0');
-                if (cb) cb.checked = false;
-                updateModelSpecularF0View();
-            }
-        }
-        updateModelWireframe();
-    });
-
-    addListener('model-matcap', 'change', (e) => {
-        state.modelMatcap = e.target.checked;
-        const styleGroup = document.getElementById('matcap-style-group');
-        if (styleGroup) styleGroup.style.display = e.target.checked ? '' : 'none';
-        if (e.target.checked) {
-            if (state.modelWireframe) {
-                state.modelWireframe = false;
-                const wireCb = document.getElementById('model-wireframe');
-                if (wireCb) wireCb.checked = false;
-                updateModelWireframe();
-            }
-            if (state.modelNormals) {
-                state.modelNormals = false;
-                const normalsCb = document.getElementById('model-normals');
-                if (normalsCb) normalsCb.checked = false;
-                updateModelNormals();
-            }
-            if (state.modelRoughness) {
-                state.modelRoughness = false;
-                const cb = document.getElementById('model-roughness');
-                if (cb) cb.checked = false;
-                updateModelRoughnessView();
-            }
-            if (state.modelMetalness) {
-                state.modelMetalness = false;
-                const cb = document.getElementById('model-metalness');
-                if (cb) cb.checked = false;
-                updateModelMetalnessView();
-            }
-            if (state.modelSpecularF0) {
-                state.modelSpecularF0 = false;
-                const cb = document.getElementById('model-specular-f0');
-                if (cb) cb.checked = false;
-                updateModelSpecularF0View();
-            }
-        }
-        updateModelMatcap();
-    });
-
-    addListener('matcap-style', 'change', (e) => {
-        state.matcapStyle = e.target.value;
-        if (state.modelMatcap) updateModelMatcap();
-    });
-
-    addListener('model-normals', 'change', (e) => {
-        state.modelNormals = e.target.checked;
-        if (e.target.checked) {
-            if (state.modelMatcap) {
-                state.modelMatcap = false;
-                const matcapCb = document.getElementById('model-matcap');
-                if (matcapCb) matcapCb.checked = false;
-                const styleGroup = document.getElementById('matcap-style-group');
-                if (styleGroup) styleGroup.style.display = 'none';
-                updateModelMatcap();
-            }
-            if (state.modelWireframe) {
-                state.modelWireframe = false;
-                const wireCb = document.getElementById('model-wireframe');
-                if (wireCb) wireCb.checked = false;
-                updateModelWireframe();
-            }
-            if (state.modelRoughness) {
-                state.modelRoughness = false;
-                const cb = document.getElementById('model-roughness');
-                if (cb) cb.checked = false;
-                updateModelRoughnessView();
-            }
-            if (state.modelMetalness) {
-                state.modelMetalness = false;
-                const cb = document.getElementById('model-metalness');
-                if (cb) cb.checked = false;
-                updateModelMetalnessView();
-            }
-            if (state.modelSpecularF0) {
-                state.modelSpecularF0 = false;
-                const cb = document.getElementById('model-specular-f0');
-                if (cb) cb.checked = false;
-                updateModelSpecularF0View();
-            }
-        }
-        updateModelNormals();
-    });
-
-    addListener('model-roughness', 'change', (e) => {
-        state.modelRoughness = e.target.checked;
-        if (e.target.checked) {
-            if (state.modelWireframe) {
-                state.modelWireframe = false;
-                const wireCb = document.getElementById('model-wireframe');
-                if (wireCb) wireCb.checked = false;
-                updateModelWireframe();
-            }
-            if (state.modelMatcap) {
-                state.modelMatcap = false;
-                const matcapCb = document.getElementById('model-matcap');
-                if (matcapCb) matcapCb.checked = false;
-                const styleGroup = document.getElementById('matcap-style-group');
-                if (styleGroup) styleGroup.style.display = 'none';
-                updateModelMatcap();
-            }
-            if (state.modelNormals) {
-                state.modelNormals = false;
-                const normalsCb = document.getElementById('model-normals');
-                if (normalsCb) normalsCb.checked = false;
-                updateModelNormals();
-            }
-            if (state.modelMetalness) {
-                state.modelMetalness = false;
-                const cb = document.getElementById('model-metalness');
-                if (cb) cb.checked = false;
-                updateModelMetalnessView();
-            }
-            if (state.modelSpecularF0) {
-                state.modelSpecularF0 = false;
-                const cb = document.getElementById('model-specular-f0');
-                if (cb) cb.checked = false;
-                updateModelSpecularF0View();
-            }
-        }
-        updateModelRoughnessView();
-    });
-
-    addListener('model-metalness', 'change', (e) => {
-        state.modelMetalness = e.target.checked;
-        if (e.target.checked) {
-            if (state.modelWireframe) {
-                state.modelWireframe = false;
-                const wireCb = document.getElementById('model-wireframe');
-                if (wireCb) wireCb.checked = false;
-                updateModelWireframe();
-            }
-            if (state.modelMatcap) {
-                state.modelMatcap = false;
-                const matcapCb = document.getElementById('model-matcap');
-                if (matcapCb) matcapCb.checked = false;
-                const styleGroup = document.getElementById('matcap-style-group');
-                if (styleGroup) styleGroup.style.display = 'none';
-                updateModelMatcap();
-            }
-            if (state.modelNormals) {
-                state.modelNormals = false;
-                const normalsCb = document.getElementById('model-normals');
-                if (normalsCb) normalsCb.checked = false;
-                updateModelNormals();
-            }
-            if (state.modelRoughness) {
-                state.modelRoughness = false;
-                const cb = document.getElementById('model-roughness');
-                if (cb) cb.checked = false;
-                updateModelRoughnessView();
-            }
-            if (state.modelSpecularF0) {
-                state.modelSpecularF0 = false;
-                const cb = document.getElementById('model-specular-f0');
-                if (cb) cb.checked = false;
-                updateModelSpecularF0View();
-            }
-        }
-        updateModelMetalnessView();
-    });
-
-    addListener('model-specular-f0', 'change', (e) => {
-        state.modelSpecularF0 = e.target.checked;
-        if (e.target.checked) {
-            if (state.modelWireframe) {
-                state.modelWireframe = false;
-                const wireCb = document.getElementById('model-wireframe');
-                if (wireCb) wireCb.checked = false;
-                updateModelWireframe();
-            }
-            if (state.modelMatcap) {
-                state.modelMatcap = false;
-                const matcapCb = document.getElementById('model-matcap');
-                if (matcapCb) matcapCb.checked = false;
-                const styleGroup = document.getElementById('matcap-style-group');
-                if (styleGroup) styleGroup.style.display = 'none';
-                updateModelMatcap();
-            }
-            if (state.modelNormals) {
-                state.modelNormals = false;
-                const normalsCb = document.getElementById('model-normals');
-                if (normalsCb) normalsCb.checked = false;
-                updateModelNormals();
-            }
-            if (state.modelRoughness) {
-                state.modelRoughness = false;
-                const cb = document.getElementById('model-roughness');
-                if (cb) cb.checked = false;
-                updateModelRoughnessView();
-            }
-            if (state.modelMetalness) {
-                state.modelMetalness = false;
-                const cb = document.getElementById('model-metalness');
-                if (cb) cb.checked = false;
-                updateModelMetalnessView();
-            }
-        }
-        updateModelSpecularF0View();
-    });
-
-    addListener('model-no-texture', 'change', (e) => {
-        updateModelTextures(modelGroup, !e.target.checked);
-    });
-
-    // Model position inputs
-    ['x', 'y', 'z'].forEach(axis => {
-        addListener(`model-pos-${axis}`, 'change', (e) => {
-            if (modelGroup) {
-                modelGroup.position[axis] = parseFloat(e.target.value) || 0;
-            }
-        });
-        addListener(`model-rot-${axis}`, 'change', (e) => {
-            if (modelGroup) {
-                modelGroup.rotation[axis] = THREE.MathUtils.degToRad(parseFloat(e.target.value) || 0);
-            }
-        });
-    });
-
-    // Point cloud settings
-    addListener('pointcloud-scale', 'input', (e) => {
-        const scale = parseFloat(e.target.value);
-        const valueEl = document.getElementById('pointcloud-scale-value');
-        if (valueEl) valueEl.textContent = scale.toFixed(1);
-        if (pointcloudGroup) {
-            pointcloudGroup.scale.setScalar(scale);
-        }
-    });
-
-    addListener('pointcloud-point-size', 'input', (e) => {
-        state.pointcloudPointSize = parseFloat(e.target.value);
-        const valueEl = document.getElementById('pointcloud-point-size-value');
-        if (valueEl) valueEl.textContent = state.pointcloudPointSize.toFixed(3);
-        updatePointcloudPointSize(pointcloudGroup, state.pointcloudPointSize);
-    });
-
-    addListener('pointcloud-opacity', 'input', (e) => {
-        state.pointcloudOpacity = parseFloat(e.target.value);
-        const valueEl = document.getElementById('pointcloud-opacity-value');
-        if (valueEl) valueEl.textContent = state.pointcloudOpacity.toFixed(2);
-        updatePointcloudOpacity(pointcloudGroup, state.pointcloudOpacity);
-    });
-
-    // Point cloud position inputs
-    ['x', 'y', 'z'].forEach(axis => {
-        addListener(`pointcloud-pos-${axis}`, 'change', (e) => {
-            if (pointcloudGroup) {
-                pointcloudGroup.position[axis] = parseFloat(e.target.value) || 0;
-            }
-        });
-        addListener(`pointcloud-rot-${axis}`, 'change', (e) => {
-            if (pointcloudGroup) {
-                pointcloudGroup.rotation[axis] = THREE.MathUtils.degToRad(parseFloat(e.target.value) || 0);
-            }
-        });
-    });
-
-    // Alignment buttons
-    addListener('btn-reset-alignment', 'click', resetAlignment);
-
-    // Share button
-    addListener('btn-share', 'click', copyShareLink);
-
-    // Preview kiosk mode in new tab
-    addListener('btn-preview-kiosk', 'click', () => {
-        const url = new URL(window.location.href);
-        url.searchParams.set('kiosk', 'true');
-        window.open(url.toString(), '_blank');
-    });
-
-    // Camera buttons
-    addListener('btn-reset-camera', 'click', resetCamera);
-    addListener('btn-fit-view', 'click', fitToView);
-
-    // Lighting controls
-    addListener('ambient-intensity', 'input', (e) => {
-        const intensity = parseFloat(e.target.value);
-        const valueEl = document.getElementById('ambient-intensity-value');
-        if (valueEl) valueEl.textContent = intensity.toFixed(1);
-        if (ambientLight) ambientLight.intensity = intensity;
-    });
-
-    addListener('hemisphere-intensity', 'input', (e) => {
-        const intensity = parseFloat(e.target.value);
-        const valueEl = document.getElementById('hemisphere-intensity-value');
-        if (valueEl) valueEl.textContent = intensity.toFixed(1);
-        if (hemisphereLight) hemisphereLight.intensity = intensity;
-    });
-
-    addListener('directional1-intensity', 'input', (e) => {
-        const intensity = parseFloat(e.target.value);
-        const valueEl = document.getElementById('directional1-intensity-value');
-        if (valueEl) valueEl.textContent = intensity.toFixed(1);
-        if (directionalLight1) directionalLight1.intensity = intensity;
-    });
-
-    addListener('directional2-intensity', 'input', (e) => {
-        const intensity = parseFloat(e.target.value);
-        const valueEl = document.getElementById('directional2-intensity-value');
-        if (valueEl) valueEl.textContent = intensity.toFixed(1);
-        if (directionalLight2) directionalLight2.intensity = intensity;
-    });
-
-    // Align objects button (landmark alignment toggle)
-    addListener('btn-align', 'click', toggleAlignment);
-
-    // Annotation controls
-    const annoBtn = addListener('btn-annotate', 'click', toggleAnnotationMode);
-    const addAnnoBtn = addListener('btn-sidebar-add-annotation', 'click', toggleAnnotationMode);
-    log.info(' Annotation buttons attached:', { annoBtn, addAnnoBtn });
-    addListener('btn-anno-save', 'click', saveAnnotation);
-    addListener('btn-anno-cancel', 'click', cancelAnnotation);
-    addListener('btn-sidebar-update-anno-camera', 'click', updateSelectedAnnotationCamera);
-    addListener('btn-sidebar-delete-anno', 'click', deleteSelectedAnnotation);
-
-    // Fly camera mode toggle
-    addListener('btn-fly-mode', 'click', toggleFlyMode);
-
-    // Auto-rotate toggle
-    addListener('btn-auto-rotate', 'click', () => {
-        controls.autoRotate = !controls.autoRotate;
-        const btn = document.getElementById('btn-auto-rotate');
-        if (btn) btn.classList.toggle('active', controls.autoRotate);
-    });
-
-    // Export/archive creation controls
-    addListener('btn-export-archive', 'click', showExportPanel);
-    addListener('btn-export-cancel', 'click', hideExportPanel);
-    addListener('btn-export-download', 'click', downloadArchive);
-
-    // Generic viewer download button
-    addListener('btn-download-viewer', 'click', downloadGenericViewer);
-
-    // Screenshot controls
-    addListener('btn-capture-screenshot', 'click', captureScreenshotToList);
-    addListener('btn-set-preview', 'click', showViewfinder);
-    addListener('btn-capture-preview', 'click', captureManualPreview);
-    addListener('btn-cancel-preview', 'click', hideViewfinder);
-    addListener('btn-clear-manual-preview', 'click', () => {
-        state.manualPreviewBlob = null;
-        const status = document.getElementById('manual-preview-status');
-        if (status) status.style.display = 'none';
-        notify.success('Manual preview cleared');
-    });
-
-    // Metadata panel controls
-    addListener('btn-close-sidebar', 'click', hideMetadataPanel);
-    addListener('btn-add-custom-field', 'click', addCustomField);
-    setupMetadataTabs();
-    setupLicenseField();
-
-    // Metadata display toggle (toolbar button)
-    addListener('btn-metadata', 'click', toggleMetadataDisplay);
-
-    // Scene settings - Camera FOV
-    addListener('camera-fov', 'input', (e) => {
-        const fov = parseInt(e.target.value, 10);
-        const valueEl = document.getElementById('camera-fov-value');
-        if (valueEl) valueEl.textContent = fov;
-        if (camera) {
-            camera.fov = fov;
-            camera.updateProjectionMatrix();
-        }
-    });
-
-    // Scene settings - Gridlines
-    addListener('toggle-gridlines', 'change', (e) => {
-        toggleGridlines(e.target.checked);
-    });
-
-    // Scene settings - Background color presets
-    document.querySelectorAll('.color-preset').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const color = btn.dataset.color;
-            setBackgroundColor(color);
-            // Update active state
-            document.querySelectorAll('.color-preset').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            // Update color picker
-            const picker = document.getElementById('bg-color-picker');
-            if (picker) picker.value = color;
-            // Uncheck env-as-background
-            const envBgToggle = document.getElementById('toggle-env-background');
-            if (envBgToggle) envBgToggle.checked = false;
-        });
-    });
-
-    // Scene settings - Custom background color
-    addListener('bg-color-picker', 'input', (e) => {
-        setBackgroundColor(e.target.value);
-        // Remove active from presets
-        document.querySelectorAll('.color-preset').forEach(b => b.classList.remove('active'));
-        // Uncheck env-as-background
-        const envBgToggle = document.getElementById('toggle-env-background');
-        if (envBgToggle) envBgToggle.checked = false;
-    });
-
-    // Scene settings - Background image
-    addListener('bg-image-input', 'change', async (e) => {
-        const file = e.target.files[0];
-        if (!file || !sceneManager) return;
-        try {
-            await sceneManager.loadBackgroundImageFromFile(file);
-            const filenameEl = document.getElementById('bg-image-filename');
-            if (filenameEl) { filenameEl.textContent = file.name; filenameEl.style.display = ''; }
-            const envBgToggle = document.getElementById('toggle-env-background');
-            if (envBgToggle) envBgToggle.checked = false;
-            document.querySelectorAll('.color-preset').forEach(b => b.classList.remove('active'));
-            const clearBtn = document.getElementById('btn-clear-bg-image');
-            if (clearBtn) clearBtn.style.display = '';
-        } catch (err) {
-            notify.error('Failed to load background image: ' + err.message);
-        }
-    });
-
-    addListener('btn-load-bg-image-url', 'click', async () => {
-        const url = prompt('Enter background image URL:');
-        if (!url || !sceneManager) return;
-        try {
-            await sceneManager.loadBackgroundImage(url);
-            const envBgToggle = document.getElementById('toggle-env-background');
-            if (envBgToggle) envBgToggle.checked = false;
-            document.querySelectorAll('.color-preset').forEach(b => b.classList.remove('active'));
-            const clearBtn = document.getElementById('btn-clear-bg-image');
-            if (clearBtn) clearBtn.style.display = '';
-        } catch (err) {
-            notify.error('Failed to load background image: ' + err.message);
-        }
-    });
-
-    addListener('btn-clear-bg-image', 'click', () => {
-        if (!sceneManager) return;
-        sceneManager.clearBackgroundImage();
-        sceneManager.setBackgroundColor(
-            '#' + (sceneManager.savedBackgroundColor || new THREE.Color(0x1a1a2e)).getHexString()
-        );
-        const filenameEl = document.getElementById('bg-image-filename');
-        if (filenameEl) filenameEl.style.display = 'none';
-        const clearBtn = document.getElementById('btn-clear-bg-image');
-        if (clearBtn) clearBtn.style.display = 'none';
-    });
-
-    // Scene settings - Tone mapping
-    addListener('tone-mapping-select', 'change', (e) => {
-        if (sceneManager) sceneManager.setToneMapping(e.target.value);
-    });
-
-    addListener('tone-mapping-exposure', 'input', (e) => {
-        const val = parseFloat(e.target.value);
-        document.getElementById('tone-mapping-exposure-value').textContent = val.toFixed(1);
-        if (sceneManager) sceneManager.setToneMappingExposure(val);
-    });
-
-    // Scene settings - Environment map (IBL)
-    addListener('env-map-select', 'change', async (e) => {
-        const value = e.target.value;
-        if (!value) {
-            if (sceneManager) sceneManager.clearEnvironment();
-            return;
-        }
-        if (value.startsWith('preset:')) {
-            const index = parseInt(value.split(':')[1]);
-            const presets = ENVIRONMENT.PRESETS.filter(p => p.url);
-            if (presets[index]) {
-                showLoading('Loading HDR environment...');
-                try {
-                    await sceneManager.loadHDREnvironment(presets[index].url);
-                    notify.success('Environment loaded');
-                } catch (err) {
-                    notify.error('Failed to load environment: ' + err.message);
-                } finally {
-                    hideLoading();
-                }
-            }
-        }
-    });
-
-    addListener('hdr-file-input', 'change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        showLoading('Loading HDR environment...');
-        try {
-            await sceneManager.loadHDREnvironmentFromFile(file);
-            const filenameEl = document.getElementById('hdr-filename');
-            if (filenameEl) { filenameEl.textContent = file.name; filenameEl.style.display = ''; }
-            const select = document.getElementById('env-map-select');
-            if (select) select.value = '';
-            notify.success('Environment loaded from file');
-        } catch (err) {
-            notify.error('Failed to load HDR: ' + err.message);
-        } finally {
-            hideLoading();
-        }
-    });
-
-    addListener('btn-load-hdr-url', 'click', async () => {
-        const url = prompt('Enter HDR file URL (.hdr):');
-        if (!url) return;
-        showLoading('Loading HDR environment...');
-        try {
-            await sceneManager.loadHDREnvironment(url);
-            const select = document.getElementById('env-map-select');
-            if (select) select.value = '';
-            notify.success('Environment loaded from URL');
-        } catch (err) {
-            notify.error('Failed to load HDR: ' + err.message);
-        } finally {
-            hideLoading();
-        }
-    });
-
-    // Scene settings - Environment as background
-    addListener('toggle-env-background', 'change', (e) => {
-        if (sceneManager) sceneManager.setEnvironmentAsBackground(e.target.checked);
-    });
-
-    // Scene settings - Shadows
-    addListener('toggle-shadows', 'change', (e) => {
-        if (sceneManager) sceneManager.enableShadows(e.target.checked);
-        const opacityGroup = document.getElementById('shadow-opacity-group');
-        if (opacityGroup) opacityGroup.style.display = e.target.checked ? '' : 'none';
-    });
-
-    addListener('shadow-opacity', 'input', (e) => {
-        const val = parseFloat(e.target.value);
-        document.getElementById('shadow-opacity-value').textContent = val.toFixed(2);
-        if (sceneManager) sceneManager.setShadowCatcherOpacity(val);
-    });
-
-    // Close annotation popup when clicking outside
-    document.addEventListener('click', (e) => {
-        const popup = document.getElementById('annotation-info-popup');
-        if (popup && !popup.classList.contains('hidden')) {
-            // Check if click was outside popup and not on an annotation marker
-            if (!popup.contains(e.target) && !e.target.closest('.annotation-marker')) {
-                dismissPopupHandler(createAnnotationControllerDeps());
-            }
-        }
-    });
-
-    // Keyboard shortcuts
-    window.addEventListener('keydown', (e) => {
-        const activeEl = document.activeElement;
-        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
-            return; // Don't trigger if typing in input
-        }
-
-        // In fly mode, only allow F (toggle out) and Escape
-        if (flyControls && flyControls.enabled) {
-            if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey) {
-                toggleFlyMode();
-            }
-            return;
-        }
-
-        if (e.key.toLowerCase() === 'a' && !e.ctrlKey && !e.metaKey) {
-            toggleAnnotationMode();
-        } else if (e.key.toLowerCase() === 'm' && !e.ctrlKey && !e.metaKey) {
-            toggleMetadataDisplay();
-        } else if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey) {
-            toggleFlyMode();
-        } else if (e.key === 'Escape') {
-            dismissPopupHandler(createAnnotationControllerDeps());
-            hideMetadataDisplay();
-        }
-    });
-
-    // Default View settings — live toggle
-    addListener('meta-viewer-single-sided', 'change', (e) => {
-        const side = e.target.checked ? THREE.FrontSide : THREE.DoubleSide;
-        if (modelGroup) {
-            modelGroup.traverse(child => {
-                if (child.isMesh && child.material) {
-                    const mats = Array.isArray(child.material) ? child.material : [child.material];
-                    mats.forEach(m => { m.side = side; m.needsUpdate = true; });
-                }
-            });
-        }
-    });
-
-    addListener('meta-viewer-bg-color', 'input', (e) => {
-        const hex = e.target.value;
-        if (scene) scene.background = new THREE.Color(hex);
-        const hexLabel = document.getElementById('meta-viewer-bg-color-hex');
-        if (hexLabel) hexLabel.textContent = hex;
-    });
-
-    // Setup collapsible sections
-    setupCollapsibles();
-
-    // Metadata sidebar event handlers
-    setupMetadataSidebar();
-
-    log.info(' UI events setup complete');
-}
+// setupUIEvents extracted to event-wiring.ts (Phase 2, Step 2.5)
 
 function setDisplayMode(mode) {
     setDisplayModeHandler(mode, {
@@ -1558,535 +924,23 @@ async function handlePointcloudFile(event) {
     }
 }
 
-// Handle archive file input
-async function handleArchiveFile(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+// Handle archive file input (delegated to archive-pipeline.ts)
+async function handleArchiveFile(event) { return handleArchiveFileCtrl(event, createArchivePipelineDeps()); }
 
-    document.getElementById('archive-filename').textContent = file.name;
-    showLoading('Loading archive...');
+// Load archive from URL (delegated to archive-pipeline.ts)
+async function loadArchiveFromUrl(url) { return loadArchiveFromUrlCtrl(url, createArchivePipelineDeps()); }
 
-    try {
-        // Clean up previous archive if any
-        if (state.archiveLoader) {
-            state.archiveLoader.dispose();
-        }
+// Ensure archive asset loaded (delegated to archive-pipeline.ts)
+async function ensureAssetLoaded(assetType) { return ensureAssetLoadedCtrl(assetType, createArchivePipelineDeps()); }
 
-        const archiveLoader = new ArchiveLoader();
-        await archiveLoader.loadFromFile(file);
-        await processArchive(archiveLoader, file.name);
+// Process loaded archive (delegated to archive-pipeline.ts)
+async function processArchive(archiveLoader, archiveName) { return processArchiveCtrl(archiveLoader, archiveName, createArchivePipelineDeps()); }
 
-        state.currentArchiveUrl = null; // Local files cannot be shared
-    } catch (error) {
-        log.error('Error loading archive:', error);
-        hideLoading();
-        notify.error('Error loading archive: ' + error.message);
-    }
-}
+// Apply viewer settings (delegated to archive-pipeline.ts)
+function applyViewerSettings(settings) { applyViewerSettingsCtrl(settings, createArchivePipelineDeps()); }
 
-// Load archive from URL
-async function loadArchiveFromUrl(url) {
-    showLoading('Downloading archive...');
-
-    try {
-        // Clean up previous archive if any
-        if (state.archiveLoader) {
-            state.archiveLoader.dispose();
-        }
-
-        const archiveLoader = new ArchiveLoader();
-        await archiveLoader.loadFromUrl(url, (progress) => {
-            showLoading(`Downloading archive... ${Math.round(progress * 100)}%`);
-        });
-
-        const fileName = url.split('/').pop() || 'archive.a3d';
-        document.getElementById('archive-filename').textContent = fileName;
-
-        state.currentArchiveUrl = url;
-        await processArchive(archiveLoader, fileName);
-    } catch (error) {
-        log.error('Error loading archive from URL:', error);
-        hideLoading();
-        notify.error('Error loading archive from URL: ' + error.message);
-    }
-}
-
-// Ensure a single archive asset type is loaded on demand.
-// Returns true if the asset is loaded (or was already loaded), false otherwise.
-async function ensureAssetLoaded(assetType) {
-    if (!state.archiveLoader) return false;
-    const archiveLoader = state.archiveLoader;
-
-    // Already loaded
-    if (state.assetStates[assetType] === ASSET_STATE.LOADED) return true;
-    // Already errored — don't retry automatically
-    if (state.assetStates[assetType] === ASSET_STATE.ERROR) return false;
-    // Already loading — wait for it
-    if (state.assetStates[assetType] === ASSET_STATE.LOADING) {
-        return new Promise(resolve => {
-            const check = () => {
-                if (state.assetStates[assetType] === ASSET_STATE.LOADED) resolve(true);
-                else if (state.assetStates[assetType] === ASSET_STATE.ERROR) resolve(false);
-                else setTimeout(check, 50);
-            };
-            check();
-        });
-    }
-
-    state.assetStates[assetType] = ASSET_STATE.LOADING;
-    showInlineLoading(assetType);
-
-    try {
-        if (assetType === 'splat') {
-            const sceneEntry = archiveLoader.getSceneEntry();
-            const contentInfo = archiveLoader.getContentInfo();
-            if (!sceneEntry || !contentInfo.hasSplat) {
-                state.assetStates[assetType] = ASSET_STATE.UNLOADED;
-                return false;
-            }
-            const splatData = await archiveLoader.extractFile(sceneEntry.file_name);
-            if (!splatData) { state.assetStates[assetType] = ASSET_STATE.ERROR; return false; }
-            await loadSplatFromBlobUrl(splatData.url, sceneEntry.file_name);
-            // Apply transform
-            const transform = archiveLoader.getEntryTransform(sceneEntry);
-            if (splatMesh && (transform.position.some(v => v !== 0) || transform.rotation.some(v => v !== 0) || transform.scale !== 1)) {
-                splatMesh.position.fromArray(transform.position);
-                splatMesh.rotation.set(...transform.rotation);
-                splatMesh.scale.setScalar(transform.scale);
-            }
-            assets.splatBlob = splatData.blob;
-            state.assetStates[assetType] = ASSET_STATE.LOADED;
-            return true;
-
-        } else if (assetType === 'mesh') {
-            const contentInfo = archiveLoader.getContentInfo();
-            const meshEntry = archiveLoader.getMeshEntry();
-            if (!meshEntry || !contentInfo.hasMesh) {
-                state.assetStates[assetType] = ASSET_STATE.UNLOADED;
-                return false;
-            }
-            // Prefer proxy mesh when quality tier is SD
-            const proxyEntry = archiveLoader.getMeshProxyEntry();
-            const useProxy = state.qualityResolved === 'sd' && contentInfo.hasMeshProxy && proxyEntry;
-            const entryToLoad = useProxy ? proxyEntry : meshEntry;
-
-            const meshData = await archiveLoader.extractFile(entryToLoad.file_name);
-            if (!meshData) { state.assetStates[assetType] = ASSET_STATE.ERROR; return false; }
-            await loadModelFromBlobUrl(meshData.url, entryToLoad.file_name);
-            // Apply transform from primary mesh entry
-            const transform = archiveLoader.getEntryTransform(meshEntry);
-            if (modelGroup && (transform.position.some(v => v !== 0) || transform.rotation.some(v => v !== 0) || transform.scale !== 1)) {
-                modelGroup.position.fromArray(transform.position);
-                modelGroup.rotation.set(...transform.rotation);
-                modelGroup.scale.setScalar(transform.scale);
-            }
-            if (useProxy) {
-                // Store the proxy blob for re-export, extract full-res blob in background
-                assets.proxyMeshBlob = meshData.blob;
-                const proxyName = entryToLoad.file_name.split('/').pop();
-                const proxyFilenameEl = document.getElementById('proxy-mesh-filename');
-                if (proxyFilenameEl) proxyFilenameEl.textContent = proxyName;
-                archiveLoader.extractFile(meshEntry.file_name).then(fullData => {
-                    if (fullData) assets.meshBlob = fullData.blob;
-                }).catch(() => {});
-                state.viewingProxy = true;
-                document.getElementById('proxy-mesh-indicator')?.classList.remove('hidden');
-                const fullResBtn = document.getElementById('btn-load-full-res');
-                if (fullResBtn) fullResBtn.style.display = '';
-            } else {
-                assets.meshBlob = meshData.blob;
-            }
-            state.assetStates[assetType] = ASSET_STATE.LOADED;
-            return true;
-
-        } else if (assetType === 'pointcloud') {
-            const contentInfo = archiveLoader.getContentInfo();
-            if (!contentInfo.hasPointcloud) {
-                state.assetStates[assetType] = ASSET_STATE.UNLOADED;
-                return false;
-            }
-            const pointcloudEntry = archiveLoader.getPointcloudEntry();
-            if (!pointcloudEntry) { state.assetStates[assetType] = ASSET_STATE.UNLOADED; return false; }
-            const pcData = await archiveLoader.extractFile(pointcloudEntry.file_name);
-            if (!pcData) { state.assetStates[assetType] = ASSET_STATE.ERROR; return false; }
-            const result = await loadPointcloudFromBlobUrlHandler(pcData.url, pointcloudEntry.file_name, { pointcloudGroup });
-            state.pointcloudLoaded = true;
-            // Apply transform
-            const transform = archiveLoader.getEntryTransform(pointcloudEntry);
-            if (pointcloudGroup && (transform.position.some(v => v !== 0) || transform.rotation.some(v => v !== 0) || transform.scale !== 1)) {
-                pointcloudGroup.position.fromArray(transform.position);
-                pointcloudGroup.rotation.set(...transform.rotation);
-                pointcloudGroup.scale.setScalar(transform.scale);
-            }
-            document.getElementById('pointcloud-filename').textContent = pointcloudEntry.file_name.split('/').pop();
-            document.getElementById('pointcloud-points').textContent = result.pointCount.toLocaleString();
-            assets.pointcloudBlob = pcData.blob;
-            state.assetStates[assetType] = ASSET_STATE.LOADED;
-            return true;
-        }
-
-        return false;
-    } catch (e) {
-        log.error(`Error loading ${assetType} from archive:`, e);
-        state.assetStates[assetType] = ASSET_STATE.ERROR;
-        return false;
-    } finally {
-        hideInlineLoading(assetType);
-    }
-}
-
-// Process loaded archive - phased lazy loading
-async function processArchive(archiveLoader, archiveName) {
-    showLoading('Parsing manifest...');
-
-    try {
-        // === Phase 1: Manifest + metadata (fast, no 3D decompression) ===
-        const manifest = await archiveLoader.parseManifest();
-        log.info(' Archive manifest:', manifest);
-
-        state.archiveLoader = archiveLoader;
-        state.archiveManifest = manifest;
-        state.archiveFileName = archiveName;
-        state.archiveLoaded = true;
-        // Reset asset states for new archive
-        state.assetStates = { splat: ASSET_STATE.UNLOADED, mesh: ASSET_STATE.UNLOADED, pointcloud: ASSET_STATE.UNLOADED };
-
-        // Prefill metadata panel from loaded archive
-        prefillMetadataFromArchive(manifest);
-
-        const contentInfo = archiveLoader.getContentInfo();
-
-        // Update archive metadata UI
-        updateArchiveMetadataUI(manifest, archiveLoader);
-
-        // Check for global alignment data
-        const globalAlignment = archiveLoader.getGlobalAlignment();
-
-        // Load annotations from archive
-        const annotations = archiveLoader.getAnnotations();
-
-        // Extract embedded images for markdown rendering
-        state.imageAssets.clear();
-        const imageEntries = archiveLoader.getImageEntries();
-        for (const entry of imageEntries) {
-            try {
-                const data = await archiveLoader.extractFile(entry.file_name);
-                if (data) {
-                    state.imageAssets.set(entry.file_name, { blob: data.blob, url: data.url, name: entry.file_name });
-                }
-            } catch (e) {
-                log.warn('Failed to extract image:', entry.file_name, e.message);
-            }
-        }
-        if (imageEntries.length > 0) {
-            log.info(` Extracted ${state.imageAssets.size} embedded images`);
-        }
-
-        // Populate source files list from archive manifest (metadata only).
-        // Blobs are re-extracted on demand at export time via archiveLoader.extractFile().
-        // releaseRawData() is skipped when source files exist so extraction stays possible.
-        const archiveSourceEntries = archiveLoader.getSourceFileEntries();
-        if (archiveSourceEntries.length > 0) {
-            for (const { entry } of archiveSourceEntries) {
-                assets.sourceFiles.push({
-                    file: null,
-                    name: entry.original_name || entry.file_name.split('/').pop(),
-                    size: entry.size_bytes || 0,
-                    category: entry.source_category || '',
-                    fromArchive: true
-                });
-            }
-            updateSourceFilesUI();
-            log.info(` Found ${archiveSourceEntries.length} source files in archive manifest`);
-        }
-
-        // === Phase 2: Load primary asset for current display mode ===
-        const primaryType = getPrimaryAssetType(state.displayMode, contentInfo);
-        showLoading(`Loading ${primaryType} from archive...`);
-        const primaryLoaded = await ensureAssetLoaded(primaryType);
-
-        if (!primaryLoaded) {
-            // Try loading any available asset
-            const fallbackTypes = ['splat', 'mesh', 'pointcloud'].filter(t => t !== primaryType);
-            let anyLoaded = false;
-            for (const type of fallbackTypes) {
-                showLoading(`Loading ${type} from archive...`);
-                if (await ensureAssetLoaded(type)) {
-                    anyLoaded = true;
-                    break;
-                }
-            }
-            if (!anyLoaded) {
-                hideLoading();
-                notify.warning('Archive does not contain any viewable splat, mesh, or point cloud files.');
-                return;
-            }
-        }
-
-        // Apply global alignment after primary asset is loaded
-        if (globalAlignment) {
-            applyAlignmentData(globalAlignment);
-        }
-
-        // Update UI
-        updateTransformInputs();
-        storeLastPositions();
-
-        // Load annotations
-        if (annotations && annotations.length > 0) {
-            loadAnnotationsFromArchive(annotations);
-        }
-
-        hideLoading();
-
-        // Apply viewer settings from manifest
-        if (manifest.viewer_settings) {
-            applyViewerSettings(manifest.viewer_settings);
-        }
-
-        // Show quality toggle if archive has any proxies
-        const contentInfoFinal = archiveLoader.getContentInfo();
-        if (hasAnyProxy(contentInfoFinal)) {
-            document.getElementById('quality-toggle-container')?.classList.remove('hidden');
-        }
-
-        // === Phase 3: Background-load remaining assets ===
-        const remainingTypes = ['splat', 'mesh', 'pointcloud'].filter(
-            t => t !== primaryType && state.assetStates[t] === ASSET_STATE.UNLOADED
-        );
-        if (remainingTypes.length > 0) {
-            setTimeout(async () => {
-                for (const type of remainingTypes) {
-                    const typeContentCheck = (type === 'splat' && contentInfo.hasSplat) ||
-                                             (type === 'mesh' && contentInfo.hasMesh) ||
-                                             (type === 'pointcloud' && contentInfo.hasPointcloud);
-                    if (typeContentCheck) {
-                        log.info(`Background loading: ${type}`);
-                        await ensureAssetLoaded(type);
-                        updateTransformInputs();
-                        // Re-apply viewer settings to newly loaded meshes
-                        if (type === 'mesh' && manifest.viewer_settings) {
-                            applyViewerSettings(manifest.viewer_settings);
-                        }
-                    }
-                }
-                // Release raw ZIP data after all assets are extracted,
-                // but keep it if archive has source files (needed for re-export).
-                // For file-based archives, _file is just a File handle — no memory cost.
-                if (!archiveLoader.hasSourceFiles()) {
-                    archiveLoader.releaseRawData();
-                    log.info('All archive assets loaded, raw data released');
-                } else {
-                    log.info('All archive assets loaded, raw data retained for source file re-export');
-                }
-            }, 100);
-        } else {
-            if (!archiveLoader.hasSourceFiles()) {
-                archiveLoader.releaseRawData();
-            } else {
-                log.info('Raw data retained for source file re-export');
-            }
-        }
-    } catch (error) {
-        log.error(' Error processing archive:', error);
-        hideLoading();
-        notify.error('Error processing archive: ' + error.message);
-    }
-}
-
-/**
- * Apply viewer settings from manifest to scene and materials
- * @param {Object} settings - viewer_settings from manifest
- */
-function applyViewerSettings(settings) {
-    if (!settings) return;
-
-    // Material side
-    if (settings.single_sided !== undefined) {
-        const side = settings.single_sided ? THREE.FrontSide : THREE.DoubleSide;
-        if (modelGroup) {
-            modelGroup.traverse(child => {
-                if (child.isMesh && child.material) {
-                    const mats = Array.isArray(child.material) ? child.material : [child.material];
-                    mats.forEach(m => { m.side = side; m.needsUpdate = true; });
-                }
-            });
-        }
-        // Sync sidebar checkbox
-        const el = document.getElementById('meta-viewer-single-sided');
-        if (el) el.checked = settings.single_sided;
-    }
-
-    // Background color
-    if (settings.background_color) {
-        if (scene) scene.background = new THREE.Color(settings.background_color);
-        // Sync sidebar color input
-        const colorEl = document.getElementById('meta-viewer-bg-color');
-        if (colorEl) colorEl.value = settings.background_color;
-        const hexLabel = document.getElementById('meta-viewer-bg-color-hex');
-        if (hexLabel) hexLabel.textContent = settings.background_color;
-    }
-
-    log.info('Applied viewer settings:', settings);
-}
-
-// Load splat from a blob URL (used by archive loader)
-async function loadSplatFromBlobUrl(blobUrl, fileName) {
-    // Remove existing splat
-    if (splatMesh) {
-        scene.remove(splatMesh);
-        if (splatMesh.dispose) splatMesh.dispose();
-        splatMesh = null;
-    }
-
-    // Create SplatMesh using Spark
-    splatMesh = new SplatMesh({ url: blobUrl });
-
-    // Apply default rotation to correct upside-down orientation
-    splatMesh.rotation.x = Math.PI;
-
-    // Verify SplatMesh is a valid THREE.Object3D
-    if (!(splatMesh instanceof THREE.Object3D)) {
-        log.warn(' WARNING: SplatMesh is not an instance of THREE.Object3D!');
-    }
-
-    // Wait for initialization
-    await new Promise(resolve => setTimeout(resolve, TIMING.SPLAT_LOAD_DELAY));
-
-    try {
-        scene.add(splatMesh);
-    } catch (addError) {
-        log.error(' Error adding splatMesh to scene:', addError);
-        throw addError;
-    }
-
-    state.splatLoaded = true;
-    updateVisibility();
-
-    // Update UI
-    document.getElementById('splat-filename').textContent = fileName;
-    document.getElementById('splat-vertices').textContent = 'Loaded';
-}
-
-// Load model from a blob URL (used by archive loader)
-async function loadModelFromBlobUrl(blobUrl, fileName) {
-    // Clear existing model
-    while (modelGroup.children.length > 0) {
-        const child = modelGroup.children[0];
-        disposeObject(child);
-        modelGroup.remove(child);
-    }
-
-    const extension = fileName.split('.').pop().toLowerCase();
-    let loadedObject;
-
-    if (extension === 'glb' || extension === 'gltf') {
-        loadedObject = await loadGLTF(blobUrl);
-    } else if (extension === 'obj') {
-        loadedObject = await loadOBJFromUrlFn(blobUrl);
-    }
-
-    if (loadedObject) {
-        modelGroup.add(loadedObject);
-        if (sceneManager) sceneManager.applyShadowProperties(loadedObject);
-        state.modelLoaded = true;
-        updateModelOpacity();
-        updateModelWireframe();
-        updateVisibility();
-
-        // Center model on grid if no splat is loaded
-        // (Archives with alignment data will override this later)
-        if (!state.splatLoaded) {
-            centerModelOnGrid(modelGroup);
-        }
-
-        // Count faces and update UI
-        const faceCount = computeMeshFaceCount(loadedObject);
-        document.getElementById('model-filename').textContent = fileName;
-        document.getElementById('model-faces').textContent = faceCount.toLocaleString();
-    }
-}
-
-// Update archive metadata UI panel
-function updateArchiveMetadataUI(manifest, archiveLoader) {
-    const section = document.getElementById('archive-metadata-section');
-    if (!section) return;
-
-    section.style.display = '';
-
-    const metadata = archiveLoader.getMetadata();
-
-    // Update basic info
-    document.getElementById('archive-version').textContent = metadata.version || '-';
-
-    const packerText = metadata.packerVersion
-        ? `${metadata.packer} v${metadata.packerVersion}`
-        : metadata.packer;
-    document.getElementById('archive-packer').textContent = packerText;
-
-    document.getElementById('archive-created').textContent =
-        metadata.createdAt ? new Date(metadata.createdAt).toLocaleString() : '-';
-
-    // Populate entries list
-    const entriesList = document.getElementById('archive-entries-list');
-    entriesList.replaceChildren(); // Clear existing content safely
-    const header = document.createElement('p');
-    header.className = 'entries-header';
-    header.textContent = 'Contents:';
-    entriesList.appendChild(header);
-
-    const entries = archiveLoader.getEntryList();
-    for (const entry of entries) {
-        const entryDiv = document.createElement('div');
-        entryDiv.className = 'archive-entry';
-
-        // Determine entry type for styling
-        let entryType = 'other';
-        if (entry.key.startsWith('scene_')) entryType = 'scene';
-        else if (entry.key.startsWith('mesh_')) entryType = 'mesh';
-        else if (entry.key.startsWith('thumbnail_')) entryType = 'thumbnail';
-
-        const typeSpan = document.createElement('span');
-        typeSpan.className = `archive-entry-type ${entryType}`;
-        typeSpan.textContent = entryType;
-
-        const nameSpan = document.createElement('span');
-        nameSpan.className = 'archive-entry-name';
-        nameSpan.textContent = entry.fileName;
-
-        const detailsDiv = document.createElement('div');
-        detailsDiv.className = 'archive-entry-details';
-        detailsDiv.textContent = entry.createdBy ? `Created by: ${entry.createdBy}` : '';
-
-        entryDiv.appendChild(typeSpan);
-        entryDiv.appendChild(nameSpan);
-        entryDiv.appendChild(detailsDiv);
-        entriesList.appendChild(entryDiv);
-    }
-}
-
-// Clear archive metadata when loading new files
-function clearArchiveMetadata() {
-    state.archiveLoaded = false;
-    state.archiveManifest = null;
-    state.archiveFileName = null;
-    state.currentArchiveUrl = null;
-
-    if (state.archiveLoader) {
-        state.archiveLoader.dispose();
-        state.archiveLoader = null;
-    }
-
-    // Delegate DOM cleanup to metadata-manager.js
-    clearArchiveMetadataHandler();
-
-    const section = document.getElementById('archive-metadata-section');
-    if (section) section.style.display = 'none';
-
-    // Clear source files from previous archive
-    assets.sourceFiles = [];
-    updateSourceFilesUI();
-}
+// Clear archive metadata (delegated to archive-pipeline.ts)
+function clearArchiveMetadata() { clearArchiveMetadataCtrl(createArchivePipelineDeps()); }
 
 // ==================== Annotation Functions ====================
 
@@ -2145,30 +999,10 @@ function loadAnnotationsFromArchive(annotations) {
     loadAnnotationsFromArchiveHandler(annotations, createAnnotationControllerDeps());
 }
 
-// ==================== Export/Archive Creation Functions ====================
+// ==================== Export/Archive Creation Functions (delegated to export-controller.ts) ====================
 
-// Show export panel
-function showExportPanel() {
-    showExportPanelHandler();
-    updateArchiveAssetCheckboxes();
-}
-
-// Update archive asset checkboxes based on loaded state
-function updateArchiveAssetCheckboxes() {
-    const assets = [
-        { id: 'archive-include-splat', loaded: state.splatLoaded },
-        { id: 'archive-include-model', loaded: state.modelLoaded },
-        { id: 'archive-include-pointcloud', loaded: state.pointcloudLoaded },
-        { id: 'archive-include-annotations', loaded: annotationSystem && annotationSystem.hasAnnotations() }
-    ];
-    assets.forEach(({ id, loaded }) => {
-        const el = document.getElementById(id);
-        if (el) {
-            el.checked = !!loaded;
-            el.disabled = !loaded;
-        }
-    });
-}
+function showExportPanel() { showExportPanelCtrl(createExportDeps()); }
+function updateArchiveAssetCheckboxes() { updateArchiveAssetCheckboxesCtrl(createExportDeps()); }
 
 // =============================================================================
 // SCREENSHOT FUNCTIONS (delegated to screenshot-manager.js)
@@ -2198,345 +1032,11 @@ function removeScreenshot(id) {
     removeScreenshotHandler(id, state);
 }
 
-// Download archive
-async function downloadArchive() {
-    log.info(' downloadArchive called');
-    if (!archiveCreator) {
-        log.error(' archiveCreator is null');
-        return;
-    }
+// Download archive — delegated to export-controller.ts
+async function downloadArchive() { return downloadArchiveCtrl(createExportDeps()); }
 
-    // Reset creator
-    log.info(' Resetting archive creator');
-    archiveCreator.reset();
-
-    // Get metadata from metadata panel
-    log.info(' Collecting metadata');
-    const metadata = collectMetadata();
-    log.info(' Metadata collected:', metadata);
-
-    // Get export options
-    const formatRadio = document.querySelector('input[name="export-format"]:checked');
-    const format = formatRadio?.value || 'a3d';
-    // Preview image and integrity hashes are always included
-    const includePreview = true;
-    const includeHashes = true;
-    log.info(' Export options:', { format, includePreview, includeHashes });
-
-    // Validate title is set
-    if (!metadata.project.title) {
-        log.info(' No title set, showing metadata panel');
-        notify.warning('Please enter a project title in the metadata panel before exporting.');
-        showMetadataPanel();
-        return;
-    }
-
-    // Apply project info
-    log.info(' Setting project info');
-    archiveCreator.setProjectInfo(metadata.project);
-
-    // Apply provenance
-    log.info(' Setting provenance');
-    archiveCreator.setProvenance(metadata.provenance);
-
-    // Apply relationships
-    log.info(' Setting relationships');
-    archiveCreator.setRelationships(metadata.relationships);
-
-    // Apply quality metrics
-    log.info(' Setting quality metrics');
-    archiveCreator.setQualityMetrics(metadata.qualityMetrics);
-
-    // Apply archival record
-    log.info(' Setting archival record');
-    archiveCreator.setArchivalRecord(metadata.archivalRecord);
-
-    // Apply material standard
-    log.info(' Setting material standard');
-    archiveCreator.setMaterialStandard(metadata.materialStandard);
-
-    // Apply preservation
-    log.info(' Setting preservation');
-    archiveCreator.setPreservation(metadata.preservation);
-
-    // Apply viewer settings
-    log.info(' Setting viewer settings');
-    archiveCreator.setViewerSettings(metadata.viewerSettings);
-
-    // Apply custom fields
-    if (Object.keys(metadata.customFields).length > 0) {
-        log.info(' Setting custom fields');
-        archiveCreator.setCustomFields(metadata.customFields);
-    }
-
-    // Apply version history
-    if (metadata.versionHistory && metadata.versionHistory.length > 0) {
-        log.info(' Setting version history');
-        archiveCreator.setVersionHistory(metadata.versionHistory);
-    }
-
-    // Read which assets the user wants to include
-    const includeSplat = document.getElementById('archive-include-splat')?.checked;
-    const includeModel = document.getElementById('archive-include-model')?.checked;
-    const includePointcloud = document.getElementById('archive-include-pointcloud')?.checked;
-    const includeAnnotations = document.getElementById('archive-include-annotations')?.checked;
-
-    // Add splat if loaded and selected
-    log.info(' Checking splat:', { splatBlob: !!assets.splatBlob, splatLoaded: state.splatLoaded });
-    if (includeSplat && assets.splatBlob && state.splatLoaded) {
-        const fileName = document.getElementById('splat-filename')?.textContent || 'scene.ply';
-        const position = splatMesh ? [splatMesh.position.x, splatMesh.position.y, splatMesh.position.z] : [0, 0, 0];
-        const rotation = splatMesh ? [splatMesh.rotation.x, splatMesh.rotation.y, splatMesh.rotation.z] : [0, 0, 0];
-        const scale = splatMesh ? splatMesh.scale.x : 1;
-
-        log.info(' Adding scene:', { fileName, position, rotation, scale });
-        archiveCreator.addScene(assets.splatBlob, fileName, {
-            position, rotation, scale,
-            created_by: metadata.splatMetadata.createdBy || 'unknown',
-            created_by_version: metadata.splatMetadata.version || '',
-            source_notes: metadata.splatMetadata.sourceNotes || '',
-            role: metadata.splatMetadata.role || ''
-        });
-    }
-
-    // Add mesh if loaded and selected
-    log.info(' Checking mesh:', { meshBlob: !!assets.meshBlob, modelLoaded: state.modelLoaded });
-    // If viewing a proxy and full-res blob hasn't been extracted yet, extract now
-    if (includeModel && state.modelLoaded && !assets.meshBlob && state.viewingProxy && state.archiveLoader) {
-        const meshEntry = state.archiveLoader.getMeshEntry();
-        if (meshEntry) {
-            const fullData = await state.archiveLoader.extractFile(meshEntry.file_name);
-            if (fullData) assets.meshBlob = fullData.blob;
-        }
-    }
-    if (includeModel && assets.meshBlob && state.modelLoaded) {
-        const fileName = document.getElementById('model-filename')?.textContent || 'mesh.glb';
-        const position = modelGroup ? [modelGroup.position.x, modelGroup.position.y, modelGroup.position.z] : [0, 0, 0];
-        const rotation = modelGroup ? [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z] : [0, 0, 0];
-        const scale = modelGroup ? modelGroup.scale.x : 1;
-
-        log.info(' Adding mesh:', { fileName, position, rotation, scale });
-        archiveCreator.addMesh(assets.meshBlob, fileName, {
-            position, rotation, scale,
-            created_by: metadata.meshMetadata.createdBy || 'unknown',
-            created_by_version: metadata.meshMetadata.version || '',
-            source_notes: metadata.meshMetadata.sourceNotes || '',
-            role: metadata.meshMetadata.role || ''
-        });
-    }
-
-    // Add display proxy mesh if available
-    if (includeModel && assets.proxyMeshBlob) {
-        const proxyFileName = document.getElementById('proxy-mesh-filename')?.textContent || 'mesh_proxy.glb';
-        const position = modelGroup ? [modelGroup.position.x, modelGroup.position.y, modelGroup.position.z] : [0, 0, 0];
-        const rotation = modelGroup ? [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z] : [0, 0, 0];
-        const scale = modelGroup ? modelGroup.scale.x : 1;
-
-        log.info(' Adding mesh proxy:', { proxyFileName });
-        archiveCreator.addMeshProxy(assets.proxyMeshBlob, proxyFileName, {
-            position, rotation, scale,
-            derived_from: 'mesh_0'
-        });
-    }
-
-    // Add display proxy splat if available
-    if (assets.proxySplatBlob) {
-        const proxySplatFileName = document.getElementById('proxy-splat-filename')?.textContent || 'scene_proxy.spz';
-        const splatPosition = splatMesh ? [splatMesh.position.x, splatMesh.position.y, splatMesh.position.z] : [0, 0, 0];
-        const splatRotation = splatMesh ? [splatMesh.rotation.x, splatMesh.rotation.y, splatMesh.rotation.z] : [0, 0, 0];
-        const splatScale = splatMesh ? splatMesh.scale.x : 1;
-
-        log.info(' Adding splat proxy:', { proxySplatFileName });
-        archiveCreator.addSceneProxy(assets.proxySplatBlob, proxySplatFileName, {
-            position: splatPosition, rotation: splatRotation, scale: splatScale,
-            derived_from: 'scene_0'
-        });
-    }
-
-    // Add point cloud if loaded and selected
-    log.info(' Checking pointcloud:', { pointcloudBlob: !!assets.pointcloudBlob, pointcloudLoaded: state.pointcloudLoaded });
-    if (includePointcloud && assets.pointcloudBlob && state.pointcloudLoaded) {
-        const fileName = document.getElementById('pointcloud-filename')?.textContent || 'pointcloud.e57';
-        const position = pointcloudGroup ? [pointcloudGroup.position.x, pointcloudGroup.position.y, pointcloudGroup.position.z] : [0, 0, 0];
-        const rotation = pointcloudGroup ? [pointcloudGroup.rotation.x, pointcloudGroup.rotation.y, pointcloudGroup.rotation.z] : [0, 0, 0];
-        const scale = pointcloudGroup ? pointcloudGroup.scale.x : 1;
-
-        log.info(' Adding pointcloud:', { fileName, position, rotation, scale });
-        archiveCreator.addPointcloud(assets.pointcloudBlob, fileName, {
-            position, rotation, scale,
-            created_by: metadata.pointcloudMetadata?.createdBy || 'unknown',
-            created_by_version: metadata.pointcloudMetadata?.version || '',
-            source_notes: metadata.pointcloudMetadata?.sourceNotes || '',
-            role: metadata.pointcloudMetadata?.role || ''
-        });
-    }
-
-    // Add annotations if selected
-    if (includeAnnotations && annotationSystem && annotationSystem.hasAnnotations()) {
-        log.info(' Adding annotations');
-        archiveCreator.setAnnotations(annotationSystem.toJSON());
-    }
-
-    // Add embedded images
-    if (state.imageAssets.size > 0) {
-        log.info(` Adding ${state.imageAssets.size} embedded images`);
-        for (const [path, asset] of state.imageAssets) {
-            archiveCreator.addImage(asset.blob, path);
-        }
-    }
-
-    // Add user-added source files (have blobs, not from archive)
-    const sourceFilesWithBlobs = assets.sourceFiles.filter(sf => sf.file && !sf.fromArchive);
-    if (sourceFilesWithBlobs.length > 0) {
-        const totalSourceSize = sourceFilesWithBlobs.reduce((sum, sf) => sum + sf.size, 0);
-        if (totalSourceSize > 2 * 1024 * 1024 * 1024) {
-            notify.warning(`Source files total ${formatFileSize(totalSourceSize)}. Very large archives may fail in the browser. Consider adding files to the ZIP after export using external tools.`);
-        }
-        log.info(` Adding ${sourceFilesWithBlobs.length} source files (${formatFileSize(totalSourceSize)})`);
-        for (const sf of sourceFilesWithBlobs) {
-            archiveCreator.addSourceFile(sf.file, sf.name, { category: sf.category });
-        }
-    }
-
-    // Re-extract source files from the loaded archive (raw data retained for this purpose)
-    if (state.archiveLoader && state.archiveLoader.hasSourceFiles()) {
-        const archiveSourceEntries = state.archiveLoader.getSourceFileEntries();
-        for (const { entry } of archiveSourceEntries) {
-            try {
-                const data = await state.archiveLoader.extractFile(entry.file_name);
-                if (data) {
-                    archiveCreator.addSourceFile(data.blob, entry.original_name || entry.file_name.split('/').pop(), {
-                        category: entry.source_category || ''
-                    });
-                }
-            } catch (e) {
-                log.warn('Failed to re-extract source file:', entry.file_name, e.message);
-            }
-        }
-    }
-
-    // Set quality stats
-    log.info(' Setting quality stats');
-    archiveCreator.setQualityStats({
-        splatCount: (includeSplat && state.splatLoaded) ? parseInt(document.getElementById('splat-vertices')?.textContent) || 0 : 0,
-        meshPolys: (includeModel && state.modelLoaded) ? parseInt(document.getElementById('model-faces')?.textContent) || 0 : 0,
-        meshVerts: (includeModel && state.modelLoaded) ? (state.meshVertexCount || 0) : 0,
-        splatFileSize: (includeSplat && assets.splatBlob) ? assets.splatBlob.size : 0,
-        meshFileSize: (includeModel && assets.meshBlob) ? assets.meshBlob.size : 0,
-        pointcloudPoints: (includePointcloud && state.pointcloudLoaded) ? parseInt(document.getElementById('pointcloud-points')?.textContent?.replace(/,/g, '')) || 0 : 0,
-        pointcloudFileSize: (includePointcloud && assets.pointcloudBlob) ? assets.pointcloudBlob.size : 0
-    });
-
-    // Add preview/thumbnail
-    if (includePreview && renderer) {
-        try {
-            let previewBlob;
-            if (state.manualPreviewBlob) {
-                log.info(' Using manual preview');
-                previewBlob = state.manualPreviewBlob;
-            } else {
-                log.info(' Auto-capturing preview screenshot');
-                renderer.render(scene, camera);
-                previewBlob = await captureScreenshot(renderer.domElement, { width: 512, height: 512 });
-            }
-            if (previewBlob) {
-                log.info(' Preview captured, adding thumbnail');
-                archiveCreator.addThumbnail(previewBlob, 'preview.jpg');
-            }
-        } catch (e) {
-            log.warn(' Failed to capture preview:', e);
-        }
-    }
-
-    // Add screenshots
-    if (state.screenshots.length > 0) {
-        log.info(` Adding ${state.screenshots.length} screenshot(s) to archive`);
-        for (const screenshot of state.screenshots) {
-            try {
-                archiveCreator.addScreenshot(screenshot.blob, `screenshot_${screenshot.id}.jpg`);
-            } catch (e) {
-                log.warn(' Failed to add screenshot:', e);
-            }
-        }
-    }
-
-    // Validate
-    log.info(' Validating archive');
-    const validation = archiveCreator.validate();
-    log.info(' Validation result:', validation);
-    if (!validation.valid) {
-        notify.error('Cannot create archive: ' + validation.errors.join('; '));
-        return;
-    }
-
-    // Create and download with progress
-    log.info(' Starting archive creation');
-    showLoading('Creating archive...', true); // Show with progress bar
-    try {
-        log.info(' Calling archiveCreator.downloadArchive');
-        await archiveCreator.downloadArchive(
-            {
-                filename: metadata.project.id || 'archive',
-                format: format,
-                includeHashes: includeHashes
-            },
-            (percent, stage) => {
-                // Progress callback
-                updateProgress(percent, stage);
-            }
-        );
-        log.info(' Archive download complete');
-        hideLoading();
-        hideExportPanel();
-    } catch (e) {
-        hideLoading();
-        log.error(' Error creating archive:', e);
-        notify.error('Error creating archive: ' + e.message);
-    }
-}
-
-// Download generic offline viewer (standalone HTML that opens any .a3d/.a3z)
-async function downloadGenericViewer() {
-    log.info(' downloadGenericViewer called');
-    showLoading('Building offline viewer...', true);
-
-    try {
-        updateProgress(1, 'Loading viewer module...');
-        const { fetchDependencies: fetchViewerDeps, generateGenericViewer } =
-            await import('./modules/kiosk-viewer.js');
-
-        updateProgress(5, 'Fetching viewer libraries...');
-        const deps = await fetchViewerDeps((msg) => {
-            updateProgress(15, msg);
-        });
-
-        updateProgress(90, 'Assembling viewer...');
-        const html = generateGenericViewer(deps);
-
-        updateProgress(95, 'Starting download...');
-        const blob = new Blob([html], { type: 'text/html' });
-        if (tauriBridge) {
-            await tauriBridge.download(blob, 'archive-viewer.html', { name: 'HTML Files', extensions: ['html'] });
-        } else {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'archive-viewer.html';
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        log.info(`[Viewer] Generic viewer exported (${(blob.size / 1024).toFixed(0)} KB)`);
-        updateProgress(100, 'Complete');
-        hideLoading();
-        notify.success('Offline viewer downloaded: archive-viewer.html');
-
-    } catch (e) {
-        hideLoading();
-        log.error(' Error creating generic viewer:', e);
-        notify.error('Error creating viewer: ' + e.message);
-    }
-}
+// Download generic offline viewer — delegated to export-controller.ts
+async function downloadGenericViewer() { return downloadGenericViewerCtrl(createExportDeps()); }
 
 // ==================== Metadata Sidebar Functions ====================
 
@@ -2569,65 +1069,9 @@ function setupMetadataSidebar() {
     });
 }
 
-async function exportMetadataManifest() {
-    const metadata = collectMetadata();
-    const manifest = {
-        container_version: '1.0',
-        packer: 'simple-splat-mesh-viewer',
-        packer_version: '1.0.0',
-        _creation_date: new Date().toISOString(),
-        ...metadata
-    };
-
-    // Include annotations if present
-    if (annotationSystem && annotationSystem.hasAnnotations()) {
-        manifest.annotations = annotationSystem.toJSON();
-    }
-
-    const json = JSON.stringify(manifest, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    if (tauriBridge) {
-        await tauriBridge.download(blob, 'manifest.json', { name: 'JSON Files', extensions: ['json'] });
-    } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'manifest.json';
-        a.click();
-        URL.revokeObjectURL(url);
-    }
-    notify.success('Manifest exported');
-}
-
-function importMetadataManifest() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            try {
-                const manifest = JSON.parse(event.target.result);
-                prefillMetadataFromArchive(manifest);
-
-                // Load annotations if present in manifest
-                if (manifest.annotations && Array.isArray(manifest.annotations) && manifest.annotations.length > 0) {
-                    loadAnnotationsFromArchive(manifest.annotations);
-                }
-
-                populateMetadataDisplay();
-                notify.success('Manifest imported');
-            } catch (err) {
-                log.error('Failed to parse manifest:', err);
-                notify.error('Invalid manifest file: ' + err.message);
-            }
-        };
-        reader.readAsText(file);
-    });
-    input.click();
-}
+// Export/Import metadata manifest — delegated to export-controller.ts
+async function exportMetadataManifest() { return exportMetadataManifestCtrl(createExportDeps()); }
+function importMetadataManifest() { importMetadataManifestCtrl(createExportDeps()); }
 
 // Update quality stats display - delegates to metadata-manager.js
 function updateMetadataStats() { updateMetadataStatsHandler(createMetadataDeps()); }
@@ -2665,134 +1109,80 @@ function updateAnnotationPopupPosition() {
  * Overrides the <label for="..."> click to open a native OS dialog instead
  * of the browser's file picker, then feeds the result into the existing handler.
  */
+// Wire native file dialogs (structural wiring delegated to tauri-bridge.js)
 function wireNativeFileDialogs() {
     if (!tauriBridge || !tauriBridge.isTauri()) return;
-    log.info('Wiring native file dialogs for Tauri');
-
-    function wireInput(inputId, filterKey, multiple, onFiles) {
-        const label = document.querySelector(`label[for="${inputId}"]`);
-        if (!label) return;
-        label.removeAttribute('for');
-        label.style.cursor = 'pointer';
-        label.addEventListener('click', async (e) => {
-            e.preventDefault();
-            const files = await tauriBridge.openFileDialog({ filterKey, multiple });
-            if (files && files.length) await onFiles(files);
-        });
-    }
-
-    wireInput('splat-input', 'splat', false, async (files) => {
-        document.getElementById('splat-filename').textContent = files[0].name;
-        showLoading('Loading Gaussian Splat...');
-        try {
-            await loadSplatFromFileHandler(files[0], createFileHandlerDeps());
-            hideLoading();
-        } catch (error) {
-            log.error('Error loading splat:', error);
-            hideLoading();
-            notify.error('Error loading Gaussian Splat: ' + error.message);
-        }
-    });
-
-    wireInput('model-input', 'model', true, async (files) => {
-        document.getElementById('model-filename').textContent = files[0].name;
-        showLoading('Loading 3D Model...');
-        try {
-            await loadModelFromFileHandler(files, createFileHandlerDeps());
-            hideLoading();
-        } catch (error) {
-            log.error('Error loading model:', error);
-            hideLoading();
-            notify.error('Error loading model: ' + error.message);
-        }
-    });
-
-    wireInput('archive-input', 'archive', false, async (files) => {
-        document.getElementById('archive-filename').textContent = files[0].name;
-        showLoading('Loading archive...');
-        try {
-            if (state.archiveLoader) state.archiveLoader.dispose();
-            const archiveLoader = new ArchiveLoader();
-            await archiveLoader.loadFromFile(files[0]);
-            await processArchive(archiveLoader, files[0].name);
-            state.currentArchiveUrl = null;
-        } catch (error) {
-            log.error('Error loading archive:', error);
-            hideLoading();
-            notify.error('Error loading archive: ' + error.message);
-        }
-    });
-
-    wireInput('pointcloud-input', 'pointcloud', false, async (files) => {
-        document.getElementById('pointcloud-filename').textContent = files[0].name;
-        showLoading('Loading point cloud...');
-        try {
-            await loadPointcloudFromFileHandler(files[0], createPointcloudDeps());
-            hideLoading();
-        } catch (error) {
-            log.error('Error loading point cloud:', error);
-            hideLoading();
-            notify.error('Error loading point cloud: ' + error.message);
-        }
-    });
-
-    wireInput('stl-input', 'stl', false, async (files) => {
-        document.getElementById('stl-filename').textContent = files[0].name;
-        showLoading('Loading STL Model...');
-        try {
-            await loadSTLFileHandler([files[0]], createFileHandlerDeps());
-            hideLoading();
-        } catch (error) {
-            log.error('Error loading STL:', error);
-            hideLoading();
-            notify.error('Error loading STL: ' + error.message);
-        }
-    });
-
-    wireInput('proxy-mesh-input', 'model', false, async (files) => {
-        assets.proxyMeshBlob = files[0];
-        document.getElementById('proxy-mesh-filename').textContent = files[0].name;
-        notify.info(`Display proxy "${files[0].name}" ready — will be included in archive exports.`);
-    });
-
-    wireInput('source-files-input', 'all', true, async (files) => {
-        const category = document.getElementById('source-files-category')?.value || '';
-        for (const file of files) {
-            assets.sourceFiles.push({ file, name: file.name, size: file.size, category, fromArchive: false });
-        }
-        updateSourceFilesUI();
-        notify.info(`Added ${files.length} source file(s) for archival.`);
-    });
-
-    wireInput('bg-image-input', 'image', false, async (files) => {
-        if (!sceneManager) return;
-        try {
-            await sceneManager.loadBackgroundImageFromFile(files[0]);
-            const filenameEl = document.getElementById('bg-image-filename');
-            if (filenameEl) { filenameEl.textContent = files[0].name; filenameEl.style.display = ''; }
-            const envBgToggle = document.getElementById('toggle-env-background');
-            if (envBgToggle) envBgToggle.checked = false;
-            document.querySelectorAll('.color-preset').forEach(b => b.classList.remove('active'));
-            const clearBtn = document.getElementById('btn-clear-bg-image');
-            if (clearBtn) clearBtn.style.display = '';
-        } catch (err) {
-            notify.error('Failed to load background image: ' + err.message);
-        }
-    });
-
-    wireInput('hdr-file-input', 'hdr', false, async (files) => {
-        showLoading('Loading HDR environment...');
-        try {
-            await sceneManager.loadHDREnvironmentFromFile(files[0]);
-            const filenameEl = document.getElementById('hdr-filename');
-            if (filenameEl) { filenameEl.textContent = files[0].name; filenameEl.style.display = ''; }
-            const select = document.getElementById('env-map-select');
-            if (select) select.value = '';
-            hideLoading();
-            notify.success('HDR environment loaded');
-        } catch (err) {
-            hideLoading();
-            notify.error('Failed to load HDR: ' + err.message);
+    tauriBridge.wireNativeFileDialogs({
+        onSplatFiles: async (files) => {
+            document.getElementById('splat-filename').textContent = files[0].name;
+            showLoading('Loading Gaussian Splat...');
+            try { await loadSplatFromFileHandler(files[0], createFileHandlerDeps()); hideLoading(); }
+            catch (e) { log.error('Error loading splat:', e); hideLoading(); notify.error('Error loading Gaussian Splat: ' + e.message); }
+        },
+        onModelFiles: async (files) => {
+            document.getElementById('model-filename').textContent = files[0].name;
+            showLoading('Loading 3D Model...');
+            try { await loadModelFromFileHandler(files, createFileHandlerDeps()); hideLoading(); }
+            catch (e) { log.error('Error loading model:', e); hideLoading(); notify.error('Error loading model: ' + e.message); }
+        },
+        onArchiveFiles: async (files) => {
+            document.getElementById('archive-filename').textContent = files[0].name;
+            showLoading('Loading archive...');
+            try {
+                if (state.archiveLoader) state.archiveLoader.dispose();
+                const archiveLoader = new ArchiveLoader();
+                await archiveLoader.loadFromFile(files[0]);
+                await processArchive(archiveLoader, files[0].name);
+                state.currentArchiveUrl = null;
+            } catch (e) { log.error('Error loading archive:', e); hideLoading(); notify.error('Error loading archive: ' + e.message); }
+        },
+        onPointcloudFiles: async (files) => {
+            document.getElementById('pointcloud-filename').textContent = files[0].name;
+            showLoading('Loading point cloud...');
+            try { await loadPointcloudFromFileHandler(files[0], createPointcloudDeps()); hideLoading(); }
+            catch (e) { log.error('Error loading point cloud:', e); hideLoading(); notify.error('Error loading point cloud: ' + e.message); }
+        },
+        onSTLFiles: async (files) => {
+            document.getElementById('stl-filename').textContent = files[0].name;
+            showLoading('Loading STL Model...');
+            try { await loadSTLFileHandler([files[0]], createFileHandlerDeps()); hideLoading(); }
+            catch (e) { log.error('Error loading STL:', e); hideLoading(); notify.error('Error loading STL: ' + e.message); }
+        },
+        onProxyMeshFiles: async (files) => {
+            assets.proxyMeshBlob = files[0];
+            document.getElementById('proxy-mesh-filename').textContent = files[0].name;
+            notify.info(`Display proxy "${files[0].name}" ready — will be included in archive exports.`);
+        },
+        onSourceFiles: async (files) => {
+            const category = document.getElementById('source-files-category')?.value || '';
+            for (const file of files) { assets.sourceFiles.push({ file, name: file.name, size: file.size, category, fromArchive: false }); }
+            updateSourceFilesUI();
+            notify.info(`Added ${files.length} source file(s) for archival.`);
+        },
+        onBgImageFiles: async (files) => {
+            if (!sceneManager) return;
+            try {
+                await sceneManager.loadBackgroundImageFromFile(files[0]);
+                const filenameEl = document.getElementById('bg-image-filename');
+                if (filenameEl) { filenameEl.textContent = files[0].name; filenameEl.style.display = ''; }
+                const envBgToggle = document.getElementById('toggle-env-background');
+                if (envBgToggle) envBgToggle.checked = false;
+                document.querySelectorAll('.color-preset').forEach(b => b.classList.remove('active'));
+                const clearBtn = document.getElementById('btn-clear-bg-image');
+                if (clearBtn) clearBtn.style.display = '';
+            } catch (err) { notify.error('Failed to load background image: ' + err.message); }
+        },
+        onHdrFiles: async (files) => {
+            showLoading('Loading HDR environment...');
+            try {
+                await sceneManager.loadHDREnvironmentFromFile(files[0]);
+                const filenameEl = document.getElementById('hdr-filename');
+                if (filenameEl) { filenameEl.textContent = files[0].name; filenameEl.style.display = ''; }
+                const select = document.getElementById('env-map-select');
+                if (select) select.value = '';
+                hideLoading();
+                notify.success('HDR environment loaded');
+            } catch (err) { hideLoading(); notify.error('Failed to load HDR: ' + err.message); }
         }
     });
 }
@@ -2896,55 +1286,8 @@ async function handleProxySplatFile(event) {
     notify.info(`Splat display proxy "${file.name}" ready — will be included in archive exports.`);
 }
 
-async function switchQualityTier(newTier) {
-    if (newTier === state.qualityResolved) return;
-    state.qualityResolved = newTier;
-
-    // Update button states
-    document.querySelectorAll('.quality-toggle-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.tier === newTier);
-        btn.classList.add('loading');
-    });
-
-    const archiveLoader = state.archiveLoader;
-    if (!archiveLoader) return;
-
-    const contentInfo = archiveLoader.getContentInfo();
-    const deps = createFileHandlerDeps();
-
-    try {
-        if (contentInfo.hasSceneProxy) {
-            if (newTier === 'hd') {
-                await loadArchiveFullResSplat(archiveLoader, deps);
-            } else {
-                await loadArchiveProxySplat(archiveLoader, deps);
-            }
-        }
-        if (contentInfo.hasMeshProxy) {
-            if (newTier === 'hd') {
-                const result = await loadArchiveFullResMesh(archiveLoader, deps);
-                if (result.loaded) {
-                    assets.meshBlob = result.blob;
-                    state.viewingProxy = false;
-                    document.getElementById('proxy-mesh-indicator')?.classList.add('hidden');
-                }
-            } else {
-                await loadArchiveProxyMesh(archiveLoader, deps);
-                state.viewingProxy = true;
-                document.getElementById('proxy-mesh-indicator')?.classList.remove('hidden');
-            }
-        }
-        updateVisibility();
-        log.info(`Quality tier switched to ${newTier}`);
-    } catch (e) {
-        log.error('Error switching quality tier:', e);
-        notify.error(`Failed to switch quality: ${e.message}`);
-    } finally {
-        document.querySelectorAll('.quality-toggle-btn').forEach(btn => {
-            btn.classList.remove('loading');
-        });
-    }
-}
+// Switch quality tier (delegated to archive-pipeline.ts)
+async function switchQualityTier(newTier) { return switchQualityTierCtrl(newTier, createArchivePipelineDeps()); }
 
 // ==================== Source Files ====================
 
@@ -3003,38 +1346,8 @@ function updateSourceFilesUI() {
     if (sizeEl) sizeEl.textContent = formatFileSize(totalSize);
 }
 
-async function handleLoadFullResMesh() {
-    const archiveLoader = state.archiveLoader;
-    if (!archiveLoader) {
-        notify.error('No archive loaded');
-        return;
-    }
-
-    showLoading('Loading full resolution mesh...');
-    try {
-        const result = await loadArchiveFullResMesh(archiveLoader, createFileHandlerDeps());
-        if (result.loaded) {
-            assets.meshBlob = result.blob;
-            state.viewingProxy = false;
-            document.getElementById('model-faces').textContent = (result.faceCount || 0).toLocaleString();
-            // Hide proxy indicator and Load Full Res button
-            document.getElementById('proxy-mesh-indicator')?.classList.add('hidden');
-            const fullResBtn = document.getElementById('btn-load-full-res');
-            if (fullResBtn) fullResBtn.style.display = 'none';
-            updateModelOpacity();
-            updateModelWireframe();
-            updateVisibility();
-            notify.success('Full resolution mesh loaded');
-        } else {
-            notify.error(result.error || 'Failed to load full resolution mesh');
-        }
-        hideLoading();
-    } catch (error) {
-        log.error('Error loading full resolution mesh:', error);
-        hideLoading();
-        notify.error('Error loading full resolution mesh: ' + error.message);
-    }
-}
+// Handle load full res mesh (delegated to archive-pipeline.ts)
+async function handleLoadFullResMesh() { return handleLoadFullResMeshCtrl(createArchivePipelineDeps()); }
 
 function updateModelOpacity() { updateModelOpacityFn(modelGroup, state.modelOpacity); }
 
@@ -3215,71 +1528,16 @@ async function loadDefaultFiles() {
     }
 }
 
+// URL loaders — thin wrappers around file-handlers.js with progress UI
 async function loadSplatFromUrl(url) {
     showLoading('Downloading Gaussian Splat...', true);
-
     try {
-        // Fetch the file as blob with progress tracking
-        log.info(' Fetching splat from URL:', url);
-        const blob = await fetchWithProgress(url, (received, total) => {
-            const percent = Math.round((received / total) * 90); // 0-90% for download
+        await loadSplatFromUrlHandler(url, createFileHandlerDeps(), (received, total) => {
+            const percent = Math.round((received / total) * 90);
             updateProgress(percent, `Downloading Gaussian Splat... ${formatFileSize(received)} / ${formatFileSize(total)}`);
         });
-        assets.splatBlob = blob;
-        log.info(' Splat blob stored, size:', blob.size);
-        updateProgress(90, 'Processing Gaussian Splat...');
-
-        // Pre-compute hash in background for faster export later
-        if (archiveCreator) {
-            archiveCreator.precomputeHash(blob).catch(e => {
-                log.warn(' Background hash precompute failed:', e);
-            });
-        }
-
-        // Create blob URL for loading
-        const blobUrl = URL.createObjectURL(blob);
-
-        // Remove existing splat
-        if (splatMesh) {
-            scene.remove(splatMesh);
-            if (splatMesh.dispose) splatMesh.dispose();
-            splatMesh = null;
-        }
-
-        // Create SplatMesh using Spark
-        splatMesh = new SplatMesh({ url: blobUrl });
-
-        // Apply default rotation to correct upside-down orientation
-        // Many splat files use Z-up coordinate system; rotate to Y-up
-        splatMesh.rotation.x = Math.PI; // 180 degrees on X-axis
-
-        // Verify SplatMesh is a valid THREE.Object3D
-        if (!(splatMesh instanceof THREE.Object3D)) {
-            log.warn(' WARNING: SplatMesh is not an instance of THREE.Object3D!');
-            log.warn(' This may indicate multiple THREE.js instances are loaded.');
-        }
-
-        // Wait a moment for initialization
-        await new Promise(resolve => setTimeout(resolve, TIMING.SPLAT_LOAD_DELAY));
-
-        try {
-            scene.add(splatMesh);
-        } catch (addError) {
-            log.error(' Error adding splatMesh to scene:', addError);
-            throw addError;
-        }
-
-        state.splatLoaded = true;
-        state.currentSplatUrl = url;
-        updateVisibility();
-        updateTransformInputs();
-        storeLastPositions();
-
-        // Update UI
         const filename = url.split('/').pop() || 'URL';
         document.getElementById('splat-filename').textContent = filename;
-        document.getElementById('splat-vertices').textContent = 'Loaded';
-
         hideLoading();
     } catch (error) {
         log.error('Error loading splat from URL:', error);
@@ -3289,71 +1547,16 @@ async function loadSplatFromUrl(url) {
 
 async function loadModelFromUrl(url) {
     showLoading('Downloading 3D Model...', true);
-
     try {
-        // Fetch the file as blob with progress tracking
-        log.info(' Fetching model from URL:', url);
-        const blob = await fetchWithProgress(url, (received, total) => {
-            const percent = Math.round((received / total) * 90); // 0-90% for download
+        const loadedObject = await loadModelFromUrlHandler(url, createFileHandlerDeps(), (received, total) => {
+            const percent = Math.round((received / total) * 90);
             updateProgress(percent, `Downloading 3D Model... ${formatFileSize(received)} / ${formatFileSize(total)}`);
         });
-        assets.meshBlob = blob;
-        log.info(' Mesh blob stored, size:', blob.size);
-        updateProgress(90, 'Processing 3D Model...');
-
-        // Pre-compute hash in background for faster export later
-        if (archiveCreator) {
-            archiveCreator.precomputeHash(blob).catch(e => {
-                log.warn(' Background hash precompute failed:', e);
-            });
+        if (loadedObject && sceneManager) {
+            sceneManager.applyShadowProperties(loadedObject);
         }
-
-        // Create blob URL for loading
-        const blobUrl = URL.createObjectURL(blob);
-
-        // Clear existing model
-        while (modelGroup.children.length > 0) {
-            const child = modelGroup.children[0];
-            disposeObject(child);
-            modelGroup.remove(child);
-        }
-
-        const extension = url.split('.').pop().toLowerCase().split('?')[0];
-        let loadedObject;
-
-        if (extension === 'glb' || extension === 'gltf') {
-            loadedObject = await loadGLTF(blobUrl);
-        } else if (extension === 'obj') {
-            loadedObject = await loadOBJFromUrlFn(blobUrl);
-        }
-
-        if (loadedObject) {
-            modelGroup.add(loadedObject);
-            if (sceneManager) sceneManager.applyShadowProperties(loadedObject);
-            state.modelLoaded = true;
-            state.currentModelUrl = url;
-            updateModelOpacity();
-            updateModelWireframe();
-            updateVisibility();
-            updateTransformInputs();
-            storeLastPositions();
-
-            // Center model on grid if no splat is loaded
-            // (loadDefaultFiles will handle alignment if both are loaded)
-            if (!state.splatLoaded) {
-                centerModelOnGrid(modelGroup);
-            }
-
-            // Count faces and vertices using utilities
-            const faceCount = computeMeshFaceCount(loadedObject);
-            state.meshVertexCount = computeMeshVertexCount(loadedObject);
-
-            // Update UI
-            const filename = url.split('/').pop() || 'URL';
-            document.getElementById('model-filename').textContent = filename;
-            document.getElementById('model-faces').textContent = faceCount.toLocaleString();
-        }
-
+        const filename = url.split('/').pop() || 'URL';
+        document.getElementById('model-filename').textContent = filename;
         hideLoading();
     } catch (error) {
         log.error('Error loading model from URL:', error);

@@ -148,6 +148,44 @@ export async function download(blob, filename, filter) {
 }
 
 // ============================================================
+// NATIVE FILE INPUT WIRING
+// ============================================================
+
+/**
+ * Replace browser file inputs with native Tauri OS dialogs.
+ * Accepts a handlers map so callers keep their business logic.
+ *
+ * @param {Object} handlers - Map of { onSplatFiles, onModelFiles, onArchiveFiles, ... }
+ *   Each handler is an async function receiving File[].
+ */
+export function wireNativeFileDialogs(handlers) {
+    if (!isTauri()) return;
+    log.info('Wiring native file dialogs for Tauri');
+
+    function wireInput(inputId, filterKey, multiple, onFiles) {
+        const label = document.querySelector(`label[for="${inputId}"]`);
+        if (!label) return;
+        label.removeAttribute('for');
+        label.style.cursor = 'pointer';
+        label.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const files = await openFileDialog({ filterKey, multiple });
+            if (files && files.length) await onFiles(files);
+        });
+    }
+
+    wireInput('splat-input', 'splat', false, handlers.onSplatFiles);
+    wireInput('model-input', 'model', true, handlers.onModelFiles);
+    wireInput('archive-input', 'archive', false, handlers.onArchiveFiles);
+    wireInput('pointcloud-input', 'pointcloud', false, handlers.onPointcloudFiles);
+    wireInput('stl-input', 'stl', false, handlers.onSTLFiles);
+    wireInput('proxy-mesh-input', 'model', false, handlers.onProxyMeshFiles);
+    wireInput('source-files-input', 'all', true, handlers.onSourceFiles);
+    wireInput('bg-image-input', 'image', false, handlers.onBgImageFiles);
+    wireInput('hdr-file-input', 'hdr', false, handlers.onHdrFiles);
+}
+
+// ============================================================
 // OPEN EXTERNAL URL
 // ============================================================
 
