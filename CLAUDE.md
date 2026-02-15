@@ -101,6 +101,9 @@ Several post-load operations use `setTimeout` with delays from `constants.js` TI
 ### Do not introduce a build step
 This project serves `src/` directly. Do not add webpack, vite, rollup, esbuild, or any other bundler. Do not add TypeScript compilation. All code must be valid browser ES modules.
 
+### Keep mudular
+If adding functionality, investegate if it makes sense to create module instead of locating new code in main.js before writing code
+
 ### Do not add npm runtime dependencies
 All runtime dependencies come from CDN via the import map in `index.html`. The only npm dependency is `serve` for local dev. If a new library is needed, add it to the import map.
 

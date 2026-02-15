@@ -12,3 +12,5 @@ src-tauri/target/
 # Node
 node_modules/
 package-lock.json
+src-tauri/tauri.conf.json.bak
+CLAUDE.md
