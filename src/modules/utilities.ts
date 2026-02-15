@@ -472,9 +472,7 @@ async function fetchWithProgress(url: string, onProgress: ((received: number, to
         return blob;
     }
 
-    // Stream the response and track progress.
-    // Chunks are cloned via .slice() to avoid buffer-reuse issues
-    // that can occur with CDN compression (Content-Encoding) layers.
+    // Stream the response and track progress
     const reader = response.body.getReader();
     const chunks: Uint8Array[] = [];
     let receivedLength = 0;
@@ -482,7 +480,7 @@ async function fetchWithProgress(url: string, onProgress: ((received: number, to
     while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        chunks.push(value.slice());
+        chunks.push(value);
         receivedLength += value.length;
         onProgress(receivedLength, contentLength);
     }

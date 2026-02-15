@@ -116,6 +116,19 @@ Allow `GET` requests from your viewer domain with `Range` header support:
 | .a3d/.a3z archives | 30 days + immutable | Versioned by filename, never change in place |
 | Thumbnails | 7 days | Moderate; can be regenerated |
 
+### Disable Compression for Archive Files
+
+**Important:** Cloudflare's automatic compression (Brotli/Gzip) must be disabled for directories serving `.a3d`/`.a3z` archive files. These files are already ZIP-compressed, and CDN re-compression corrupts the binary data when the viewer's streaming download assembles response chunks.
+
+In the Cloudflare dashboard:
+
+1. Go to **Rules → Compression Rules**
+2. Create a rule:
+   - **When:** URI Path starts with your archive directory (e.g., `/content/3d/`)
+   - **Then:** Set compression to **Disabled**
+
+This applies to any origin serving archives (Ghost, R2 public buckets, nginx, etc.). The viewer uses `ReadableStream` to track download progress, and CDN compression layers interfere with manual chunk assembly. Without this rule, archives will fail to load with `"invalid distance"` decompression errors.
+
 ## Iframe Embedding
 
 Embed the viewer on your company website using existing URL parameters:
