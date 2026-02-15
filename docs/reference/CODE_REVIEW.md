@@ -63,6 +63,11 @@ function init(): void {
 - Add Playwright or Cypress for E2E testing
 - Prioritize testing for archive parsing, alignment algorithms, and file handling
 
+> **Progress (2026-02-13):**
+> - Logger extracted to standalone `logger.js` (zero external dependencies), breaking the transitive Three.js dependency that blocked Node.js testing of archive modules
+> - Recommended approach: `node:test` (built-in) for unit tests + Playwright for E2E smoke tests
+> - Priority test targets identified: `sanitizeArchiveFilename()`, URL validation, archive round-trip, alignment math
+
 ### ~~1.3 Monolithic Main Module (MEDIUM Priority)~~ ✅ FIXED
 
 > **Status:** Completed on 2026-02-04
@@ -94,7 +99,7 @@ function init(): void {
 > **Status:** Resolved on 2026-02-04
 >
 > **Fix implemented in:**
-> - `utilities.js` - New `Logger` class with configurable log levels
+> - `utilities.js` - New `Logger` class with configurable log levels (later extracted to standalone `logger.js` on 2026-02-13 for testability — zero external dependencies)
 > - `main.js` - Replaced ~180 console.log/warn/error calls with Logger
 > - `archive-loader.js` - Updated to use Logger
 > - `archive-creator.js` - Updated to use Logger
@@ -378,6 +383,17 @@ row.appendChild(keyInput);
 
 ### 3.4 Crypto API Degradation (MEDIUM Priority) — Partially Addressed
 
+> **Status:** Partially resolved on 2026-02-08
+>
+> **Changes made:**
+> - Warning banner added to Integrity tab when `crypto.subtle` is unavailable
+> - Toast notification on page load for HTTP contexts
+> - Advisory only — does not block archive creation
+>
+> **Remaining:**
+> - Pure-JavaScript SHA-256 fallback for HTTP environments not yet implemented
+> - HTTPS enforcement in production not yet configured
+
 **Issue:** SHA-256 hashing is unavailable on HTTP connections, compromising archive integrity.
 
 **Location:** `archive-creator.js:19-31`
@@ -549,10 +565,11 @@ The codebase shows solid foundational work with good 3D visualization capabiliti
   - Mesh material processing consolidated
   - Face/vertex counting utilities added
   - Object disposal utility added
-- ✅ Proper logging system with configurable log levels (utilities.js)
+- ✅ Proper logging system with configurable log levels (extracted to standalone `logger.js` on 2026-02-13; re-exported from `utilities.js` for backward compatibility)
   - Logger class with DEBUG, INFO, WARN, ERROR, NONE levels
   - URL parameter override (?log=debug)
   - Module-specific prefixes
+  - Zero external dependencies — enables Node.js testing of archive modules
 
 The application is now ready for production from both a security and code quality standpoint.
 
@@ -560,8 +577,9 @@ The application is now ready for production from both a security and code qualit
 - ✅ 18 modules now in `src/modules/`, up from the original 5 (`alignment.js`, `scene-manager.js`, `file-handlers.js`, `ui-controller.js`, `metadata-manager.js`)
 - ✅ Additional modules added since review: `annotation-controller.js`, `kiosk-main.js`, `quality-tier.js`, `theme-loader.js`, `tauri-bridge.js`
 - ✅ Modules use dependency injection for testability
-- ✅ `main.js` reduced from ~4,300 lines to ~3,640 lines
+- ✅ `main.js` reduced from ~4,300 lines to ~3,100 lines (28% reduction), though has since grown back to ~3,900 lines with new features (quality tier toggle, splat proxy support, Tauri integration, PBR debug views)
 - ✅ `main.js` now acts as orchestrator with helper functions for dependency injection
+- ✅ Additional modules added since initial review: `quality-tier.js`, `kiosk-main.js`, `theme-loader.js`, `tauri-bridge.js`, `logger.js`
 
 Remaining items are longer-term maintainability improvements: adding a testing framework and adding file size limits for uploads.
 

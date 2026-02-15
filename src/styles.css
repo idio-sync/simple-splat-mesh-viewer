@@ -1664,6 +1664,29 @@ input[type="range"]::-webkit-slider-thumb:hover {
     color: #666;
 }
 
+/* Color input row (swatch + hex label) */
+.color-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.color-input-row input[type="color"] {
+    width: 36px;
+    height: 28px;
+    padding: 2px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.color-hex-label {
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: #aaa;
+}
+
 /* Field validation errors (advisory) */
 .field-error {
     display: block;

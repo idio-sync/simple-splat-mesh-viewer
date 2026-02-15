@@ -878,7 +878,11 @@ export function collectMetadata() {
         },
         customFields: {},
         versionHistory: [],
-        includeIntegrity: document.getElementById('meta-include-integrity')?.checked ?? true
+        includeIntegrity: document.getElementById('meta-include-integrity')?.checked ?? true,
+        viewerSettings: {
+            singleSided: document.getElementById('meta-viewer-single-sided')?.checked ?? true,
+            backgroundColor: document.getElementById('meta-viewer-bg-color')?.value || '#1a1a2e'
+        }
     };
 
     // Handle custom license
@@ -1327,6 +1331,19 @@ export function prefillMetadataFromArchive(manifest) {
                 const el = document.getElementById(id);
                 if (el && value) el.value = value;
             }
+        }
+    }
+
+    // Viewer settings
+    if (manifest.viewer_settings) {
+        const singleSidedEl = document.getElementById('meta-viewer-single-sided');
+        if (singleSidedEl) singleSidedEl.checked = manifest.viewer_settings.single_sided ?? true;
+
+        const bgColorEl = document.getElementById('meta-viewer-bg-color');
+        if (bgColorEl && manifest.viewer_settings.background_color) {
+            bgColorEl.value = manifest.viewer_settings.background_color;
+            const hexLabel = document.getElementById('meta-viewer-bg-color-hex');
+            if (hexLabel) hexLabel.textContent = manifest.viewer_settings.background_color;
         }
     }
 

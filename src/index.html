@@ -281,6 +281,7 @@
                     <button class="edit-tab" data-tab="preservation">Preservation</button>
                     <button class="edit-tab" data-tab="assets">Assets</button>
                     <button class="edit-tab" data-tab="integrity">Integrity</button>
+                    <button class="edit-tab" data-tab="viewer">Default View</button>
                 </div>
                 <div class="metadata-actions">
                     <button id="btn-import-metadata" class="action-btn" title="Import metadata from a manifest.json file">Import Manifest</button>
@@ -870,6 +871,26 @@
                         <label for="meta-include-integrity">Include integrity data in manifest</label>
                     </div>
                 </div>
+
+                <!-- Default View Tab -->
+                <div class="edit-tab-content" id="edit-tab-viewer">
+                    <div class="subsection-header">Mesh Rendering</div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="meta-viewer-single-sided" checked>
+                        <label for="meta-viewer-single-sided">Single Sided</label>
+                    </div>
+                    <span class="field-hint">When enabled, back faces are culled (like Sketchfab default). Disable for thin geometry like leaves, fabric, or paper.</span>
+
+                    <div class="subsection-header" style="margin-top: 20px;">Scene</div>
+                    <div class="metadata-field">
+                        <label for="meta-viewer-bg-color">Background Color</label>
+                        <div class="color-input-row">
+                            <input type="color" id="meta-viewer-bg-color" value="#1a1a2e">
+                            <span class="color-hex-label" id="meta-viewer-bg-color-hex">#1a1a2e</span>
+                        </div>
+                        <span class="field-hint">Default scene background color for the viewer and kiosk mode.</span>
+                    </div>
+                </div>
             </div>
 
             <!-- KIOSK-STRIP-END: metadata edit tab -->
@@ -1174,6 +1195,18 @@
                     <div class="checkbox-group">
                         <input type="checkbox" id="model-normals" />
                         <label for="model-normals">Show Normals</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="model-roughness" />
+                        <label for="model-roughness">Roughness</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="model-metalness" />
+                        <label for="model-metalness">Metalness</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="model-specular-f0" />
+                        <label for="model-specular-f0">Specular F0</label>
                     </div>
                     <div class="position-inputs">
                         <label>Position:</label>

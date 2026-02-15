@@ -302,6 +302,7 @@ export function setup(manifest, deps) {
     const {
         Logger, escapeHtml,
         updateModelTextures, updateModelWireframe, updateModelMatcap, updateModelNormals,
+        updateModelRoughness, updateModelMetalness, updateModelSpecularF0,
         sceneManager, state, annotationSystem, modelGroup,
         setDisplayMode, createDisplayModeDeps, triggerLazyLoad,
         showAnnotationPopup, hideAnnotationPopup, hideAnnotationLine,
@@ -524,153 +525,95 @@ export function setup(manifest, deps) {
     });
     ribbon.appendChild(textureToggle);
 
-    // Wireframe toggle
-    const wireframeToggle = document.createElement('button');
-    wireframeToggle.className = 'editorial-marker-toggle';
-    wireframeToggle.title = 'Toggle wireframe';
-    wireframeToggle.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>';
-    let wireframeOn = false;
-    wireframeToggle.addEventListener('click', () => {
-        wireframeOn = !wireframeOn;
-        // Turn off matcap when enabling wireframe
-        if (wireframeOn && activeMatcap) {
-            activeMatcap = null;
-            updateModelMatcap(modelGroup, false);
-            matcapToggle.classList.add('off');
-            matcapToggle.title = 'Matcap';
-            matcapDropdown.querySelectorAll('.editorial-matcap-item').forEach(item => {
-                item.classList.remove('active');
-            });
-        }
-        // Turn off normals when enabling wireframe
-        if (wireframeOn && normalsOn) {
-            normalsOn = false;
-            updateModelNormals(modelGroup, false);
-            normalsToggle.classList.add('off');
-        }
-        updateModelWireframe(modelGroup, wireframeOn);
-        wireframeToggle.classList.toggle('off', !wireframeOn);
-    });
-    wireframeToggle.classList.add('off');
-    ribbon.appendChild(wireframeToggle);
-
-    // Matcap toggle with dropdown popover
+    // Combined Material Views dropdown (wireframe, normals, PBR channels, matcap presets)
     const matcapPresets = ['clay', 'chrome', 'pearl', 'jade', 'copper'];
     const matcapLabels = ['Clay', 'Chrome', 'Pearl', 'Jade', 'Copper'];
-    let activeMatcap = null; // null = off
+    let activeView = null; // null or: 'wireframe','normals','roughness','metalness','specularF0','matcap:clay', etc.
 
-    // Wrapper for positioning the popover relative to the button
-    const matcapWrapper = document.createElement('div');
-    matcapWrapper.className = 'editorial-matcap-wrapper';
+    const materialWrapper = document.createElement('div');
+    materialWrapper.className = 'editorial-matcap-wrapper';
 
-    const matcapToggle = document.createElement('button');
-    matcapToggle.className = 'editorial-marker-toggle off';
-    matcapToggle.title = 'Matcap';
-    matcapToggle.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><ellipse cx="12" cy="12" rx="4" ry="10"/><path d="M2 12h20"/></svg>';
+    const materialBtn = document.createElement('button');
+    materialBtn.className = 'editorial-marker-toggle off';
+    materialBtn.title = 'Material views';
+    materialBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><ellipse cx="12" cy="12" rx="4" ry="10"/><path d="M2 12h20"/></svg>';
 
-    // Build dropdown
-    const matcapDropdown = document.createElement('div');
-    matcapDropdown.className = 'editorial-matcap-dropdown';
+    const materialDropdown = document.createElement('div');
+    materialDropdown.className = 'editorial-matcap-dropdown';
 
-    const applyMatcap = (style) => {
-        if (style === activeMatcap) {
-            // Toggle off
-            activeMatcap = null;
-            updateModelMatcap(modelGroup, false);
-            matcapToggle.classList.add('off');
-            matcapToggle.title = 'Matcap';
-        } else {
-            // Turn off wireframe
-            if (wireframeOn) {
-                wireframeOn = false;
-                updateModelWireframe(modelGroup, false);
-                wireframeToggle.classList.add('off');
-            }
-            // Turn off normals
-            if (normalsOn) {
-                normalsOn = false;
-                updateModelNormals(modelGroup, false);
-                normalsToggle.classList.add('off');
-            }
-            activeMatcap = style;
-            updateModelMatcap(modelGroup, true, style);
-            matcapToggle.classList.remove('off');
-            matcapToggle.title = `Matcap: ${matcapLabels[matcapPresets.indexOf(style)]}`;
-        }
-        // Update active state on items
-        matcapDropdown.querySelectorAll('.editorial-matcap-item').forEach(item => {
-            item.classList.toggle('active', item.dataset.style === activeMatcap);
-        });
-        matcapDropdown.classList.remove('open');
+    const viewLabels = {
+        wireframe: 'Wireframe', normals: 'Normals',
+        roughness: 'Roughness', metalness: 'Metalness', specularF0: 'Specular F0'
     };
 
-    matcapPresets.forEach((style, i) => {
+    const setMaterialView = (view) => {
+        if (view === activeView) view = null;
+        // Disable current
+        if (activeView) {
+            if (activeView === 'wireframe') updateModelWireframe(modelGroup, false);
+            else if (activeView === 'normals') updateModelNormals(modelGroup, false);
+            else if (activeView === 'roughness') updateModelRoughness(modelGroup, false);
+            else if (activeView === 'metalness') updateModelMetalness(modelGroup, false);
+            else if (activeView === 'specularF0') updateModelSpecularF0(modelGroup, false);
+            else if (activeView.startsWith('matcap:')) updateModelMatcap(modelGroup, false);
+        }
+        activeView = view;
+        // Enable new
+        if (activeView) {
+            if (activeView === 'wireframe') updateModelWireframe(modelGroup, true);
+            else if (activeView === 'normals') updateModelNormals(modelGroup, true);
+            else if (activeView === 'roughness') updateModelRoughness(modelGroup, true);
+            else if (activeView === 'metalness') updateModelMetalness(modelGroup, true);
+            else if (activeView === 'specularF0') updateModelSpecularF0(modelGroup, true);
+            else if (activeView.startsWith('matcap:')) updateModelMatcap(modelGroup, true, activeView.split(':')[1]);
+        }
+        // Update button
+        materialBtn.classList.toggle('off', !activeView);
+        const label = activeView
+            ? (viewLabels[activeView] || matcapLabels[matcapPresets.indexOf((activeView.split(':')[1]) || '')] || activeView)
+            : null;
+        materialBtn.title = label ? 'Material: ' + label : 'Material views';
+        materialDropdown.querySelectorAll('.editorial-matcap-item').forEach(el => {
+            el.classList.toggle('active', el.dataset.view === activeView);
+        });
+        materialDropdown.classList.remove('open');
+    };
+
+    const addMaterialItem = (label, viewKey) => {
         const item = document.createElement('button');
         item.className = 'editorial-matcap-item';
-        item.dataset.style = style;
-        item.textContent = matcapLabels[i];
-        item.addEventListener('click', (e) => {
-            e.stopPropagation();
-            applyMatcap(style);
-        });
-        matcapDropdown.appendChild(item);
-    });
+        item.dataset.view = viewKey;
+        item.textContent = label;
+        item.addEventListener('click', (e) => { e.stopPropagation(); setMaterialView(viewKey); });
+        materialDropdown.appendChild(item);
+    };
 
-    // Off option
+    const addDivider = () => {
+        const d = document.createElement('div');
+        d.className = 'editorial-material-divider';
+        materialDropdown.appendChild(d);
+    };
+
+    addMaterialItem('Wireframe', 'wireframe');
+    addMaterialItem('Normals', 'normals');
+    addMaterialItem('Roughness', 'roughness');
+    addMaterialItem('Metalness', 'metalness');
+    addMaterialItem('Specular F0', 'specularF0');
+    addDivider();
+    matcapPresets.forEach((style, i) => addMaterialItem(matcapLabels[i], 'matcap:' + style));
+    addDivider();
     const offItem = document.createElement('button');
     offItem.className = 'editorial-matcap-item editorial-matcap-off';
     offItem.textContent = 'Off';
-    offItem.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (activeMatcap) applyMatcap(activeMatcap); // toggles off
-        matcapDropdown.classList.remove('open');
-    });
-    matcapDropdown.appendChild(offItem);
+    offItem.addEventListener('click', (e) => { e.stopPropagation(); setMaterialView(null); });
+    materialDropdown.appendChild(offItem);
 
-    matcapToggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        matcapDropdown.classList.toggle('open');
-    });
+    materialBtn.addEventListener('click', (e) => { e.stopPropagation(); materialDropdown.classList.toggle('open'); });
+    document.addEventListener('click', () => { materialDropdown.classList.remove('open'); });
 
-    // Close dropdown when clicking elsewhere
-    document.addEventListener('click', () => {
-        matcapDropdown.classList.remove('open');
-    });
-
-    matcapWrapper.appendChild(matcapToggle);
-    matcapWrapper.appendChild(matcapDropdown);
-    ribbon.appendChild(matcapWrapper);
-
-    // Normals visualization toggle
-    let normalsOn = false;
-    const normalsToggle = document.createElement('button');
-    normalsToggle.className = 'editorial-marker-toggle off';
-    normalsToggle.title = 'Show normals';
-    normalsToggle.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v10"/><path d="M4.93 4.93l7.07 7.07"/><path d="M2 12h10"/><path d="M4.93 19.07l7.07-7.07"/><circle cx="12" cy="12" r="2"/></svg>';
-    normalsToggle.addEventListener('click', () => {
-        normalsOn = !normalsOn;
-        if (normalsOn) {
-            // Turn off wireframe
-            if (wireframeOn) {
-                wireframeOn = false;
-                updateModelWireframe(modelGroup, false);
-                wireframeToggle.classList.add('off');
-            }
-            // Turn off matcap
-            if (activeMatcap) {
-                activeMatcap = null;
-                updateModelMatcap(modelGroup, false);
-                matcapToggle.classList.add('off');
-                matcapToggle.title = 'Matcap';
-                matcapDropdown.querySelectorAll('.editorial-matcap-item').forEach(item => {
-                    item.classList.remove('active');
-                });
-            }
-        }
-        updateModelNormals(modelGroup, normalsOn);
-        normalsToggle.classList.toggle('off', !normalsOn);
-    });
-    ribbon.appendChild(normalsToggle);
+    materialWrapper.appendChild(materialBtn);
+    materialWrapper.appendChild(materialDropdown);
+    ribbon.appendChild(materialWrapper);
 
     // FOV slider — compact inline control
     const fovWrapper = document.createElement('div');

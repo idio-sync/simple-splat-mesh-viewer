@@ -76,6 +76,9 @@ import {
     updateModelWireframe as updateModelWireframeFn,
     updateModelMatcap as updateModelMatcapFn,
     updateModelNormals as updateModelNormalsFn,
+    updateModelRoughness as updateModelRoughnessFn,
+    updateModelMetalness as updateModelMetalnessFn,
+    updateModelSpecularF0 as updateModelSpecularF0Fn,
     loadGLTF,
     loadOBJFromUrl as loadOBJFromUrlFn,
     loadSTLFile as loadSTLFileHandler,
@@ -238,6 +241,9 @@ const state = {
     modelMatcap: false,
     matcapStyle: 'clay',
     modelNormals: false,
+    modelRoughness: false,
+    modelMetalness: false,
+    modelSpecularF0: false,
     pointcloudPointSize: 0.01,
     pointcloudOpacity: 1,
     controlsVisible: config.showControls,
@@ -750,6 +756,24 @@ function setupUIEvents() {
                 if (normalsCb) normalsCb.checked = false;
                 updateModelNormals();
             }
+            if (state.modelRoughness) {
+                state.modelRoughness = false;
+                const cb = document.getElementById('model-roughness');
+                if (cb) cb.checked = false;
+                updateModelRoughnessView();
+            }
+            if (state.modelMetalness) {
+                state.modelMetalness = false;
+                const cb = document.getElementById('model-metalness');
+                if (cb) cb.checked = false;
+                updateModelMetalnessView();
+            }
+            if (state.modelSpecularF0) {
+                state.modelSpecularF0 = false;
+                const cb = document.getElementById('model-specular-f0');
+                if (cb) cb.checked = false;
+                updateModelSpecularF0View();
+            }
         }
         updateModelWireframe();
     });
@@ -771,6 +795,24 @@ function setupUIEvents() {
                 if (normalsCb) normalsCb.checked = false;
                 updateModelNormals();
             }
+            if (state.modelRoughness) {
+                state.modelRoughness = false;
+                const cb = document.getElementById('model-roughness');
+                if (cb) cb.checked = false;
+                updateModelRoughnessView();
+            }
+            if (state.modelMetalness) {
+                state.modelMetalness = false;
+                const cb = document.getElementById('model-metalness');
+                if (cb) cb.checked = false;
+                updateModelMetalnessView();
+            }
+            if (state.modelSpecularF0) {
+                state.modelSpecularF0 = false;
+                const cb = document.getElementById('model-specular-f0');
+                if (cb) cb.checked = false;
+                updateModelSpecularF0View();
+            }
         }
         updateModelMatcap();
     });
@@ -783,7 +825,6 @@ function setupUIEvents() {
     addListener('model-normals', 'change', (e) => {
         state.modelNormals = e.target.checked;
         if (e.target.checked) {
-            // Turn off matcap
             if (state.modelMatcap) {
                 state.modelMatcap = false;
                 const matcapCb = document.getElementById('model-matcap');
@@ -792,15 +833,149 @@ function setupUIEvents() {
                 if (styleGroup) styleGroup.style.display = 'none';
                 updateModelMatcap();
             }
-            // Turn off wireframe
             if (state.modelWireframe) {
                 state.modelWireframe = false;
                 const wireCb = document.getElementById('model-wireframe');
                 if (wireCb) wireCb.checked = false;
                 updateModelWireframe();
             }
+            if (state.modelRoughness) {
+                state.modelRoughness = false;
+                const cb = document.getElementById('model-roughness');
+                if (cb) cb.checked = false;
+                updateModelRoughnessView();
+            }
+            if (state.modelMetalness) {
+                state.modelMetalness = false;
+                const cb = document.getElementById('model-metalness');
+                if (cb) cb.checked = false;
+                updateModelMetalnessView();
+            }
+            if (state.modelSpecularF0) {
+                state.modelSpecularF0 = false;
+                const cb = document.getElementById('model-specular-f0');
+                if (cb) cb.checked = false;
+                updateModelSpecularF0View();
+            }
         }
         updateModelNormals();
+    });
+
+    addListener('model-roughness', 'change', (e) => {
+        state.modelRoughness = e.target.checked;
+        if (e.target.checked) {
+            if (state.modelWireframe) {
+                state.modelWireframe = false;
+                const wireCb = document.getElementById('model-wireframe');
+                if (wireCb) wireCb.checked = false;
+                updateModelWireframe();
+            }
+            if (state.modelMatcap) {
+                state.modelMatcap = false;
+                const matcapCb = document.getElementById('model-matcap');
+                if (matcapCb) matcapCb.checked = false;
+                const styleGroup = document.getElementById('matcap-style-group');
+                if (styleGroup) styleGroup.style.display = 'none';
+                updateModelMatcap();
+            }
+            if (state.modelNormals) {
+                state.modelNormals = false;
+                const normalsCb = document.getElementById('model-normals');
+                if (normalsCb) normalsCb.checked = false;
+                updateModelNormals();
+            }
+            if (state.modelMetalness) {
+                state.modelMetalness = false;
+                const cb = document.getElementById('model-metalness');
+                if (cb) cb.checked = false;
+                updateModelMetalnessView();
+            }
+            if (state.modelSpecularF0) {
+                state.modelSpecularF0 = false;
+                const cb = document.getElementById('model-specular-f0');
+                if (cb) cb.checked = false;
+                updateModelSpecularF0View();
+            }
+        }
+        updateModelRoughnessView();
+    });
+
+    addListener('model-metalness', 'change', (e) => {
+        state.modelMetalness = e.target.checked;
+        if (e.target.checked) {
+            if (state.modelWireframe) {
+                state.modelWireframe = false;
+                const wireCb = document.getElementById('model-wireframe');
+                if (wireCb) wireCb.checked = false;
+                updateModelWireframe();
+            }
+            if (state.modelMatcap) {
+                state.modelMatcap = false;
+                const matcapCb = document.getElementById('model-matcap');
+                if (matcapCb) matcapCb.checked = false;
+                const styleGroup = document.getElementById('matcap-style-group');
+                if (styleGroup) styleGroup.style.display = 'none';
+                updateModelMatcap();
+            }
+            if (state.modelNormals) {
+                state.modelNormals = false;
+                const normalsCb = document.getElementById('model-normals');
+                if (normalsCb) normalsCb.checked = false;
+                updateModelNormals();
+            }
+            if (state.modelRoughness) {
+                state.modelRoughness = false;
+                const cb = document.getElementById('model-roughness');
+                if (cb) cb.checked = false;
+                updateModelRoughnessView();
+            }
+            if (state.modelSpecularF0) {
+                state.modelSpecularF0 = false;
+                const cb = document.getElementById('model-specular-f0');
+                if (cb) cb.checked = false;
+                updateModelSpecularF0View();
+            }
+        }
+        updateModelMetalnessView();
+    });
+
+    addListener('model-specular-f0', 'change', (e) => {
+        state.modelSpecularF0 = e.target.checked;
+        if (e.target.checked) {
+            if (state.modelWireframe) {
+                state.modelWireframe = false;
+                const wireCb = document.getElementById('model-wireframe');
+                if (wireCb) wireCb.checked = false;
+                updateModelWireframe();
+            }
+            if (state.modelMatcap) {
+                state.modelMatcap = false;
+                const matcapCb = document.getElementById('model-matcap');
+                if (matcapCb) matcapCb.checked = false;
+                const styleGroup = document.getElementById('matcap-style-group');
+                if (styleGroup) styleGroup.style.display = 'none';
+                updateModelMatcap();
+            }
+            if (state.modelNormals) {
+                state.modelNormals = false;
+                const normalsCb = document.getElementById('model-normals');
+                if (normalsCb) normalsCb.checked = false;
+                updateModelNormals();
+            }
+            if (state.modelRoughness) {
+                state.modelRoughness = false;
+                const cb = document.getElementById('model-roughness');
+                if (cb) cb.checked = false;
+                updateModelRoughnessView();
+            }
+            if (state.modelMetalness) {
+                state.modelMetalness = false;
+                const cb = document.getElementById('model-metalness');
+                if (cb) cb.checked = false;
+                updateModelMetalnessView();
+            }
+        }
+        updateModelSpecularF0View();
     });
 
     addListener('model-no-texture', 'change', (e) => {
@@ -1167,6 +1342,26 @@ function setupUIEvents() {
             dismissPopupHandler(createAnnotationControllerDeps());
             hideMetadataDisplay();
         }
+    });
+
+    // Default View settings — live toggle
+    addListener('meta-viewer-single-sided', 'change', (e) => {
+        const side = e.target.checked ? THREE.FrontSide : THREE.DoubleSide;
+        if (modelGroup) {
+            modelGroup.traverse(child => {
+                if (child.isMesh && child.material) {
+                    const mats = Array.isArray(child.material) ? child.material : [child.material];
+                    mats.forEach(m => { m.side = side; m.needsUpdate = true; });
+                }
+            });
+        }
+    });
+
+    addListener('meta-viewer-bg-color', 'input', (e) => {
+        const hex = e.target.value;
+        if (scene) scene.background = new THREE.Color(hex);
+        const hexLabel = document.getElementById('meta-viewer-bg-color-hex');
+        if (hexLabel) hexLabel.textContent = hex;
     });
 
     // Setup collapsible sections
@@ -1741,6 +1936,11 @@ async function processArchive(archiveLoader, archiveName) {
 
         hideLoading();
 
+        // Apply viewer settings from manifest
+        if (manifest.viewer_settings) {
+            applyViewerSettings(manifest.viewer_settings);
+        }
+
         // Show quality toggle if archive has any proxies
         const contentInfoFinal = archiveLoader.getContentInfo();
         if (hasAnyProxy(contentInfoFinal)) {
@@ -1761,6 +1961,10 @@ async function processArchive(archiveLoader, archiveName) {
                         log.info(`Background loading: ${type}`);
                         await ensureAssetLoaded(type);
                         updateTransformInputs();
+                        // Re-apply viewer settings to newly loaded meshes
+                        if (type === 'mesh' && manifest.viewer_settings) {
+                            applyViewerSettings(manifest.viewer_settings);
+                        }
                     }
                 }
                 // Release raw ZIP data after all assets are extracted,
@@ -1785,6 +1989,42 @@ async function processArchive(archiveLoader, archiveName) {
         hideLoading();
         notify.error('Error processing archive: ' + error.message);
     }
+}
+
+/**
+ * Apply viewer settings from manifest to scene and materials
+ * @param {Object} settings - viewer_settings from manifest
+ */
+function applyViewerSettings(settings) {
+    if (!settings) return;
+
+    // Material side
+    if (settings.single_sided !== undefined) {
+        const side = settings.single_sided ? THREE.FrontSide : THREE.DoubleSide;
+        if (modelGroup) {
+            modelGroup.traverse(child => {
+                if (child.isMesh && child.material) {
+                    const mats = Array.isArray(child.material) ? child.material : [child.material];
+                    mats.forEach(m => { m.side = side; m.needsUpdate = true; });
+                }
+            });
+        }
+        // Sync sidebar checkbox
+        const el = document.getElementById('meta-viewer-single-sided');
+        if (el) el.checked = settings.single_sided;
+    }
+
+    // Background color
+    if (settings.background_color) {
+        if (scene) scene.background = new THREE.Color(settings.background_color);
+        // Sync sidebar color input
+        const colorEl = document.getElementById('meta-viewer-bg-color');
+        if (colorEl) colorEl.value = settings.background_color;
+        const hexLabel = document.getElementById('meta-viewer-bg-color-hex');
+        if (hexLabel) hexLabel.textContent = settings.background_color;
+    }
+
+    log.info('Applied viewer settings:', settings);
 }
 
 // Load splat from a blob URL (used by archive loader)
@@ -2209,6 +2449,10 @@ async function downloadArchive() {
     // Apply preservation
     log.info(' Setting preservation');
     archiveCreator.setPreservation(metadata.preservation);
+
+    // Apply viewer settings
+    log.info(' Setting viewer settings');
+    archiveCreator.setViewerSettings(metadata.viewerSettings);
 
     // Apply custom fields
     if (Object.keys(metadata.customFields).length > 0) {
@@ -2990,6 +3234,12 @@ function updateModelWireframe() { updateModelWireframeFn(modelGroup, state.model
 function updateModelMatcap() { updateModelMatcapFn(modelGroup, state.modelMatcap, state.matcapStyle); }
 
 function updateModelNormals() { updateModelNormalsFn(modelGroup, state.modelNormals); }
+
+function updateModelRoughnessView() { updateModelRoughnessFn(modelGroup, state.modelRoughness); }
+
+function updateModelMetalnessView() { updateModelMetalnessFn(modelGroup, state.modelMetalness); }
+
+function updateModelSpecularF0View() { updateModelSpecularF0Fn(modelGroup, state.modelSpecularF0); }
 
 async function saveAlignment() {
     const alignment = {

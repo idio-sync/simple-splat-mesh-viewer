@@ -231,6 +231,10 @@ export class ArchiveCreator {
                 color_space: "",
                 normal_space: ""
             },
+            viewer_settings: {
+                single_sided: true,
+                background_color: "#1a1a2e"
+            },
             preservation: {
                 format_registry: {
                     glb: "fmt/861",
@@ -725,6 +729,17 @@ export class ArchiveCreator {
                 }
             }
         }
+    }
+
+    /**
+     * Set viewer settings (display defaults)
+     * @param {Object} settings - Viewer settings from form
+     */
+    setViewerSettings(settings) {
+        if (!settings) return;
+
+        if (settings.singleSided !== undefined) this.manifest.viewer_settings.single_sided = settings.singleSided;
+        if (settings.backgroundColor !== undefined) this.manifest.viewer_settings.background_color = settings.backgroundColor;
     }
 
     /**
@@ -1306,6 +1321,11 @@ export class ArchiveCreator {
         // Material Standard (PBR)
         if (metadata.materialStandard) {
             this.setMaterialStandard(metadata.materialStandard);
+        }
+
+        // Viewer settings
+        if (metadata.viewerSettings) {
+            this.setViewerSettings(metadata.viewerSettings);
         }
 
         // Preservation metadata

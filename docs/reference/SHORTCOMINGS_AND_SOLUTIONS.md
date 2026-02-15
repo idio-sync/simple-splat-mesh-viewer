@@ -59,6 +59,10 @@
 - **Medium-term:** Bundle the required dependencies (Three.js, Spark.js, fflate) as local assets within the application's deployment. Fetch from local first, fall back to CDN. This eliminates the CDN as a single point of failure.
 - **Long-term:** Provide a CLI or build script that pre-fetches and bundles all dependencies for air-gapped or institutional deployments where external network access may be restricted.
 
+  **Status: Partially Implemented (2026-02-13)**
+  - `scripts/vendor-deps.mjs` downloads CDN dependencies to `dist/vendor/` and rewrites the import map for Tauri desktop builds
+  - Not yet available for the web app or kiosk export (CDN is still the sole source there)
+
 ### 1.4 No Progressive or Level-of-Detail Loading
 
 **Problem:** The viewer loads entire files into memory. Large assets (45M-face meshes, 1.2B-point E57 clouds) either load completely or not at all. There's no tiling, streaming, octree, or LOD system. This limits usability to machines with substantial GPU memory.
@@ -66,6 +70,14 @@
 **Solutions:**
 - **Short-term:** Add file size warnings in the UI. When loading assets above a threshold (e.g., 100MB mesh, 500MB E57), warn the user and offer to skip.
 - **Medium-term:** Implement mesh simplification on load — use a decimation algorithm to create a display-resolution proxy while keeping the full-resolution file in the archive. For E57 point clouds, implement an octree-based renderer that loads visible nodes on demand.
+
+  **Status: Implemented (2026-02-13) — via upload, not on-load decimation**
+  - Users can upload pre-simplified mesh and splat proxies alongside full-resolution assets
+  - Archive manifest stores proxies as separate `data_entries` with `lod: "proxy"` and `derived_from` linking to the primary entry
+  - Kiosk viewer auto-detects device capability (`quality-tier.js`) and defaults to SD (proxy) on low-end devices
+  - SD/HD toggle allows manual switching between proxy and full-resolution at runtime
+  - On-load decimation (in-browser) remains unimplemented
+
 - **Long-term:** Support multi-resolution archives. The manifest could list multiple LOD versions of each asset:
   ```json
   "mesh_0": {
@@ -83,6 +95,8 @@
   - Kiosk viewer auto-loads proxy mesh when available (mobile/bandwidth-constrained scenarios)
   - Quality tier detection (`quality-tier.js`) adapts asset loading to device capability
   - Full multi-resolution LOD chain (multiple levels) and in-browser decimation not yet implemented
+
+  **Note:** The implemented approach uses separate `data_entries` (e.g. `mesh_0_proxy`) rather than an `lod_variants` array. The separate-entry pattern was chosen because it preserves per-entry metadata (transform, provenance) and integrates with the existing `role: "derived"` / `derived_from` hierarchy.
 
 ---
 
@@ -274,6 +288,11 @@
   - A Web Bundle (`.wbn`) — a W3C format specifically designed for self-contained web content. Browser support is emerging.
   - An Electron/Tauri-packaged offline viewer for institutional desktops where browser compatibility is less certain.
 
+  **Status: Partially Implemented (2026-02-13)**
+  - Tauri v2 desktop app added (`src-tauri/`), defaults to kiosk mode with editorial theme
+  - GitHub Actions CI/CD builds for Windows, Linux, and macOS
+  - Base64 embedding and Web Bundle approaches remain unimplemented
+
 ### 6.2 Embedded JavaScript Will Age
 
 **Problem:** The kiosk viewer embeds Three.js 0.170.0 and Spark.js 0.1.10 as base64 blobs. These libraries use JavaScript patterns, APIs, and WebGL calls that may break as browsers evolve. A kiosk file created today may not render correctly in a 2036 browser.
@@ -443,8 +462,8 @@
 - **Long-term:** ~~Support image attachments on annotations (e.g., a close-up photograph taken during the survey).~~ Support annotation import/export in the Web Annotation Data Model format for interoperability with IIIF, Mirador, and other cultural heritage annotation tools.
 
   **Status: Partially Implemented (2026-02-08)**
-  - Image attachments in annotations implemented via `asset:` protocol
-  - Images stored as separate entries in the archive, referenced by `asset:filename.jpg` in annotation body
+  - Image attachments in annotations implemented via `asset:images/filename.ext` protocol
+  - Images stored as separate ZIP entries under `images/`, resolved to `blob:` URLs at runtime via `resolveAssetRefs()`
   - Rendered inline in annotation display with markdown support
   - Annotation types, polyline/area annotations, and W3C Web Annotation export not yet implemented
 

@@ -1409,6 +1409,145 @@ export function updateModelNormals(modelGroup, enabled) {
 }
 
 // =============================================================================
+// PBR CHANNEL DEBUG VIEWS (Roughness / Metalness / Specular F0)
+// =============================================================================
+
+const _pbrDebugVert = /* glsl */`
+varying vec2 vUv;
+void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+
+const _pbrDebugFrag = /* glsl */`
+uniform int uMode;
+uniform float uRoughness;
+uniform float uMetalness;
+uniform float uF0;
+uniform vec3 uBaseColor;
+uniform sampler2D uRoughnessMap;
+uniform sampler2D uMetalnessMap;
+uniform sampler2D uBaseColorMap;
+uniform bool uHasRoughnessMap;
+uniform bool uHasMetalnessMap;
+uniform bool uHasBaseColorMap;
+varying vec2 vUv;
+void main() {
+    if (uMode == 0) {
+        float val = uRoughness;
+        if (uHasRoughnessMap) val *= texture2D(uRoughnessMap, vUv).g;
+        gl_FragColor = vec4(vec3(val), 1.0);
+    } else if (uMode == 1) {
+        float val = uMetalness;
+        if (uHasMetalnessMap) val *= texture2D(uMetalnessMap, vUv).b;
+        gl_FragColor = vec4(vec3(val), 1.0);
+    } else {
+        float met = uMetalness;
+        if (uHasMetalnessMap) met *= texture2D(uMetalnessMap, vUv).b;
+        vec3 base = uBaseColor;
+        if (uHasBaseColorMap) base *= texture2D(uBaseColorMap, vUv).rgb;
+        gl_FragColor = vec4(mix(vec3(uF0), base, met), 1.0);
+    }
+}`;
+
+/**
+ * Create a ShaderMaterial that visualises a single PBR channel.
+ * @param {THREE.Material} mat - Original PBR material
+ * @param {number} mode - 0 = roughness, 1 = metalness, 2 = specular F0
+ * @returns {THREE.ShaderMaterial}
+ */
+function _createPBRDebugMaterial(mat, mode) {
+    const roughness = mat.roughness !== undefined ? mat.roughness : 0.8;
+    const metalness = mat.metalness !== undefined ? mat.metalness : 0.1;
+    const ior = mat.ior !== undefined ? mat.ior : 1.5;
+    const f0 = Math.pow((ior - 1) / (ior + 1), 2);
+    const baseColor = mat.color ? mat.color.clone() : new THREE.Color(1, 1, 1);
+
+    return new THREE.ShaderMaterial({
+        vertexShader: _pbrDebugVert,
+        fragmentShader: _pbrDebugFrag,
+        uniforms: {
+            uMode: { value: mode },
+            uRoughness: { value: roughness },
+            uMetalness: { value: metalness },
+            uF0: { value: f0 },
+            uBaseColor: { value: baseColor },
+            uRoughnessMap: { value: mat.roughnessMap || null },
+            uMetalnessMap: { value: mat.metalnessMap || null },
+            uBaseColorMap: { value: mat.map || null },
+            uHasRoughnessMap: { value: !!mat.roughnessMap },
+            uHasMetalnessMap: { value: !!mat.metalnessMap },
+            uHasBaseColorMap: { value: !!mat.map },
+        },
+    });
+}
+
+/**
+ * Generic PBR debug view toggle. Saves/restores originals via _storedMaterials.
+ * @param {THREE.Group} modelGroup
+ * @param {boolean} enabled
+ * @param {number} mode - 0 = roughness, 1 = metalness, 2 = specular F0
+ */
+function _togglePBRDebugView(modelGroup, enabled, mode) {
+    if (!modelGroup) return;
+
+    modelGroup.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+
+        const isArray = Array.isArray(child.material);
+        const materials = isArray ? child.material : [child.material];
+
+        if (enabled) {
+            if (!_storedMaterials.has(child)) {
+                _storedMaterials.set(child, isArray ? [...materials] : materials[0]);
+            }
+
+            const debugMats = materials.map(mat => _createPBRDebugMaterial(mat, mode));
+            child.material = isArray ? debugMats : debugMats[0];
+        } else {
+            const stored = _storedMaterials.get(child);
+            if (stored) {
+                const currentMats = isArray ? child.material : [child.material];
+                currentMats.forEach(m => { if (m && m.dispose) m.dispose(); });
+                child.material = stored;
+                _storedMaterials.delete(child);
+            }
+        }
+    });
+}
+
+/**
+ * Toggle roughness debug view — grayscale visualisation of roughness values.
+ * Mutually exclusive with matcap, normals, and other debug views (shares _storedMaterials).
+ * @param {THREE.Group} modelGroup
+ * @param {boolean} enabled
+ */
+export function updateModelRoughness(modelGroup, enabled) {
+    _togglePBRDebugView(modelGroup, enabled, 0);
+}
+
+/**
+ * Toggle metalness debug view — grayscale visualisation of metalness values.
+ * Mutually exclusive with matcap, normals, and other debug views (shares _storedMaterials).
+ * @param {THREE.Group} modelGroup
+ * @param {boolean} enabled
+ */
+export function updateModelMetalness(modelGroup, enabled) {
+    _togglePBRDebugView(modelGroup, enabled, 1);
+}
+
+/**
+ * Toggle specular F0 debug view — shows Fresnel reflectance at normal incidence.
+ * Dielectrics show a dark ~0.04 value; metals show their base color.
+ * Mutually exclusive with matcap, normals, and other debug views (shares _storedMaterials).
+ * @param {THREE.Group} modelGroup
+ * @param {boolean} enabled
+ */
+export function updateModelSpecularF0(modelGroup, enabled) {
+    _togglePBRDebugView(modelGroup, enabled, 2);
+}
+
+// =============================================================================
 // E57 POINT CLOUD LOADING
 // =============================================================================
 

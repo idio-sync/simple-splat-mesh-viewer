@@ -4,6 +4,12 @@
    Part of the 'editorial' theme package.
    ============================================================================= */
 
+/* --- Base Typography — inherited by all editorial elements --- */
+
+body.kiosk-mode.kiosk-editorial {
+    font-family: var(--kiosk-font-body);
+}
+
 /* --- Hide Sidebar Layout Elements --- */
 
 body.kiosk-mode.kiosk-editorial #metadata-sidebar,
@@ -343,6 +349,14 @@ body.kiosk-mode.kiosk-editorial .editorial-matcap-off {
 
 body.kiosk-mode.kiosk-editorial .editorial-matcap-off:hover {
     color: var(--kiosk-text-secondary);
+}
+
+/* Dropdown section divider */
+
+body.kiosk-mode.kiosk-editorial .editorial-material-divider {
+    height: 1px;
+    background: var(--kiosk-border-subtle);
+    margin: 3px 10px;
 }
 
 /* --- FOV Slider (inline ribbon control) --- */
@@ -822,9 +836,7 @@ body.kiosk-mode.kiosk-editorial #annotation-line-overlay line {
 
 body.kiosk-mode.kiosk-editorial #annotation-info-popup {
     max-height: calc(100vh - 150px);
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(var(--kiosk-accent-rgb),0.3) transparent;
+    overflow: visible;
 }
 
 body.kiosk-mode.kiosk-editorial #annotation-info-popup::-webkit-scrollbar {
@@ -1133,10 +1145,12 @@ body.kiosk-mode.kiosk-editorial .editorial-picker-eyebrow {
 }
 
 body.kiosk-mode.kiosk-editorial .editorial-picker-title {
-    font-family: var(--kiosk-font-display);
-    font-size: 1.6rem;
-    font-weight: 300;
+    font-family: var(--kiosk-font-body);
+    font-size: 1.5rem;
+    font-weight: 700;
     color: var(--kiosk-text-primary);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
     margin: 0 0 8px 0;
     letter-spacing: -0.01em;
 }

@@ -26,6 +26,7 @@ import {
     processArchivePhase1, loadArchiveAsset,
     getAssetTypesForMode, getPrimaryAssetType,
     updateModelOpacity, updateModelWireframe, updateModelTextures, updateModelMatcap, updateModelNormals,
+    updateModelRoughness, updateModelMetalness, updateModelSpecularF0,
     updatePointcloudPointSize, updatePointcloudOpacity,
     loadSplatFromFile, loadSplatFromUrl,
     loadModelFromFile, loadModelFromUrl,
@@ -930,6 +931,25 @@ async function handleArchiveFile(file) {
             if (archiveSection) archiveSection.style.display = '';
         }
 
+        // Apply viewer settings from manifest (after theme, so these override theme defaults)
+        if (manifest.viewer_settings) {
+            if (manifest.viewer_settings.single_sided !== undefined) {
+                const side = manifest.viewer_settings.single_sided ? THREE.FrontSide : THREE.DoubleSide;
+                if (modelGroup) {
+                    modelGroup.traverse(child => {
+                        if (child.isMesh && child.material) {
+                            const mats = Array.isArray(child.material) ? child.material : [child.material];
+                            mats.forEach(m => { m.side = side; m.needsUpdate = true; });
+                        }
+                    });
+                }
+            }
+            if (manifest.viewer_settings.background_color && scene) {
+                scene.background = new THREE.Color(manifest.viewer_settings.background_color);
+            }
+            log.info('Applied viewer settings:', manifest.viewer_settings);
+        }
+
         updateProgress(100, 'Complete');
 
         // Smooth entry transition: fade overlay + camera ease-in
@@ -985,6 +1005,16 @@ async function handleArchiveFile(file) {
                         await ensureAssetLoaded(type);
                         // Update settings visibility after background load
                         showRelevantSettings(state.splatLoaded, state.modelLoaded, state.pointcloudLoaded);
+                        // Re-apply viewer settings to newly loaded meshes
+                        if (type === 'mesh' && manifest.viewer_settings?.single_sided !== undefined) {
+                            const side = manifest.viewer_settings.single_sided ? THREE.FrontSide : THREE.DoubleSide;
+                            modelGroup.traverse(child => {
+                                if (child.isMesh && child.material) {
+                                    const mats = Array.isArray(child.material) ? child.material : [child.material];
+                                    mats.forEach(m => { m.side = side; m.needsUpdate = true; });
+                                }
+                            });
+                        }
                     }
                 }
                 // Keep archive data available for export downloads
@@ -1186,6 +1216,9 @@ function createLayoutDeps() {
         updateModelWireframe,
         updateModelMatcap,
         updateModelNormals,
+        updateModelRoughness,
+        updateModelMetalness,
+        updateModelSpecularF0,
         sceneManager,
         state,
         annotationSystem,
@@ -1313,6 +1346,12 @@ function setupViewerUI() {
                 normalsCb.checked = false;
                 updateModelNormals(modelGroup, false);
             }
+            const roughCb = document.getElementById('model-roughness');
+            if (roughCb?.checked) { roughCb.checked = false; updateModelRoughness(modelGroup, false); }
+            const metalCb = document.getElementById('model-metalness');
+            if (metalCb?.checked) { metalCb.checked = false; updateModelMetalness(modelGroup, false); }
+            const f0Cb = document.getElementById('model-specular-f0');
+            if (f0Cb?.checked) { f0Cb.checked = false; updateModelSpecularF0(modelGroup, false); }
         }
         updateModelWireframe(modelGroup, e.target.checked);
     });
@@ -1330,6 +1369,12 @@ function setupViewerUI() {
                 normalsCb.checked = false;
                 updateModelNormals(modelGroup, false);
             }
+            const roughCb = document.getElementById('model-roughness');
+            if (roughCb?.checked) { roughCb.checked = false; updateModelRoughness(modelGroup, false); }
+            const metalCb = document.getElementById('model-metalness');
+            if (metalCb?.checked) { metalCb.checked = false; updateModelMetalness(modelGroup, false); }
+            const f0Cb = document.getElementById('model-specular-f0');
+            if (f0Cb?.checked) { f0Cb.checked = false; updateModelSpecularF0(modelGroup, false); }
         }
         updateModelMatcap(modelGroup, e.target.checked, document.getElementById('matcap-style')?.value || 'clay');
     });
@@ -1353,8 +1398,74 @@ function setupViewerUI() {
                 if (styleGroup) styleGroup.style.display = 'none';
                 updateModelMatcap(modelGroup, false);
             }
+            const roughCb = document.getElementById('model-roughness');
+            if (roughCb?.checked) { roughCb.checked = false; updateModelRoughness(modelGroup, false); }
+            const metalCb = document.getElementById('model-metalness');
+            if (metalCb?.checked) { metalCb.checked = false; updateModelMetalness(modelGroup, false); }
+            const f0Cb = document.getElementById('model-specular-f0');
+            if (f0Cb?.checked) { f0Cb.checked = false; updateModelSpecularF0(modelGroup, false); }
         }
         updateModelNormals(modelGroup, e.target.checked);
+    });
+    addListener('model-roughness', 'change', (e) => {
+        if (e.target.checked) {
+            const wireCb = document.getElementById('model-wireframe');
+            if (wireCb?.checked) { wireCb.checked = false; updateModelWireframe(modelGroup, false); }
+            const matcapCb = document.getElementById('model-matcap');
+            if (matcapCb?.checked) {
+                matcapCb.checked = false;
+                const styleGroup = document.getElementById('matcap-style-group');
+                if (styleGroup) styleGroup.style.display = 'none';
+                updateModelMatcap(modelGroup, false);
+            }
+            const normalsCb = document.getElementById('model-normals');
+            if (normalsCb?.checked) { normalsCb.checked = false; updateModelNormals(modelGroup, false); }
+            const metalCb = document.getElementById('model-metalness');
+            if (metalCb?.checked) { metalCb.checked = false; updateModelMetalness(modelGroup, false); }
+            const f0Cb = document.getElementById('model-specular-f0');
+            if (f0Cb?.checked) { f0Cb.checked = false; updateModelSpecularF0(modelGroup, false); }
+        }
+        updateModelRoughness(modelGroup, e.target.checked);
+    });
+    addListener('model-metalness', 'change', (e) => {
+        if (e.target.checked) {
+            const wireCb = document.getElementById('model-wireframe');
+            if (wireCb?.checked) { wireCb.checked = false; updateModelWireframe(modelGroup, false); }
+            const matcapCb = document.getElementById('model-matcap');
+            if (matcapCb?.checked) {
+                matcapCb.checked = false;
+                const styleGroup = document.getElementById('matcap-style-group');
+                if (styleGroup) styleGroup.style.display = 'none';
+                updateModelMatcap(modelGroup, false);
+            }
+            const normalsCb = document.getElementById('model-normals');
+            if (normalsCb?.checked) { normalsCb.checked = false; updateModelNormals(modelGroup, false); }
+            const roughCb = document.getElementById('model-roughness');
+            if (roughCb?.checked) { roughCb.checked = false; updateModelRoughness(modelGroup, false); }
+            const f0Cb = document.getElementById('model-specular-f0');
+            if (f0Cb?.checked) { f0Cb.checked = false; updateModelSpecularF0(modelGroup, false); }
+        }
+        updateModelMetalness(modelGroup, e.target.checked);
+    });
+    addListener('model-specular-f0', 'change', (e) => {
+        if (e.target.checked) {
+            const wireCb = document.getElementById('model-wireframe');
+            if (wireCb?.checked) { wireCb.checked = false; updateModelWireframe(modelGroup, false); }
+            const matcapCb = document.getElementById('model-matcap');
+            if (matcapCb?.checked) {
+                matcapCb.checked = false;
+                const styleGroup = document.getElementById('matcap-style-group');
+                if (styleGroup) styleGroup.style.display = 'none';
+                updateModelMatcap(modelGroup, false);
+            }
+            const normalsCb = document.getElementById('model-normals');
+            if (normalsCb?.checked) { normalsCb.checked = false; updateModelNormals(modelGroup, false); }
+            const roughCb = document.getElementById('model-roughness');
+            if (roughCb?.checked) { roughCb.checked = false; updateModelRoughness(modelGroup, false); }
+            const metalCb = document.getElementById('model-metalness');
+            if (metalCb?.checked) { metalCb.checked = false; updateModelMetalness(modelGroup, false); }
+        }
+        updateModelSpecularF0(modelGroup, e.target.checked);
     });
     addListener('model-no-texture', 'change', (e) => {
         updateModelTextures(modelGroup, !e.target.checked);
