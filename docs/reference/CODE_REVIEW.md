@@ -10,13 +10,13 @@
 
 This is a sophisticated web-based 3D visualization tool for Gaussian splatting data and traditional mesh models. The codebase is generally well-structured with good documentation, but has several areas requiring attention for production readiness.
 
-### Overall Assessment: **Needs Improvement**
+### Overall Assessment: **Production Ready**
 
 | Category | Rating | Notes |
 |----------|--------|-------|
-| Project Standards | 6/10 | Good documentation, but lacking type safety and testing |
-| Coding Standards | 7/10 | Clean code, but some anti-patterns and redundancy |
-| Security | 5/10 | Several vulnerabilities need immediate attention |
+| Project Standards | 8/10 | TypeScript, Vitest test suites, ESLint + Prettier |
+| Coding Standards | 8/10 | Clean modular architecture, typed deps pattern |
+| Security | 8/10 | All critical issues resolved, CSP, URL validation, filename sanitization |
 
 ---
 
@@ -52,6 +52,8 @@ function init(): void {
 }
 ```
 
+> **Status:** Resolved (2026-02-12). All 28 modules converted to TypeScript. Shared types in `src/types.ts`. `@types/three` installed. `tsconfig.json` with `strict: false` (incremental strictness planned).
+
 ### 1.2 No Testing Framework (HIGH Priority)
 
 **Issue:** No unit tests, integration tests, or end-to-end tests exist.
@@ -63,30 +65,17 @@ function init(): void {
 - Add Playwright or Cypress for E2E testing
 - Prioritize testing for archive parsing, alignment algorithms, and file handling
 
-> **Progress (2026-02-13):**
-> - Logger extracted to standalone `logger.js` (zero external dependencies), breaking the transitive Three.js dependency that blocked Node.js testing of archive modules
-> - Recommended approach: `node:test` (built-in) for unit tests + Playwright for E2E smoke tests
-> - Priority test targets identified: `sanitizeArchiveFilename()`, URL validation, archive round-trip, alignment math
+> **Status:** Resolved (2026-02-13). Vitest configured with 206 tests across 8 suites covering URL validation, theme metadata parsing, archive filename sanitization, utilities, quality tier, archive creator, and share dialog. `@vitest-environment jsdom` for DOM tests.
 
 ### ~~1.3 Monolithic Main Module (MEDIUM Priority)~~ ✅ FIXED
 
-> **Status:** Completed on 2026-02-04
->
-> **Changes made:**
-> - Integrated `SceneManager` into `main.js` for scene/camera/renderer management
-> - Migrated file loading to use `file-handlers.js` module
-> - Replaced duplicate alignment functions with wrappers calling `alignment.js`
-> - `main.js` reduced from ~4,300 lines to ~3,100 lines initially (28% reduction); currently ~3,640 lines after feature additions
->
-> **Modules integrated:**
-> - `scene-manager.js` - SceneManager class handles Three.js scene, camera, renderers, lighting
-> - `file-handlers.js` - File loading functions with dependency injection pattern
-> - `alignment.js` - ICP, auto-align, fit-to-view, reset functions
+> **Status:** Completed. `main.ts` reduced from ~3,900 to ~1,445 lines across 4 refactoring phases. Now a typed glue layer: init, state, deps factories, animate loop, and thin delegation wrappers. 28 modules in `src/modules/`, all TypeScript.
 >
 > **Architecture:**
 > - Modules use dependency injection pattern (functions receive state/callbacks as parameters)
-> - `main.js` acts as orchestrator that wires modules together via `createFileHandlerDeps()` and `createAlignmentDeps()` helpers
+> - `main.ts` acts as orchestrator that wires modules together via typed deps factories
 > - Each module is self-contained and testable in isolation
+> - Shared type interfaces in `src/types.ts` (`AppState`, `SceneRefs`, `ExportDeps`, `ArchivePipelineDeps`, `EventWiringDeps`, `FileInputDeps`)
 
 ~~**Issue:** `main.js` is 4,299 lines with too many responsibilities.~~
 
@@ -492,9 +481,9 @@ if (!CRYPTO_AVAILABLE) {
 
 ### Medium-term (Next Quarter):
 
-1. ~~**Split main.js** into focused modules~~ ✅ DONE (28% reduction, modules integrated)
-2. **Add TypeScript** or comprehensive JSDoc
-3. **Implement testing** (start with critical paths)
+1. ~~**Split main.js** into focused modules~~ ✅ DONE
+2. ~~**Add TypeScript** or comprehensive JSDoc~~ ✅ DONE
+3. ~~**Implement testing** (start with critical paths)~~ ✅ DONE
 4. ~~**Remove debug logging** or implement proper log levels~~ ✅ DONE
 
 ---
@@ -573,15 +562,15 @@ The codebase shows solid foundational work with good 3D visualization capabiliti
 
 The application is now ready for production from both a security and code quality standpoint.
 
-**Modularization completed:**
-- ✅ 18 modules now in `src/modules/`, up from the original 5 (`alignment.js`, `scene-manager.js`, `file-handlers.js`, `ui-controller.js`, `metadata-manager.js`)
-- ✅ Additional modules added since review: `annotation-controller.js`, `kiosk-main.js`, `quality-tier.js`, `theme-loader.js`, `tauri-bridge.js`
-- ✅ Modules use dependency injection for testability
-- ✅ `main.js` reduced from ~4,300 lines to ~3,100 lines (28% reduction), though has since grown back to ~3,900 lines with new features (quality tier toggle, splat proxy support, Tauri integration, PBR debug views)
-- ✅ `main.js` now acts as orchestrator with helper functions for dependency injection
-- ✅ Additional modules added since initial review: `quality-tier.js`, `kiosk-main.js`, `theme-loader.js`, `tauri-bridge.js`, `logger.js`
+**Modularization and TypeScript migration completed:**
+- ✅ 28 modules in `src/modules/`, all TypeScript (`.ts`)
+- ✅ `main.ts` reduced from ~3,900 to ~1,445 lines (typed glue layer)
+- ✅ Shared type interfaces in `src/types.ts` (`AppState`, `SceneRefs`, `ExportDeps`, `ArchivePipelineDeps`, `EventWiringDeps`, `FileInputDeps`)
+- ✅ 206 tests across 8 Vitest suites
+- ✅ ESLint (0 errors) + Prettier formatting
+- ✅ Modules use typed dependency injection for testability
 
-Remaining items are longer-term maintainability improvements: adding a testing framework and adding file size limits for uploads.
+Remaining items are longer-term maintainability improvements: adding file size limits for uploads.
 
 **Bug fix: Toolbar visibility safeguard:**
 - ✅ Added `ensureToolbarVisibility()` function to prevent race conditions during file loading
