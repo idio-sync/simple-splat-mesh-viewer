@@ -56,6 +56,7 @@ interface LoadSplatDeps {
     setSplatMesh: (mesh: any) => void;
     state: AppState;
     archiveCreator?: any;
+    sceneManager?: { ensureWebGLRenderer: () => Promise<void>; ensureWebGPURenderer: () => Promise<void> };
     callbacks?: {
         onSplatLoaded?: (mesh: any, file: File | Blob) => void;
         onApplySplatTransform?: (transform: any) => void;
@@ -105,6 +106,7 @@ interface LoadArchiveAssetDeps {
     pointcloudGroup: THREE.Group;
     state: AppState;
     qualityTier?: QualityTier | string;
+    sceneManager?: { ensureWebGLRenderer: () => Promise<void>; ensureWebGPURenderer: () => Promise<void> };
     callbacks?: {
         onApplySplatTransform?: (transform: any) => void;
         onApplyModelTransform?: (transform: any) => void;
@@ -118,6 +120,7 @@ interface LoadFullResDeps {
     setSplatMesh: (mesh: any) => void;
     modelGroup: THREE.Group;
     state: AppState;
+    sceneManager?: { ensureWebGLRenderer: () => Promise<void>; ensureWebGPURenderer: () => Promise<void> };
     callbacks?: {
         onApplySplatTransform?: (transform: any) => void;
         onApplyModelTransform?: (transform: any) => void;
@@ -182,6 +185,9 @@ type ProgressCallback = ((received: number, total: number) => void) | null;
 export async function loadSplatFromFile(file: File, deps: LoadSplatDeps): Promise<any> {
     const { scene, getSplatMesh, setSplatMesh, state, archiveCreator, callbacks } = deps;
 
+    // Spark.js requires WebGL — switch renderer if currently WebGPU
+    if (deps.sceneManager) await deps.sceneManager.ensureWebGLRenderer();
+
     // Remove existing splat
     const existingSplat = getSplatMesh();
     if (existingSplat) {
@@ -244,6 +250,9 @@ export async function loadSplatFromFile(file: File, deps: LoadSplatDeps): Promis
 export async function loadSplatFromUrl(url: string, deps: LoadSplatDeps, onProgress: ProgressCallback = null): Promise<any> {
     const { scene, getSplatMesh, setSplatMesh, state, archiveCreator, callbacks } = deps;
 
+    // Spark.js requires WebGL — switch renderer if currently WebGPU
+    if (deps.sceneManager) await deps.sceneManager.ensureWebGLRenderer();
+
     log.info('Fetching splat from URL:', url);
     const blob = await fetchWithProgress(url, onProgress);
     log.info('Splat blob fetched, size:', blob.size);
@@ -305,6 +314,9 @@ export async function loadSplatFromUrl(url: string, deps: LoadSplatDeps, onProgr
  */
 export async function loadSplatFromBlobUrl(blobUrl: string, fileName: string, deps: LoadSplatDeps): Promise<any> {
     const { scene, getSplatMesh, setSplatMesh, state } = deps;
+
+    // Spark.js requires WebGL — switch renderer if currently WebGPU
+    if (deps.sceneManager) await deps.sceneManager.ensureWebGLRenderer();
 
     // Remove existing splat
     const existingSplat = getSplatMesh();

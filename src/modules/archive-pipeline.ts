@@ -35,6 +35,11 @@ const log = Logger.getLogger('archive-pipeline');
 async function loadSplatFromBlobUrl(blobUrl: string, fileName: string, deps: ArchivePipelineDeps): Promise<void> {
     const { sceneRefs, state, setSplatMesh } = deps;
 
+    // Spark.js requires WebGL — switch renderer if currently WebGPU
+    if (deps.sceneManager?.ensureWebGLRenderer) {
+        await deps.sceneManager.ensureWebGLRenderer();
+    }
+
     // Remove existing splat
     if (sceneRefs.splatMesh) {
         sceneRefs.scene.remove(sceneRefs.splatMesh);

@@ -29,7 +29,9 @@ import {
     Object3D,
     PlaneGeometry,
     ToneMapping,
+    Vector2,
 } from 'three';
+import { WebGPURenderer } from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
@@ -56,11 +58,18 @@ export class SceneManager {
     // Three.js core objects
     scene: Scene | null;
     camera: PerspectiveCamera | null;
-    renderer: WebGLRenderer | null;
-    rendererRight: WebGLRenderer | null;
+    renderer: any; // WebGLRenderer | WebGPURenderer — widened for Spark.js compat
+    rendererRight: any; // WebGLRenderer | WebGPURenderer
     controls: OrbitControls | null;
     controlsRight: OrbitControls | null;
     transformControls: TransformControls | null;
+
+    // Renderer type tracking
+    rendererType: 'webgpu' | 'webgl';
+    webgpuSupported: boolean;
+    private _canvas: HTMLCanvasElement | null;
+    private _canvasRight: HTMLCanvasElement | null;
+    onRendererChanged: ((renderer: any) => void) | null;
 
     // Lighting
     ambientLight: AmbientLight | null;
@@ -111,6 +120,13 @@ export class SceneManager {
         this.controlsRight = null;
         this.transformControls = null;
 
+        // Renderer type tracking
+        this.rendererType = 'webgl';
+        this.webgpuSupported = false;
+        this._canvas = null;
+        this._canvasRight = null;
+        this.onRendererChanged = null;
+
         // Lighting
         this.ambientLight = null;
         this.hemisphereLight = null;
@@ -152,9 +168,31 @@ export class SceneManager {
     }
 
     /**
-     * Initialize the scene with all components
+     * Create a renderer of the specified type on the given canvas,
+     * applying standard settings (pixel ratio, color space, tone mapping, shadows).
+     * For WebGPU, the caller must also call `await renderer.init()` after this.
      */
-    init(canvas: HTMLCanvasElement, canvasRight: HTMLCanvasElement): boolean {
+    private _createRenderer(canvas: HTMLCanvasElement, type: 'webgpu' | 'webgl'): any {
+        let newRenderer: any;
+        if (type === 'webgpu') {
+            newRenderer = new WebGPURenderer({ canvas, antialias: true });
+        } else {
+            newRenderer = new WebGLRenderer({ canvas, antialias: true });
+        }
+        newRenderer.setPixelRatio(Math.min(window.devicePixelRatio, RENDERER.MAX_PIXEL_RATIO));
+        newRenderer.outputColorSpace = THREE.SRGBColorSpace;
+        newRenderer.toneMapping = THREE.NoToneMapping;
+        newRenderer.toneMappingExposure = 1.0;
+        newRenderer.shadowMap.enabled = false;
+        newRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        return newRenderer;
+    }
+
+    /**
+     * Initialize the scene with all components.
+     * Async because WebGPURenderer requires `await renderer.init()`.
+     */
+    async init(canvas: HTMLCanvasElement, canvasRight: HTMLCanvasElement): Promise<boolean> {
         if (!canvas) {
             log.error('FATAL: Main canvas not found!');
             return false;
@@ -165,6 +203,14 @@ export class SceneManager {
         }
 
         log.info('Initializing scene...');
+
+        // Store canvas references
+        this._canvas = canvas;
+        this._canvasRight = canvasRight;
+
+        // Detect WebGPU support
+        this.webgpuSupported = !!navigator.gpu;
+        log.info('WebGPU supported:', this.webgpuSupported);
 
         // Scene
         this.scene = new Scene();
@@ -183,30 +229,24 @@ export class SceneManager {
             CAMERA.INITIAL_POSITION.z
         );
 
+        // Choose renderer type: WebGPU if supported, else WebGL
+        const useWebGPU = this.webgpuSupported;
+        const rendererTypeToCreate = useWebGPU ? 'webgpu' : 'webgl';
+
         // Main Renderer
-        this.renderer = new WebGLRenderer({
-            canvas: canvas,
-            antialias: true
-        });
+        this.renderer = this._createRenderer(canvas, rendererTypeToCreate);
         this.renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, RENDERER.MAX_PIXEL_RATIO));
-        this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-        this.renderer.toneMapping = THREE.NoToneMapping;
-        this.renderer.toneMappingExposure = 1.0;
-        this.renderer.shadowMap.enabled = false;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        if (useWebGPU) {
+            await (this.renderer as WebGPURenderer).init();
+        }
+        this.rendererType = rendererTypeToCreate;
+        log.info('Main renderer created:', this.rendererType);
 
         // Right Renderer (for split view)
-        this.rendererRight = new WebGLRenderer({
-            canvas: canvasRight,
-            antialias: true
-        });
-        this.rendererRight.setPixelRatio(Math.min(window.devicePixelRatio, RENDERER.MAX_PIXEL_RATIO));
-        this.rendererRight.outputColorSpace = THREE.SRGBColorSpace;
-        this.rendererRight.toneMapping = THREE.NoToneMapping;
-        this.rendererRight.toneMappingExposure = 1.0;
-        this.rendererRight.shadowMap.enabled = false;
-        this.rendererRight.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.rendererRight = this._createRenderer(canvasRight, rendererTypeToCreate);
+        if (useWebGPU) {
+            await (this.rendererRight as WebGPURenderer).init();
+        }
 
         // Orbit Controls - Main
         this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -291,6 +331,188 @@ export class SceneManager {
 
         log.info('Scene initialization complete');
         return true;
+    }
+
+    /**
+     * Switch between WebGPU and WebGL renderers.
+     * Replaces the canvas in the DOM, recreates controls, and fires onRendererChanged.
+     */
+    async switchRenderer(target: 'webgpu' | 'webgl'): Promise<void> {
+        // No-op guards
+        if (this.rendererType === target) return;
+        if (target === 'webgpu' && !this.webgpuSupported) return;
+
+        log.info(`Switching renderer: ${this.rendererType} -> ${target}`);
+
+        // Save current renderer state
+        const size = new Vector2();
+        this.renderer.getSize(size);
+        const pixelRatio = this.renderer.getPixelRatio();
+        const toneMapping = this.renderer.toneMapping;
+        const toneMappingExposure = this.renderer.toneMappingExposure;
+        const shadowMapEnabled = this.renderer.shadowMap.enabled;
+        const shadowMapType = this.renderer.shadowMap.type;
+        const outputColorSpace = this.renderer.outputColorSpace;
+
+        // Save orbit controls state
+        const controlsTarget = this.controls!.target.clone();
+        const controlsDamping = this.controls!.enableDamping;
+        const controlsAutoRotate = this.controls!.autoRotate;
+        const controlsAutoRotateSpeed = this.controls!.autoRotateSpeed;
+
+        // --- Dispose old main renderer + controls ---
+        this.controls!.dispose();
+        this.controlsRight!.dispose();
+
+        // Remove TransformControls listeners and detach before dispose
+        if (this.transformControls) {
+            try { this.transformControls.detach(); } catch { /* ignore */ }
+            this.scene!.remove(this.transformControls as unknown as Object3D);
+            this.transformControls.dispose();
+        }
+
+        this.renderer.dispose();
+        this.rendererRight.dispose();
+
+        // --- Replace main canvas in DOM ---
+        const oldCanvas = this._canvas!;
+        const newCanvas = document.createElement('canvas');
+        newCanvas.id = oldCanvas.id;
+        newCanvas.className = oldCanvas.className;
+        newCanvas.style.cssText = oldCanvas.style.cssText;
+        oldCanvas.parentNode!.replaceChild(newCanvas, oldCanvas);
+        this._canvas = newCanvas;
+
+        // --- Replace right canvas in DOM ---
+        const oldCanvasRight = this._canvasRight!;
+        const newCanvasRight = document.createElement('canvas');
+        newCanvasRight.id = oldCanvasRight.id;
+        newCanvasRight.className = oldCanvasRight.className;
+        newCanvasRight.style.cssText = oldCanvasRight.style.cssText;
+        oldCanvasRight.parentNode!.replaceChild(newCanvasRight, oldCanvasRight);
+        this._canvasRight = newCanvasRight;
+
+        // --- Create new renderers ---
+        this.renderer = this._createRenderer(newCanvas, target);
+        this.renderer.setSize(size.x, size.y);
+        this.renderer.setPixelRatio(pixelRatio);
+        this.renderer.toneMapping = toneMapping;
+        this.renderer.toneMappingExposure = toneMappingExposure;
+        this.renderer.shadowMap.enabled = shadowMapEnabled;
+        this.renderer.shadowMap.type = shadowMapType;
+        this.renderer.outputColorSpace = outputColorSpace;
+        if (target === 'webgpu') {
+            await (this.renderer as WebGPURenderer).init();
+        }
+
+        this.rendererRight = this._createRenderer(newCanvasRight, target);
+        this.rendererRight.setPixelRatio(pixelRatio);
+        this.rendererRight.toneMapping = toneMapping;
+        this.rendererRight.toneMappingExposure = toneMappingExposure;
+        this.rendererRight.shadowMap.enabled = shadowMapEnabled;
+        this.rendererRight.shadowMap.type = shadowMapType;
+        this.rendererRight.outputColorSpace = outputColorSpace;
+        if (target === 'webgpu') {
+            await (this.rendererRight as WebGPURenderer).init();
+        }
+
+        // --- Recreate OrbitControls ---
+        this.controls = new OrbitControls(this.camera!, this.renderer.domElement);
+        this.controls.enableDamping = controlsDamping;
+        this.controls.dampingFactor = ORBIT_CONTROLS.DAMPING_FACTOR;
+        this.controls.screenSpacePanning = true;
+        this.controls.minDistance = ORBIT_CONTROLS.MIN_DISTANCE;
+        this.controls.maxDistance = ORBIT_CONTROLS.MAX_DISTANCE;
+        this.controls.mouseButtons = {
+            LEFT: THREE.MOUSE.ROTATE,
+            MIDDLE: THREE.MOUSE.DOLLY,
+            RIGHT: THREE.MOUSE.PAN
+        };
+        this.controls.touches = {
+            ONE: THREE.TOUCH.ROTATE,
+            TWO: THREE.TOUCH.DOLLY_PAN
+        };
+        this.controls.rotateSpeed = 1.0;
+        this.controls.autoRotate = controlsAutoRotate;
+        this.controls.autoRotateSpeed = controlsAutoRotateSpeed;
+        this.controls.target.copy(controlsTarget);
+
+        this.controlsRight = new OrbitControls(this.camera!, this.rendererRight.domElement);
+        this.controlsRight.enableDamping = controlsDamping;
+        this.controlsRight.dampingFactor = ORBIT_CONTROLS.DAMPING_FACTOR;
+        this.controlsRight.screenSpacePanning = true;
+        this.controlsRight.minDistance = ORBIT_CONTROLS.MIN_DISTANCE;
+        this.controlsRight.maxDistance = ORBIT_CONTROLS.MAX_DISTANCE;
+        this.controlsRight.mouseButtons = {
+            LEFT: THREE.MOUSE.ROTATE,
+            MIDDLE: THREE.MOUSE.DOLLY,
+            RIGHT: THREE.MOUSE.PAN
+        };
+        this.controlsRight.rotateSpeed = 1.0;
+        this.controlsRight.target.copy(controlsTarget);
+
+        // --- Recreate TransformControls ---
+        this.transformControls = new TransformControls(this.camera!, this.renderer.domElement);
+        this.transformControls.addEventListener('dragging-changed', (event: any) => {
+            this.controls!.enabled = !event.value;
+            this.controlsRight!.enabled = !event.value;
+            if (this.onDraggingChanged) {
+                this.onDraggingChanged(event.value);
+            }
+        });
+        this.transformControls.addEventListener('objectChange', () => {
+            if (this.onTransformChange) {
+                this.onTransformChange();
+            }
+        });
+        try {
+            this.scene!.add(this.transformControls as unknown as Object3D);
+        } catch {
+            log.warn('Failed to re-add TransformControls to scene after renderer switch');
+        }
+
+        // --- Recreate PMREMGenerator if an env map is active ---
+        if (this.currentEnvMap && this.pmremGenerator) {
+            this.pmremGenerator.dispose();
+            this.pmremGenerator = new PMREMGenerator(this.renderer);
+            this.pmremGenerator.compileEquirectangularShader();
+            if (this.currentEnvTexture) {
+                const oldEnvMap = this.currentEnvMap;
+                this.currentEnvMap = this.pmremGenerator.fromEquirectangular(this.currentEnvTexture).texture;
+                this.scene!.environment = this.currentEnvMap;
+                oldEnvMap.dispose();
+            }
+        }
+
+        // Update state
+        this.rendererType = target;
+
+        // Fire callback
+        if (this.onRendererChanged) {
+            this.onRendererChanged(this.renderer);
+        }
+
+        log.info(`Renderer switched to ${target}`);
+    }
+
+    /**
+     * Ensure the renderer is WebGL (for Spark.js Gaussian splat compatibility).
+     * No-op if already WebGL.
+     */
+    async ensureWebGLRenderer(): Promise<void> {
+        if (this.rendererType !== 'webgl') {
+            await this.switchRenderer('webgl');
+        }
+    }
+
+    /**
+     * Ensure the renderer is WebGPU (for better performance).
+     * No-op if already WebGPU or if WebGPU is not supported.
+     */
+    async ensureWebGPURenderer(): Promise<void> {
+        if (this.rendererType !== 'webgpu') {
+            await this.switchRenderer('webgpu');
+        }
     }
 
     /**
@@ -421,7 +643,7 @@ export class SceneManager {
     loadHDREnvironment(url: string): Promise<Texture> {
         return new Promise((resolve, reject) => {
             if (!this.pmremGenerator) {
-                this.pmremGenerator = new PMREMGenerator(this.renderer!);
+                this.pmremGenerator = new PMREMGenerator(this.renderer);
                 this.pmremGenerator.compileEquirectangularShader();
             }
 
@@ -870,9 +1092,9 @@ export class SceneManager {
 /**
  * Create and initialize a scene manager
  */
-export function createSceneManager(canvas: HTMLCanvasElement, canvasRight: HTMLCanvasElement): SceneManager | null {
+export async function createSceneManager(canvas: HTMLCanvasElement, canvasRight: HTMLCanvasElement): Promise<SceneManager | null> {
     const manager = new SceneManager();
-    const success = manager.init(canvas, canvasRight);
+    const success = await manager.init(canvas, canvasRight);
     return success ? manager : null;
 }
 

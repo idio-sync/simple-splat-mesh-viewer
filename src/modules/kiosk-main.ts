@@ -146,7 +146,7 @@ function normalizeManifest(raw: any): any {
 // =============================================================================
 
 let sceneManager: SceneManager | null = null;
-let scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer, controls: any, modelGroup: THREE.Group, pointcloudGroup: THREE.Group;
+let scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: any, controls: any, modelGroup: THREE.Group, pointcloudGroup: THREE.Group;
 let flyControls: FlyControls | null = null;
 let annotationSystem: AnnotationSystem | null = null;
 let splatMesh: any = null; // TODO: SplatMesh type
@@ -211,10 +211,11 @@ export async function init(): Promise<void> {
     const canvasRight = document.getElementById('viewer-canvas-right');
 
     sceneManager = new SceneManager();
-    if (!sceneManager.init(canvas as HTMLCanvasElement, canvasRight as HTMLCanvasElement)) {
+    if (!await sceneManager.init(canvas as HTMLCanvasElement, canvasRight as HTMLCanvasElement)) {
         log.error('Scene initialization failed');
         return;
     }
+    log.info('Renderer type:', sceneManager.rendererType);
 
     // Extract scene objects for local use
     scene = sceneManager.scene;
@@ -230,6 +231,18 @@ export async function init(): Promise<void> {
 
     // Create fly controls
     flyControls = new FlyControls(camera, renderer.domElement);
+
+    // Register callback for renderer switches (WebGPU <-> WebGL)
+    sceneManager.onRendererChanged = (newRenderer: any) => {
+        renderer = newRenderer;
+        controls = sceneManager!.controls;
+        if (annotationSystem) annotationSystem.updateRenderer(newRenderer);
+        if (flyControls) {
+            flyControls.dispose();
+            flyControls = new FlyControls(camera, newRenderer.domElement);
+        }
+        log.info('Renderer changed to', sceneManager!.rendererType);
+    };
 
     // Create annotation system
     annotationSystem = new AnnotationSystem(scene, camera, renderer, controls);
@@ -1186,6 +1199,7 @@ function createArchiveDeps(): any {
         pointcloudGroup,
         state,
         qualityTier: state.qualityResolved,
+        sceneManager,
         getSplatMesh: () => splatMesh,
         setSplatMesh: (mesh) => { splatMesh = mesh; },
         callbacks: {
@@ -1223,6 +1237,7 @@ function createSplatDeps(): any {
         getSplatMesh: () => splatMesh,
         setSplatMesh: (mesh) => { splatMesh = mesh; },
         state,
+        sceneManager,
         archiveCreator: null,
         callbacks: {}
     };

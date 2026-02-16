@@ -676,6 +676,26 @@ export class AnnotationSystem {
     }
 
     /**
+     * Update the renderer reference (e.g., after a WebGPU/WebGL switch).
+     * Unbinds event listeners from the old canvas and rebinds to the new one.
+     */
+    updateRenderer(newRenderer: any): void {
+        // Remove listeners from old canvas
+        if (this.renderer && this.renderer.domElement) {
+            this.renderer.domElement.removeEventListener('click', this._onClick);
+            this.renderer.domElement.style.cursor = '';
+        }
+
+        this.renderer = newRenderer;
+
+        // Rebind if placement mode is active
+        if (this.placementMode && this.renderer && this.renderer.domElement) {
+            this.renderer.domElement.addEventListener('click', this._onClick);
+            this.renderer.domElement.style.cursor = 'crosshair';
+        }
+    }
+
+    /**
      * Dispose of resources
      */
     dispose(): void {

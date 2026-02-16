@@ -272,7 +272,7 @@ let sceneManager: any = null;
 // Three.js objects - Main view (references extracted from SceneManager for backward compatibility)
 let scene: THREE.Scene;
 let camera: THREE.PerspectiveCamera;
-let renderer: THREE.WebGLRenderer;
+let renderer: any; // WebGLRenderer | WebGPURenderer — widened for auto-switching
 let controls: any; // OrbitControls
 let transformControls: any; // TransformControls
 let flyControls: any = null; // FlyControls (custom)
@@ -342,6 +342,7 @@ function createFileHandlerDeps(): any {
         setSplatMesh: (mesh: any) => { splatMesh = mesh; },
         getModelGroup: () => modelGroup,
         state,
+        sceneManager,
         archiveCreator,
         callbacks: {
             onSplatLoaded: (mesh: any, file: any) => {
@@ -572,7 +573,7 @@ function createEventWiringDeps(): EventWiringDeps {
 }
 
 // Initialize the scene
-function init() {
+async function init() {
     log.info(' init() starting...');
 
     // Verify required DOM elements
@@ -585,12 +586,13 @@ function init() {
         return;
     }
 
-    // Create and initialize SceneManager
+    // Create and initialize SceneManager (async for WebGPU renderer.init())
     sceneManager = new SceneManager();
-    if (!sceneManager.init(canvas, canvasRight)) {
+    if (!await sceneManager.init(canvas as HTMLCanvasElement, canvasRight)) {
         log.error(' FATAL: SceneManager initialization failed!');
         return;
     }
+    log.info('Renderer type:', sceneManager.rendererType);
 
     // Extract objects to global variables for backward compatibility
     scene = sceneManager.scene;
@@ -609,6 +611,20 @@ function init() {
 
     // Initialize fly camera controls (disabled by default, orbit mode is default)
     flyControls = new FlyControls(camera, renderer.domElement);
+
+    // Register callback for renderer switches (WebGPU <-> WebGL)
+    sceneManager.onRendererChanged = (newRenderer: any) => {
+        renderer = newRenderer;
+        controls = sceneManager.controls;
+        controlsRight = sceneManager.controlsRight;
+        transformControls = sceneManager.transformControls;
+        if (annotationSystem) annotationSystem.updateRenderer(newRenderer);
+        if (flyControls) {
+            flyControls.dispose();
+            flyControls = new FlyControls(camera, newRenderer.domElement);
+        }
+        log.info('Renderer changed, module-scope references updated');
+    };
 
     // Set up SceneManager callbacks for transform controls
     sceneManager.onTransformChange = () => {
@@ -1418,7 +1434,7 @@ async function startApp() {
         log.info(' Kiosk mode detected, loading kiosk-main.js');
         try {
             const { init: kioskInit } = await import('./modules/kiosk-main.js');
-            kioskInit();
+            await kioskInit();
         } catch (e) {
             log.error(' Kiosk init error:', e);
             log.error(' Stack:', e.stack);
@@ -1427,7 +1443,7 @@ async function startApp() {
     }
 
     try {
-        init();
+        await init();
     } catch (e) {
         log.error(' Init error:', e);
         log.error(' Stack:', e.stack);
