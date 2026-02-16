@@ -230,14 +230,24 @@ export class SceneManager {
         );
 
         // Choose renderer type: WebGPU if supported, else WebGL
-        const useWebGPU = this.webgpuSupported;
-        const rendererTypeToCreate = useWebGPU ? 'webgpu' : 'webgl';
+        let useWebGPU = this.webgpuSupported;
+        let rendererTypeToCreate = useWebGPU ? 'webgpu' : 'webgl';
 
-        // Main Renderer
+        // Main Renderer with WebGPU fallback to WebGL on init failure
         this.renderer = this._createRenderer(canvas, rendererTypeToCreate);
         this.renderer.setSize(canvas.clientWidth, canvas.clientHeight);
         if (useWebGPU) {
-            await (this.renderer as WebGPURenderer).init();
+            try {
+                await (this.renderer as WebGPURenderer).init();
+            } catch (err) {
+                log.warn('WebGPU initialization failed, falling back to WebGL:', err);
+                this.renderer.dispose();
+                useWebGPU = false;
+                rendererTypeToCreate = 'webgl';
+                this.webgpuSupported = false;
+                this.renderer = this._createRenderer(canvas, rendererTypeToCreate);
+                this.renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+            }
         }
         this.rendererType = rendererTypeToCreate;
         log.info('Main renderer created:', this.rendererType);
@@ -245,7 +255,13 @@ export class SceneManager {
         // Right Renderer (for split view)
         this.rendererRight = this._createRenderer(canvasRight, rendererTypeToCreate);
         if (useWebGPU) {
-            await (this.rendererRight as WebGPURenderer).init();
+            try {
+                await (this.rendererRight as WebGPURenderer).init();
+            } catch (err) {
+                log.warn('WebGPU initialization failed for right renderer, falling back to WebGL:', err);
+                this.rendererRight.dispose();
+                this.rendererRight = this._createRenderer(canvasRight, 'webgl');
+            }
         }
 
         // Orbit Controls - Main

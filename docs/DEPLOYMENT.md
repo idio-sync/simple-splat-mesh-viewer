@@ -164,6 +164,25 @@ FRAME_ANCESTORS='self' https://yourcompany.com https://*.yourcompany.com
 
 ## SSL / HTTPS
 
+### WebGPU Requires Secure Contexts
+
+**Important:** The viewer uses WebGPU for high-performance rendering when available. WebGPU is a browser security feature that **requires a secure context** (HTTPS) to function:
+
+| Access Method | Secure Context? | WebGPU Available? |
+|---------------|----------------|-------------------|
+| `https://example.com` | ✅ Yes | ✅ Yes |
+| `http://localhost` | ✅ Yes (exception) | ✅ Yes |
+| `http://127.0.0.1` | ✅ Yes (exception) | ✅ Yes |
+| `http://hostname.lan` | ❌ No | ❌ No |
+| `http://192.168.x.x` | ❌ No | ❌ No |
+
+**What happens without HTTPS:**
+- On non-secure contexts, the viewer automatically falls back to WebGL rendering
+- You'll see a console warning: `WebGPU initialization failed, falling back to WebGL`
+- Performance is slightly reduced (WebGL vs WebGPU) but all features work
+
+**Production recommendation:** Always deploy with HTTPS to enable WebGPU rendering for best performance.
+
 ### Option A: Cloudflare (Recommended)
 
 1. Add your domain to Cloudflare
