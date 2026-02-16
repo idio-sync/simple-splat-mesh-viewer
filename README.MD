@@ -39,32 +39,30 @@ The kiosk viewer supports themes — self-contained packages that control colors
 
 ## Quick Start
 
-### Using Python (simplest)
+### Development
 ```bash
-cd Vitrine3D/src
-python3 -m http.server 8080
+npm install
+npm run dev
 ```
 Then open http://localhost:8080 in your browser.
 
-### Using Node.js
+### Production Build
 ```bash
-npx serve src
+npm run build       # Vite production build to dist/
+npm run preview     # Preview production build locally
 ```
 
 ### Using Docker
 ```bash
-# Build the image
-docker build -t vitrine3d -f docker/Dockerfile .
+npm run docker:build    # Vite build + Docker image
+npm run docker:run      # http://localhost:8080
 
-# Run with default settings
-docker run -p 8080:80 vitrine3d
-
-# Run with pre-loaded archive
+# Or with pre-loaded archive
 docker run -p 8080:80 \
   -e DEFAULT_ARCHIVE_URL="https://example.com/scene.a3d" \
   vitrine3d
 
-# Run with pre-loaded files
+# Or with pre-loaded files
 docker run -p 8080:80 \
   -e DEFAULT_SPLAT_URL="https://example.com/model.ply" \
   -e DEFAULT_MODEL_URL="https://example.com/model.glb" \
@@ -113,26 +111,41 @@ docker run -p 8080:80 \
 Vitrine3D/
 ├── src/
 │   ├── index.html                  # Main HTML file with UI structure
-│   ├── main.js                     # Core application logic and event handling
+│   ├── main.ts                     # App controller / glue layer
+│   ├── types.ts                    # Shared TypeScript types and deps interfaces
 │   ├── config.js                   # Runtime configuration (URL params, kiosk detection)
 │   ├── pre-module.js               # Pre-module initialization
 │   ├── styles.css                  # UI styles (dark theme + kiosk-mode overrides)
 │   ├── modules/
-│   │   ├── constants.js            # Application constants and defaults
-│   │   ├── utilities.js            # Logging, hashing, markdown, image asset resolution
-│   │   ├── scene-manager.js        # Three.js scene, camera, renderer setup
-│   │   ├── file-handlers.js        # File loading with lazy archive extraction
-│   │   ├── archive-loader.js       # Archive ZIP parsing, lazy on-demand extraction
-│   │   ├── archive-creator.js      # Archive creation, manifest, image bundling
-│   │   ├── alignment.js            # Auto-align, ICP, fit-to-view
-│   │   ├── annotation-system.js    # 3D annotation placement with depth awareness
-│   │   ├── metadata-manager.js     # Metadata editing, validation, and display
-│   │   ├── share-dialog.js         # Share URL generation
-│   │   ├── fly-controls.js         # First-person fly camera
-│   │   ├── ui-controller.js        # UI state management
-│   │   ├── theme-loader.js         # Theme CSS/layout loading and metadata parsing
-│   │   ├── kiosk-viewer.js         # Offline viewer HTML generator
-│   │   └── kiosk-main.js           # Kiosk viewer entry point (viewer-only mode)
+│   │   ├── constants.ts            # Application constants and defaults
+│   │   ├── utilities.ts            # Hashing, markdown, image asset resolution
+│   │   ├── logger.ts              # Standalone Logger class
+│   │   ├── scene-manager.ts        # Three.js scene, camera, renderer setup
+│   │   ├── ui-controller.ts        # Loading overlay, display-mode helpers
+│   │   ├── file-handlers.ts        # Asset loading: splat, mesh, point cloud, archive
+│   │   ├── file-input-handlers.ts  # File input events, URL prompts, Tauri dialogs
+│   │   ├── archive-loader.ts       # Archive ZIP parsing, lazy on-demand extraction
+│   │   ├── archive-creator.ts      # Archive creation, manifest, image bundling
+│   │   ├── archive-pipeline.ts     # Archive loading/processing pipeline
+│   │   ├── export-controller.ts    # Archive export, viewer download, metadata manifests
+│   │   ├── event-wiring.ts         # Central UI event binding
+│   │   ├── asset-store.ts          # ES module singleton for blob references
+│   │   ├── screenshot-manager.ts   # Screenshot capture, viewfinder, gallery
+│   │   ├── transform-controller.ts # Transform gizmo, object sync, delta tracking
+│   │   ├── url-validation.ts       # URL validation for user-entered URLs
+│   │   ├── source-files-manager.ts # Source file list UI for archive exports
+│   │   ├── alignment.ts            # KD-tree, ICP, auto-align, fit-to-view
+│   │   ├── annotation-system.ts    # 3D annotation placement with depth awareness
+│   │   ├── annotation-controller.ts # Annotation UI orchestration
+│   │   ├── metadata-manager.ts     # Metadata editing, validation, and display
+│   │   ├── fly-controls.ts         # First-person fly camera (WASD + mouse look)
+│   │   ├── share-dialog.ts         # Share URL generation
+│   │   ├── quality-tier.ts         # SD/HD quality detection and switching
+│   │   ├── theme-loader.ts         # Theme CSS/layout loading and metadata parsing
+│   │   ├── kiosk-viewer.ts         # Offline viewer HTML generator
+│   │   ├── kiosk-main.ts           # Kiosk viewer entry point (viewer-only mode)
+│   │   ├── tauri-bridge.ts         # Tauri v2 native dialog integration
+│   │   └── __tests__/              # Vitest test suites
 │   └── themes/
 │       ├── _template/              # Copy this folder to create a new theme
 │       │   └── theme.css
@@ -153,12 +166,12 @@ Vitrine3D/
 │   │   ├── METADATA.md             # Metadata editor documentation
 │   │   └── SPECIFICATION.md        # Archive format specification
 │   ├── reference/
-│   │   ├── ARCHITECTURE.md         # Plain-English architecture overview
-│   │   ├── CODE_REVIEW.md          # Code review findings and remediation status
+│   │   ├── ARCHITECTURE.md         # Architecture overview and module relationships
+│   │   ├── CODE_REVIEW.md          # Code review findings and status
 │   │   ├── SHORTCOMINGS_AND_SOLUTIONS.md # Known gaps and proposed solutions
-│   │   ├── THREEJS_FORMATS_REFERENCE.md  # Three.js format support reference
-│   │   ├── TYPESCRIPT_CONVERSION_FEASIBILITY.md # TypeScript migration analysis
-│   │   └── tauri_application.md    # Tauri desktop application docs
+│   │   ├── SKETCHFAB-FEATURE-PARITY.md   # Sketchfab feature comparison
+│   │   ├── THREEJS_FORMATS_REFERENCE.md   # Three.js format support reference
+│   │   └── TAURI_APPLICATION.md    # Tauri desktop application docs
 │   ├── CONFIGURATION.md            # URL parameters, share/embed, security
 │   ├── DEPLOYMENT.md               # Docker and production deployment
 │   ├── KIOSK-VIEWER.md             # Offline kiosk viewer documentation
@@ -173,9 +186,11 @@ Vitrine3D/
 - [three-e57-loader](https://www.npmjs.com/package/three-e57-loader) — E57 point cloud loading (WASM-based via web-e57)
 - [fflate](https://github.com/101arrowz/fflate) — Fast ZIP compression/decompression
 - [nginx](https://nginx.org/) — Web server for Docker deployment
-- Vanilla JavaScript (ES Modules, no build step)
+- [Vite](https://vitejs.dev/) — Dev server, bundler, and build toolchain
+- [Vitest](https://vitest.dev/) — Test runner
+- TypeScript with ESLint and Prettier
 
-Runtime dependencies are loaded via browser [import maps](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script/type/importmap) from [esm.sh](https://esm.sh/) and [jsDelivr](https://www.jsdelivr.com/) CDNs. The kiosk viewer generator fetches Three.js core from jsDelivr and Three.js addons from esm.sh for reliable offline bundling. No bundler or build toolchain is required.
+Runtime dependencies are installed via npm and resolved by Vite from `node_modules/`. The kiosk viewer generator fetches Three.js core from jsDelivr and Three.js addons from esm.sh at generation time for reliable offline bundling.
 
 ## Browser Compatibility
 
