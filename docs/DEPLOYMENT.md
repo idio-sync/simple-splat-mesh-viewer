@@ -213,16 +213,6 @@ volumes:
   caddy_data:
 ```
 
-## Migrating from Sketchfab
-
-**Phase 1 (Weeks 1-4):** Deploy self-hosted viewer. Upload existing scans as .a3d archives. Run both Sketchfab and self-hosted in parallel.
-
-**Phase 2 (Weeks 4-8):** Replace Sketchfab iframe embeds on your website with self-hosted viewer URLs. Send clients updated direct links.
-
-**Phase 3 (Week 8+):** Remove scans from Sketchfab. Cancel subscription.
-
-> **Note:** Sketchfab URLs cannot be redirected (you don't control `sketchfab.com`). Any client-bookmarked Sketchfab links will break after removal. Proactively send new links.
-
 ## Future: Admin Panel
 
 The viewer is stateless by design. Add an admin panel as a **separate service** in docker-compose:

@@ -989,6 +989,163 @@ input[type="range"]::-webkit-slider-thumb:hover {
     50% { transform: translate(-50%, -50%) scale(1.2); }
 }
 
+/* =============================================================================
+   MEASUREMENT SYSTEM
+   ============================================================================= */
+
+#measurement-markers {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 61;
+}
+
+/* Endpoint markers (A / B) */
+.measure-point {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    background: #FF6B35;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    font-size: 10px;
+    font-family: monospace;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    transition: opacity 0.15s;
+    z-index: 62;
+    box-shadow: 0 2px 8px rgba(255, 107, 53, 0.5);
+}
+
+.measure-point.measure-point-pending {
+    animation: measure-pulse 1s ease-in-out infinite;
+    opacity: 0.85;
+}
+
+@keyframes measure-pulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 2px 8px rgba(255, 107, 53, 0.5); }
+    50% { transform: translate(-50%, -50%) scale(1.2); box-shadow: 0 2px 16px rgba(255, 107, 53, 0.8); }
+}
+
+/* Distance label at midpoint */
+.measure-label {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(15, 15, 26, 0.92);
+    border: 1px solid #FF6B35;
+    border-radius: 4px;
+    padding: 3px 7px 3px 8px;
+    transform: translate(-50%, -50%);
+    pointer-events: all;
+    z-index: 63;
+    white-space: nowrap;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+.measure-label-text {
+    color: #FF6B35;
+    font-family: monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+}
+
+.measure-label-delete {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+    transition: color 0.15s;
+}
+
+.measure-label-delete:hover {
+    color: #ff4444;
+}
+
+/* Scale panel */
+#measure-scale-panel {
+    position: fixed;
+    bottom: 20px;
+    left: 60px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(15, 15, 26, 0.92);
+    border: 1px solid #3a3a5a;
+    border-radius: 6px;
+    padding: 6px 10px;
+    z-index: 200;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+}
+
+#measure-scale-panel.hidden {
+    display: none;
+}
+
+.measure-scale-label {
+    color: #aaa;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+#measure-scale-value {
+    width: 60px;
+    background: #2a2a3a;
+    border: 1px solid #3a3a5a;
+    border-radius: 3px;
+    color: #e0e0ff;
+    font-size: 12px;
+    font-family: monospace;
+    padding: 3px 5px;
+    text-align: right;
+}
+
+#measure-scale-unit {
+    background: #2a2a3a;
+    border: 1px solid #3a3a5a;
+    border-radius: 3px;
+    color: #e0e0ff;
+    font-size: 12px;
+    padding: 3px 4px;
+}
+
+#measure-clear-all {
+    background: none;
+    border: 1px solid #3a3a5a;
+    border-radius: 3px;
+    color: #aaa;
+    font-size: 11px;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+#measure-clear-all:hover {
+    color: #ff6b35;
+    border-color: #ff6b35;
+}
+
+/* Active state for measure button */
+#btn-measure.active {
+    color: #FF6B35;
+    background: rgba(255, 107, 53, 0.12);
+    border-color: rgba(255, 107, 53, 0.35);
+}
+
 /* Annotation mode indicator */
 #annotation-mode-indicator {
     position: absolute;

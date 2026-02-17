@@ -1225,6 +1225,133 @@ body.kiosk-mode.kiosk-editorial .kiosk-picker-formats {
     opacity: 0.6;
 }
 
+/* --- Measure — editorial uses a ribbon dropdown; hide global panel + toolbar button --- */
+
+body.kiosk-mode.kiosk-editorial #measure-scale-panel,
+body.kiosk-mode.kiosk-editorial #btn-measure {
+    display: none !important;
+}
+
+/* Measure wrapper (positional context for the dropdown) */
+
+body.kiosk-mode.kiosk-editorial .editorial-measure-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    align-self: stretch; /* full ribbon height → bottom: 100% on dropdown = ribbon top */
+}
+
+/* Dropdown panel */
+
+body.kiosk-mode.kiosk-editorial .editorial-measure-dropdown {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 8px); /* 8px gap above ribbon top */
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(var(--kiosk-surface-rgb), 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--kiosk-border-subtle);
+    border-radius: 4px;
+    padding: 8px 10px;
+    min-width: 0;
+    width: fit-content;
+    z-index: 200;
+    flex-direction: column;
+    gap: 0;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-measure-dropdown.open {
+    display: flex;
+    animation: editorialDropdownIn 0.15s ease-out;
+}
+
+/* Scale row: "1 unit = [val] [unit]" */
+
+body.kiosk-mode.kiosk-editorial .editorial-measure-scale-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-measure-scale-label {
+    font-family: var(--kiosk-font-body);
+    font-size: 0.6rem;
+    font-weight: 500;
+    color: var(--kiosk-text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-measure-scale-value {
+    width: 22px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--kiosk-border-subtle);
+    border-radius: 2px;
+    color: var(--kiosk-text-primary);
+    font-family: var(--kiosk-font-mono);
+    font-size: 0.65rem;
+    padding: 2px 4px;
+    text-align: right;
+    outline: none;
+    min-width: 0;
+    -moz-appearance: textfield;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-measure-scale-value::-webkit-inner-spin-button,
+body.kiosk-mode.kiosk-editorial .editorial-measure-scale-value::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-measure-scale-value:focus {
+    border-color: var(--kiosk-accent);
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-measure-scale-unit {
+    appearance: none;
+    -webkit-appearance: none;
+    background: rgba(var(--kiosk-surface-rgb), 0.85);
+    border: 1px solid var(--kiosk-border-subtle);
+    border-radius: 2px;
+    color: var(--kiosk-text-primary);
+    font-family: var(--kiosk-font-body);
+    font-size: 0.62rem;
+    padding: 2px 4px;
+    width: 28px;
+    text-align: center;
+    cursor: pointer;
+    outline: none;
+    letter-spacing: 0.04em;
+}
+
+/* Clear all button */
+
+body.kiosk-mode.kiosk-editorial .editorial-measure-clear {
+    font-family: var(--kiosk-font-body);
+    font-size: 0.58rem;
+    font-weight: 400;
+    color: var(--kiosk-text-faint);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: none;
+    border: none;
+    border-top: 1px solid var(--kiosk-border-subtle);
+    padding: 6px 0 2px;
+    margin-top: 7px;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: color 0.1s;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-measure-clear:hover {
+    color: var(--kiosk-text-secondary);
+}
+
 /* --- Mobile Fallback: revert to sidebar at narrow viewports --- */
 
 @media (max-width: 700px) {

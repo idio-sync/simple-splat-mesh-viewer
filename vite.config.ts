@@ -9,7 +9,7 @@ import { transformSync } from 'esbuild';
 const KIOSK_MODULES = [
     'constants.ts', 'logger.ts', 'utilities.ts', 'archive-loader.ts',
     'ui-controller.ts', 'scene-manager.ts', 'fly-controls.ts',
-    'annotation-system.ts', 'file-handlers.ts', 'metadata-manager.ts',
+    'annotation-system.ts', 'measurement-system.ts', 'file-handlers.ts', 'metadata-manager.ts',
     'theme-loader.ts', 'quality-tier.ts', 'kiosk-main.ts'
 ];
 

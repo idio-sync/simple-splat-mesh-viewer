@@ -202,11 +202,11 @@ function createInfoOverlay(manifest, deps) {
         if (Array.isArray(prov.processing_software)) {
             prov.processing_software.forEach(sw => {
                 const val = typeof sw === 'object' ? `${sw.name || ''} ${sw.version || ''}`.trim() : sw;
-                processDetails.push({ label: 'Software', value: val });
+                if (val) processDetails.push({ label: 'Software', value: val });
             });
         }
         if (prov.processing_notes) processDetails.push({ label: 'Notes', value: prov.processing_notes });
-        if (prov.convention_hints) processDetails.push({ label: 'Conventions', value: prov.convention_hints });
+        if (prov.convention_hints?.length) processDetails.push({ label: 'Conventions', value: Array.isArray(prov.convention_hints) ? prov.convention_hints.join(', ') : prov.convention_hints });
     }
     addSection('Processing', processDetails);
 
@@ -432,6 +432,93 @@ export function setup(manifest, deps) {
     detailsLink.className = 'editorial-view-mode-link editorial-details-link';
     detailsLink.textContent = 'Details';
     viewModes.appendChild(detailsLink);
+
+    // Measure dropdown (like material view — self-contained, replaces global scale panel)
+    if (deps.measurementSystem) {
+        const measureSep = document.createElement('span');
+        measureSep.className = 'editorial-view-mode-sep';
+        measureSep.textContent = '|';
+        viewModes.appendChild(measureSep);
+
+        const measureWrapper = document.createElement('div');
+        measureWrapper.className = 'editorial-measure-wrapper';
+
+        const measureBtn = document.createElement('button');
+        measureBtn.className = 'editorial-view-mode-link editorial-measure-btn';
+        measureBtn.textContent = 'Measure';
+
+        const measureDropdown = document.createElement('div');
+        measureDropdown.className = 'editorial-measure-dropdown';
+
+        // Scale row: 1 unit = [value] [unit]
+        const scaleRow = document.createElement('div');
+        scaleRow.className = 'editorial-measure-scale-row';
+
+        const scaleLabel = document.createElement('span');
+        scaleLabel.className = 'editorial-measure-scale-label';
+        scaleLabel.textContent = '1 unit =';
+
+        const scaleValue = document.createElement('input');
+        scaleValue.type = 'number';
+        scaleValue.value = '1';
+        scaleValue.min = '0.0001';
+        scaleValue.step = 'any';
+        scaleValue.className = 'editorial-measure-scale-value';
+
+        const scaleUnit = document.createElement('select');
+        scaleUnit.className = 'editorial-measure-scale-unit';
+        ['m', 'cm', 'mm', 'in', 'ft'].forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u;
+            opt.textContent = u;
+            if (u === 'in') opt.selected = true;
+            scaleUnit.appendChild(opt);
+        });
+
+        scaleRow.appendChild(scaleLabel);
+        scaleRow.appendChild(scaleValue);
+        scaleRow.appendChild(scaleUnit);
+        measureDropdown.appendChild(scaleRow);
+
+        // Clear all button
+        const clearBtn = document.createElement('button');
+        clearBtn.className = 'editorial-measure-clear';
+        clearBtn.textContent = 'Clear all';
+        clearBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deps.measurementSystem.clearAll();
+        });
+        measureDropdown.appendChild(clearBtn);
+
+        // Wire scale inputs → setScale()
+        const getVal = () => parseFloat(scaleValue.value) || 1;
+        const getUnit = () => scaleUnit.value;
+        scaleValue.addEventListener('input', (e) => {
+            e.stopPropagation();
+            deps.measurementSystem.setScale(getVal(), getUnit());
+        });
+        scaleUnit.addEventListener('change', (e) => {
+            e.stopPropagation();
+            deps.measurementSystem.setScale(getVal(), getUnit());
+        });
+
+        // Initialize with inches
+        deps.measurementSystem.setScale(1, 'in');
+
+        // Button toggles measure mode + dropdown; deactivation clears all measurements
+        measureBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isActive = !deps.measurementSystem.isActive;
+            deps.measurementSystem.setMeasureMode(isActive);
+            if (!isActive) deps.measurementSystem.clearAll();
+            measureBtn.classList.toggle('active', isActive);
+            measureDropdown.classList.toggle('open', isActive);
+        });
+
+        measureWrapper.appendChild(measureBtn);
+        measureWrapper.appendChild(measureDropdown);
+        viewModes.appendChild(measureWrapper);
+    }
 
     ribbon.appendChild(viewModes);
 

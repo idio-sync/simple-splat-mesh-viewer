@@ -4,6 +4,7 @@ import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader } from './modules/archive-loader.js';
 // hasAnyProxy moved to archive-pipeline.ts (Phase 2.2)
 import { AnnotationSystem } from './modules/annotation-system.js';
+import { MeasurementSystem } from './modules/measurement-system.js';
 import { ArchiveCreator, CRYPTO_AVAILABLE } from './modules/archive-creator.js';
 import { CAMERA, TIMING, ASSET_STATE, MESH_LOD } from './modules/constants.js';
 import { Logger, notify } from './modules/utilities.js';
@@ -285,8 +286,9 @@ let hemisphereLight: THREE.HemisphereLight;
 let directionalLight1: THREE.DirectionalLight;
 let directionalLight2: THREE.DirectionalLight;
 
-// Annotation, alignment, and archive creation
+// Annotation, alignment, archive creation, and measurement
 let annotationSystem: any = null;
+let measurementSystem: any = null;
 let landmarkAlignment: any = null;
 let archiveCreator: any = null;
 
@@ -619,6 +621,7 @@ async function init() {
         controlsRight = sceneManager.controlsRight;
         transformControls = sceneManager.transformControls;
         if (annotationSystem) annotationSystem.updateRenderer(newRenderer);
+        if (measurementSystem) measurementSystem.updateRenderer(newRenderer);
         if (flyControls) {
             flyControls.dispose();
             flyControls = new FlyControls(camera, newRenderer.domElement);
@@ -641,6 +644,11 @@ async function init() {
     annotationSystem.onAnnotationSelected = onAnnotationSelected;
     annotationSystem.onPlacementModeChanged = onPlacementModeChanged;
     log.info(' Annotation system initialized:', !!annotationSystem);
+
+    // Initialize measurement system
+    measurementSystem = new MeasurementSystem(scene, camera, renderer, controls);
+    _wireMeasurementControls();
+    log.info(' Measurement system initialized:', !!measurementSystem);
 
     // Initialize landmark alignment system
     landmarkAlignment = new LandmarkAlignment({
@@ -1256,6 +1264,45 @@ function applyViewerModeSettings() {
     applyViewerModeSettingsHandler(config);
 }
 
+function _wireMeasurementControls() {
+    // Show the measure button (starts display:none in HTML)
+    const measureBtn = document.getElementById('btn-measure');
+    if (measureBtn) measureBtn.style.display = '';
+
+    // Toggle measure mode on/off
+    addListener('btn-measure', 'click', () => {
+        if (!measurementSystem) return;
+        const active = !measurementSystem.isActive;
+        measurementSystem.setMeasureMode(active);
+        const btn = document.getElementById('btn-measure');
+        if (btn) btn.classList.toggle('active', active);
+        const panel = document.getElementById('measure-scale-panel');
+        if (panel) panel.classList.toggle('hidden', !active);
+    });
+
+    // Scale factor inputs
+    let _scaleUnit = 'm';
+    addListener('measure-scale-value', 'input', (e) => {
+        const val = parseFloat((e as InputEvent & { target: HTMLInputElement }).target.value);
+        if (measurementSystem && !isNaN(val) && val > 0) {
+            measurementSystem.setScale(val, _scaleUnit);
+        }
+    });
+    addListener('measure-scale-unit', 'change', (e) => {
+        _scaleUnit = (e as Event & { target: HTMLSelectElement }).target.value;
+        const valueInput = document.getElementById('measure-scale-value') as HTMLInputElement | null;
+        const val = valueInput ? parseFloat(valueInput.value) : 1;
+        if (measurementSystem && !isNaN(val) && val > 0) {
+            measurementSystem.setScale(val, _scaleUnit);
+        }
+    });
+
+    // Clear all measurements
+    addListener('measure-clear-all', 'click', () => {
+        if (measurementSystem) measurementSystem.clearAll();
+    });
+}
+
 // Load default files from configuration
 async function loadDefaultFiles() {
     // Archive URL takes priority over splat/model URLs
@@ -1393,6 +1440,11 @@ function animate() {
         // Update annotation marker positions
         if (annotationSystem) {
             annotationSystem.updateMarkerPositions();
+        }
+
+        // Update measurement marker positions
+        if (measurementSystem) {
+            measurementSystem.updateMarkerPositions();
         }
 
         // Update alignment marker positions

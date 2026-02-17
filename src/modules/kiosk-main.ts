@@ -16,6 +16,7 @@ import { SceneManager } from './scene-manager.js';
 type AssetType = 'splat' | 'mesh' | 'pointcloud';
 import { FlyControls } from './fly-controls.js';
 import { AnnotationSystem } from './annotation-system.js';
+import { MeasurementSystem } from './measurement-system.js';
 import { CAMERA, ASSET_STATE, QUALITY_TIER } from './constants.js';
 import { resolveQualityTier, hasAnyProxy } from './quality-tier.js';
 import { Logger, notify, parseMarkdown, resolveAssetRefs, fetchWithProgress, downloadBlob } from './utilities.js';
@@ -149,6 +150,7 @@ let sceneManager: SceneManager | null = null;
 let scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: any, controls: any, modelGroup: THREE.Group, pointcloudGroup: THREE.Group;
 let flyControls: FlyControls | null = null;
 let annotationSystem: AnnotationSystem | null = null;
+let measurementSystem: MeasurementSystem | null = null;
 let splatMesh: any = null; // TODO: SplatMesh type
 let fpsElement: HTMLElement | null = null;
 let currentPopupAnnotationId: string | null = null;
@@ -237,6 +239,7 @@ export async function init(): Promise<void> {
         renderer = newRenderer;
         controls = sceneManager!.controls;
         if (annotationSystem) annotationSystem.updateRenderer(newRenderer);
+        if (measurementSystem) measurementSystem.updateRenderer(newRenderer);
         if (flyControls) {
             flyControls.dispose();
             flyControls = new FlyControls(camera, newRenderer.domElement);
@@ -280,6 +283,9 @@ export async function init(): Promise<void> {
             currentPopupAnnotationId = showAnnotationPopup(annotation, state.imageAssets);
         }
     };
+
+    // Create measurement system
+    measurementSystem = new MeasurementSystem(scene, camera, renderer, controls);
 
     // Load theme and determine layout
     const config = window.APP_CONFIG || {};
@@ -1298,6 +1304,7 @@ function createLayoutDeps(): any {
         sceneManager,
         state,
         annotationSystem,
+        measurementSystem,
         modelGroup,
         setDisplayMode,
         createDisplayModeDeps,
@@ -1340,6 +1347,38 @@ function setupViewerUI(): void {
                 }
             }
         });
+    });
+
+    // Measurement tool
+    const measureBtn = document.getElementById('btn-measure');
+    if (measureBtn) {
+        measureBtn.style.display = '';
+        measureBtn.addEventListener('click', () => {
+            if (!measurementSystem) return;
+            const active = !measurementSystem.isActive;
+            measurementSystem.setMeasureMode(active);
+            measureBtn.classList.toggle('active', active);
+            const panel = document.getElementById('measure-scale-panel');
+            if (panel) panel.classList.toggle('hidden', !active);
+        });
+    }
+    let _kioskScaleUnit = 'm';
+    addListener('measure-scale-value', 'input', (e) => {
+        const val = parseFloat((e as InputEvent & { target: HTMLInputElement }).target.value);
+        if (measurementSystem && !isNaN(val) && val > 0) {
+            measurementSystem.setScale(val, _kioskScaleUnit);
+        }
+    });
+    addListener('measure-scale-unit', 'change', (e) => {
+        _kioskScaleUnit = (e as Event & { target: HTMLSelectElement }).target.value;
+        const valueInput = document.getElementById('measure-scale-value') as HTMLInputElement | null;
+        const val = valueInput ? parseFloat(valueInput.value) : 1;
+        if (measurementSystem && !isNaN(val) && val > 0) {
+            measurementSystem.setScale(val, _kioskScaleUnit);
+        }
+    });
+    addListener('measure-clear-all', 'click', () => {
+        if (measurementSystem) measurementSystem.clearAll();
     });
 
     // Fly mode toggle
@@ -3180,8 +3219,13 @@ function animate(): void {
             updateAnnotationLine(currentPopupAnnotationId);
         }
 
+        // Update measurement marker screen positions
+        if (measurementSystem) {
+            measurementSystem.updateMarkerPositions();
+        }
+
         sceneManager.updateFPS(fpsElement);
-    } catch {
-        // Silently handle animation errors to keep the loop running
+    } catch (e) {
+        console.warn('[animate] frame error:', e);
     }
 }

@@ -1274,44 +1274,46 @@ export function updateModelWireframe(modelGroup: THREE.Group, wireframe: boolean
 // MODEL TEXTURE TOGGLE
 // =============================================================================
 
-const _storedTextures = new WeakMap<any, any>();
+// Per-mesh storage of original materials (same pattern as _storedMaterials for matcap).
+// Whole-material swap avoids setting map=null+needsUpdate=true which causes WebGPU
+// pipeline recompilation errors in Three.js r170+.
+const _storedTexturedMaterials = new WeakMap<any, any>();
 
 /**
- * Toggle model textures on/off
+ * Toggle model textures on/off by swapping whole materials (WebGPU-safe).
  */
 export function updateModelTextures(modelGroup: THREE.Group, showTextures: boolean): void {
     if (!modelGroup) return;
     modelGroup.traverse((child) => {
-        if ((child as any).isMesh && (child as any).material) {
-            const materials = Array.isArray((child as any).material) ? (child as any).material : [(child as any).material];
-            materials.forEach((mat: any) => {
-                if (!showTextures) {
-                    if (!_storedTextures.has(mat)) {
-                        _storedTextures.set(mat, {
-                            map: mat.map, normalMap: mat.normalMap,
-                            roughnessMap: mat.roughnessMap, metalnessMap: mat.metalnessMap,
-                            aoMap: mat.aoMap, emissiveMap: mat.emissiveMap
-                        });
-                    }
-                    mat.map = null;
-                    mat.normalMap = null;
-                    mat.roughnessMap = null;
-                    mat.metalnessMap = null;
-                    mat.aoMap = null;
-                    mat.emissiveMap = null;
-                } else {
-                    const stored = _storedTextures.get(mat);
-                    if (stored) {
-                        mat.map = stored.map;
-                        mat.normalMap = stored.normalMap;
-                        mat.roughnessMap = stored.roughnessMap;
-                        mat.metalnessMap = stored.metalnessMap;
-                        mat.aoMap = stored.aoMap;
-                        mat.emissiveMap = stored.emissiveMap;
-                    }
-                }
-                mat.needsUpdate = true;
+        if (!(child as any).isMesh || !(child as any).material) return;
+
+        const isArray = Array.isArray((child as any).material);
+        const materials: any[] = isArray ? (child as any).material : [(child as any).material];
+
+        if (!showTextures) {
+            // Store originals on the mesh object (only once)
+            if (!_storedTexturedMaterials.has(child)) {
+                _storedTexturedMaterials.set(child, isArray ? [...materials] : materials[0]);
+            }
+            // Replace with texture-free clones — no map=null, no needsUpdate
+            const noTexMats = materials.map((mat: any) => {
+                const noTex = new THREE.MeshStandardMaterial({
+                    color: mat.color ? mat.color.clone() : new THREE.Color(0xcccccc),
+                    roughness: mat.roughness ?? 0.8,
+                    metalness: mat.metalness ?? 0.0,
+                    side: mat.side,
+                    transparent: mat.transparent,
+                    opacity: mat.opacity,
+                    wireframe: mat.wireframe ?? false,
+                });
+                return noTex;
             });
+            (child as any).material = isArray ? noTexMats : noTexMats[0];
+        } else {
+            const stored = _storedTexturedMaterials.get(child);
+            if (stored) {
+                (child as any).material = stored;
+            }
         }
     });
 }

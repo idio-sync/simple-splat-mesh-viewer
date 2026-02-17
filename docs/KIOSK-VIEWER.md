@@ -1,6 +1,8 @@
-# Offline Kiosk Viewer
+# Kiosk Viewer
 
-The **Download Viewer** button generates a self-contained HTML file (~1 MB before archive data) that works entirely offline with zero network access. This is designed for delivering 3D scan data to clients who may not have internet access or technical expertise.
+Kiosk view mode is a read only mode used for presentation or 3D data. It can be accessed via a url augment, a compiled executable or via a n offline usable bundled HTML file.
+
+The **Download Viewer** button in the archive export prompt generates a self-contained HTML file (~1 MB before archive data) that works entirely offline with zero network access. This is designed for delivering 3D scan data to clients who may not have internet access or technical expertise.
 
 ## How It Works
 
@@ -172,5 +174,5 @@ Use `autoload=false` when embedding multiple viewers on one page to defer downlo
 ## Limitations
 
 - The kiosk viewer is read-only — no archive creation, metadata editing, or alignment tools
-- The embedded JavaScript stack (Three.js 0.170.0, Spark.js 0.1.10) is frozen at export time and may eventually become incompatible with future browsers
+- The embedded JavaScript stack (Three.js, Spark.js) in the executable and bundled HTML file is frozen at export time and may eventually become incompatible with future browsers
 - The archive's raw data files (GLB, PLY, E57) remain the authoritative preservation copies; the kiosk viewer is a convenience access layer
