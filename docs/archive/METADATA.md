@@ -4,7 +4,7 @@ The metadata sidebar (press `M` or click the toolbar button) provides structured
 
 | Tab | Contents |
 |-----|----------|
-| **Project** | Title, ID, description (with markdown and image support), license, relationships, version history |
+| **Project** | Title, ID, description (with markdown and image support), tags, license, relationships, version history |
 | **Provenance** | Capture date/device/serial, operator/ORCID, location, processing software list, processing notes, convention hints |
 | **Archival Record** | Dublin Core / Smithsonian EDAN fields: title, identifiers (accession, SIRIS, URI), creation details, physical description, provenance, rights, geographic and temporal coverage |
 | **Quality** | Quality tier (Metrology/Reference/Visualization), accuracy grade, capture resolution, alignment error, scale verification, data quality notes, read-only asset statistics |

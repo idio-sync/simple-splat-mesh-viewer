@@ -26,6 +26,7 @@ export interface ProjectInfo {
     id: string;
     license: string;
     description: string;
+    tags: string[];
 }
 
 export interface ProvenanceInfo {
@@ -517,7 +518,8 @@ export class ArchiveCreator {
                 title: "",
                 id: "",
                 license: "CC0",
-                description: ""
+                description: "",
+                tags: []
             },
             relationships: {
                 part_of: "",
@@ -894,11 +896,12 @@ export class ArchiveCreator {
         return this.hashCache.get(blob) || null;
     }
 
-    setProjectInfo({ title, id, license, description }: Partial<ProjectInfo>): void {
+    setProjectInfo({ title, id, license, description, tags }: Partial<ProjectInfo>): void {
         if (title !== undefined) this.manifest.project.title = title;
         if (id !== undefined) this.manifest.project.id = id;
         if (license !== undefined) this.manifest.project.license = license;
         if (description !== undefined) this.manifest.project.description = description;
+        if (tags !== undefined) this.manifest.project.tags = tags;
     }
 
     setProvenance({ captureDate, captureDevice, deviceSerial, operator, operatorOrcid, location, conventions, processingSoftware, processingNotes }: ProvenanceInfo): void {

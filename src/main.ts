@@ -741,6 +741,14 @@ function onKeyDown(event: KeyboardEvent) {
         case 'escape':
             setSelectedObject('none' as SelectedObject);
             break;
+        case 'f11':
+            event.preventDefault();
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+            break;
     }
 }
 

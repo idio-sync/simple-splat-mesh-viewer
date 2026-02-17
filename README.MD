@@ -15,7 +15,9 @@ Powered by [Three.js](https://github.com/mrdoob/three.js/) and [Spark](https://s
 - **Screenshot capture** — capture viewport screenshots with a viewfinder-based archive preview override, thumbnail gallery with delete, and automatic export to `/screenshots/` in archives
 - **Transform controls** for positioning, rotating, and scaling each object independently
 - **Alignment Tools** for registering splats and models in overlapping space
+- **Measurement tool** — point-to-point distance measurement with two-click flow, 3D line overlay, and configurable units (m/cm/mm/in/ft); works in main editor and kiosk viewer
 - **Annotation system** for placing spatial notes on 3D surfaces, with image attachments and depth-aware markers
+- **Archive tags** — add comma-separated tags to archives, displayed as chips in all viewer modes; stored as `project.tags` in the manifest
 - **Metadata editor** with 8 tabs covering project info, provenance, archival records, quality metrics, preservation, and more — with inline field validation
 - **Kiosk themes** — customizable color palettes and layouts via self-contained theme packages
 - **Lazy archive loading** — only the manifest is decompressed on open; individual assets load on demand

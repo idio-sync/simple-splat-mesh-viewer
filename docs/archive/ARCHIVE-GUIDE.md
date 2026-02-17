@@ -34,7 +34,7 @@ The `manifest.json` file is the heart of the archive. It contains structured met
 
 | Section | Purpose |
 |---------|---------|
-| `project` | Title, description, license, project ID |
+| `project` | Title, description, tags, license, project ID |
 | `relationships` | Links to parent collections, related objects, superseded archives |
 | `provenance` | Capture date, device, operator, processing software chain |
 | `quality_metrics` | Accuracy tier, alignment error, capture resolution, data quality notes |

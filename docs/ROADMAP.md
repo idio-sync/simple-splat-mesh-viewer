@@ -27,7 +27,7 @@ Prioritized list of future work, drawn from the [code review](reference/CODE_REV
 - [x] **Done** — Auto-detect mobile/low-end devices in kiosk viewer via `quality-tier.js` and default to SD (proxy) assets; SD/HD toggle lets users switch manually
 
 ### Measurement & Analysis Tools
-- [ ] Point-to-point distance measurement (click two surface points, display Euclidean distance)
+- [x] **Done** — Point-to-point distance measurement (two-click flow, 3D line overlay, DOM markers, configurable units m/cm/mm/in/ft; works in main editor and kiosk viewer)
 - [ ] Coordinate readout on hover (XYZ in scene units)
 - [ ] Multi-point polyline measurement with cumulative distance
 - [ ] Cross-section tool (define a cutting plane, display intersection profile)

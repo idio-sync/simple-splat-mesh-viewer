@@ -199,6 +199,7 @@ Project-level identification. This section provides the minimal descriptive meta
 | `title` | string | REQUIRED | Human-readable title of the archive. MUST NOT be empty. |
 | `id` | string | RECOMMENDED | Machine-readable identifier (slug, UUID, or institutional ID). |
 | `description` | string | OPTIONAL | Extended description. MAY contain Markdown. |
+| `tags` | array of strings | OPTIONAL | Free-form classification tags for discovery and filtering (e.g., `["photogrammetry", "heritage", "exterior"]`). |
 | `license` | string | RECOMMENDED | License identifier. SHOULD use [SPDX identifiers](https://spdx.org/licenses/) (e.g., `"CC-BY-4.0"`, `"CC0-1.0"`) or a URL to the license text. |
 
 ```json
@@ -206,6 +207,7 @@ Project-level identification. This section provides the minimal descriptive meta
     "title": "Lincoln Memorial — Seated Statue",
     "id": "lm-metrology-2025-03",
     "description": "High-resolution metrology-grade 3D scan...",
+    "tags": ["photogrammetry", "metrology", "interior"],
     "license": "CC0-1.0"
 }
 ```

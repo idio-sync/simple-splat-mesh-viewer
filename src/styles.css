@@ -1123,6 +1123,45 @@ input[type="range"]::-webkit-slider-thumb:hover {
     padding: 3px 4px;
 }
 
+/* ── Fullscreen button ───────────────────────────────────────── */
+#btn-fullscreen .icon-compress { display: none; }
+#btn-fullscreen.is-fullscreen .icon-expand   { display: none; }
+#btn-fullscreen.is-fullscreen .icon-compress { display: block; }
+
+/* ── Tag chips ───────────────────────────────────────────────── */
+.display-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0 0 12px 0;
+}
+
+.tag-chip {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.75rem;
+    padding: 2px 10px;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+body.kiosk-mode .tag-chip {
+    background: rgba(var(--kiosk-accent-rgb, 78, 205, 196), 0.12);
+    border-color: rgba(var(--kiosk-accent-rgb, 78, 205, 196), 0.3);
+    color: var(--kiosk-text-muted, #aaa);
+}
+
+.field-hint {
+    display: block;
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 3px;
+}
+
 #measure-clear-all {
     background: none;
     border: 1px solid #3a3a5a;

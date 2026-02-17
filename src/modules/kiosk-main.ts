@@ -1362,6 +1362,17 @@ function setupViewerUI(): void {
             if (panel) panel.classList.toggle('hidden', !active);
         });
     }
+
+    // Escape exits measure mode and clears measurements
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && measurementSystem?.isActive) {
+            measurementSystem.setMeasureMode(false);
+            measurementSystem.clearAll();
+            if (measureBtn) measureBtn.classList.remove('active');
+            const panel = document.getElementById('measure-scale-panel');
+            if (panel) panel.classList.add('hidden');
+        }
+    });
     let _kioskScaleUnit = 'm';
     addListener('measure-scale-value', 'input', (e) => {
         const val = parseFloat((e as InputEvent & { target: HTMLInputElement }).target.value);
@@ -1380,6 +1391,35 @@ function setupViewerUI(): void {
     addListener('measure-clear-all', 'click', () => {
         if (measurementSystem) measurementSystem.clearAll();
     });
+
+    // Fullscreen toggle
+    const fullscreenBtn = document.getElementById('btn-fullscreen');
+    if (!document.fullscreenEnabled) {
+        if (fullscreenBtn) fullscreenBtn.style.display = 'none';
+    } else {
+        if (fullscreenBtn) {
+            fullscreenBtn.addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen();
+                } else {
+                    document.exitFullscreen();
+                }
+            });
+        }
+        document.addEventListener('fullscreenchange', () => {
+            if (fullscreenBtn) fullscreenBtn.classList.toggle('is-fullscreen', !!document.fullscreenElement);
+        });
+        document.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (e.key === 'F11') {
+                e.preventDefault();
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen();
+                } else {
+                    document.exitFullscreen();
+                }
+            }
+        });
+    }
 
     // Fly mode toggle
     addListener('btn-fly-mode', 'click', toggleFlyMode);

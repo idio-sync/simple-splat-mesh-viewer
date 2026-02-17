@@ -19,9 +19,10 @@ The **Download Viewer** button in the archive export prompt generates a self-con
 - Shadow casting with shadow catcher ground plane
 - Annotation viewing with depth-aware markers, popups, connecting lines, and image attachments via `asset:` protocol
 - Image support in project descriptions via `asset:` protocol
-- Metadata sidebar (view-only)
+- Metadata sidebar (view-only) — includes project tags displayed as chips below the description
 - Scene settings (background color, lighting, grid)
 - Asset-specific controls (opacity, wireframe, point size)
+- Point-to-point distance measurement — two-click flow with 3D line overlay and configurable units (m/cm/mm/in/ft); session-only, not saved to archives
 - LOD proxy mesh support — automatically loads pre-simplified proxy meshes when available, with SD/HD quality tier toggle
 - Mobile-responsive layout with bottom sheet navigation and swipe-based annotation browsing
 - Lazy asset loading — the manifest loads first, then individual assets load on demand with inline progress indicators

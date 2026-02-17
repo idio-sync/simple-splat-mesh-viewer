@@ -122,6 +122,19 @@ function createInfoOverlay(manifest, deps) {
         colLeft.appendChild(descEl);
     }
 
+    const tags = manifest?.tags || manifest?.project?.tags || [];
+    if (tags.length > 0) {
+        const tagsRow = document.createElement('div');
+        tagsRow.className = 'editorial-info-tags';
+        tags.forEach(tag => {
+            const chip = document.createElement('span');
+            chip.className = 'editorial-tag-chip';
+            chip.textContent = tag;
+            tagsRow.appendChild(chip);
+        });
+        colLeft.appendChild(tagsRow);
+    }
+
     const license = manifest?.license || manifest?.project?.license || manifest?.archival_record?.rights?.license ||
                     manifest?.archival_record?.rights?.statement || '';
     if (license) {
@@ -732,6 +745,30 @@ export function setup(manifest, deps) {
     fovWrapper.appendChild(fovLabel);
     ribbon.appendChild(fovWrapper);
 
+    // Fullscreen button — far right of ribbon
+    if (document.fullscreenEnabled) {
+        const fsBtn = document.createElement('button');
+        fsBtn.className = 'editorial-marker-toggle editorial-fullscreen-btn';
+        fsBtn.title = 'Toggle Fullscreen (F11)';
+        fsBtn.style.marginLeft = '8px';
+        fsBtn.innerHTML = `<svg class="icon-expand" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg><svg class="icon-compress" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="10" y1="14" x2="3" y2="21"></line><line x1="21" y1="3" x2="14" y2="10"></line></svg>`;
+        fsBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        });
+        document.addEventListener('fullscreenchange', () => {
+            const isFs = !!document.fullscreenElement;
+            const expand = fsBtn.querySelector('.icon-expand');
+            const compress = fsBtn.querySelector('.icon-compress');
+            if (expand) expand.style.display = isFs ? 'none' : '';
+            if (compress) compress.style.display = isFs ? '' : 'none';
+        });
+        ribbon.appendChild(fsBtn);
+    }
+
     viewerContainer.appendChild(ribbon);
 
     // --- 5. Info Overlay ---
@@ -752,11 +789,23 @@ export function setup(manifest, deps) {
         }
     });
 
-    // Close overlay on ESC key
+    // Close overlay or exit measure mode on ESC key
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && overlay.classList.contains('open')) {
+        if (e.key !== 'Escape') return;
+        if (overlay.classList.contains('open')) {
             overlay.classList.remove('open');
             detailsLink.classList.remove('active');
+        }
+        // Check dropdown open state — not isActive, since kiosk handler may have already set it false
+        const measureDropdown = document.querySelector('.editorial-measure-dropdown');
+        if (measureDropdown?.classList.contains('open')) {
+            measureDropdown.classList.remove('open');
+            const measureBtn = document.querySelector('.editorial-measure-btn');
+            if (measureBtn) measureBtn.classList.remove('active');
+            if (deps.measurementSystem) {
+                deps.measurementSystem.setMeasureMode(false);
+                deps.measurementSystem.clearAll();
+            }
         }
     });
 

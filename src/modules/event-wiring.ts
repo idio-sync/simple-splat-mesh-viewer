@@ -604,6 +604,9 @@ export function setupUIEvents(deps: EventWiringDeps): void {
     // ─── Metadata sidebar event handlers ─────────────────────
     deps.metadata.setupMetadataSidebar();
 
+    // ─── Fullscreen toggle ────────────────────────────────────
+    setupFullscreen();
+
     log.info(' UI events setup complete');
 }
 
@@ -639,4 +642,26 @@ function clearDebugViews(state: any, deps: EventWiringDeps, activeView: string):
             view.update();
         }
     }
+}
+
+function setupFullscreen(): void {
+    const btn = document.getElementById('btn-fullscreen');
+    if (!document.fullscreenEnabled) {
+        if (btn) btn.style.display = 'none';
+        return;
+    }
+
+    const toggle = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+        } else {
+            document.exitFullscreen();
+        }
+    };
+
+    if (btn) btn.addEventListener('click', toggle);
+
+    document.addEventListener('fullscreenchange', () => {
+        if (btn) btn.classList.toggle('is-fullscreen', !!document.fullscreenElement);
+    });
 }

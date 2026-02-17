@@ -41,6 +41,7 @@ export interface MetadataProject {
     id: string;
     description: string;
     license: string;
+    tags: string[];
 }
 
 export interface MetadataRelationships {
@@ -927,12 +928,14 @@ export function setupFieldValidation(): void {
  * Collect all metadata from the panel
  */
 export function collectMetadata(): CollectedMetadata {
+    const tagsRaw = (document.getElementById('meta-tags') as HTMLInputElement)?.value?.trim() ?? '';
     const metadata: CollectedMetadata = {
         project: {
             title: (document.getElementById('meta-title') as HTMLInputElement)?.value || '',
             id: (document.getElementById('meta-id') as HTMLInputElement)?.value || '',
             description: (document.getElementById('meta-description') as HTMLTextAreaElement)?.value || '',
-            license: (document.getElementById('meta-license') as HTMLSelectElement)?.value || 'CC0'
+            license: (document.getElementById('meta-license') as HTMLSelectElement)?.value || 'CC0',
+            tags: tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : []
         },
         relationships: {
             partOf: (document.getElementById('meta-part-of') as HTMLInputElement)?.value || '',
@@ -1173,6 +1176,9 @@ export function prefillMetadataFromArchive(manifest: any): void {
 
         const descEl = document.getElementById('meta-description') as HTMLTextAreaElement | null;
         if (descEl && manifest.project.description) descEl.value = manifest.project.description;
+
+        const tagsEl = document.getElementById('meta-tags') as HTMLInputElement | null;
+        if (tagsEl) tagsEl.value = (manifest.project?.tags ?? []).join(', ');
 
         if (manifest.project.license) {
             const licenseSelect = document.getElementById('meta-license') as HTMLSelectElement | null;
@@ -1601,6 +1607,20 @@ export function populateMetadataDisplay(deps: MetadataDeps = {}): void {
             descEl.style.display = '';
         } else {
             descEl.style.display = 'none';
+        }
+    }
+
+    // Tags - render as chips below description
+    const tagsDisplayEl = document.getElementById('display-tags');
+    if (tagsDisplayEl) {
+        const tags = metadata.project?.tags ?? [];
+        if (tags.length > 0) {
+            tagsDisplayEl.innerHTML = tags
+                .map(t => `<span class="tag-chip">${t.replace(/</g, '&lt;')}</span>`)
+                .join('');
+            tagsDisplayEl.style.display = '';
+        } else {
+            tagsDisplayEl.style.display = 'none';
         }
     }
 
