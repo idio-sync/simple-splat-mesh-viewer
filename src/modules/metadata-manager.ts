@@ -1378,11 +1378,21 @@ export function prefillMetadataFromArchive(manifest: any): void {
                 const locNameEl = document.getElementById('meta-coverage-location') as HTMLInputElement | null;
                 if (locNameEl && ar.coverage.spatial.location_name) locNameEl.value = ar.coverage.spatial.location_name;
 
-                if (ar.coverage.spatial.coordinates?.length >= 2) {
-                    const latEl = document.getElementById('meta-coverage-lat') as HTMLInputElement | null;
-                    const lonEl = document.getElementById('meta-coverage-lon') as HTMLInputElement | null;
-                    if (latEl && ar.coverage.spatial.coordinates[0] != null) latEl.value = ar.coverage.spatial.coordinates[0];
-                    if (lonEl && ar.coverage.spatial.coordinates[1] != null) lonEl.value = ar.coverage.spatial.coordinates[1];
+                if (ar.coverage.spatial.coordinates) {
+                    // Legacy compat: convert {latitude, longitude} object to [lat, lon] tuple
+                    let coords: [number | null, number | null] | any = ar.coverage.spatial.coordinates;
+                    if (!Array.isArray(coords) && typeof coords === 'object' && coords !== null) {
+                        coords = [
+                            coords.latitude != null ? parseFloat(String(coords.latitude)) || null : null,
+                            coords.longitude != null ? parseFloat(String(coords.longitude)) || null : null
+                        ];
+                    }
+                    if (Array.isArray(coords) && coords.length >= 2) {
+                        const latEl = document.getElementById('meta-coverage-lat') as HTMLInputElement | null;
+                        const lonEl = document.getElementById('meta-coverage-lon') as HTMLInputElement | null;
+                        if (latEl && coords[0] != null) latEl.value = String(coords[0]);
+                        if (lonEl && coords[1] != null) lonEl.value = String(coords[1]);
+                    }
                 }
             }
             if (ar.coverage.temporal) {

@@ -61,6 +61,11 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
     log.info(' Resetting archive creator');
     archiveCreator.reset();
 
+    // Preserve original creation date when re-exporting a loaded archive
+    if (state.archiveManifest?._creation_date) {
+        archiveCreator.preserveCreationDate(state.archiveManifest._creation_date);
+    }
+
     // Get metadata from metadata panel
     log.info(' Collecting metadata');
     const metadata = metadataFns.collectMetadata();
@@ -269,13 +274,13 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
     // Set quality stats
     log.info(' Setting quality stats');
     archiveCreator.setQualityStats({
-        splatCount: (includeSplat && state.splatLoaded) ? parseInt(document.getElementById('splat-vertices')?.textContent || '0') || 0 : 0,
-        meshPolys: (includeModel && state.modelLoaded) ? parseInt(document.getElementById('model-faces')?.textContent || '0') || 0 : 0,
-        meshVerts: (includeModel && state.modelLoaded) ? (state.meshVertexCount || 0) : 0,
-        splatFileSize: (includeSplat && assets.splatBlob) ? assets.splatBlob.size : 0,
-        meshFileSize: (includeModel && assets.meshBlob) ? assets.meshBlob.size : 0,
-        pointcloudPoints: (includePointcloud && state.pointcloudLoaded) ? parseInt(document.getElementById('pointcloud-points')?.textContent?.replace(/,/g, '') || '0') || 0 : 0,
-        pointcloudFileSize: (includePointcloud && assets.pointcloudBlob) ? assets.pointcloudBlob.size : 0
+        splat_count: (includeSplat && state.splatLoaded) ? parseInt(document.getElementById('splat-vertices')?.textContent || '0') || 0 : 0,
+        mesh_polygons: (includeModel && state.modelLoaded) ? parseInt(document.getElementById('model-faces')?.textContent || '0') || 0 : 0,
+        mesh_vertices: (includeModel && state.modelLoaded) ? (state.meshVertexCount || 0) : 0,
+        splat_file_size: (includeSplat && assets.splatBlob) ? assets.splatBlob.size : 0,
+        mesh_file_size: (includeModel && assets.meshBlob) ? assets.meshBlob.size : 0,
+        pointcloud_points: (includePointcloud && state.pointcloudLoaded) ? parseInt(document.getElementById('pointcloud-points')?.textContent?.replace(/,/g, '') || '0') || 0 : 0,
+        pointcloud_file_size: (includePointcloud && assets.pointcloudBlob) ? assets.pointcloudBlob.size : 0
     });
 
     // Add preview/thumbnail
@@ -396,24 +401,27 @@ export async function downloadGenericViewer(deps: ExportDeps): Promise<void> {
  * Export metadata as a standalone JSON manifest file.
  */
 export async function exportMetadataManifest(deps: ExportDeps): Promise<void> {
-    const { sceneRefs, tauriBridge, metadata: metadataFns } = deps;
+    const { sceneRefs, state, tauriBridge, metadata: metadataFns } = deps;
     const { annotationSystem } = sceneRefs;
 
+    // Use a temporary ArchiveCreator to produce consistent snake_case output
+    const { ArchiveCreator } = await import('./archive-creator.js');
+    const tempCreator = new ArchiveCreator();
+
+    // Preserve original creation date if re-exporting
+    if (state.archiveManifest?._creation_date) {
+        tempCreator.preserveCreationDate(state.archiveManifest._creation_date);
+    }
+
     const metadata = metadataFns.collectMetadata();
-    const manifest: any = {
-        container_version: '1.0',
-        packer: 'vitrine3d',
-        packer_version: '1.0.0',
-        _creation_date: new Date().toISOString(),
-        ...metadata
-    };
+    tempCreator.applyMetadata(metadata);
 
     // Include annotations if present
     if (annotationSystem && annotationSystem.hasAnnotations()) {
-        manifest.annotations = annotationSystem.toJSON();
+        tempCreator.setAnnotations(annotationSystem.toJSON());
     }
 
-    const json = JSON.stringify(manifest, null, 2);
+    const json = tempCreator.generateManifest();
     const blob = new Blob([json], { type: 'application/json' });
     if (tauriBridge) {
         await tauriBridge.download(blob, 'manifest.json', { name: 'JSON Files', extensions: ['json'] });

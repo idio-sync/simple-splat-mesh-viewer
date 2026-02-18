@@ -144,6 +144,21 @@ function normalizeManifest(raw: any): any {
     return m;
 }
 
+/**
+ * Format a date string for display. Returns null if the input is not a valid date.
+ *  - 'long'  → "February 18, 2026"  (sidebar / detail views)
+ *  - 'medium'→ "February 2026"       (bylines — wall label, info overlay)
+ */
+function formatDisplayDate(raw: string, style: 'long' | 'medium' = 'long'): string | null {
+    if (!raw) return null;
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return raw;          // pass through unparseable strings as-is
+    if (style === 'medium') {
+        return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+    }
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
 // =============================================================================
 // MODULE STATE
 // =============================================================================
@@ -292,6 +307,10 @@ export async function init(): Promise<void> {
     // Create measurement system
     measurementSystem = new MeasurementSystem(scene, camera, renderer, controls);
 
+    // Create kiosk-only DOM elements before theme init (layout modules customize them)
+    createFilePicker();
+    createClickGate();
+
     // Load theme and determine layout
     const config = window.APP_CONFIG || {};
     const themeMeta = await loadTheme(config.theme, { layoutOverride: config.layout || undefined });
@@ -369,6 +388,61 @@ export async function init(): Promise<void> {
     setupFilePicker();
 
     log.info('Kiosk viewer ready');
+}
+
+// =============================================================================
+// DOM CREATION — Kiosk-only elements created dynamically (not in index.html)
+// =============================================================================
+
+function createFilePicker(): HTMLElement {
+    const picker = document.createElement('div');
+    picker.id = 'kiosk-file-picker';
+    picker.className = 'hidden';
+    picker.innerHTML = `
+        <div class="kiosk-picker-content">
+            <h1>Vitrine3D</h1>
+            <p>Open a 3D file or archive to view its content.</p>
+            <div class="kiosk-picker-box" id="kiosk-drop-zone">
+                <div class="kiosk-picker-icon">&#128194;</div>
+                <p>Select a <strong>3D file</strong> or <strong>archive</strong></p>
+                <button id="kiosk-picker-btn" type="button">Select File</button>
+                <p class="kiosk-picker-hint">or drag and drop it here</p>
+                <p class="kiosk-picker-formats">
+                    Archives: .a3d, .a3z<br>
+                    Models: .glb, .gltf, .obj, .stl<br>
+                    Splats: .ply, .splat, .ksplat, .spz, .sog<br>
+                    Point Clouds: .e57
+                </p>
+            </div>
+            <input type="file" id="kiosk-picker-input" accept=".a3z,.a3d,.glb,.gltf,.obj,.stl,.ply,.splat,.ksplat,.spz,.sog,.e57" multiple style="display:none">
+        </div>
+    `;
+    document.body.appendChild(picker);
+    return picker;
+}
+
+function createClickGate(): HTMLElement {
+    const gate = document.createElement('div');
+    gate.id = 'kiosk-click-gate';
+    gate.className = 'hidden';
+    gate.innerHTML = `
+        <div class="kiosk-gate-vignette"></div>
+        <img id="kiosk-gate-poster" alt="" />
+        <div class="kiosk-gate-card">
+            <h2 id="kiosk-gate-title"></h2>
+            <p id="kiosk-gate-description" class="hidden"></p>
+            <div id="kiosk-gate-tags" class="display-tags hidden"></div>
+            <button id="kiosk-gate-play" type="button" aria-label="Load 3D viewer">
+                <svg viewBox="0 0 24 24" width="32" height="32">
+                    <polygon points="8,5 19,12 8,19" />
+                </svg>
+            </button>
+            <p id="kiosk-gate-cta" class="hidden">Touch to begin</p>
+            <div id="kiosk-gate-types"></div>
+        </div>
+    `;
+    document.body.appendChild(gate);
+    return gate;
 }
 
 // =============================================================================
@@ -787,7 +861,7 @@ async function loadArchiveFromTauri(filePath: string): Promise<void> {
 // =============================================================================
 
 // Ensure a single archive asset type is loaded on demand (kiosk version).
-async function ensureAssetLoaded(assetType: AssetType): Promise<boolean> {
+async function ensureAssetLoaded(assetType: AssetType, onProgress?: (percent: number, stage: string) => void): Promise<boolean> {
     if (!state.archiveLoader) return false;
 
     if (state.assetStates[assetType] === ASSET_STATE.LOADED) return true;
@@ -805,7 +879,7 @@ async function ensureAssetLoaded(assetType: AssetType): Promise<boolean> {
 
     showInlineLoading(assetType);
     try {
-        const result = await loadArchiveAsset(state.archiveLoader, assetType, createArchiveDeps());
+        const result = await loadArchiveAsset(state.archiveLoader, assetType, { ...createArchiveDeps(), onProgress });
         if (result.loaded) {
             if (assetType === 'splat') state.splatLoaded = true;
             else if (assetType === 'mesh') state.modelLoaded = true;
@@ -874,7 +948,10 @@ async function handleArchiveFile(file: File): Promise<void> {
         }
         updateProgress(30, 'Loading 3D data...');
         const primaryType = getPrimaryAssetType(state.displayMode, contentInfo);
-        const primaryLoaded = await ensureAssetLoaded(primaryType as AssetType);
+        const primaryLoaded = await ensureAssetLoaded(primaryType as AssetType, (pct, stage) => {
+            // Map 0-100% from loadArchiveAsset onto 30-80% of the overall progress bar
+            updateProgress(30 + pct * 0.5, stage);
+        });
 
         if (!primaryLoaded) {
             // Try any available type as fallback
@@ -945,9 +1022,8 @@ async function handleArchiveFile(file: File): Promise<void> {
         }
         const displayDate = document.getElementById('display-date');
         const displayDateRow = document.getElementById('display-date-row');
-        if (displayDate && displayDateRow && manifest.provenance?.captureDate) {
-            const d = new Date(manifest.provenance.captureDate);
-            displayDate.textContent = isNaN(d.getTime()) ? manifest.provenance.captureDate : d.toLocaleDateString();
+        if (displayDate && displayDateRow && manifest.provenance?.capture_date) {
+            displayDate.textContent = formatDisplayDate(manifest.provenance.capture_date, 'long') || manifest.provenance.capture_date;
             displayDateRow.style.display = '';
         }
         const displayLocation = document.getElementById('display-location');
@@ -1841,7 +1917,7 @@ function populateInfoOverlay(manifest: any): void {
 
     const title = manifest.project?.title;
     const creator = manifest.provenance?.operator;
-    const captureDate = manifest.provenance?.captureDate;
+    const captureDate = manifest.provenance?.capture_date;
     const location = manifest.provenance?.location;
     const description = manifest.project?.description;
     const tags = manifest.project?.tags;
@@ -1855,8 +1931,7 @@ function populateInfoOverlay(manifest: any): void {
         const parts: string[] = [];
         if (creator) parts.push(creator);
         if (captureDate) {
-            const d = new Date(captureDate);
-            parts.push(isNaN(d.getTime()) ? captureDate : d.getFullYear().toString());
+            parts.push(formatDisplayDate(captureDate, 'medium') || captureDate);
         }
         if (location) parts.push(location);
         if (parts.length > 0) {
@@ -1961,7 +2036,7 @@ function populateWallLabel(manifest: any): void {
 
     const title = manifest.project?.title;
     const creator = manifest.provenance?.operator;
-    const captureDate = manifest.provenance?.captureDate;
+    const captureDate = manifest.provenance?.capture_date;
     const description = manifest.project?.description;
 
     // Title
@@ -1969,13 +2044,12 @@ function populateWallLabel(manifest: any): void {
         titleEl.textContent = title || 'Untitled';
     }
 
-    // Byline: "Creator · Year" or just one
+    // Byline: "Creator · February 2026" or just one
     if (bylineEl) {
         const parts: string[] = [];
         if (creator) parts.push(creator);
         if (captureDate) {
-            const d = new Date(captureDate);
-            parts.push(isNaN(d.getTime()) ? captureDate : d.getFullYear().toString());
+            parts.push(formatDisplayDate(captureDate, 'medium') || captureDate);
         }
         if (parts.length > 0) {
             bylineEl.textContent = parts.join(' \u00b7 ');

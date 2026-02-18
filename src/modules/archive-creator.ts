@@ -37,7 +37,7 @@ export interface ProvenanceInfo {
     operatorOrcid?: string;
     location?: string;
     conventions?: string[] | string;
-    processingSoftware?: string[];
+    processingSoftware?: Array<{ name: string; version: string; url: string }>;
     processingNotes?: string;
 }
 
@@ -99,10 +99,7 @@ export interface ArchivalRecord {
     coverage?: {
         spatial?: {
             locationName?: string;
-            coordinates?: {
-                latitude?: string;
-                longitude?: string;
-            };
+            coordinates?: [number | null, number | null];
         };
         temporal?: {
             subjectPeriod?: string;
@@ -127,7 +124,7 @@ export interface Relationships {
     partOf?: string;
     derivedFrom?: string;
     replaces?: string;
-    relatedObjects?: string[];
+    relatedObjects?: Array<{ title: string; description: string; url: string }>;
 }
 
 export interface Preservation {
@@ -172,15 +169,17 @@ export interface IntegrityData {
 
 export interface Manifest {
     container_version: string;
+    metadata_schema_version: string;
     packer: string;
     packer_version: string;
     _creation_date: string;
+    _last_modified: string;
     project: ProjectInfo;
     relationships: {
         part_of: string;
         derived_from: string;
         replaces: string;
-        related_objects: string[];
+        related_objects: Array<{ title: string; description: string; url: string }>;
     };
     provenance: {
         capture_date: string;
@@ -190,7 +189,7 @@ export interface Manifest {
         operator_orcid: string;
         location: string;
         convention_hints: string[];
-        processing_software: string[];
+        processing_software: Array<{ name: string; version: string; url: string }>;
         processing_notes: string;
     };
     quality_metrics: {
@@ -250,10 +249,7 @@ export interface Manifest {
         coverage: {
             spatial: {
                 location_name: string;
-                coordinates: {
-                    latitude: string;
-                    longitude: string;
-                };
+                coordinates: [number | null, number | null];
             };
             temporal: {
                 subject_period: string;
@@ -511,9 +507,11 @@ export class ArchiveCreator {
     private _createEmptyManifest(): Manifest {
         return {
             container_version: "1.0",
+            metadata_schema_version: "1.0",
             packer: "vitrine3d",
             packer_version: "1.0.0",
-            _creation_date: new Date().toISOString(),
+            _creation_date: "",
+            _last_modified: "",
             project: {
                 title: "",
                 id: "",
@@ -595,10 +593,7 @@ export class ArchiveCreator {
                 coverage: {
                     spatial: {
                         location_name: "",
-                        coordinates: {
-                            latitude: "",
-                            longitude: ""
-                        }
+                        coordinates: [null, null] as [number | null, number | null]
                     },
                     temporal: {
                         subject_period: "",
@@ -853,7 +848,11 @@ export class ArchiveCreator {
         lines.push('ABOUT THIS FORMAT');
         lines.push(subsep);
         lines.push(`Format:    archive-3d v${m.container_version}`);
+        lines.push(`Schema:    v${m.metadata_schema_version}`);
         lines.push(`Created:   ${m._creation_date}`);
+        if (m._last_modified && m._last_modified !== m._creation_date) {
+            lines.push(`Modified:  ${m._last_modified}`);
+        }
         lines.push(`Packer:    ${m.packer} v${m.packer_version}`);
         lines.push('');
         lines.push('The archive-3d format is an open container for bundling 3D');
@@ -1056,12 +1055,7 @@ export class ArchiveCreator {
                     this.manifest.archival_record.coverage.spatial.location_name = record.coverage.spatial.locationName;
                 }
                 if (record.coverage.spatial.coordinates) {
-                    if (record.coverage.spatial.coordinates.latitude !== undefined) {
-                        this.manifest.archival_record.coverage.spatial.coordinates.latitude = record.coverage.spatial.coordinates.latitude;
-                    }
-                    if (record.coverage.spatial.coordinates.longitude !== undefined) {
-                        this.manifest.archival_record.coverage.spatial.coordinates.longitude = record.coverage.spatial.coordinates.longitude;
-                    }
+                    this.manifest.archival_record.coverage.spatial.coordinates = record.coverage.spatial.coordinates;
                 }
             }
             if (record.coverage.temporal) {
@@ -1657,10 +1651,23 @@ export class ArchiveCreator {
     }
 
     generateManifest(): string {
-        // Update creation date
-        this.manifest._creation_date = new Date().toISOString();
+        const now = new Date().toISOString();
+        // Only set creation date for new archives; preserve original for re-exports
+        if (!this.manifest._creation_date) {
+            this.manifest._creation_date = now;
+        }
+        this.manifest._last_modified = now;
 
         return JSON.stringify(this.manifest, null, 2);
+    }
+
+    /**
+     * Preserve the original creation date from a loaded archive during re-export.
+     */
+    preserveCreationDate(originalDate: string): void {
+        if (originalDate) {
+            this.manifest._creation_date = originalDate;
+        }
     }
 
     previewManifest(): Manifest {

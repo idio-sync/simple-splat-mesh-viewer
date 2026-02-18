@@ -72,6 +72,7 @@ interface ContentInfo {
 
 interface ArchiveMetadata {
     version: string;
+    schemaVersion: string;
     packer: string;
     packerVersion: string;
     createdAt: string | null;
@@ -96,6 +97,7 @@ interface ManifestDataEntry {
 
 interface ArchiveManifest {
     container_version: string;
+    metadata_schema_version?: string;
     data_entries: Record<string, ManifestDataEntry>;
     packer?: string;
     packer_version?: string;
@@ -780,6 +782,7 @@ export class ArchiveLoader {
 
         return {
             version: this.manifest.container_version,
+            schemaVersion: this.manifest.metadata_schema_version || '0',
             packer: this.manifest.packer || 'Unknown',
             packerVersion: this.manifest.packer_version || '',
             createdAt: this.manifest._creation_date || this.manifest.created_at || null,
