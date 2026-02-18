@@ -35,10 +35,11 @@ import {
     updateTransformInputs as updateTransformInputsHandler,
     showExportPanel as showExportPanelHandler,
     applyControlsMode as applyControlsModeHandler,
-    toggleControlsPanel as toggleControlsPanelHandler,
     applyControlsVisibility as applyControlsVisibilityHandler,
     ensureToolbarVisibility as ensureToolbarVisibilityHandler,
-    applyViewerModeSettings as applyViewerModeSettingsHandler
+    applyViewerModeSettings as applyViewerModeSettingsHandler,
+    updateStatusBar,
+    updateDisplayPill
 } from './modules/ui-controller.js';
 import {
     formatFileSize,
@@ -558,7 +559,7 @@ function createEventWiringDeps(): EventWiringDeps {
         screenshots: { captureScreenshotToList, showViewfinder, captureManualPreview, hideViewfinder },
         metadata: { hideMetadataPanel, toggleMetadataDisplay, setupMetadataSidebar },
         share: { copyShareLink },
-        controls: { toggleControlsPanel },
+        transform: { setSelectedObject, setTransformMode },
         tauri: {
             wireNativeDialogsIfAvailable: () => {
                 if (window.__TAURI__ && tauriBridge) {
@@ -846,6 +847,12 @@ function setTransformMode(mode: TransformMode) {
 
 function updateVisibility() {
     updateVisibilityHandler(state.displayMode, splatMesh, modelGroup, pointcloudGroup, stlGroup);
+    updateDisplayPill({
+        splat: state.splatLoaded,
+        model: state.modelLoaded,
+        pointcloud: state.pointcloudLoaded,
+        stl: state.stlLoaded
+    });
 }
 
 function updateTransformInputs() {
@@ -1252,10 +1259,6 @@ function createControlsDeps(): any {
     return { state, config, onWindowResize };
 }
 
-function toggleControlsPanel() {
-    toggleControlsPanelHandler(createControlsDeps());
-}
-
 function applyControlsVisibility(shouldShowOverride?: boolean) {
     applyControlsVisibilityHandler(createControlsDeps(), shouldShowOverride);
 }
@@ -1284,8 +1287,6 @@ function _wireMeasurementControls() {
         measurementSystem.setMeasureMode(active);
         const btn = document.getElementById('btn-measure');
         if (btn) btn.classList.toggle('active', active);
-        const panel = document.getElementById('measure-scale-panel');
-        if (panel) panel.classList.toggle('hidden', !active);
     });
 
     // Scale factor inputs
@@ -1426,6 +1427,7 @@ function autoCenterAlign() {
 let animationErrorCount = 0;
 const MAX_ANIMATION_ERRORS = 10;
 const fpsElement = document.getElementById('fps-counter');
+let _statusBarFrameCount = 0;
 
 function animate() {
     requestAnimationFrame(animate);
@@ -1464,6 +1466,21 @@ function animate() {
         updateAnnotationPopupPosition();
 
         sceneManager.updateFPS(fpsElement);
+
+        // Update status bar (~2 Hz to avoid DOM thrashing)
+        _statusBarFrameCount++;
+        if (_statusBarFrameCount >= 30) {
+            _statusBarFrameCount = 0;
+            const ri = renderer?.info;
+            updateStatusBar({
+                fps: sceneManager.lastFPS ?? 0,
+                renderer: sceneManager.rendererType ?? 'WebGL',
+                tris: ri?.render?.triangles ?? 0,
+                splats: splatMesh?.packedSplats?.splatCount ?? 0,
+                cameraMode: (flyControls && flyControls.enabled) ? 'Fly' : 'Orbit',
+                filename: state.archiveFileName ?? ''
+            });
+        }
 
         // Reset error count on successful frame
         animationErrorCount = 0;

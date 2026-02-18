@@ -1,0 +1,2402 @@
+<!DOCTYPE html>
+<!--
+  Vitrine3D — Editor Layout v2 Mockup (Updated)
+  Proposed layout: Tool Rail + Viewport + Properties Panel
+
+  Key design decisions:
+  - Left sidebar replaced by narrow tool rail (48px)
+  - Tool rail is SOLE navigation — no redundant tab bar in properties panel
+  - Properties panel header shows active context name
+  - Full-width status bar pinned to window bottom
+  - Display mode pill in viewport overlay (top-right)
+  - All features from the real app represented
+  - Dense but organized — Blender/RealityCapture aesthetic
+
+  Design tokens: neutral slate palette, accent #5a9e97
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vitrine3D — Editor Layout v2 (Mockup)</title>
+<style>
+
+/* ============================================================
+   Design Tokens
+   ============================================================ */
+:root {
+    --bg-deep:       #111318;
+    --bg-panel:      #16181d;
+    --bg-surface:    #1c1f25;
+    --bg-elevated:   #22252c;
+    --bg-input:      #1a1d23;
+    --bg-hover:      #282b33;
+    --bg-active:     #2e323b;
+
+    --border-subtle: #24272e;
+    --border-default:#2e323a;
+    --border-strong: #3a3f49;
+
+    --accent:        #5a9e97;
+    --accent-hover:  #6bb3ab;
+    --accent-muted:  rgba(90, 158, 151, 0.15);
+    --accent-text:   #7cc4bc;
+
+    --text-primary:  #c8ccd4;
+    --text-secondary:#8a8f9a;
+    --text-muted:    #5c6170;
+    --text-faint:    #3e4350;
+
+    --danger:        #c45c5c;
+    --warning:       #c4a05c;
+
+    --font-sans:     -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+    --font-mono:     'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+
+    --radius-sm:     2px;
+    --radius-md:     3px;
+
+    --rail-width:    48px;
+    --props-width:   320px;
+    --status-height: 26px;
+}
+
+/* ============================================================
+   Reset + Base
+   ============================================================ */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-sans);
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    font-size: 12px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+}
+
+button {
+    font-family: inherit;
+    cursor: pointer;
+}
+
+input, select, textarea {
+    font-family: inherit;
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 2px; }
+
+/* ============================================================
+   Root Layout
+   ============================================================
+   [ tool-rail | viewport | props-panel ]
+   [          status-bar (full width)   ]
+   ============================================================ */
+.app {
+    display: grid;
+    grid-template-columns: var(--rail-width) 1fr var(--props-width);
+    grid-template-rows: 1fr var(--status-height);
+    grid-template-areas:
+        "rail viewport props"
+        "status status status";
+    height: 100vh;
+    width: 100vw;
+}
+
+/* ============================================================
+   Tool Rail
+   ============================================================ */
+.tool-rail {
+    grid-area: rail;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 0;
+    gap: 2px;
+    z-index: 200;
+    overflow: hidden;
+}
+
+.rail-logo {
+    width: 28px;
+    height: 28px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.tool-btn {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.1s, color 0.1s;
+    flex-shrink: 0;
+}
+
+.tool-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+}
+
+.tool-btn.active {
+    background: var(--accent-muted);
+    color: var(--accent-text);
+}
+
+.tool-btn.active::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 20px;
+    background: var(--accent);
+    border-radius: 0 1px 1px 0;
+}
+
+.rail-spacer { flex: 1; }
+
+.rail-sep {
+    width: 24px;
+    height: 1px;
+    background: var(--border-subtle);
+    margin: 4px 0;
+    flex-shrink: 0;
+}
+
+/* Tooltip */
+.tool-btn[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
+    font-size: 11px;
+    white-space: nowrap;
+    padding: 5px 8px;
+    border-radius: var(--radius-md);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s;
+    z-index: 1000;
+    font-weight: 400;
+}
+
+.tool-btn[data-tooltip]:hover::after {
+    opacity: 1;
+}
+
+/* ============================================================
+   Viewport
+   ============================================================ */
+.viewport {
+    grid-area: viewport;
+    position: relative;
+    background: radial-gradient(ellipse at 40% 45%, #1f2330 0%, #141720 55%, #0e1016 100%);
+    overflow: hidden;
+}
+
+.vp-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-position: center center;
+    transform: perspective(600px) rotateX(60deg) translateY(80px) scale(1.6);
+    transform-origin: center bottom;
+    opacity: 0.5;
+}
+
+.vp-splat-cloud {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -52%);
+    width: 380px;
+    height: 280px;
+    background: radial-gradient(ellipse at 50% 60%,
+        rgba(120, 140, 160, 0.18) 0%,
+        rgba(90, 110, 130, 0.10) 40%,
+        transparent 70%
+    );
+    border-radius: 50%;
+    filter: blur(2px);
+}
+
+.vp-mesh {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 240px;
+    height: 200px;
+    opacity: 0.6;
+}
+
+/* Annotation markers */
+.vp-annotation {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    pointer-events: all;
+}
+
+.vp-annotation-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--bg-deep);
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid rgba(255,255,255,0.2);
+    box-shadow: 0 0 0 3px rgba(90, 158, 151, 0.25);
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.vp-annotation-label {
+    background: rgba(22, 24, 29, 0.88);
+    border: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+    font-size: 10px;
+    padding: 3px 7px;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+    backdrop-filter: blur(6px);
+}
+
+/* Transform gizmo */
+.vp-gizmo {
+    position: absolute;
+    bottom: 52px;
+    left: 14px;
+    width: 56px;
+    height: 56px;
+    opacity: 0.7;
+}
+
+/* Display mode pill */
+.vp-display-pill {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    background: rgba(17, 19, 24, 0.80);
+    border: 1px solid var(--border-strong);
+    border-radius: 20px;
+    overflow: hidden;
+    backdrop-filter: blur(12px);
+    z-index: 50;
+}
+
+.vp-pill-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 500;
+    padding: 5px 10px;
+    border-right: 1px solid rgba(46, 50, 58, 0.5);
+    transition: all 0.1s;
+    letter-spacing: 0.2px;
+}
+
+.vp-pill-btn:last-child { border-right: none; }
+
+.vp-pill-btn:hover {
+    color: var(--text-secondary);
+    background: rgba(40, 43, 51, 0.5);
+}
+
+.vp-pill-btn.active {
+    color: var(--accent-text);
+    background: var(--accent-muted);
+}
+
+/* Quality tier badge — positioned below the display pill */
+.vp-quality-badge {
+    position: absolute;
+    top: 42px;
+    right: 12px;
+    background: rgba(17, 19, 24, 0.80);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    padding: 4px 10px;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: var(--accent-text);
+    backdrop-filter: blur(12px);
+    cursor: pointer;
+}
+
+/* Camera mode hint */
+.vp-camera-hint {
+    position: absolute;
+    top: 12px;
+    left: 14px;
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.3px;
+    font-family: var(--font-mono);
+}
+
+/* ============================================================
+   Properties Panel
+   ============================================================ */
+.props-panel {
+    grid-area: props;
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Panel header — replaces redundant tab bar */
+.props-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+    min-height: 34px;
+}
+
+.props-header-title {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.props-header-subtitle {
+    font-size: 10px;
+    color: var(--text-faint);
+}
+
+/* Pane container */
+.props-pane {
+    display: none;
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 16px;
+}
+
+.props-pane.active {
+    display: block;
+}
+
+/* ============================================================
+   Properties Panel — Form Controls
+   ============================================================ */
+
+/* Section */
+.prop-section {
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.prop-section:last-child { border-bottom: none; }
+
+.prop-section-hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 12px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.1s;
+}
+
+.prop-section-hd:hover { background: var(--bg-surface); }
+
+.prop-section-title {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.prop-section-chevron {
+    font-size: 8px;
+    color: var(--text-faint);
+    transition: transform 0.15s;
+    flex-shrink: 0;
+}
+
+.prop-section.open .prop-section-chevron {
+    transform: rotate(90deg);
+}
+
+.prop-section-body {
+    padding: 4px 12px 10px;
+    display: none;
+}
+
+.prop-section.open .prop-section-body {
+    display: block;
+}
+
+/* Segmented control */
+.seg-ctrl {
+    display: flex;
+    background: var(--bg-deep);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.seg-btn {
+    flex: 1;
+    padding: 5px 0;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--border-default);
+    transition: all 0.1s;
+}
+
+.seg-btn:last-child { border-right: none; }
+.seg-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.seg-btn.active { background: var(--accent-muted); color: var(--accent-text); }
+
+/* Slider row */
+.sl-row { margin-bottom: 8px; }
+.sl-row:last-child { margin-bottom: 0; }
+
+.sl-hd {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.sl-label { font-size: 11px; color: var(--text-secondary); }
+.sl-val { font-size: 10px; color: var(--accent-text); font-family: var(--font-mono); }
+
+input[type="range"] {
+    width: 100%;
+    height: 3px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--bg-deep);
+    border-radius: 1px;
+    outline: none;
+    border: none;
+    cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    background: var(--accent-hover);
+}
+
+/* Checkbox row */
+.cb-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 5px;
+    height: 20px;
+}
+
+.cb-row:last-child { margin-bottom: 0; }
+
+.cb-row input[type="checkbox"] {
+    width: 12px;
+    height: 12px;
+    cursor: pointer;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+}
+
+.cb-row label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+/* Color swatches */
+.swatch-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 6px;
+    align-items: center;
+}
+
+.swatch {
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: border-color 0.1s;
+}
+
+.swatch:hover { border-color: var(--border-strong); }
+.swatch.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+.swatch-custom {
+    flex: 1;
+    height: 20px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: var(--text-faint);
+    letter-spacing: 0.3px;
+}
+
+/* Labels */
+.prop-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 5px;
+    display: block;
+}
+
+/* Inline row */
+.prop-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    min-height: 22px;
+}
+.prop-row:last-child { margin-bottom: 0; }
+.prop-row-label { font-size: 11px; color: var(--text-secondary); flex-shrink: 0; }
+
+/* Buttons */
+.prop-btn {
+    width: 100%;
+    padding: 5px 10px;
+    margin-bottom: 4px;
+    border: 1px solid var(--border-default);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    text-align: center;
+    transition: all 0.1s;
+    display: block;
+}
+
+.prop-btn:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border-strong); }
+.prop-btn:last-child { margin-bottom: 0; }
+
+.prop-btn-row { display: flex; gap: 4px; }
+.prop-btn-row .prop-btn { flex: 1; }
+
+.prop-btn.danger { color: var(--danger); border-color: rgba(196, 92, 92, 0.3); }
+.prop-btn.danger:hover { background: rgba(196, 92, 92, 0.1); }
+
+.prop-btn.accent { color: var(--accent-text); border-color: rgba(90,158,151,0.3); }
+.prop-btn.accent:hover { background: var(--accent-muted); }
+
+/* Select dropdown */
+.prop-select {
+    width: 100%;
+    padding: 4px 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 11px;
+    outline: none;
+    cursor: pointer;
+}
+
+.prop-select:focus { border-color: var(--accent); }
+
+/* Text input */
+.prop-input {
+    width: 100%;
+    padding: 4px 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 11px;
+    outline: none;
+}
+
+.prop-input:focus { border-color: var(--accent); }
+
+/* Textarea */
+.prop-textarea {
+    width: 100%;
+    padding: 4px 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 11px;
+    outline: none;
+    resize: vertical;
+    min-height: 52px;
+    line-height: 1.4;
+}
+
+.prop-textarea:focus { border-color: var(--accent); }
+
+/* Hint text */
+.prop-hint {
+    font-size: 10px;
+    color: var(--text-faint);
+    margin-top: 3px;
+    line-height: 1.3;
+}
+
+/* Radio group */
+.radio-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 5px;
+    height: 20px;
+}
+
+.radio-row input[type="radio"] {
+    width: 12px;
+    height: 12px;
+    cursor: pointer;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+}
+
+.radio-row label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+/* ============================================================
+   Outliner (Assets)
+   ============================================================ */
+.outliner { display: flex; flex-direction: column; gap: 1px; margin-bottom: 2px; }
+
+.outliner-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 12px;
+    background: var(--bg-surface);
+    transition: background 0.1s;
+    cursor: default;
+    user-select: none;
+}
+
+.outliner-item:hover { background: var(--bg-hover); }
+.outliner-item.dimmed { opacity: 0.45; }
+
+.outliner-type-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.dot-splat  { background: var(--accent); }
+.dot-mesh   { background: #6a8bce; }
+.dot-cloud  { background: #c4863a; }
+.dot-stl    { background: #9a7bce; }
+
+.outliner-name {
+    flex: 1;
+    font-size: 11px;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.outliner-actions { display: flex; gap: 3px; flex-shrink: 0; }
+
+.outliner-icon-btn {
+    width: 18px;
+    height: 18px;
+    border: none;
+    background: transparent;
+    color: var(--text-faint);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    transition: all 0.1s;
+    padding: 0;
+}
+
+.outliner-icon-btn:hover { background: var(--bg-active); color: var(--text-secondary); }
+
+/* ============================================================
+   XYZ Inputs (Transform)
+   ============================================================ */
+.xyz-block { margin-bottom: 8px; }
+
+.xyz-inputs { display: flex; gap: 3px; }
+
+.xyz-field { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+
+.xyz-axis-label {
+    font-size: 9px;
+    text-align: center;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.xyz-axis-label.x { color: #c06060; }
+.xyz-axis-label.y { color: #6aa060; }
+.xyz-axis-label.z { color: #6080c0; }
+
+.xyz-input {
+    width: 100%;
+    padding: 3px 4px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 10px;
+    font-family: var(--font-mono);
+    text-align: center;
+    outline: none;
+}
+
+.xyz-input:focus { border-color: var(--accent); }
+
+/* ============================================================
+   Metadata Sub-tabs
+   ============================================================ */
+.meta-mode-bar {
+    display: flex;
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 0 4px;
+}
+
+.meta-mode-btn {
+    flex: 1;
+    padding: 7px 4px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    transition: all 0.1s;
+    letter-spacing: 0.2px;
+}
+
+.meta-mode-btn:hover { color: var(--text-secondary); background: var(--bg-surface); }
+.meta-mode-btn.active { color: var(--accent-text); border-bottom-color: var(--accent); }
+
+.meta-pane { display: none; }
+.meta-pane.active { display: block; }
+
+/* Edit category selector (replaces cramped tab bar) */
+.meta-category-bar {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.meta-category-select {
+    width: 100%;
+    padding: 5px 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 11px;
+    font-weight: 500;
+    outline: none;
+    cursor: pointer;
+}
+
+.meta-category-select:focus { border-color: var(--accent); }
+
+.meta-category-select option {
+    background: var(--bg-panel);
+    color: var(--text-primary);
+}
+
+/* Annotation list item */
+.anno-item {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.anno-item:hover { background: var(--bg-surface); }
+.anno-item.selected { background: var(--bg-active); }
+
+.anno-item-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.anno-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--bg-deep);
+    font-size: 9px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Source file items */
+.source-file-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.source-file-item:last-child { border-bottom: none; }
+
+.source-file-name {
+    flex: 1;
+    font-size: 11px;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.source-file-size {
+    font-size: 10px;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    flex-shrink: 0;
+}
+
+/* ============================================================
+   Status Bar
+   ============================================================ */
+.status-bar {
+    grid-area: status;
+    background: var(--bg-panel);
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px 0 calc(var(--rail-width) + 10px);
+    font-size: 10px;
+    color: var(--text-muted);
+    overflow: hidden;
+    z-index: 100;
+}
+
+.status-left, .status-right {
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 10px;
+    border-right: 1px solid var(--border-subtle);
+    height: var(--status-height);
+    white-space: nowrap;
+}
+
+.status-item:last-child { border-right: none; }
+.status-item:first-child { padding-left: 0; }
+.status-right .status-item:last-child { padding-right: 0; }
+
+.status-badge {
+    padding: 1px 5px;
+    border-radius: var(--radius-sm);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.badge-webgpu {
+    background: var(--accent-muted);
+    color: var(--accent-text);
+    border: 1px solid rgba(90, 158, 151, 0.3);
+}
+
+.badge-hd {
+    background: rgba(106, 139, 206, 0.12);
+    color: #8aabde;
+    border: 1px solid rgba(106, 139, 206, 0.25);
+}
+
+.status-num { font-family: var(--font-mono); color: var(--text-secondary); }
+.status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+/* ============================================================
+   Mockup Annotation Notes
+   ============================================================ */
+.mockup-note {
+    position: absolute;
+    background: rgba(196, 160, 92, 0.1);
+    border: 1px dashed rgba(196, 160, 92, 0.35);
+    border-radius: 4px;
+    padding: 5px 9px;
+    font-size: 10px;
+    color: rgba(196, 160, 92, 0.85);
+    line-height: 1.45;
+    max-width: 210px;
+    pointer-events: none;
+    z-index: 800;
+}
+
+.mockup-note strong {
+    color: #dbb86c;
+    display: block;
+    margin-bottom: 2px;
+}
+
+/* ============================================================
+   Utility
+   ============================================================ */
+.mt4  { margin-top: 4px; }
+.mt6  { margin-top: 6px; }
+.mt8  { margin-top: 8px; }
+.mb4  { margin-bottom: 4px; }
+.mb6  { margin-bottom: 6px; }
+
+.text-muted   { color: var(--text-muted); }
+.text-faint   { color: var(--text-faint); }
+.text-accent  { color: var(--accent-text); }
+.font-mono    { font-family: var(--font-mono); }
+
+/* ============================================================
+   Archive Persistence Indicators
+   ============================================================
+   Sections whose values are saved in .a3d/.a3z exports get a
+   subtle left accent border.  Session-only sections have no
+   border (the default).
+   ============================================================ */
+.prop-section.archived {
+    border-left: 2px solid rgba(90, 158, 151, 0.45);
+}
+
+.prop-section.archived > .prop-section-hd {
+    padding-left: 10px;
+}
+
+.prop-section.archived > .prop-section-body {
+    padding-left: 10px;
+}
+
+/* Small inline tag for section headers */
+.archive-tag {
+    font-size: 8px;
+    color: var(--accent);
+    opacity: 0.65;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-left: auto;
+    padding-right: 6px;
+    flex-shrink: 0;
+}
+
+/* Legend strip in properties header */
+.props-header-legend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    color: var(--text-faint);
+}
+
+.props-header-legend .legend-swatch {
+    width: 8px;
+    height: 8px;
+    border-left: 2px solid rgba(90, 158, 151, 0.45);
+    flex-shrink: 0;
+}
+
+</style>
+</head>
+<body>
+
+<div class="app">
+
+    <!-- ========================================================
+         TOOL RAIL
+         ======================================================== -->
+    <aside class="tool-rail" id="tool-rail">
+
+        <!-- Logo -->
+        <div class="rail-logo" title="Vitrine3D">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="3" width="18" height="18" rx="1" stroke="var(--accent)" stroke-width="1.5" fill="none" opacity="0.5"/>
+                <rect x="7" y="7" width="10" height="10" rx="0.5" fill="var(--accent)" opacity="0.35"/>
+                <rect x="9" y="9" width="6" height="6" rx="0.5" fill="var(--accent)" opacity="0.6"/>
+            </svg>
+        </div>
+
+        <!-- Scene -->
+        <button class="tool-btn active" data-tool="scene" data-tooltip="Scene  S">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                <polyline points="2 17 12 22 22 17"/>
+                <polyline points="2 12 12 17 22 12"/>
+            </svg>
+        </button>
+
+        <!-- Assets -->
+        <button class="tool-btn" data-tool="assets" data-tooltip="Assets  A">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+            </svg>
+        </button>
+
+        <!-- Transform -->
+        <button class="tool-btn" data-tool="transform" data-tooltip="Transform  T">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <polyline points="5 9 2 12 5 15"/>
+                <polyline points="9 5 12 2 15 5"/>
+                <polyline points="15 19 12 22 9 19"/>
+                <polyline points="19 9 22 12 19 15"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+                <line x1="12" y1="2" x2="12" y2="22"/>
+            </svg>
+        </button>
+
+        <!-- Align -->
+        <button class="tool-btn" data-tool="align" data-tooltip="Align  L">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="M4 22V2"/>
+                <rect x="8" y="6" width="12" height="4"/>
+                <rect x="8" y="14" width="8" height="4"/>
+            </svg>
+        </button>
+
+        <div class="rail-sep"></div>
+
+        <!-- Annotate -->
+        <button class="tool-btn" data-tool="annotate" data-tooltip="Annotate  N">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+            </svg>
+        </button>
+
+        <!-- Measure -->
+        <button class="tool-btn" data-tool="measure" data-tooltip="Measure  M">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="M2 12h20"/>
+                <path d="M7 8v8"/>
+                <path d="M12 6v4"/>
+                <path d="M17 8v8"/>
+            </svg>
+        </button>
+
+        <!-- Capture -->
+        <button class="tool-btn" data-tool="capture" data-tooltip="Capture  C">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+            </svg>
+        </button>
+
+        <!-- Metadata -->
+        <button class="tool-btn" data-tool="metadata" data-tooltip="Metadata  D">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+        </button>
+
+        <div class="rail-spacer"></div>
+        <div class="rail-sep"></div>
+
+        <!-- Export -->
+        <button class="tool-btn" data-tool="export" data-tooltip="Export  E">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+        </button>
+
+        <!-- Fullscreen -->
+        <button class="tool-btn" data-tool="fullscreen" data-tooltip="Fullscreen  F">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <polyline points="15 3 21 3 21 9"/>
+                <polyline points="9 21 3 21 3 15"/>
+                <line x1="21" y1="3" x2="14" y2="10"/>
+                <line x1="3" y1="21" x2="10" y2="14"/>
+            </svg>
+        </button>
+
+        <!-- Settings -->
+        <button class="tool-btn" data-tool="settings" data-tooltip="Settings  ,">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+        </button>
+
+    </aside>
+
+
+    <!-- ========================================================
+         VIEWPORT
+         ======================================================== -->
+    <main class="viewport" id="viewport">
+
+        <div class="vp-grid"></div>
+        <div class="vp-splat-cloud"></div>
+
+        <!-- Wireframe mesh (SVG) -->
+        <svg class="vp-mesh" viewBox="0 0 240 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <g stroke="rgba(120,150,180,0.22)" stroke-width="0.8">
+                <rect x="60" y="60" width="120" height="100" stroke="rgba(140,170,200,0.3)"/>
+                <rect x="80" y="40" width="120" height="100" stroke="rgba(100,130,160,0.18)"/>
+                <line x1="60" y1="60" x2="80" y2="40"/>
+                <line x1="180" y1="60" x2="200" y2="40"/>
+                <line x1="60" y1="160" x2="80" y2="140"/>
+                <line x1="180" y1="160" x2="200" y2="140"/>
+                <line x1="100" y1="60" x2="100" y2="160"/>
+                <line x1="140" y1="60" x2="140" y2="160"/>
+                <line x1="60" y1="93" x2="180" y2="93"/>
+                <line x1="60" y1="127" x2="180" y2="127"/>
+            </g>
+            <g fill="rgba(90,158,151,0.5)">
+                <circle cx="60" cy="60" r="2"/>
+                <circle cx="180" cy="60" r="2"/>
+                <circle cx="60" cy="160" r="2"/>
+                <circle cx="180" cy="160" r="2"/>
+            </g>
+            <g stroke="rgba(200,200,220,0.12)" stroke-width="0.5">
+                <line x1="120" y1="0" x2="120" y2="200"/>
+                <line x1="0" y1="100" x2="240" y2="100"/>
+            </g>
+        </svg>
+
+        <!-- Gizmo -->
+        <svg class="vp-gizmo" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="28" y1="28" x2="50" y2="28" stroke="#c06060" stroke-width="1.5"/>
+            <polygon points="50,28 45,25.5 45,30.5" fill="#c06060"/>
+            <text x="52" y="31" font-size="7" fill="#c06060" font-family="monospace">X</text>
+            <line x1="28" y1="28" x2="28" y2="6" stroke="#6aa060" stroke-width="1.5"/>
+            <polygon points="28,6 25.5,11 30.5,11" fill="#6aa060"/>
+            <text x="24" y="5" font-size="7" fill="#6aa060" font-family="monospace">Y</text>
+            <line x1="28" y1="28" x2="12" y2="42" stroke="#6080c0" stroke-width="1.5"/>
+            <polygon points="12,42 14,36.5 18,39.5" fill="#6080c0"/>
+            <text x="6" y="50" font-size="7" fill="#6080c0" font-family="monospace">Z</text>
+            <circle cx="28" cy="28" r="2.5" fill="rgba(200,204,212,0.5)"/>
+        </svg>
+
+        <!-- Camera mode -->
+        <div class="vp-camera-hint">ORBIT</div>
+
+        <!-- Quality badge -->
+        <div class="vp-quality-badge" title="Toggle SD/HD">HD</div>
+
+        <!-- Display mode pill -->
+        <div class="vp-display-pill" id="vp-pill">
+            <button class="vp-pill-btn" data-mode="model">Model</button>
+            <button class="vp-pill-btn" data-mode="splat">Splat</button>
+            <button class="vp-pill-btn" data-mode="cloud">Cloud</button>
+            <button class="vp-pill-btn" data-mode="stl">STL</button>
+            <button class="vp-pill-btn active" data-mode="both">M/S</button>
+            <button class="vp-pill-btn" data-mode="split">Split</button>
+        </div>
+
+        <!-- Annotations -->
+        <div class="vp-annotation" style="top: 38%; left: 32%;">
+            <div class="vp-annotation-dot">1</div>
+            <div class="vp-annotation-label">Column base</div>
+        </div>
+        <div class="vp-annotation" style="top: 24%; left: 52%;">
+            <div class="vp-annotation-dot">2</div>
+            <div class="vp-annotation-label">Inscription panel</div>
+        </div>
+        <div class="vp-annotation" style="top: 58%; left: 58%;">
+            <div class="vp-annotation-dot">3</div>
+            <div class="vp-annotation-label">Damage ref #A-017</div>
+        </div>
+
+        <!-- Design notes -->
+        <div class="mockup-note" style="position:absolute; bottom:38px; left:14px; max-width:190px;">
+            <strong>Tool Rail (48px)</strong>
+            Sole navigation. No redundant tab bar in properties panel. Active indicator on left edge.
+        </div>
+
+        <div class="mockup-note" style="position:absolute; top:14px; left:50%; transform:translateX(-50%); max-width:230px; text-align:center;">
+            <strong>Viewport</strong>
+            Three.js/WebGPU canvas. Grid, mesh, gizmo are SVG approximations.
+        </div>
+
+    </main>
+
+
+    <!-- ========================================================
+         PROPERTIES PANEL
+         ======================================================== -->
+    <aside class="props-panel" id="props-panel">
+
+        <!-- Header — driven by tool rail, replaces tab bar -->
+        <div class="props-header" id="props-header">
+            <span class="props-header-title" id="props-header-title">Scene</span>
+            <div class="props-header-legend" title="Sections with an accent border are saved in archive exports">
+                <span class="legend-swatch"></span>
+                <span>= saved in archive</span>
+            </div>
+        </div>
+
+        <!-- ====================================================
+             SCENE PANE
+             ==================================================== -->
+        <div class="props-pane active" id="pane-scene">
+
+            <!-- Display Mode -->
+            <div class="prop-section open">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Display Mode</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <div class="seg-ctrl" id="panel-display-seg">
+                        <button class="seg-btn" data-mode="model">Model</button>
+                        <button class="seg-btn" data-mode="splat">Splat</button>
+                        <button class="seg-btn" data-mode="cloud">Cloud</button>
+                    </div>
+                    <div class="seg-ctrl mt4" id="panel-display-seg2">
+                        <button class="seg-btn" data-mode="stl">STL</button>
+                        <button class="seg-btn active" data-mode="both">M/S</button>
+                        <button class="seg-btn" data-mode="split">Split</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Background — color saved in archive viewer_settings -->
+            <div class="prop-section open archived">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Background</span>
+                    <span class="archive-tag">archived</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <div class="swatch-row">
+                        <div class="swatch active" style="background:#1a1a2e;" title="Dark Blue"></div>
+                        <div class="swatch" style="background:#0a0a0a;" title="Near Black"></div>
+                        <div class="swatch" style="background:#2d2d2d;" title="Dark Gray"></div>
+                        <div class="swatch" style="background:#4a4a4a;" title="Medium Gray"></div>
+                        <div class="swatch" style="background:#808080;" title="Gray"></div>
+                        <div class="swatch" style="background:#f0f0f0; border-color:#555;" title="Light Gray"></div>
+                        <div class="swatch-custom" title="Custom color">Custom</div>
+                    </div>
+                    <div class="prop-btn-row mt4">
+                        <button class="prop-btn" style="font-size:10px;">BG Image...</button>
+                        <button class="prop-btn" style="font-size:10px;">BG URL...</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Camera -->
+            <div class="prop-section open">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Camera</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <div class="sl-row">
+                        <div class="sl-hd">
+                            <span class="sl-label">Field of View</span>
+                            <span class="sl-val">60&deg;</span>
+                        </div>
+                        <input type="range" min="10" max="120" value="60">
+                    </div>
+                    <div class="cb-row mt4">
+                        <input type="checkbox" id="autorotate">
+                        <label for="autorotate">Auto-rotate</label>
+                    </div>
+                    <div class="cb-row">
+                        <input type="checkbox" id="show-grid" checked>
+                        <label for="show-grid">Show Grid</label>
+                    </div>
+                    <div class="prop-btn-row mt6">
+                        <button class="prop-btn">Reset Camera</button>
+                        <button class="prop-btn">Fit to View</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lighting -->
+            <div class="prop-section">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Lighting</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <div class="sl-row">
+                        <div class="sl-hd"><span class="sl-label">Ambient</span><span class="sl-val">0.8</span></div>
+                        <input type="range" min="0" max="2" step="0.1" value="0.8">
+                    </div>
+                    <div class="sl-row">
+                        <div class="sl-hd"><span class="sl-label">Hemisphere</span><span class="sl-val">0.6</span></div>
+                        <input type="range" min="0" max="2" step="0.1" value="0.6">
+                    </div>
+                    <div class="sl-row">
+                        <div class="sl-hd"><span class="sl-label">Directional 1</span><span class="sl-val">1.5</span></div>
+                        <input type="range" min="0" max="3" step="0.1" value="1.5">
+                    </div>
+                    <div class="sl-row">
+                        <div class="sl-hd"><span class="sl-label">Directional 2</span><span class="sl-val">0.5</span></div>
+                        <input type="range" min="0" max="3" step="0.1" value="0.5">
+                    </div>
+                    <div class="cb-row mt4">
+                        <input type="checkbox" id="shadows">
+                        <label for="shadows">Enable Shadows</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tone Mapping -->
+            <div class="prop-section">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Tone Mapping</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <select class="prop-select mb4">
+                        <option>None</option>
+                        <option>Linear</option>
+                        <option>Reinhard</option>
+                        <option>Cineon</option>
+                        <option>ACES Filmic</option>
+                        <option>AgX</option>
+                    </select>
+                    <div class="sl-row">
+                        <div class="sl-hd"><span class="sl-label">Exposure</span><span class="sl-val">1.0</span></div>
+                        <input type="range" min="0.1" max="3" step="0.1" value="1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Environment -->
+            <div class="prop-section">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Environment (IBL)</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <select class="prop-select mb4">
+                        <option>None</option>
+                        <option>Outdoor</option>
+                        <option>Studio</option>
+                        <option>Sunset</option>
+                    </select>
+                    <div class="prop-btn-row mb4">
+                        <button class="prop-btn" style="font-size:10px;">HDR File</button>
+                        <button class="prop-btn" style="font-size:10px;">HDR URL</button>
+                    </div>
+                    <div class="cb-row">
+                        <input type="checkbox" id="env-bg">
+                        <label for="env-bg">Show as Background</label>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+
+        <!-- ====================================================
+             ASSETS PANE
+             ==================================================== -->
+        <div class="props-pane" id="pane-assets">
+
+            <!-- Outliner — asset files saved in archive -->
+            <div class="prop-section open archived">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Loaded Assets</span>
+                    <span class="archive-tag">archived</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body" style="padding-left:0; padding-right:0; padding-top:2px;">
+                    <div class="outliner">
+                        <div class="outliner-item">
+                            <div class="outliner-type-dot dot-splat" title="Gaussian Splat"></div>
+                            <span class="outliner-name">scene.ply</span>
+                            <div class="outliner-actions">
+                                <button class="outliner-icon-btn" title="Visibility"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                                <button class="outliner-icon-btn" title="Lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></button>
+                            </div>
+                        </div>
+                        <div class="outliner-item">
+                            <div class="outliner-type-dot dot-mesh" title="Mesh (GLB)"></div>
+                            <span class="outliner-name">lincoln_interior.glb</span>
+                            <div class="outliner-actions">
+                                <button class="outliner-icon-btn" title="Visibility"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                                <button class="outliner-icon-btn" title="Lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></button>
+                            </div>
+                        </div>
+                        <div class="outliner-item dimmed">
+                            <div class="outliner-type-dot dot-cloud" title="Point Cloud"></div>
+                            <span class="outliner-name" style="font-style:italic;">Point Cloud — not loaded</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Load Files -->
+            <div class="prop-section open">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Load Files</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <button class="prop-btn"><span style="color:#6a8bce;">+</span> 3D Model (.glb, .gltf, .obj)</button>
+                    <button class="prop-btn"><span style="color:var(--accent-text);">+</span> Gaussian Splat (.ply, .splat, .ksplat, .spz)</button>
+                    <button class="prop-btn"><span style="color:#c4863a;">+</span> Point Cloud (.e57)</button>
+                    <button class="prop-btn"><span style="color:#9a7bce;">+</span> STL Model (.stl)</button>
+                    <button class="prop-btn mt4">Load Archive (.a3d, .a3z)</button>
+                    <button class="prop-btn" style="color:var(--text-muted); font-size:10px;">Load from URL&hellip;</button>
+                </div>
+            </div>
+
+            <!-- Proxy Assets — saved in archive -->
+            <div class="prop-section archived">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Display Proxies</span>
+                    <span class="archive-tag">archived</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <button class="prop-btn" style="font-size:10px;">Mesh Proxy (.glb, .obj)</button>
+                    <button class="prop-btn" style="font-size:10px;">Splat Proxy (.ply, .spz)</button>
+                    <p class="prop-hint">Pre-simplified assets for mobile/tablet viewers.</p>
+                </div>
+            </div>
+
+            <!-- Source Files — saved in archive -->
+            <div class="prop-section archived">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Source Files</span>
+                    <span class="archive-tag">archived</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <button class="prop-btn" style="font-size:10px;">+ Add Source Files</button>
+                    <select class="prop-select mt4" style="font-size:10px;">
+                        <option>Category (optional)</option>
+                        <option>Raw Photography</option>
+                        <option>Processing Report</option>
+                        <option>Ground Control Points</option>
+                        <option>Calibration Data</option>
+                        <option>Project File</option>
+                        <option>Reference Material</option>
+                    </select>
+                    <p class="prop-hint">Archived alongside 3D data. Not loaded into viewer.</p>
+                </div>
+            </div>
+
+            <!-- Model Settings — mixed: transforms archived, visualization session-only -->
+            <div class="prop-section">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Model Settings</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <p class="prop-hint mb4" style="font-style:italic;">Visualization settings below are session-only.</p>
+                    <div class="sl-row">
+                        <div class="sl-hd"><span class="sl-label">Scale</span><span class="sl-val">1.0</span></div>
+                        <input type="range" min="0.1" max="5" step="0.1" value="1">
+                    </div>
+                    <div class="sl-row">
+                        <div class="sl-hd"><span class="sl-label">Opacity</span><span class="sl-val">1.0</span></div>
+                        <input type="range" min="0" max="1" step="0.05" value="1">
+                    </div>
+                    <div class="cb-row mt4">
+                        <input type="checkbox" id="wireframe"><label for="wireframe">Wireframe</label>
+                    </div>
+                    <div class="cb-row">
+                        <input type="checkbox" id="hidetex"><label for="hidetex">Hide Textures</label>
+                    </div>
+                    <div class="cb-row">
+                        <input type="checkbox" id="matcap"><label for="matcap">Matcap</label>
+                    </div>
+                    <div class="cb-row">
+                        <input type="checkbox" id="normals"><label for="normals">Show Normals</label>
+                    </div>
+                    <div class="cb-row">
+                        <input type="checkbox" id="roughness-vis"><label for="roughness-vis">Roughness</label>
+                    </div>
+                    <div class="cb-row">
+                        <input type="checkbox" id="metalness-vis"><label for="metalness-vis">Metalness</label>
+                    </div>
+                    <div class="cb-row">
+                        <input type="checkbox" id="specf0"><label for="specf0">Specular F0</label>
+                    </div>
+                    <div style="border-left:2px solid rgba(90,158,151,0.45); padding-left:8px; margin-top:8px;">
+                    <p class="prop-hint mb4" style="color:var(--accent); opacity:0.65; font-style:italic;">Transforms saved in archive</p>
+                    <div class="xyz-block">
+                        <span class="prop-label">Position</span>
+                        <div class="xyz-inputs">
+                            <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" value="0" step="0.1"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" value="0" step="0.1"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" value="0" step="0.1"></div>
+                        </div>
+                    </div>
+                    <div class="xyz-block">
+                        <span class="prop-label">Rotation (deg)</span>
+                        <div class="xyz-inputs">
+                            <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" value="0" step="1"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" value="0" step="1"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" value="0" step="1"></div>
+                        </div>
+                    </div>
+                    </div><!-- /archived transforms wrapper -->
+                </div>
+            </div>
+
+            <!-- Splat Settings — mixed: transforms archived, scale session-only -->
+            <div class="prop-section">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Splat Settings</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <div class="sl-row">
+                        <div class="sl-hd"><span class="sl-label">Scale</span><span class="sl-val">1.0</span></div>
+                        <input type="range" min="0.1" max="5" step="0.1" value="1">
+                    </div>
+                    <div style="border-left:2px solid rgba(90,158,151,0.45); padding-left:8px; margin-top:8px;">
+                    <p class="prop-hint mb4" style="color:var(--accent); opacity:0.65; font-style:italic;">Transforms saved in archive</p>
+                    <div class="xyz-block">
+                        <span class="prop-label">Position</span>
+                        <div class="xyz-inputs">
+                            <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" value="0" step="0.1"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" value="0" step="0.1"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" value="0" step="0.1"></div>
+                        </div>
+                    </div>
+                    <div class="xyz-block">
+                        <span class="prop-label">Rotation (deg)</span>
+                        <div class="xyz-inputs">
+                            <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" value="0" step="1"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" value="0" step="1"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" value="0" step="1"></div>
+                        </div>
+                    </div>
+                    </div><!-- /archived transforms wrapper -->
+                </div>
+            </div>
+
+            <!-- Point Cloud Settings — mixed: transforms archived, scale/size/opacity session-only -->
+            <div class="prop-section">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Point Cloud Settings</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <p class="prop-hint mb4" style="font-style:italic;">Scale, size, and opacity are session-only.</p>
+                    <div class="sl-row">
+                        <div class="sl-hd"><span class="sl-label">Scale</span><span class="sl-val">1.0</span></div>
+                        <input type="range" min="0.1" max="5" step="0.1" value="1">
+                    </div>
+                    <div class="sl-row">
+                        <div class="sl-hd"><span class="sl-label">Point Size</span><span class="sl-val">0.01</span></div>
+                        <input type="range" min="0.001" max="0.1" step="0.001" value="0.01">
+                    </div>
+                    <div class="sl-row">
+                        <div class="sl-hd"><span class="sl-label">Opacity</span><span class="sl-val">1.0</span></div>
+                        <input type="range" min="0" max="1" step="0.05" value="1">
+                    </div>
+                    <div style="border-left:2px solid rgba(90,158,151,0.45); padding-left:8px; margin-top:8px;">
+                    <p class="prop-hint mb4" style="color:var(--accent); opacity:0.65; font-style:italic;">Transforms saved in archive</p>
+                    <div class="xyz-block">
+                        <span class="prop-label">Position</span>
+                        <div class="xyz-inputs">
+                            <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" value="0" step="0.1"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" value="0" step="0.1"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" value="0" step="0.1"></div>
+                        </div>
+                    </div>
+                    <div class="xyz-block">
+                        <span class="prop-label">Rotation (deg)</span>
+                        <div class="xyz-inputs">
+                            <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" value="0" step="1"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" value="0" step="1"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" value="0" step="1"></div>
+                        </div>
+                    </div>
+                    </div><!-- /archived transforms wrapper -->
+                </div>
+            </div>
+
+        </div>
+
+
+        <!-- ====================================================
+             TRANSFORM PANE
+             ==================================================== -->
+        <div class="props-pane" id="pane-transform">
+
+            <div class="prop-section open">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Active Object</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <div class="seg-ctrl">
+                        <button class="seg-btn active">Splat</button>
+                        <button class="seg-btn">Mesh</button>
+                        <button class="seg-btn">Cloud</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="prop-section open">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Gizmo Mode</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <div class="seg-ctrl">
+                        <button class="seg-btn active">Translate</button>
+                        <button class="seg-btn">Rotate</button>
+                        <button class="seg-btn">Scale</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="prop-section open archived">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Position</span>
+                    <span class="archive-tag">archived</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <div class="xyz-block">
+                        <div class="xyz-inputs">
+                            <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" value="0.000" step="0.001"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" value="0.000" step="0.001"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" value="0.000" step="0.001"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="prop-section open archived">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Rotation</span>
+                    <span class="archive-tag">archived</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <div class="xyz-block">
+                        <div class="xyz-inputs">
+                            <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" value="0.00" step="0.1"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" value="0.00" step="0.1"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" value="0.00" step="0.1"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="prop-section open archived">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Scale</span>
+                    <span class="archive-tag">archived</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <div class="xyz-block">
+                        <div class="xyz-inputs">
+                            <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" value="1.000" step="0.001"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" value="1.000" step="0.001"></div>
+                            <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" value="1.000" step="0.001"></div>
+                        </div>
+                    </div>
+                    <div class="cb-row mt4">
+                        <input type="checkbox" id="scale-uniform" checked>
+                        <label for="scale-uniform">Uniform scale</label>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+
+        <!-- ====================================================
+             ALIGN PANE
+             ==================================================== -->
+        <div class="props-pane" id="pane-align">
+
+            <div class="prop-section open">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">3-Point Alignment</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <p style="font-size:11px; color:var(--text-muted); margin-bottom:8px; line-height:1.5;">
+                        Click 3 matching points on each object for precise alignment.
+                    </p>
+                    <button class="prop-btn accent">Align Objects</button>
+                </div>
+            </div>
+
+            <div class="prop-section open">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Auto-Align</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <button class="prop-btn">Run ICP Alignment</button>
+                    <button class="prop-btn">Fit to View</button>
+                    <button class="prop-btn mt4">Reset All Transforms</button>
+                </div>
+            </div>
+
+        </div>
+
+
+        <!-- ====================================================
+             ANNOTATE PANE
+             ==================================================== -->
+        <div class="props-pane" id="pane-annotate">
+
+            <div class="prop-section open">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Add Annotation</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <p style="font-size:11px; color:var(--text-muted); margin-bottom:8px; line-height:1.5;">
+                        Click a point on the 3D model to place a new annotation marker.
+                    </p>
+                    <button class="prop-btn accent">+ Place Annotation</button>
+                </div>
+            </div>
+
+            <div class="prop-section open archived">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Annotations (3)</span>
+                    <span class="archive-tag">archived</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body" style="padding-left:0; padding-right:0;">
+
+                    <div class="anno-item">
+                        <div class="anno-item-row">
+                            <div class="anno-dot">1</div>
+                            <span style="font-size:11px; color:var(--text-secondary); flex:1;">Column base</span>
+                        </div>
+                    </div>
+
+                    <div class="anno-item">
+                        <div class="anno-item-row">
+                            <div class="anno-dot">2</div>
+                            <span style="font-size:11px; color:var(--text-secondary); flex:1;">Inscription panel</span>
+                        </div>
+                    </div>
+
+                    <div class="anno-item selected">
+                        <div class="anno-item-row">
+                            <div class="anno-dot" style="box-shadow:0 0 0 2px rgba(90,158,151,0.4);">3</div>
+                            <span style="font-size:11px; color:var(--text-primary); flex:1;">Damage ref #A-017</span>
+                            <span style="font-size:9px; color:var(--accent-text); flex-shrink:0;">selected</span>
+                        </div>
+                        <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border-subtle);">
+                            <div style="font-size:10px; color:var(--text-muted); margin-bottom:4px;">Title</div>
+                            <input class="prop-input" type="text" value="Damage ref #A-017">
+                            <div style="font-size:10px; color:var(--text-muted); margin-top:6px; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
+                                Description
+                                <button style="background:none; border:1px solid var(--border-default); border-radius:2px; color:var(--text-faint); padding:1px 3px; cursor:pointer; font-size:9px;" title="Insert Image">IMG</button>
+                            </div>
+                            <textarea class="prop-textarea">Surface spalling approx 12cm, likely frost damage. Ref capture dataset session 3.</textarea>
+                            <div class="prop-btn-row mt6">
+                                <button class="prop-btn" style="font-size:10px;">Update Camera</button>
+                                <button class="prop-btn danger" style="font-size:10px;">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+
+        <!-- ====================================================
+             MEASURE PANE
+             ==================================================== -->
+        <div class="props-pane" id="pane-measure">
+
+            <div class="prop-section open">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Scale</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="font-size:11px; color:var(--text-secondary); white-space:nowrap;">1 unit =</span>
+                        <input class="prop-input" type="number" value="1" step="any" style="width:60px; text-align:center;">
+                        <select class="prop-select" style="width:60px;">
+                            <option>m</option>
+                            <option>cm</option>
+                            <option>mm</option>
+                            <option>in</option>
+                            <option>ft</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="prop-section open">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Measurements</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <p style="font-size:11px; color:var(--text-muted); margin-bottom:8px; line-height:1.5;">
+                        Click two points on the model to measure distance.
+                    </p>
+                    <div style="font-size:11px; color:var(--text-secondary); padding:4px 0; border-bottom:1px solid var(--border-subtle); display:flex; justify-content:space-between;">
+                        <span>A &rarr; B</span>
+                        <span class="font-mono" style="color:var(--accent-text);">1.245 m</span>
+                    </div>
+                    <div style="font-size:11px; color:var(--text-secondary); padding:4px 0; display:flex; justify-content:space-between;">
+                        <span>C &rarr; D</span>
+                        <span class="font-mono" style="color:var(--accent-text);">0.832 m</span>
+                    </div>
+                    <button class="prop-btn danger mt6">Clear All</button>
+                </div>
+            </div>
+
+        </div>
+
+
+        <!-- ====================================================
+             CAPTURE PANE
+             ==================================================== -->
+        <div class="props-pane" id="pane-capture">
+
+            <div class="prop-section open archived">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Screenshots</span>
+                    <span class="archive-tag">archived</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <button class="prop-btn accent">Capture Screenshot</button>
+                    <button class="prop-btn mt4">Set Archive Preview Image</button>
+                    <p class="prop-hint mt4">A preview is captured automatically during export. Taking a manual preview overrides that.</p>
+                </div>
+            </div>
+
+            <div class="prop-section open archived">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Captured (2)</span>
+                    <span class="archive-tag">archived</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <div style="display:flex; gap:4px;">
+                        <div style="flex:1; height:48px; background:var(--bg-surface); border:1px solid var(--border-default); border-radius:2px; display:flex; align-items:center; justify-content:center; font-size:9px; color:var(--text-faint);">capture_01.png</div>
+                        <div style="flex:1; height:48px; background:var(--bg-surface); border:1px solid var(--border-default); border-radius:2px; display:flex; align-items:center; justify-content:center; font-size:9px; color:var(--text-faint);">capture_02.png</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+
+        <!-- ====================================================
+             METADATA PANE
+             ==================================================== -->
+        <div class="props-pane" id="pane-metadata">
+
+            <div style="padding:4px 12px; font-size:9px; color:var(--accent); opacity:0.65; letter-spacing:0.4px; text-transform:uppercase; font-weight:600; border-left:2px solid rgba(90,158,151,0.45); margin:6px 0 0 0;">All metadata is saved in archive</div>
+
+            <!-- Mode tabs: View / Edit -->
+            <div class="meta-mode-bar">
+                <button class="meta-mode-btn active" data-meta="view">View</button>
+                <button class="meta-mode-btn" data-meta="edit">Edit</button>
+            </div>
+
+            <!-- View Mode -->
+            <div class="meta-pane active" id="meta-view">
+                <div style="padding:12px;">
+                    <h2 style="font-size:16px; font-weight:600; color:var(--text-primary); margin-bottom:4px; line-height:1.3;">Lincoln Memorial Interior</h2>
+                    <p style="font-size:11px; color:var(--text-secondary); line-height:1.5; margin-bottom:10px;">
+                        High-resolution 3D scan of the Lincoln Memorial interior chamber, capturing the seated statue and surrounding architectural details.
+                    </p>
+                    <div style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:12px;">
+                        <span style="font-size:9px; padding:2px 6px; background:var(--bg-surface); border:1px solid var(--border-default); border-radius:10px; color:var(--text-secondary);">heritage</span>
+                        <span style="font-size:9px; padding:2px 6px; background:var(--bg-surface); border:1px solid var(--border-default); border-radius:10px; color:var(--text-secondary);">scan</span>
+                        <span style="font-size:9px; padding:2px 6px; background:var(--bg-surface); border:1px solid var(--border-default); border-radius:10px; color:var(--text-secondary);">2024</span>
+                    </div>
+                    <div style="border-top:1px solid var(--border-subtle); padding-top:10px;">
+                        <div style="display:flex; justify-content:space-between; padding:3px 0; font-size:11px;">
+                            <span style="color:var(--text-muted);">Creator</span>
+                            <span style="color:var(--text-secondary);">NPS Digital Lab</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; padding:3px 0; font-size:11px;">
+                            <span style="color:var(--text-muted);">Date</span>
+                            <span style="color:var(--text-secondary);">2024-03-15</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; padding:3px 0; font-size:11px;">
+                            <span style="color:var(--text-muted);">Location</span>
+                            <span style="color:var(--text-secondary);">Washington, DC</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; padding:3px 0; font-size:11px;">
+                            <span style="color:var(--text-muted);">Captured with</span>
+                            <span style="color:var(--text-secondary);">Faro Focus S350</span>
+                        </div>
+                    </div>
+                    <div style="margin-top:10px; font-size:10px; color:var(--text-muted); padding:6px 8px; background:var(--bg-surface); border-radius:2px;">
+                        CC-BY 4.0
+                    </div>
+                    <div style="display:flex; gap:8px; margin-top:12px; text-align:center;">
+                        <div style="flex:1; padding:8px 4px; background:var(--bg-surface); border-radius:2px;">
+                            <div style="font-size:14px; font-weight:600; color:var(--text-primary); font-family:var(--font-mono);">2.4M</div>
+                            <div style="font-size:9px; color:var(--text-muted); margin-top:2px;">Gaussians</div>
+                        </div>
+                        <div style="flex:1; padding:8px 4px; background:var(--bg-surface); border-radius:2px;">
+                            <div style="font-size:14px; font-weight:600; color:var(--text-primary); font-family:var(--font-mono);">1.2M</div>
+                            <div style="font-size:9px; color:var(--text-muted); margin-top:2px;">Polygons</div>
+                        </div>
+                        <div style="flex:1; padding:8px 4px; background:var(--bg-surface); border-radius:2px;">
+                            <div style="font-size:14px; font-weight:600; color:var(--text-primary); font-family:var(--font-mono);">3</div>
+                            <div style="font-size:9px; color:var(--text-muted); margin-top:2px;">Annotations</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit Mode -->
+            <div class="meta-pane" id="meta-edit">
+                <div class="meta-category-bar">
+                    <select class="meta-category-select" id="meta-category-select">
+                        <option value="project" selected>Project</option>
+                        <option value="provenance">Provenance</option>
+                        <option value="archival">Archival</option>
+                        <option value="quality">Quality</option>
+                        <option value="material">Material</option>
+                        <option value="preservation">Preservation</option>
+                        <option value="assets">Assets</option>
+                        <option value="integrity">Integrity</option>
+                        <option value="view">View</option>
+                    </select>
+                </div>
+                <div style="padding:8px 12px; border-bottom:1px solid var(--border-subtle);">
+                    <div class="prop-btn-row">
+                        <button class="prop-btn" style="font-size:10px;">Import Manifest</button>
+                        <button class="prop-btn" style="font-size:10px;">Export Manifest</button>
+                    </div>
+                </div>
+                <div style="padding:10px 12px;">
+                    <div style="margin-bottom:10px;">
+                        <div style="font-size:10px; color:var(--text-muted); margin-bottom:3px;">Title <span style="color:var(--danger);">*</span></div>
+                        <input class="prop-input" type="text" value="Lincoln Memorial Interior">
+                    </div>
+                    <div style="margin-bottom:10px;">
+                        <div style="font-size:10px; color:var(--text-muted); margin-bottom:3px;">Project ID</div>
+                        <input class="prop-input" type="text" value="lincoln-memorial-interior" style="color:var(--text-faint);">
+                        <p class="prop-hint">Auto-generated from title if empty</p>
+                    </div>
+                    <div style="margin-bottom:10px;">
+                        <div style="font-size:10px; color:var(--text-muted); margin-bottom:3px; display:flex; align-items:center; gap:4px;">
+                            Description
+                            <button style="background:none; border:1px solid var(--border-default); border-radius:2px; color:var(--text-faint); padding:1px 3px; cursor:pointer; font-size:9px;" title="Insert Image">IMG</button>
+                        </div>
+                        <textarea class="prop-textarea" rows="3">High-resolution 3D scan of the Lincoln Memorial interior chamber.</textarea>
+                    </div>
+                    <div style="margin-bottom:10px;">
+                        <div style="font-size:10px; color:var(--text-muted); margin-bottom:3px;">Tags</div>
+                        <input class="prop-input" type="text" value="heritage, scan, 2024">
+                        <p class="prop-hint">Separate tags with commas</p>
+                    </div>
+                    <div style="margin-bottom:10px;">
+                        <div style="font-size:10px; color:var(--text-muted); margin-bottom:3px;">License</div>
+                        <select class="prop-select">
+                            <option>CC0 Public Domain</option>
+                            <option selected>CC-BY 4.0</option>
+                            <option>CC-BY-SA 4.0</option>
+                            <option>CC-BY-NC 4.0</option>
+                            <option>MIT License</option>
+                            <option>All Rights Reserved</option>
+                            <option>Custom...</option>
+                        </select>
+                    </div>
+                    <div style="font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin:12px 0 6px; padding-top:8px; border-top:1px solid var(--border-subtle);">Relationships</div>
+                    <div style="margin-bottom:8px;">
+                        <div style="font-size:10px; color:var(--text-muted); margin-bottom:3px;">Part Of</div>
+                        <input class="prop-input" type="text" placeholder="Parent collection ID">
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <div style="font-size:10px; color:var(--text-muted); margin-bottom:3px;">Derived From</div>
+                        <input class="prop-input" type="text" placeholder="Source asset ID">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+
+        <!-- ====================================================
+             EXPORT PANE
+             ==================================================== -->
+        <div class="props-pane" id="pane-export">
+
+            <!-- Archive Contents — shows what's in the export -->
+            <div class="prop-section open archived">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Archive Contents</span>
+                    <span class="archive-tag">archived</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <div class="source-file-item">
+                        <span style="font-size:11px; color:var(--accent);">&#9679;</span>
+                        <span class="source-file-name">scene.ply</span>
+                        <span class="source-file-size">38.4 MB</span>
+                    </div>
+                    <div class="source-file-item">
+                        <span style="font-size:11px; color:#6a8bce;">&#9679;</span>
+                        <span class="source-file-name">lincoln_interior.glb</span>
+                        <span class="source-file-size">3.8 MB</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Format -->
+            <div class="prop-section open">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Format</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <div class="radio-row">
+                        <input type="radio" name="fmt" id="fmt-a3d" checked>
+                        <label for="fmt-a3d">.a3d (Standard)</label>
+                    </div>
+                    <div class="radio-row">
+                        <input type="radio" name="fmt" id="fmt-a3z">
+                        <label for="fmt-a3z">.a3z (Compressed)</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Include -->
+            <div class="prop-section open">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Include</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <div class="cb-row">
+                        <input type="checkbox" id="inc-splat" checked disabled><label for="inc-splat">Gaussian Splat</label>
+                    </div>
+                    <div class="cb-row">
+                        <input type="checkbox" id="inc-model" checked disabled><label for="inc-model">3D Model</label>
+                    </div>
+                    <div class="cb-row">
+                        <input type="checkbox" id="inc-cloud" checked disabled><label for="inc-cloud">Point Cloud</label>
+                    </div>
+                    <div class="cb-row">
+                        <input type="checkbox" id="inc-anno" checked disabled><label for="inc-anno">Annotations</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="prop-section open">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Export</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <button class="prop-btn accent" style="margin-bottom:6px;">Download Archive (.a3d)</button>
+                    <button class="prop-btn">Download Offline Viewer</button>
+                    <p class="prop-hint">Self-contained HTML file. Opens any .a3d/.a3z offline.</p>
+                </div>
+            </div>
+
+            <!-- Share -->
+            <div class="prop-section open">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Share</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <button class="prop-btn">Copy Share Link</button>
+                    <p class="prop-hint">Only works for files loaded via URL.</p>
+                    <button class="prop-btn mt4">Preview Kiosk Mode</button>
+                </div>
+            </div>
+
+            <!-- Archive Info -->
+            <div class="prop-section">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Archive Info</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <div class="prop-row"><span class="prop-row-label">Version</span><span class="font-mono" style="font-size:10px; color:var(--text-secondary);">1.0.0</span></div>
+                    <div class="prop-row"><span class="prop-row-label">Packer</span><span class="font-mono" style="font-size:10px; color:var(--text-secondary);">Vitrine3D</span></div>
+                    <div class="prop-row"><span class="prop-row-label">Created</span><span class="font-mono" style="font-size:10px; color:var(--text-secondary);">2024-03-15</span></div>
+                </div>
+            </div>
+
+        </div>
+
+
+        <!-- ====================================================
+             SETTINGS PANE
+             ==================================================== -->
+        <div class="props-pane" id="pane-settings">
+            <div class="prop-section open">
+                <div class="prop-section-hd">
+                    <span class="prop-section-title">Info</span>
+                    <span class="prop-section-chevron">&#9654;</span>
+                </div>
+                <div class="prop-section-body">
+                    <div class="prop-row"><span class="prop-row-label">Splat count</span><span class="font-mono" style="font-size:10px; color:var(--text-secondary);">2,412,847</span></div>
+                    <div class="prop-row"><span class="prop-row-label">Model faces</span><span class="font-mono" style="font-size:10px; color:var(--text-secondary);">1,204,312</span></div>
+                    <div class="prop-row"><span class="prop-row-label">Point cloud</span><span class="font-mono" style="font-size:10px; color:var(--text-secondary);">-</span></div>
+                    <div class="prop-row"><span class="prop-row-label">FPS</span><span class="font-mono" style="font-size:10px; color:var(--accent-text);">58</span></div>
+                </div>
+            </div>
+        </div>
+
+    </aside>
+
+
+    <!-- ========================================================
+         STATUS BAR
+         ======================================================== -->
+    <footer class="status-bar">
+        <div class="status-left">
+            <div class="status-item">
+                <span class="status-badge badge-webgpu">WebGPU</span>
+            </div>
+            <div class="status-item">
+                <span class="status-badge badge-hd">HD</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot"></span>
+                <span class="status-num">58 fps</span>
+            </div>
+            <div class="status-item">
+                <span style="color:var(--text-faint);">&#9651;</span>
+                <span class="status-num">1,204,312 tris</span>
+            </div>
+            <div class="status-item">
+                <span style="color:var(--text-faint);">&#183;&#183;&#183;</span>
+                <span class="status-num">2,412,847 splats</span>
+            </div>
+            <div class="status-item">
+                Orbit mode
+            </div>
+        </div>
+        <div class="status-right">
+            <div class="status-item">
+                <span style="color:var(--text-faint)">file:</span>
+                <span class="status-num">lincoln_memorial_scan.a3d</span>
+            </div>
+            <div class="status-item">
+                <span class="status-num">42.2 MB</span>
+            </div>
+        </div>
+    </footer>
+
+</div>
+
+
+<!-- ============================================================
+     Interaction Script
+     ============================================================ -->
+<script>
+// Tool -> Pane mapping
+const toolMap = {
+    'scene':      'scene',
+    'assets':     'assets',
+    'transform':  'transform',
+    'align':      'align',
+    'annotate':   'annotate',
+    'measure':    'measure',
+    'capture':    'capture',
+    'metadata':   'metadata',
+    'export':     'export',
+    'fullscreen': null,
+    'settings':   'settings',
+};
+
+// Tool -> Header title
+const toolTitles = {
+    'scene':     'Scene',
+    'assets':    'Assets',
+    'transform': 'Transform',
+    'align':     'Alignment',
+    'annotate':  'Annotate',
+    'measure':   'Measure',
+    'capture':   'Capture',
+    'metadata':  'Metadata',
+    'export':    'Export',
+    'settings':  'Settings',
+};
+
+const toolBtns    = document.querySelectorAll('.tool-btn[data-tool]');
+const propsPanes  = document.querySelectorAll('.props-pane');
+const headerTitle = document.getElementById('props-header-title');
+
+function activateTool(toolName) {
+    toolBtns.forEach(b => b.classList.toggle('active', b.dataset.tool === toolName));
+
+    const targetPane = toolMap[toolName];
+    if (!targetPane) return;
+
+    propsPanes.forEach(p => p.classList.toggle('active', p.id === 'pane-' + targetPane));
+    headerTitle.textContent = toolTitles[toolName] || toolName;
+}
+
+toolBtns.forEach(btn => {
+    btn.addEventListener('click', () => activateTool(btn.dataset.tool));
+});
+
+// Collapsible sections
+document.querySelectorAll('.prop-section-hd').forEach(hd => {
+    hd.addEventListener('click', () => {
+        hd.closest('.prop-section').classList.toggle('open');
+    });
+});
+
+// Viewport display mode pill
+const pillBtns = document.querySelectorAll('.vp-pill-btn');
+function setDisplayMode(mode) {
+    pillBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    document.querySelectorAll('#panel-display-seg .seg-btn, #panel-display-seg2 .seg-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.mode === mode);
+    });
+}
+
+pillBtns.forEach(btn => {
+    btn.addEventListener('click', () => setDisplayMode(btn.dataset.mode));
+});
+
+document.querySelectorAll('#panel-display-seg .seg-btn, #panel-display-seg2 .seg-btn').forEach(btn => {
+    btn.addEventListener('click', () => setDisplayMode(btn.dataset.mode));
+});
+
+// Slider value display
+document.querySelectorAll('input[type="range"]').forEach(slider => {
+    const valEl = slider.closest('.sl-row')?.querySelector('.sl-val');
+    if (!valEl) return;
+    slider.addEventListener('input', () => {
+        const val = parseFloat(slider.value);
+        const step = parseFloat(slider.step) || 1;
+        const decimals = step < 1 ? (slider.step.split('.')[1] || '').length : 0;
+        valEl.textContent = decimals > 0 ? val.toFixed(decimals) : Math.round(val);
+        if (slider.min === '10' || slider.min === '15') valEl.textContent += '\u00B0';
+    });
+});
+
+// Swatch selection
+document.querySelectorAll('.swatch-row').forEach(row => {
+    row.querySelectorAll('.swatch').forEach(swatch => {
+        swatch.addEventListener('click', () => {
+            row.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+            swatch.classList.add('active');
+        });
+    });
+});
+
+// Metadata mode tabs
+document.querySelectorAll('.meta-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.meta-mode-btn').forEach(b => b.classList.toggle('active', b === btn));
+        document.querySelectorAll('.meta-pane').forEach(p => p.classList.toggle('active', p.id === 'meta-' + btn.dataset.meta));
+    });
+});
+
+// Edit category dropdown (visual only — switches active category label)
+const catSelect = document.getElementById('meta-category-select');
+if (catSelect) {
+    catSelect.addEventListener('change', () => {
+        // In real app, this would show/hide category-specific form fields
+    });
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+    const key = e.key.toLowerCase();
+    const map = {
+        's': 'scene', 'a': 'assets', 't': 'transform', 'l': 'align',
+        'n': 'annotate', 'm': 'measure', 'c': 'capture', 'd': 'metadata',
+        'e': 'export', 'f': 'fullscreen',
+    };
+    if (map[key] && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (!['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+            activateTool(map[key]);
+        }
+    }
+});
+</script>
+
+</body>
+</html>

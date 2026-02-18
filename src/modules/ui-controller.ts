@@ -103,6 +103,32 @@ export function updateVisibility(
     }
 }
 
+/**
+ * Show/hide display mode pill buttons based on which asset types are loaded.
+ * "Both" and "Split" only appear when multiple types are loaded.
+ */
+export function updateDisplayPill(loaded: { splat: boolean; model: boolean; pointcloud: boolean; stl: boolean }): void {
+    const show = (id: string, visible: boolean) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = visible ? '' : 'none';
+    };
+
+    show('btn-splat', loaded.splat);
+    show('btn-model', loaded.model);
+    show('btn-pointcloud', loaded.pointcloud);
+    show('btn-stl', loaded.stl);
+
+    // "Both" (M/S) only when splat AND model are loaded
+    show('btn-both', loaded.splat && loaded.model);
+    // "Split" only when at least 2 types are loaded
+    const count = [loaded.splat, loaded.model, loaded.pointcloud, loaded.stl].filter(Boolean).length;
+    show('btn-split', count >= 2);
+
+    // Show the pill itself only if at least one type is loaded
+    const pill = document.getElementById('vp-display-pill');
+    if (pill) pill.style.display = count > 0 ? '' : 'none';
+}
+
 // =============================================================================
 // LOADING OVERLAY
 // =============================================================================
@@ -168,8 +194,82 @@ export function hideLoading(): void {
 }
 
 // =============================================================================
-// CONTROLS PANEL
+// TOOL RAIL & PROPERTIES PANEL
 // =============================================================================
+
+/** Map of tool names to their pane IDs and display titles */
+const TOOL_PANE_MAP: Record<string, { pane: string; title: string }> = {
+    scene:     { pane: 'pane-scene',     title: 'Scene' },
+    assets:    { pane: 'pane-assets',    title: 'Assets' },
+    transform: { pane: 'pane-transform', title: 'Transform' },
+    align:     { pane: 'pane-align',     title: 'Alignment' },
+    annotate:  { pane: 'pane-annotate',  title: 'Annotations' },
+    measure:   { pane: 'pane-measure',   title: 'Measurements' },
+    capture:   { pane: 'pane-capture',   title: 'Screenshots' },
+    metadata:  { pane: 'pane-metadata',  title: 'Metadata' },
+    export:    { pane: 'pane-export',    title: 'Export' },
+    settings:  { pane: 'pane-settings',  title: 'Settings' },
+};
+
+/**
+ * Activate a tool in the tool rail, showing its corresponding pane.
+ * If the same tool is clicked again, toggle the props panel closed.
+ */
+let _activeTool: string | null = 'assets';
+
+export function activateTool(toolName: string): void {
+    const panel = document.getElementById('props-panel');
+    const headerTitle = document.getElementById('props-header-title');
+
+    // If tool has no pane (e.g. fullscreen), skip pane switching
+    if (!TOOL_PANE_MAP[toolName]) return;
+
+    // Toggle: if same tool clicked again, hide props panel
+    if (_activeTool === toolName && panel && !panel.classList.contains('hidden')) {
+        panel.classList.add('hidden');
+        _activeTool = null;
+        // Remove active from all tool buttons
+        document.querySelectorAll('#tool-rail .tool-btn').forEach(btn => btn.classList.remove('active'));
+        return;
+    }
+
+    _activeTool = toolName;
+
+    // Show props panel
+    if (panel) panel.classList.remove('hidden');
+
+    // Update tool rail active state
+    document.querySelectorAll('#tool-rail .tool-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-tool') === toolName);
+    });
+
+    // Switch pane visibility via .active class (CSS: .props-pane { display:none }, .props-pane.active { display:block })
+    const mapping = TOOL_PANE_MAP[toolName];
+    document.querySelectorAll('#props-panel .props-pane').forEach(pane => {
+        pane.classList.toggle('active', pane.id === mapping.pane);
+    });
+
+    // Update header title
+    if (headerTitle) headerTitle.textContent = mapping.title;
+
+    log.debug(`Tool activated: ${toolName}`);
+}
+
+/** Get the currently active tool name */
+export function getActiveTool(): string | null {
+    return _activeTool;
+}
+
+/**
+ * Toggle properties panel visibility
+ */
+export function togglePropsPanel(): void {
+    const panel = document.getElementById('props-panel');
+    if (!panel) return;
+    panel.classList.toggle('hidden');
+}
+
+// --- Legacy compatibility wrappers (controls-panel no longer exists) ---
 
 interface ControlsPanelDeps {
     state: AppState;
@@ -177,192 +277,78 @@ interface ControlsPanelDeps {
     onWindowResize?: () => void;
 }
 
-/**
- * Toggle controls panel visibility
- */
-export function toggleControlsPanel(deps: ControlsPanelDeps): void {
-    const { state } = deps;
-    state.controlsVisible = !state.controlsVisible;
-    applyControlsVisibility(deps);
+/** @deprecated Controls panel replaced by tool rail + props panel */
+export function toggleControlsPanel(_deps: ControlsPanelDeps): void {
+    togglePropsPanel();
+}
+
+/** @deprecated Controls panel replaced by tool rail + props panel */
+export function applyControlsVisibility(_deps: ControlsPanelDeps, _shouldShowOverride?: boolean): void {
+    // No-op — layout managed by CSS grid now
+}
+
+/** @deprecated Left toolbar replaced by tool rail */
+export function ensureToolbarVisibility(_config: { showToolbar?: boolean }): void {
+    // No-op — tool rail visibility managed by CSS
 }
 
 /**
- * Apply controls panel visibility. Handles controlsMode (full/minimal/none),
- * width/padding styles, toggle button class management, and resize callback.
- */
-export function applyControlsVisibility(deps: ControlsPanelDeps, shouldShowOverride?: boolean): void {
-    const { state, config, onWindowResize } = deps;
-    const controlsPanel = document.getElementById('controls-panel') as HTMLDivElement | null;
-    if (!controlsPanel) return;
-
-    const toggleBtn = document.getElementById('btn-toggle-controls');
-    const shouldShow = shouldShowOverride !== undefined ? shouldShowOverride : state.controlsVisible;
-    const mode = (config && config.controlsMode) || 'full';
-
-    if (mode === 'none') {
-        controlsPanel.style.display = 'none';
-        if (toggleBtn) toggleBtn.style.display = 'none';
-        return;
-    }
-
-    // Clear any inline display/visibility styles
-    controlsPanel.style.display = '';
-    controlsPanel.style.visibility = '';
-    controlsPanel.style.opacity = '';
-
-    if (shouldShow) {
-        controlsPanel.classList.remove('panel-hidden', 'hidden');
-
-        const targetWidth = (mode === 'minimal') ? '200px' : '280px';
-        controlsPanel.style.width = targetWidth;
-        controlsPanel.style.minWidth = targetWidth;
-        controlsPanel.style.padding = '20px';
-        controlsPanel.style.overflow = 'visible';
-        controlsPanel.style.overflowY = 'auto';
-        controlsPanel.style.borderLeftWidth = '1px';
-        controlsPanel.style.pointerEvents = 'auto';
-
-        if (toggleBtn) toggleBtn.classList.remove('controls-hidden');
-    } else {
-        controlsPanel.classList.add('panel-hidden');
-        if (toggleBtn) toggleBtn.classList.add('controls-hidden');
-    }
-
-    setTimeout(() => {
-        try { if (onWindowResize) onWindowResize(); } catch { /* ignore */ }
-    }, 200);
-}
-
-/**
- * Ensure toolbar visibility is maintained (safeguard against race conditions).
- */
-export function ensureToolbarVisibility(config: { showToolbar?: boolean }): void {
-    // Only hide toolbar if explicitly set to false (not undefined)
-    if (config.showToolbar === false) {
-        return; // Toolbar intentionally hidden via URL parameter
-    }
-
-    const toolbar = document.getElementById('left-toolbar') as HTMLDivElement | null;
-    if (!toolbar) return;
-
-    // Force toolbar to be visible
-    toolbar.style.display = 'flex';
-    toolbar.style.visibility = 'visible';
-    toolbar.style.zIndex = '10000';
-
-    // Re-check after file loading completes (delayed checks)
-    setTimeout(() => {
-        const tb = document.getElementById('left-toolbar') as HTMLDivElement | null;
-        if (tb && config.showToolbar !== false) {
-            tb.style.display = 'flex';
-            tb.style.visibility = 'visible';
-            tb.style.zIndex = '10000';
-        }
-    }, 1000);
-
-    setTimeout(() => {
-        const tb = document.getElementById('left-toolbar') as HTMLDivElement | null;
-        if (tb && config.showToolbar !== false) {
-            tb.style.display = 'flex';
-            tb.style.visibility = 'visible';
-            tb.style.zIndex = '10000';
-        }
-    }, 3000);
-}
-
-/**
- * Apply viewer mode settings (toolbar visibility, sidebar state).
+ * Apply viewer mode settings (sidebar state via URL params).
  */
 export function applyViewerModeSettings(config: {
     showToolbar?: boolean;
     sidebarMode?: string;
     controlsMode?: string;
 }): void {
-    // Apply toolbar visibility - only hide if explicitly set to false
-    if (config.showToolbar === false) {
-        const toolbar = document.getElementById('left-toolbar');
-        if (toolbar) {
-            toolbar.style.display = 'none';
-            log.info('Toolbar hidden via URL parameter');
-        }
-    }
-
-    // Apply sidebar state (after a short delay to ensure DOM is ready)
+    // Apply sidebar state — open metadata pane if requested
     if (config.sidebarMode && config.sidebarMode !== 'closed') {
         setTimeout(() => {
-            const sidebar = document.getElementById('metadata-sidebar');
-            if (sidebar) {
-                sidebar.classList.remove('hidden');
-                log.info('Metadata sidebar shown via URL parameter');
+            activateTool('metadata');
+            log.info('Metadata pane shown via URL parameter');
 
-                // If view-only mode, hide the Edit tab
-                if (config.sidebarMode === 'view') {
-                    const editTab = document.querySelector('.sidebar-mode-tab[data-mode="edit"]') as HTMLElement | null;
-                    if (editTab) {
-                        editTab.style.display = 'none';
-                        log.info('Edit tab hidden for view-only mode');
-                    }
-
-                    // Also hide the annotations tab if in pure view mode
-                    const annotationsTab = document.querySelector('.sidebar-mode-tab[data-mode="annotations"]') as HTMLElement | null;
-                    if (annotationsTab) {
-                        annotationsTab.style.display = 'none';
-                    }
+            // If view-only mode, hide the Edit tab
+            if (config.sidebarMode === 'view') {
+                const editTab = document.querySelector('.sidebar-mode-tab[data-mode="edit"]') as HTMLElement | null;
+                if (editTab) {
+                    editTab.style.display = 'none';
+                    log.info('Edit tab hidden for view-only mode');
                 }
 
-                // Activate View tab by default
-                const viewTab = document.querySelector('.sidebar-mode-tab[data-mode="view"]') as HTMLElement | null;
-                const viewContent = document.getElementById('sidebar-view');
-                if (viewTab && viewContent) {
-                    document.querySelectorAll('.sidebar-mode-tab').forEach(t => t.classList.remove('active'));
-                    document.querySelectorAll('.sidebar-mode-content').forEach(c => c.classList.remove('active'));
-                    viewTab.classList.add('active');
-                    viewContent.classList.add('active');
+                const annotationsTab = document.querySelector('.sidebar-mode-tab[data-mode="annotations"]') as HTMLElement | null;
+                if (annotationsTab) {
+                    annotationsTab.style.display = 'none';
                 }
+            }
+
+            // Activate View tab by default
+            const viewTab = document.querySelector('.sidebar-mode-tab[data-mode="view"]') as HTMLElement | null;
+            const viewContent = document.getElementById('sidebar-view');
+            if (viewTab && viewContent) {
+                document.querySelectorAll('.sidebar-mode-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.sidebar-mode-content').forEach(c => c.classList.remove('active'));
+                viewTab.classList.add('active');
+                viewContent.classList.add('active');
             }
         }, 100);
     }
+
+    // Hide tool rail if controls=none
+    if (config.controlsMode === 'none') {
+        const rail = document.getElementById('tool-rail');
+        const panel = document.getElementById('props-panel');
+        if (rail) rail.style.display = 'none';
+        if (panel) panel.style.display = 'none';
+    }
 }
 
-/**
- * Apply controls mode (full, minimal, none)
- */
+/** @deprecated Controls panel replaced by tool rail + props panel */
 export function applyControlsMode(mode: string): void {
-    const controlsPanel = document.getElementById('controls-panel') as HTMLDivElement | null;
-
     if (mode === 'none') {
-        // Hide panel completely
-        if (controlsPanel) controlsPanel.style.display = 'none';
-        const toggleBtn = document.getElementById('btn-toggle-controls');
-        if (toggleBtn) toggleBtn.style.display = 'none';
-        return;
+        const rail = document.getElementById('tool-rail');
+        const panel = document.getElementById('props-panel');
+        if (rail) rail.style.display = 'none';
+        if (panel) panel.style.display = 'none';
     }
-
-    // Show panel
-    if (controlsPanel) controlsPanel.style.display = '';
-    const toggleBtn = document.getElementById('btn-toggle-controls');
-    if (toggleBtn) toggleBtn.style.display = '';
-
-    if (mode === 'minimal') {
-        // Hide all sections except display mode toggle
-        const sections = controlsPanel?.querySelectorAll('.control-section');
-        sections?.forEach(section => {
-            const header = section.querySelector('h3');
-            const headerText = header?.textContent?.toLowerCase() || '';
-            // Keep only display mode section
-            if (!headerText.includes('display')) {
-                (section as HTMLElement).style.display = 'none';
-            }
-        });
-
-        // Hide the main title
-        const title = controlsPanel?.querySelector('h2') as HTMLElement | null;
-        if (title) title.style.display = 'none';
-
-        // Make the panel narrower for minimal mode
-        if (controlsPanel) controlsPanel.style.width = '200px';
-    }
-    // 'full' mode shows everything (default)
 }
 
 // =============================================================================
@@ -445,27 +431,69 @@ export function updateStatusText(elementId: string, text: string): void {
 // =============================================================================
 
 /**
- * Setup collapsible section handlers
+ * Setup collapsible section handlers for .prop-section elements.
+ * Clicking a .prop-section-hd toggles the .open class on the parent .prop-section,
+ * which controls body visibility and chevron rotation via CSS.
  */
 export function setupCollapsibles(): void {
-    const collapsibles = document.querySelectorAll('.collapsible-header');
+    const headers = document.querySelectorAll('.prop-section-hd');
 
-    collapsibles.forEach(header => {
+    headers.forEach(header => {
         header.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
-            const section = (header as HTMLElement).closest('.control-section.collapsible');
+            const section = (header as HTMLElement).closest('.prop-section');
             if (section) {
-                section.classList.toggle('collapsed');
-                const icon = header.querySelector('.collapse-icon');
-                if (icon) {
-                    icon.textContent = section.classList.contains('collapsed') ? '▶' : '▼';
-                }
+                section.classList.toggle('open');
             }
         });
     });
 
-    log.debug('Collapsible sections initialized');
+    log.debug('Collapsible prop-sections initialized');
+}
+
+// =============================================================================
+// STATUS BAR
+// =============================================================================
+
+/**
+ * Update status bar elements. Called from the animate loop (throttled by caller).
+ */
+export function updateStatusBar(info: {
+    fps?: number;
+    renderer?: string;
+    tris?: number;
+    splats?: number;
+    cameraMode?: string;
+    filename?: string;
+}): void {
+    if (info.fps !== undefined) {
+        const el = document.getElementById('status-fps');
+        if (el) el.textContent = `${info.fps} fps`;
+    }
+    if (info.renderer !== undefined) {
+        const el = document.getElementById('status-renderer');
+        if (el) {
+            el.textContent = info.renderer;
+            el.classList.toggle('badge-webgpu', info.renderer === 'WebGPU');
+        }
+    }
+    if (info.tris !== undefined) {
+        const el = document.getElementById('status-tris');
+        if (el) el.textContent = info.tris > 0 ? `${info.tris.toLocaleString()} tris` : '- tris';
+    }
+    if (info.splats !== undefined) {
+        const el = document.getElementById('status-splats');
+        if (el) el.textContent = info.splats > 0 ? `${info.splats.toLocaleString()} splats` : '- splats';
+    }
+    if (info.cameraMode !== undefined) {
+        const el = document.getElementById('status-camera-mode');
+        if (el) el.textContent = info.cameraMode;
+    }
+    if (info.filename !== undefined) {
+        const el = document.getElementById('status-filename');
+        if (el) el.textContent = info.filename;
+    }
 }
 
 // =============================================================================
@@ -515,19 +543,19 @@ export function setupKeyboardShortcuts(handlers: Record<string, (e: KeyboardEven
 // =============================================================================
 
 /**
- * Show export panel
+ * Show export panel — no-op in new layout (export content always visible inside pane)
  */
 export function showExportPanel(): void {
-    const panel = document.getElementById('export-panel');
-    if (panel) panel.classList.remove('hidden');
+    // In the new layout, export content is always visible inside #pane-export.
+    // Tool rail controls pane visibility via activateTool().
 }
 
 /**
- * Hide export panel
+ * Hide export panel — no-op in new layout
  */
 export function hideExportPanel(): void {
-    const panel = document.getElementById('export-panel');
-    if (panel) panel.classList.add('hidden');
+    // In the new layout, export content is always visible inside #pane-export.
+    // Tool rail controls pane visibility via activateTool().
 }
 
 // =============================================================================

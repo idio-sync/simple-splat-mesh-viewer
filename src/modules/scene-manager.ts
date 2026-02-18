@@ -105,6 +105,7 @@ export class SceneManager {
     // FPS tracking
     frameCount: number;
     lastFpsTime: number;
+    lastFPS: number;
 
     // Callbacks
     onTransformChange: TransformChangeCallback | null;
@@ -161,6 +162,7 @@ export class SceneManager {
         // FPS tracking
         this.frameCount = 0;
         this.lastFpsTime = performance.now();
+        this.lastFPS = 0;
 
         // Callbacks
         this.onTransformChange = null;
@@ -983,6 +985,7 @@ export class SceneManager {
         this.frameCount++;
         const currentTime = performance.now();
         if (currentTime - this.lastFpsTime >= 1000) {
+            this.lastFPS = this.frameCount;
             if (fpsElement) {
                 fpsElement.textContent = this.frameCount.toString();
             }

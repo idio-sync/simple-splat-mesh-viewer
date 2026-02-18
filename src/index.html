@@ -51,19 +51,161 @@
 
     <!-- Click-to-load gate (shown when ?autoload=false) -->
     <div id="kiosk-click-gate" class="hidden">
+        <div class="kiosk-gate-vignette"></div>
         <img id="kiosk-gate-poster" alt="" />
-        <div class="kiosk-gate-content">
+        <div class="kiosk-gate-card">
             <h2 id="kiosk-gate-title"></h2>
+            <p id="kiosk-gate-description" class="hidden"></p>
+            <div id="kiosk-gate-tags" class="display-tags hidden"></div>
             <button id="kiosk-gate-play" type="button" aria-label="Load 3D viewer">
                 <svg viewBox="0 0 24 24" width="32" height="32">
-                    <polygon points="6,3 20,12 6,21" />
+                    <polygon points="8,5 19,12 8,19" />
                 </svg>
             </button>
-            <p id="kiosk-gate-types"></p>
+            <p id="kiosk-gate-cta" class="hidden">Touch to begin</p>
+            <div id="kiosk-gate-types"></div>
         </div>
     </div>
 
+    <!-- ================================================================
+         APP GRID LAYOUT
+         [ tool-rail 48px | viewport 1fr | props-panel 320px ]
+         [              status-bar 26px (full width)          ]
+         ================================================================ -->
     <div id="app">
+
+        <!-- ============================================================
+             TOOL RAIL (left, 48px)
+             ============================================================ -->
+        <aside id="tool-rail">
+            <!-- Logo -->
+            <div class="rail-logo" title="Vitrine3D">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="3" width="18" height="18" rx="1" stroke="var(--accent)" stroke-width="1.5" fill="none" opacity="0.5"/>
+                    <rect x="7" y="7" width="10" height="10" rx="0.5" fill="var(--accent)" opacity="0.35"/>
+                    <rect x="9" y="9" width="6" height="6" rx="0.5" fill="var(--accent)" opacity="0.6"/>
+                </svg>
+            </div>
+
+            <!-- Assets — Load splats, meshes, point clouds -->
+            <button class="tool-btn active" data-tool="assets" data-tooltip="Assets  A" title="Load and configure 3D assets">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                    <rect x="3" y="3" width="7" height="7"/>
+                    <rect x="14" y="3" width="7" height="7"/>
+                    <rect x="14" y="14" width="7" height="7"/>
+                    <rect x="3" y="14" width="7" height="7"/>
+                </svg>
+            </button>
+
+            <!-- Scene — Background, lighting, environment -->
+            <button class="tool-btn" data-tool="scene" data-tooltip="Scene  S" title="Background, lighting, and environment">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                    <polyline points="2 17 12 22 22 17"/>
+                    <polyline points="2 12 12 17 22 12"/>
+                </svg>
+            </button>
+
+            <!-- Transform — Move, rotate, scale objects -->
+            <button class="tool-btn" data-tool="transform" data-tooltip="Transform  T" title="Move, rotate, and scale objects">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                    <polyline points="5 9 2 12 5 15"/>
+                    <polyline points="9 5 12 2 15 5"/>
+                    <polyline points="15 19 12 22 9 19"/>
+                    <polyline points="19 9 22 12 19 15"/>
+                    <line x1="2" y1="12" x2="22" y2="12"/>
+                    <line x1="12" y1="2" x2="12" y2="22"/>
+                </svg>
+            </button>
+
+            <!-- Align — 3-point alignment between objects -->
+            <button class="tool-btn" data-tool="align" data-tooltip="Align  L" title="3-point alignment between objects">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                    <path d="M4 22V2"/>
+                    <rect x="8" y="6" width="12" height="4"/>
+                    <rect x="8" y="14" width="8" height="4"/>
+                </svg>
+            </button>
+
+            <div class="rail-sep"></div>
+
+            <!-- Measure — Measure distances on model -->
+            <button class="tool-btn" data-tool="measure" data-tooltip="Measure  M" title="Measure distances between points">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                    <path d="M2 12h20"/>
+                    <path d="M7 8v8"/>
+                    <path d="M12 6v4"/>
+                    <path d="M17 8v8"/>
+                </svg>
+            </button>
+
+            <!-- Capture — Take screenshots -->
+            <button class="tool-btn" data-tool="capture" data-tooltip="Capture  C" title="Capture screenshots of the viewport">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                    <circle cx="12" cy="13" r="4"/>
+                </svg>
+            </button>
+
+            <!-- Annotate — Place annotation markers -->
+            <button class="tool-btn" data-tool="annotate" data-tooltip="Annotate  N" title="Place and edit annotation markers">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                </svg>
+            </button>
+
+            <!-- Metadata — Project info, Dublin Core -->
+            <button class="tool-btn" data-tool="metadata" data-tooltip="Metadata  D" id="btn-metadata" title="Edit project metadata and Dublin Core fields">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                </svg>
+            </button>
+
+            <div class="rail-spacer"></div>
+            <div class="rail-sep"></div>
+
+            <!-- Export — Package as archive -->
+            <button class="tool-btn" data-tool="export" data-tooltip="Export  E" id="btn-export-archive" title="Export scene as .a3d/.a3z archive">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+            </button>
+
+            <!-- Fullscreen -->
+            <button class="tool-btn" data-tool="fullscreen" data-tooltip="Fullscreen  F11" id="btn-fullscreen" title="Toggle fullscreen mode">
+                <svg class="icon-expand" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <polyline points="9 21 3 21 3 15"></polyline>
+                    <line x1="21" y1="3" x2="14" y2="10"></line>
+                    <line x1="3" y1="21" x2="10" y2="14"></line>
+                </svg>
+                <svg class="icon-compress" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="4 14 10 14 10 20"></polyline>
+                    <polyline points="20 10 14 10 14 4"></polyline>
+                    <line x1="10" y1="14" x2="3" y2="21"></line>
+                    <line x1="21" y1="3" x2="14" y2="10"></line>
+                </svg>
+            </button>
+
+            <!-- Settings — Stats and preferences -->
+            <button class="tool-btn" data-tool="settings" data-tooltip="Settings  ," title="Application settings and stats">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+            </button>
+        </aside>
+
+
+        <!-- ============================================================
+             VIEWPORT (center, 1fr)
+             ============================================================ -->
         <div id="viewer-container">
             <canvas id="viewer-canvas"></canvas>
             <canvas id="viewer-canvas-right" class="hidden"></canvas>
@@ -79,94 +221,20 @@
                     <button id="btn-cancel-preview" class="action-btn secondary">Cancel</button>
                 </div>
             </div>
-            <div id="left-toolbar">
-                <button id="btn-toggle-controls" class="toggle-controls-btn" title="Toggle Controls">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="4" y1="21" x2="4" y2="14"></line>
-                        <line x1="4" y1="10" x2="4" y2="3"></line>
-                        <line x1="12" y1="21" x2="12" y2="12"></line>
-                        <line x1="12" y1="8" x2="12" y2="3"></line>
-                        <line x1="20" y1="21" x2="20" y2="16"></line>
-                        <line x1="20" y1="12" x2="20" y2="3"></line>
-                        <line x1="1" y1="14" x2="7" y2="14"></line>
-                        <line x1="9" y1="8" x2="15" y2="8"></line>
-                        <line x1="17" y1="16" x2="23" y2="16"></line>
-                    </svg>
-                </button>
-                <button id="btn-metadata" class="toolbar-btn" title="View Metadata (M)">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
-                        <polyline points="10 9 9 9 8 9"></polyline>
-                    </svg>
-                </button>
-                <button id="btn-annotate" class="toolbar-btn" title="Place Annotation (A)">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                        <circle cx="12" cy="10" r="3"></circle>
-                    </svg>
-                </button>
-                <button id="btn-toggle-annotations" class="toolbar-btn" title="Toggle Annotations" style="display:none;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                        <circle cx="12" cy="10" r="3"></circle>
-                    </svg>
-                </button>
-                <button id="btn-measure" class="toolbar-btn" title="Measure Distance" style="display:none;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M2 12h20"></path>
-                        <path d="M2 12l4-4"></path>
-                        <path d="M2 12l4 4"></path>
-                        <path d="M22 12l-4-4"></path>
-                        <path d="M22 12l-4 4"></path>
-                        <path d="M7 9v6"></path>
-                        <path d="M12 7v10"></path>
-                        <path d="M17 9v6"></path>
-                    </svg>
-                </button>
-                <button id="btn-fullscreen" class="toolbar-btn" title="Toggle Fullscreen (F11)">
-                    <svg class="icon-expand" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="15 3 21 3 21 9"></polyline>
-                        <polyline points="9 21 3 21 3 15"></polyline>
-                        <line x1="21" y1="3" x2="14" y2="10"></line>
-                        <line x1="3" y1="21" x2="10" y2="14"></line>
-                    </svg>
-                    <svg class="icon-compress" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="4 14 10 14 10 20"></polyline>
-                        <polyline points="20 10 14 10 14 4"></polyline>
-                        <line x1="10" y1="14" x2="3" y2="21"></line>
-                        <line x1="21" y1="3" x2="14" y2="10"></line>
-                    </svg>
-                </button>
-                <button id="btn-fly-mode" class="toolbar-btn" title="Fly Camera Mode (F)">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-                    </svg>
-                </button>
-                <button id="btn-auto-rotate" class="toolbar-btn" title="Auto-Rotate">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="23 4 23 10 17 10"></polyline>
-                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-                    </svg>
-                </button>
-                <button id="btn-load-full-res" class="toolbar-btn" title="Load Full Resolution Mesh" style="display:none;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                        <polyline points="2 17 12 22 22 17"></polyline>
-                        <polyline points="2 12 12 17 22 12"></polyline>
-                    </svg>
-                </button>
-                <button id="btn-export-archive" class="toolbar-btn" title="Export Archive">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                </button>
+
+            <!-- Viewport overlay: Display mode pill -->
+            <div class="vp-display-pill" id="vp-display-pill">
+                <button class="vp-pill-btn" id="btn-model" data-mode="model">Model</button>
+                <button class="vp-pill-btn" id="btn-splat" data-mode="splat">Splat</button>
+                <button class="vp-pill-btn" id="btn-pointcloud" data-mode="pointcloud">Cloud</button>
+                <button class="vp-pill-btn" id="btn-stl" data-mode="stl">STL</button>
+                <button class="vp-pill-btn active" id="btn-both" data-mode="both">M/S</button>
+                <button class="vp-pill-btn" id="btn-split" data-mode="split">Split</button>
             </div>
+
+            <!-- Quality toggle moved to status bar -->
+
+            <!-- Viewport hints and indicators -->
             <div id="transform-hint" class="hidden">
                 <span id="hint-text">Click on splat or model to select</span>
             </div>
@@ -183,937 +251,255 @@
             <div id="proxy-mesh-indicator" class="hidden">
                 Viewing display proxy &middot; <a href="#" id="proxy-load-full-link">Load full resolution</a>
             </div>
-            <div id="quality-toggle-container" class="hidden">
-                <button id="btn-quality-sd" class="quality-toggle-btn" data-tier="sd">SD</button>
-                <button id="btn-quality-hd" class="quality-toggle-btn active" data-tier="hd">HD</button>
-            </div>
         </div>
 
-        <!-- Annotation markers container -->
-        <div id="annotation-markers"></div>
 
-        <!-- Measurement markers container -->
-        <div id="measurement-markers"></div>
+        <!-- ============================================================
+             PROPERTIES PANEL (right, 320px)
+             ============================================================ -->
+        <aside id="props-panel">
 
-        <!-- Measurement scale panel (shown when measure mode is active) -->
-        <div id="measure-scale-panel" class="hidden">
-            <span class="measure-scale-label">1 unit =</span>
-            <input id="measure-scale-value" type="number" value="1" min="0.0001" step="any">
-            <select id="measure-scale-unit">
-                <option value="m">m</option>
-                <option value="cm">cm</option>
-                <option value="mm">mm</option>
-                <option value="in">in</option>
-                <option value="ft">ft</option>
-            </select>
-            <button id="measure-clear-all" title="Clear all measurements">Clear</button>
-        </div>
-
-        <!-- Alignment markers container -->
-        <div id="alignment-markers"></div>
-
-        <!-- Annotation info popup (appears when clicking markers) -->
-        <div id="annotation-info-popup" class="hidden">
-            <div class="annotation-info-header">
-                <span class="annotation-info-number"></span>
-                <h4 class="annotation-info-title"></h4>
-            </div>
-            <div class="annotation-info-body"></div>
-        </div>
-
-        <!-- Annotation bar at bottom -->
-        <div id="annotation-bar" class="hidden">
-            <div id="annotation-chips"></div>
-        </div>
-
-        <!-- Annotation panel popup -->
-        <!-- KIOSK-STRIP-START: annotation creation panel -->
-        <div id="annotation-panel" class="hidden">
-            <h3>New Annotation</h3>
-            <div class="coords-display">
-                Position: <span id="anno-pos-display">-</span>
-            </div>
-            <label for="anno-id">ID</label>
-            <input type="text" id="anno-id" placeholder="anno_1">
-            <label for="anno-title">Title</label>
-            <input type="text" id="anno-title" placeholder="Feature name">
-            <label for="anno-body">Description <button type="button" class="insert-image-btn" id="btn-anno-insert-image" title="Insert Image"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button></label>
-            <textarea id="anno-body" placeholder="Describe this point of interest..."></textarea>
-            <div class="btn-group">
-                <button id="btn-anno-cancel" class="action-btn secondary">Cancel</button>
-                <button id="btn-anno-save" class="action-btn">Save</button>
-            </div>
-        </div>
-
-        <!-- KIOSK-STRIP-END: annotation creation panel -->
-
-        <!-- Unified Metadata Sidebar (right side) -->
-        <div id="metadata-sidebar" class="hidden">
-            <!-- Mobile drag handle (hidden on desktop, visible on mobile kiosk) -->
-            <div id="sidebar-drag-handle">
-                <div class="drag-handle-bar"></div>
-            </div>
-            <!-- Main mode tabs -->
-            <div class="sidebar-mode-tabs">
-                <button class="sidebar-mode-tab active" data-mode="view">View</button>
-                <button class="sidebar-mode-tab" data-mode="edit">Edit</button>
-                <button class="sidebar-mode-tab" data-mode="annotations">Annotations</button>
-            </div>
-
-            <!-- View Mode Content -->
-            <div class="sidebar-mode-content active" id="sidebar-view">
-                <div class="display-content">
-                    <h1 class="display-title" id="display-title">Untitled</h1>
-                    <p class="display-description" id="display-description"></p>
-                    <div id="display-tags" class="display-tags" style="display:none"></div>
-
-                    <div class="display-divider"></div>
-
-                    <div class="display-details">
-                        <div class="display-detail" id="display-creator-row">
-                            <span class="display-label">Creator</span>
-                            <span class="display-value" id="display-creator"></span>
-                        </div>
-                        <div class="display-detail" id="display-date-row">
-                            <span class="display-label">Date</span>
-                            <span class="display-value" id="display-date"></span>
-                        </div>
-                        <div class="display-detail" id="display-location-row">
-                            <span class="display-label">Location</span>
-                            <span class="display-value" id="display-location"></span>
-                        </div>
-                        <div class="display-detail" id="display-device-row">
-                            <span class="display-label">Captured with</span>
-                            <span class="display-value" id="display-device"></span>
-                        </div>
-                    </div>
-
-                    <div class="display-license" id="display-license-row">
-                        <span id="display-license"></span>
-                    </div>
-
-                    <div class="display-stats" id="display-stats">
-                        <div class="display-stat" id="display-splat-stat">
-                            <span class="stat-number" id="display-splat-count">-</span>
-                            <span class="stat-label">Gaussians</span>
-                        </div>
-                        <div class="display-stat" id="display-mesh-stat">
-                            <span class="stat-number" id="display-mesh-count">-</span>
-                            <span class="stat-label">Polygons</span>
-                        </div>
-                        <div class="display-stat" id="display-pointcloud-stat" style="display: none;">
-                            <span class="stat-number" id="display-pointcloud-count">-</span>
-                            <span class="stat-label">Points</span>
-                        </div>
-                        <div class="display-stat" id="display-anno-stat">
-                            <span class="stat-number" id="display-anno-count">0</span>
-                            <span class="stat-label">Annotations</span>
-                        </div>
-                    </div>
+            <!-- Header -->
+            <div class="props-header" id="props-header">
+                <span class="props-header-title" id="props-header-title">Scene</span>
+                <div class="props-header-legend" title="Sections with an accent border are saved in archive exports">
+                    <span class="legend-swatch"></span>
+                    <span>= saved in archive</span>
                 </div>
             </div>
 
-            <!-- KIOSK-STRIP-START: metadata edit tab -->
-            <!-- Edit Mode Content -->
-            <div class="sidebar-mode-content" id="sidebar-edit">
-                <div class="edit-tabs">
-                    <button class="edit-tab active" data-tab="project">Project</button>
-                    <button class="edit-tab" data-tab="provenance">Provenance</button>
-                    <button class="edit-tab" data-tab="archival">Archival</button>
-                    <button class="edit-tab" data-tab="quality">Quality</button>
-                    <button class="edit-tab" data-tab="material">Material</button>
-                    <button class="edit-tab" data-tab="preservation">Preservation</button>
-                    <button class="edit-tab" data-tab="assets">Assets</button>
-                    <button class="edit-tab" data-tab="integrity">Integrity</button>
-                    <button class="edit-tab" data-tab="viewer">Default View</button>
-                </div>
-                <div class="metadata-actions">
-                    <button id="btn-import-metadata" class="action-btn" title="Import metadata from a manifest.json file">Import Manifest</button>
-                    <button id="btn-export-metadata" class="action-btn" title="Export current metadata as manifest.json">Export Manifest</button>
+            <!-- ========================================================
+                 SCENE PANE
+                 ======================================================== -->
+            <div class="props-pane" id="pane-scene">
+
+                <!-- Background -->
+                <div class="prop-section open archived">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Background</span>
+                        <span class="archive-tag">archived</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <div class="swatch-row">
+                            <div class="swatch active" data-color="#1a1a2e" style="background:#1a1a2e;" title="Dark Blue"></div>
+                            <div class="swatch" data-color="#0a0a0a" style="background:#0a0a0a;" title="Near Black"></div>
+                            <div class="swatch" data-color="#2d2d2d" style="background:#2d2d2d;" title="Dark Gray"></div>
+                            <div class="swatch" data-color="#4a4a4a" style="background:#4a4a4a;" title="Medium Gray"></div>
+                            <div class="swatch" data-color="#808080" style="background:#808080;" title="Gray"></div>
+                            <div class="swatch" data-color="#f0f0f0" style="background:#f0f0f0; border-color:#555;" title="Light Gray"></div>
+                            <div class="swatch-custom" title="Custom color">
+                                <input type="color" id="bg-color-picker" value="#1a1a2e">
+                                <span>Custom</span>
+                            </div>
+                        </div>
+                        <div class="prop-btn-row mt4">
+                            <label for="bg-image-input" class="prop-btn" style="font-size:10px; cursor:pointer; margin-bottom:0;">BG Image...</label>
+                            <button class="prop-btn" id="btn-load-bg-image-url" style="font-size:10px;">BG URL...</button>
+                        </div>
+                        <input type="file" id="bg-image-input" accept=".png,.jpg,.jpeg,.webp" style="display:none" />
+                        <div class="prop-btn-row mt4" style="display:none;" id="bg-image-status">
+                            <span id="bg-image-filename" class="prop-hint" style="flex:1;"></span>
+                            <button id="btn-clear-bg-image" class="prop-btn" style="font-size:10px; flex:0;">Clear</button>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Project Tab -->
-                <div class="edit-tab-content active" id="edit-tab-project">
-                    <div class="metadata-field">
-                        <label for="meta-title">Title <span class="required">*</span></label>
-                        <input type="text" id="meta-title" placeholder="My 3D Scene">
+                <!-- Camera -->
+                <div class="prop-section open">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Camera</span>
+                        <span class="prop-section-chevron">&#9654;</span>
                     </div>
-                    <div class="metadata-field">
-                        <label for="meta-id">Project ID</label>
-                        <input type="text" id="meta-id" placeholder="my-3d-scene">
-                        <span class="field-hint">Auto-generated from title if empty</span>
+                    <div class="prop-section-body">
+                        <div class="sl-row">
+                            <div class="sl-hd">
+                                <span class="sl-label">Field of View</span>
+                                <span class="sl-val" id="camera-fov-value">60</span>
+                            </div>
+                            <input type="range" id="camera-fov" min="10" max="120" step="1" value="60">
+                        </div>
+                        <div class="cb-row mt4">
+                            <input type="checkbox" id="btn-auto-rotate">
+                            <label for="btn-auto-rotate">Auto-rotate</label>
+                        </div>
+                        <div class="cb-row">
+                            <input type="checkbox" id="toggle-gridlines" checked>
+                            <label for="toggle-gridlines">Show Grid</label>
+                        </div>
+                        <div class="cb-row">
+                            <input type="checkbox" id="btn-fly-mode">
+                            <label for="btn-fly-mode">Fly Camera Mode</label>
+                        </div>
+                        <div class="prop-btn-row mt6">
+                            <button class="prop-btn" id="btn-reset-camera">Reset Camera</button>
+                            <button class="prop-btn" id="btn-fit-view">Fit to View</button>
+                        </div>
                     </div>
-                    <div class="metadata-field">
-                        <label for="meta-description">Description <button type="button" class="insert-image-btn" id="btn-desc-insert-image" title="Insert Image"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button></label>
-                        <textarea id="meta-description" rows="3" placeholder="Describe this 3D scene..."></textarea>
+                </div>
+
+                <!-- Lighting -->
+                <div class="prop-section">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Lighting</span>
+                        <span class="prop-section-chevron">&#9654;</span>
                     </div>
-                    <div class="metadata-field">
-                        <label for="meta-tags">Tags</label>
-                        <input type="text" id="meta-tags" placeholder="scan, heritage, 2024" title="Comma-separated tags">
-                        <small class="field-hint">Separate tags with commas</small>
+                    <div class="prop-section-body">
+                        <div class="sl-row">
+                            <div class="sl-hd"><span class="sl-label">Ambient</span><span class="sl-val" id="ambient-intensity-value">0.8</span></div>
+                            <input type="range" id="ambient-intensity" min="0" max="2" step="0.1" value="0.8">
+                        </div>
+                        <div class="sl-row">
+                            <div class="sl-hd"><span class="sl-label">Hemisphere</span><span class="sl-val" id="hemisphere-intensity-value">0.6</span></div>
+                            <input type="range" id="hemisphere-intensity" min="0" max="2" step="0.1" value="0.6">
+                        </div>
+                        <div class="sl-row">
+                            <div class="sl-hd"><span class="sl-label">Directional 1</span><span class="sl-val" id="directional1-intensity-value">1.5</span></div>
+                            <input type="range" id="directional1-intensity" min="0" max="3" step="0.1" value="1.5">
+                        </div>
+                        <div class="sl-row">
+                            <div class="sl-hd"><span class="sl-label">Directional 2</span><span class="sl-val" id="directional2-intensity-value">0.5</span></div>
+                            <input type="range" id="directional2-intensity" min="0" max="3" step="0.1" value="0.5">
+                        </div>
+                        <div class="cb-row mt4">
+                            <input type="checkbox" id="toggle-shadows" />
+                            <label for="toggle-shadows">Enable Shadows</label>
+                        </div>
+                        <div class="sl-row mt4" id="shadow-opacity-group" style="display:none;">
+                            <div class="sl-hd"><span class="sl-label">Shadow Opacity</span><span class="sl-val" id="shadow-opacity-value">0.3</span></div>
+                            <input type="range" id="shadow-opacity" min="0.05" max="1" step="0.05" value="0.3">
+                        </div>
                     </div>
-                    <div class="metadata-field">
-                        <label for="meta-license">License</label>
-                        <select id="meta-license">
-                            <option value="CC0">CC0 Public Domain</option>
-                            <option value="CC-BY 4.0">CC-BY 4.0</option>
-                            <option value="CC-BY-SA 4.0">CC-BY-SA 4.0</option>
-                            <option value="CC-BY-NC 4.0">CC-BY-NC 4.0</option>
-                            <option value="MIT">MIT License</option>
-                            <option value="All Rights Reserved">All Rights Reserved</option>
-                            <option value="custom">Custom...</option>
+                </div>
+
+                <!-- Tone Mapping -->
+                <div class="prop-section">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Tone Mapping</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <select class="prop-select mb4" id="tone-mapping-select">
+                            <option value="None" selected>None</option>
+                            <option value="Linear">Linear</option>
+                            <option value="Reinhard">Reinhard</option>
+                            <option value="Cineon">Cineon</option>
+                            <option value="ACESFilmic">ACES Filmic</option>
+                            <option value="AgX">AgX</option>
                         </select>
-                    </div>
-                    <div class="metadata-field hidden" id="custom-license-field">
-                        <label for="meta-custom-license">Custom License</label>
-                        <input type="text" id="meta-custom-license" placeholder="Enter custom license">
-                    </div>
-
-                    <div class="subsection-header">Relationships</div>
-                    <div class="metadata-field">
-                        <label for="meta-part-of">Part Of</label>
-                        <input type="text" id="meta-part-of" placeholder="Parent collection or project ID">
-                        <span class="field-hint">ID of collection this belongs to</span>
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-derived-from">Derived From</label>
-                        <input type="text" id="meta-derived-from" placeholder="Source asset ID">
-                        <span class="field-hint">ID of asset this was derived from</span>
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-replaces">Replaces</label>
-                        <input type="text" id="meta-replaces" placeholder="Previous version ID">
-                        <span class="field-hint">ID of asset this supersedes</span>
-                    </div>
-                    <div class="subsection-header">Related Objects</div>
-                    <div id="related-objects-list"></div>
-                    <button id="btn-add-related-object" class="action-btn secondary" style="width: 100%; margin-top: 10px;">
-                        + Add Related Object
-                    </button>
-                </div>
-
-                <!-- Provenance Tab -->
-                <div class="edit-tab-content" id="edit-tab-provenance">
-                    <div class="subsection-header">Capture Information</div>
-                    <div class="metadata-field">
-                        <label for="meta-capture-date">Capture Date</label>
-                        <input type="date" id="meta-capture-date">
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-capture-device">Capture Device</label>
-                        <input type="text" id="meta-capture-device" placeholder="e.g., iPhone 15 Pro, Faro Focus">
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-device-serial">Device Serial Number</label>
-                        <input type="text" id="meta-device-serial" placeholder="e.g., AL-2024-0847">
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-operator">Operator / Creator</label>
-                        <input type="text" id="meta-operator" placeholder="Name or organization">
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-operator-orcid">Operator ORCID</label>
-                        <input type="text" id="meta-operator-orcid" placeholder="e.g., 0000-0002-1825-0097">
-                        <span class="field-hint">ORCID identifier for attribution</span>
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-location">Capture Location</label>
-                        <input type="text" id="meta-location" placeholder="Where the capture was made">
-                    </div>
-
-                    <div class="subsection-header">Processing Software</div>
-                    <div id="processing-software-list"></div>
-                    <button id="btn-add-processing-software" class="action-btn secondary" style="width: 100%; margin-top: 10px;">
-                        + Add Processing Software
-                    </button>
-
-                    <div class="subsection-header" style="margin-top: 20px;">Processing Notes</div>
-                    <div class="metadata-field">
-                        <label for="meta-processing-notes">Notes</label>
-                        <textarea id="meta-processing-notes" rows="3" placeholder="e.g., Gap fill applied to underside, decimation from 50M to 5M polys"></textarea>
-                        <span class="field-hint">Document any significant processing steps or modifications</span>
-                    </div>
-
-                    <div class="subsection-header">Convention Hints</div>
-                    <div class="metadata-field">
-                        <label for="meta-conventions">References</label>
-                        <input type="text" id="meta-conventions" placeholder="e.g., arxiv:2312.13299">
-                        <span class="field-hint">Comma-separated list of convention references</span>
-                    </div>
-                    <div class="subsection-header">Version History</div>
-                    <div class="field-hint">Track changes between archive versions</div>
-                    <div id="version-history-list"></div>
-                    <button id="btn-add-version-entry" class="action-btn secondary" style="width: 100%; margin-top: 10px;">
-                        + Add Version Entry
-                    </button>
-                    <div class="subsection-header">Custom Fields</div>
-                    <div id="custom-fields-list"></div>
-                    <button id="btn-add-custom-field" class="action-btn secondary" style="width: 100%; margin-top: 10px;">
-                        + Add Custom Field
-                    </button>
-                </div>
-
-                <!-- Archival Record Tab (Dublin Core) -->
-                <div class="edit-tab-content" id="edit-tab-archival">
-                    <div class="metadata-field">
-                        <label for="meta-archival-standard">Metadata Standard</label>
-                        <input type="text" id="meta-archival-standard" value="Smithsonian EDAN / Dublin Core" placeholder="Dublin Core, etc.">
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-archival-title">Object Title</label>
-                        <input type="text" id="meta-archival-title" placeholder="Official title of the object">
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-archival-alt-titles">Alternate Titles</label>
-                        <input type="text" id="meta-archival-alt-titles" placeholder="Comma-separated list">
-                        <span class="field-hint">Other names this object is known by</span>
-                    </div>
-
-                    <div class="subsection-header">Identifiers</div>
-                    <div class="metadata-field">
-                        <label for="meta-archival-accession">Accession Number</label>
-                        <input type="text" id="meta-archival-accession" placeholder="e.g., 2023.001.001">
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-archival-siris">SIRIS ID</label>
-                        <input type="text" id="meta-archival-siris" placeholder="Smithsonian SIRIS identifier">
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-archival-uri">URI</label>
-                        <input type="text" id="meta-archival-uri" placeholder="Permanent identifier URL">
-                    </div>
-
-                    <div class="subsection-header">Creation Information</div>
-                    <div class="metadata-field">
-                        <label for="meta-archival-creator">Creator</label>
-                        <input type="text" id="meta-archival-creator" placeholder="Original creator/artist">
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-archival-date-created">Date Created</label>
-                        <input type="text" id="meta-archival-date-created" placeholder="e.g., ca. 1850, 15th century">
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-archival-period">Period</label>
-                        <input type="text" id="meta-archival-period" placeholder="e.g., Renaissance, Ming Dynasty">
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-archival-culture">Culture</label>
-                        <input type="text" id="meta-archival-culture" placeholder="e.g., Japanese, Mayan">
-                    </div>
-
-                    <div class="subsection-header">Physical Description</div>
-                    <div class="metadata-field">
-                        <label for="meta-archival-medium">Medium</label>
-                        <input type="text" id="meta-archival-medium" placeholder="e.g., Bronze, Oil on canvas">
-                    </div>
-                    <div class="metadata-field">
-                        <label>Dimensions</label>
-                        <div class="dimension-inputs">
-                            <input type="text" id="meta-archival-dim-height" placeholder="Height">
-                            <input type="text" id="meta-archival-dim-width" placeholder="Width">
-                            <input type="text" id="meta-archival-dim-depth" placeholder="Depth">
+                        <div class="sl-row">
+                            <div class="sl-hd"><span class="sl-label">Exposure</span><span class="sl-val" id="tone-mapping-exposure-value">1.0</span></div>
+                            <input type="range" id="tone-mapping-exposure" min="0.1" max="3" step="0.1" value="1">
                         </div>
-                        <span class="field-hint">Include units (e.g., 25 cm, 10 in)</span>
                     </div>
-                    <div class="metadata-field">
-                        <label for="meta-archival-condition">Condition</label>
-                        <input type="text" id="meta-archival-condition" placeholder="e.g., Good, Minor wear">
-                    </div>
+                </div>
 
-                    <div class="subsection-header">Provenance & Rights</div>
-                    <div class="metadata-field">
-                        <label for="meta-archival-provenance">Provenance</label>
-                        <textarea id="meta-archival-provenance" rows="3" placeholder="Ownership and custody history..."></textarea>
+                <!-- Environment -->
+                <div class="prop-section">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Environment (IBL)</span>
+                        <span class="prop-section-chevron">&#9654;</span>
                     </div>
-                    <div class="metadata-field">
-                        <label for="meta-archival-copyright">Copyright Status</label>
-                        <select id="meta-archival-copyright">
-                            <option value="">Not specified</option>
-                            <option value="Public Domain">Public Domain</option>
-                            <option value="CC0">CC0</option>
-                            <option value="CC-BY">CC-BY</option>
-                            <option value="CC-BY-SA">CC-BY-SA</option>
-                            <option value="CC-BY-NC">CC-BY-NC</option>
-                            <option value="All Rights Reserved">All Rights Reserved</option>
+                    <div class="prop-section-body">
+                        <select class="prop-select mb4" id="env-map-select">
+                            <option value="">None</option>
+                            <option value="preset:0">Outdoor</option>
+                            <option value="preset:1">Studio</option>
+                            <option value="preset:2">Sunset</option>
                         </select>
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-archival-credit">Credit Line</label>
-                        <input type="text" id="meta-archival-credit" placeholder="e.g., Gift of John Doe, 2023">
-                    </div>
-
-                    <div class="subsection-header">Context</div>
-                    <div class="metadata-field">
-                        <label for="meta-archival-context-desc">Description</label>
-                        <textarea id="meta-archival-context-desc" rows="3" placeholder="Historical and cultural context..."></textarea>
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-archival-location-history">Location History</label>
-                        <input type="text" id="meta-archival-location-history" placeholder="Previous locations/exhibitions">
-                    </div>
-
-                    <div class="subsection-header">Geographic Coverage</div>
-                    <div class="metadata-field">
-                        <label for="meta-coverage-location">Location Name</label>
-                        <input type="text" id="meta-coverage-location" placeholder="e.g., Lincoln Memorial, Washington DC">
-                    </div>
-                    <div class="metadata-field">
-                        <label>Coordinates</label>
-                        <div class="coordinate-inputs">
-                            <input type="number" id="meta-coverage-lat" step="0.000001" placeholder="Latitude">
-                            <input type="number" id="meta-coverage-lon" step="0.000001" placeholder="Longitude">
+                        <div class="prop-btn-row mb4">
+                            <label for="hdr-file-input" class="prop-btn" style="font-size:10px; cursor:pointer; margin-bottom:0;">HDR File</label>
+                            <button class="prop-btn" id="btn-load-hdr-url" style="font-size:10px;">HDR URL</button>
                         </div>
-                        <span class="field-hint">WGS84 decimal degrees</span>
-                    </div>
-
-                    <div class="subsection-header">Temporal Coverage</div>
-                    <div class="metadata-field">
-                        <label for="meta-coverage-period">Subject Period</label>
-                        <input type="text" id="meta-coverage-period" placeholder="e.g., 1922-present, Ming Dynasty">
-                        <span class="field-hint">Time period the subject represents</span>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="meta-coverage-circa">
-                        <label for="meta-coverage-circa">Date is approximate (circa)</label>
-                    </div>
-                </div>
-
-                <!-- Assets Tab -->
-                <div class="edit-tab-content" id="edit-tab-assets">
-                    <div class="asset-section" id="splat-asset-section">
-                        <h4>Scene (Gaussian Splat)</h4>
-                        <div class="asset-status" id="splat-asset-status">No splat loaded</div>
-                        <div class="asset-fields hidden" id="splat-asset-fields">
-                            <div class="metadata-field">
-                                <label for="meta-splat-created-by">Created By</label>
-                                <input type="text" id="meta-splat-created-by" placeholder="e.g., nerfstudio, 3DGS">
-                            </div>
-                            <div class="metadata-field">
-                                <label for="meta-splat-version">Tool Version</label>
-                                <input type="text" id="meta-splat-version" placeholder="e.g., 0.3.4">
-                            </div>
-                            <div class="metadata-field">
-                                <label for="meta-splat-notes">Source Notes</label>
-                                <textarea id="meta-splat-notes" rows="2" placeholder="Additional notes about this asset..."></textarea>
-                            </div>
-                            <div class="metadata-field">
-                                <label for="meta-splat-role">Data Role</label>
-                                <select id="meta-splat-role">
-                                    <option value="">Not specified</option>
-                                    <option value="primary">Primary</option>
-                                    <option value="derived">Derived</option>
-                                </select>
-                                <span class="field-hint">Primary = original capture, Derived = processed output</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="asset-section" id="mesh-asset-section">
-                        <h4>Mesh (3D Model)</h4>
-                        <div class="asset-status" id="mesh-asset-status">No mesh loaded</div>
-                        <div class="asset-fields hidden" id="mesh-asset-fields">
-                            <div class="metadata-field">
-                                <label for="meta-mesh-created-by">Created By</label>
-                                <input type="text" id="meta-mesh-created-by" placeholder="e.g., Blender, Reality Capture">
-                            </div>
-                            <div class="metadata-field">
-                                <label for="meta-mesh-version">Tool Version</label>
-                                <input type="text" id="meta-mesh-version" placeholder="e.g., 3.4.0">
-                            </div>
-                            <div class="metadata-field">
-                                <label for="meta-mesh-notes">Source Notes</label>
-                                <textarea id="meta-mesh-notes" rows="2" placeholder="Additional notes about this asset..."></textarea>
-                            </div>
-                            <div class="metadata-field">
-                                <label for="meta-mesh-role">Data Role</label>
-                                <select id="meta-mesh-role">
-                                    <option value="">Not specified</option>
-                                    <option value="primary">Primary</option>
-                                    <option value="derived">Derived</option>
-                                </select>
-                                <span class="field-hint">Primary = original capture, Derived = processed output</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="asset-group">
-                        <div class="subsection-header">Point Cloud Asset</div>
-                        <div class="asset-status" id="pointcloud-asset-status">No point cloud loaded</div>
-                        <div class="asset-fields hidden" id="pointcloud-asset-fields">
-                            <div class="metadata-field">
-                                <label for="meta-pointcloud-created-by">Created By</label>
-                                <input type="text" id="meta-pointcloud-created-by" placeholder="e.g., FARO Scene, Leica Cyclone">
-                            </div>
-                            <div class="metadata-field">
-                                <label for="meta-pointcloud-version">Tool Version</label>
-                                <input type="text" id="meta-pointcloud-version" placeholder="e.g., 2024.1">
-                            </div>
-                            <div class="metadata-field">
-                                <label for="meta-pointcloud-notes">Source Notes</label>
-                                <textarea id="meta-pointcloud-notes" rows="2" placeholder="Additional notes about this point cloud..."></textarea>
-                            </div>
-                            <div class="metadata-field">
-                                <label for="meta-pointcloud-role">Data Role</label>
-                                <select id="meta-pointcloud-role">
-                                    <option value="">Not specified</option>
-                                    <option value="primary">Primary</option>
-                                    <option value="derived">Derived</option>
-                                </select>
-                                <span class="field-hint">Primary = original capture, Derived = processed output</span>
-                            </div>
+                        <input type="file" id="hdr-file-input" accept=".hdr" style="display:none" />
+                        <span id="hdr-filename" class="prop-hint" style="display:none;"></span>
+                        <div class="cb-row mt4">
+                            <input type="checkbox" id="toggle-env-background" />
+                            <label for="toggle-env-background">Show as Background</label>
                         </div>
                     </div>
                 </div>
 
-                <!-- Quality Tab -->
-                <div class="edit-tab-content" id="edit-tab-quality">
-                    <div class="metadata-field">
-                        <label for="meta-quality-tier">Quality Tier</label>
-                        <select id="meta-quality-tier">
-                            <option value="">Not specified</option>
-                            <option value="Tier 1 - Metrology">Tier 1 - Metrology</option>
-                            <option value="Tier 2 - Reference">Tier 2 - Reference</option>
-                            <option value="Tier 3 - Visualization">Tier 3 - Visualization</option>
-                        </select>
-                        <span class="field-hint">Tier 1: highest precision, Tier 3: display-optimized</span>
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-quality-accuracy">Accuracy Grade</label>
-                        <select id="meta-quality-accuracy">
-                            <option value="">Not specified</option>
-                            <option value="A+">A+</option>
-                            <option value="A">A</option>
-                            <option value="B+">B+</option>
-                            <option value="B">B</option>
-                            <option value="C">C</option>
-                            <option value="N/A">N/A</option>
-                        </select>
-                    </div>
-
-                    <div class="subsection-header">Capture Resolution</div>
-                    <div class="metadata-field inline-fields">
-                        <div class="field-group">
-                            <label for="meta-quality-res-value">Value</label>
-                            <input type="number" id="meta-quality-res-value" step="0.01" placeholder="1.0">
-                        </div>
-                        <div class="field-group">
-                            <label for="meta-quality-res-unit">Unit</label>
-                            <select id="meta-quality-res-unit">
-                                <option value="mm">mm</option>
-                                <option value="cm">cm</option>
-                                <option value="m">m</option>
-                            </select>
-                        </div>
-                        <div class="field-group">
-                            <label for="meta-quality-res-type">Type</label>
-                            <input type="text" id="meta-quality-res-type" value="GSD" placeholder="GSD">
-                        </div>
-                    </div>
-
-                    <div class="subsection-header">Alignment Error</div>
-                    <div class="metadata-field inline-fields">
-                        <div class="field-group">
-                            <label for="meta-quality-align-value">Value</label>
-                            <input type="number" id="meta-quality-align-value" step="0.01" placeholder="0.5">
-                        </div>
-                        <div class="field-group">
-                            <label for="meta-quality-align-unit">Unit</label>
-                            <select id="meta-quality-align-unit">
-                                <option value="mm">mm</option>
-                                <option value="cm">cm</option>
-                                <option value="m">m</option>
-                            </select>
-                        </div>
-                        <div class="field-group">
-                            <label for="meta-quality-align-method">Method</label>
-                            <input type="text" id="meta-quality-align-method" value="RMSE" placeholder="RMSE">
-                        </div>
-                    </div>
-
-                    <div class="metadata-field">
-                        <label for="meta-quality-scale-verify">Scale Verification</label>
-                        <input type="text" id="meta-quality-scale-verify" placeholder="e.g., Reference object measured">
-                    </div>
-
-                    <div class="subsection-header">Asset Statistics (Read-only)</div>
-                    <div class="quality-stats">
-                        <div class="stat-row">
-                            <span class="stat-label">Splat Count</span>
-                            <span class="stat-value" id="meta-splat-count">-</span>
-                        </div>
-                        <div class="stat-row">
-                            <span class="stat-label">Mesh Polygons</span>
-                            <span class="stat-value" id="meta-mesh-polys">-</span>
-                        </div>
-                        <div class="stat-row">
-                            <span class="stat-label">Mesh Vertices</span>
-                            <span class="stat-value" id="meta-mesh-verts">-</span>
-                        </div>
-                        <div class="stat-row">
-                            <span class="stat-label">Annotation Count</span>
-                            <span class="stat-value" id="meta-anno-count">0</span>
-                        </div>
-                    </div>
-                    <div class="subsection-header">File Sizes</div>
-                    <div class="quality-stats">
-                        <div class="stat-row">
-                            <span class="stat-label">Splat File</span>
-                            <span class="stat-value" id="meta-splat-size">-</span>
-                        </div>
-                        <div class="stat-row">
-                            <span class="stat-label">Mesh File</span>
-                            <span class="stat-value" id="meta-mesh-size">-</span>
-                        </div>
-                        <div class="stat-row">
-                            <span class="stat-label">Est. Archive Size</span>
-                            <span class="stat-value" id="meta-archive-size">-</span>
-                        </div>
-                    </div>
-
-                    <div class="subsection-header">Data Quality / Known Limitations</div>
-                    <div class="metadata-field">
-                        <label for="meta-quality-coverage-gaps">Coverage Gaps</label>
-                        <textarea id="meta-quality-coverage-gaps" rows="2" placeholder="e.g., Underside of base not captured, rear of object occluded"></textarea>
-                        <span class="field-hint">Areas not captured or with missing data</span>
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-quality-reconstruction">Reconstruction Areas</label>
-                        <textarea id="meta-quality-reconstruction" rows="2" placeholder="e.g., Left ear interpolated from symmetry, hole filled algorithmically"></textarea>
-                        <span class="field-hint">Areas that were reconstructed or interpolated</span>
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-quality-color-calibration">Color Calibration</label>
-                        <input type="text" id="meta-quality-color-calibration" placeholder="e.g., X-Rite ColorChecker verified, uncalibrated">
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-quality-uncertainty">Measurement Uncertainty</label>
-                        <input type="text" id="meta-quality-uncertainty" placeholder="e.g., ±0.05mm at 95% confidence">
-                        <span class="field-hint">Statistical confidence interval for measurements</span>
-                    </div>
-                </div>
-
-                <!-- Material Standard Tab -->
-                <div class="edit-tab-content" id="edit-tab-material">
-                    <div class="metadata-field">
-                        <label for="meta-material-workflow">PBR Workflow</label>
-                        <select id="meta-material-workflow">
-                            <option value="">Not specified</option>
-                            <option value="Metal/Roughness">Metal/Roughness</option>
-                            <option value="Specular/Glossiness">Specular/Glossiness</option>
-                        </select>
-                        <span class="field-hint">Physically-based rendering workflow used</span>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="meta-material-occlusion-packed">
-                        <label for="meta-material-occlusion-packed">Occlusion Packed (R=AO, G=Roughness, B=Metalness)</label>
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-material-colorspace">Color Space</label>
-                        <select id="meta-material-colorspace">
-                            <option value="">Not specified</option>
-                            <option value="Linear sRGB">Linear sRGB</option>
-                            <option value="sRGB">sRGB</option>
-                            <option value="ACEScg">ACEScg</option>
-                        </select>
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-material-normalspace">Normal Map Space</label>
-                        <select id="meta-material-normalspace">
-                            <option value="">Not specified</option>
-                            <option value="OpenGL">OpenGL (+Y up)</option>
-                            <option value="DirectX">DirectX (-Y up)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Preservation Tab -->
-                <div class="edit-tab-content" id="edit-tab-preservation">
-                    <div class="subsection-header">Format Registry (PRONOM)</div>
-                    <div class="metadata-field">
-                        <label for="meta-pres-format-glb">GLB Format ID</label>
-                        <input type="text" id="meta-pres-format-glb" value="fmt/861" placeholder="fmt/861">
-                        <span class="field-hint">PRONOM identifier for glTF Binary</span>
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-pres-format-obj">OBJ Format ID</label>
-                        <input type="text" id="meta-pres-format-obj" value="fmt/935" placeholder="fmt/935">
-                        <span class="field-hint">PRONOM identifier for Wavefront OBJ</span>
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-pres-format-ply">PLY Format ID</label>
-                        <input type="text" id="meta-pres-format-ply" value="fmt/831" placeholder="fmt/831">
-                        <span class="field-hint">PRONOM identifier for Stanford PLY</span>
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-pres-format-e57">E57 Format ID</label>
-                        <input type="text" id="meta-pres-format-e57" value="fmt/643" placeholder="fmt/643">
-                        <span class="field-hint">PRONOM identifier for ASTM E57</span>
-                    </div>
-
-                    <div class="subsection-header">Significant Properties</div>
-                    <span class="field-hint" style="display: block; margin-bottom: 10px;">Properties that must be preserved for the asset to remain meaningful</span>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="meta-pres-prop-geometry" checked>
-                        <label for="meta-pres-prop-geometry">Geometry / Mesh Structure</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="meta-pres-prop-vertex-color">
-                        <label for="meta-pres-prop-vertex-color">Vertex Colors</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="meta-pres-prop-uv">
-                        <label for="meta-pres-prop-uv">UV Mapping</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="meta-pres-prop-normals">
-                        <label for="meta-pres-prop-normals">Normal Maps</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="meta-pres-prop-pbr">
-                        <label for="meta-pres-prop-pbr">PBR Materials</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="meta-pres-prop-scale">
-                        <label for="meta-pres-prop-scale">Real-world Scale</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="meta-pres-prop-splat">
-                        <label for="meta-pres-prop-splat">Gaussian Splat Data</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="meta-pres-prop-pointcloud">
-                        <label for="meta-pres-prop-pointcloud">E57 Point Cloud Data</label>
-                    </div>
-
-                    <div class="subsection-header">Rendering Requirements</div>
-                    <div class="metadata-field">
-                        <label for="meta-pres-render-req">Minimum Requirements</label>
-                        <input type="text" id="meta-pres-render-req" value="WebGL 2.0" placeholder="e.g., WebGL 2.0, OpenGL ES 3.0">
-                        <span class="field-hint">Minimum graphics API required for rendering</span>
-                    </div>
-                    <div class="metadata-field">
-                        <label for="meta-pres-render-notes">Rendering Notes</label>
-                        <textarea id="meta-pres-render-notes" rows="2" placeholder="e.g., Requires compute shaders for splat rendering, best viewed in Chrome/Edge"></textarea>
-                    </div>
-                </div>
-
-                <!-- Integrity Tab -->
-                <div class="edit-tab-content" id="edit-tab-integrity">
-                    <div id="crypto-warning-banner" class="warning-banner hidden">
-                        <span class="warning-icon">⚠</span>
-                        <span>SHA-256 hashing unavailable. This page is not served over HTTPS, so integrity hashes cannot be calculated. Archives will be created without integrity verification.</span>
-                    </div>
-                    <div class="integrity-info">
-                        <div class="stat-row">
-                            <span class="stat-label">Hash Algorithm</span>
-                            <span class="stat-value">SHA-256</span>
-                        </div>
-                        <div class="stat-row">
-                            <span class="stat-label">Manifest Hash</span>
-                            <span class="stat-value hash-preview" id="meta-manifest-hash">Calculated on export</span>
-                        </div>
-                    </div>
-                    <div class="subsection-header">Asset Hashes</div>
-                    <div id="asset-hashes-list" class="hash-list">
-                        <p class="hash-placeholder">Hashes will be calculated when you export the archive.</p>
-                    </div>
-                    <div class="checkbox-group" style="margin-top: 15px;">
-                        <input type="checkbox" id="meta-include-integrity" checked>
-                        <label for="meta-include-integrity">Include integrity data in manifest</label>
-                    </div>
-                </div>
-
-                <!-- Default View Tab -->
-                <div class="edit-tab-content" id="edit-tab-viewer">
-                    <div class="subsection-header">Mesh Rendering</div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="meta-viewer-single-sided" checked>
-                        <label for="meta-viewer-single-sided">Single Sided</label>
-                    </div>
-                    <span class="field-hint">When enabled, back faces are culled (like Sketchfab default). Disable for thin geometry like leaves, fabric, or paper.</span>
-
-                    <div class="subsection-header" style="margin-top: 20px;">Scene</div>
-                    <div class="metadata-field">
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="meta-viewer-bg-override">
-                            <label for="meta-viewer-bg-override">Override Background Color</label>
-                        </div>
-                        <span class="field-hint">When unchecked, the viewer theme controls the background color.</span>
-                        <div class="color-input-row" id="meta-viewer-bg-color-row" style="margin-top: 6px; display: none;">
-                            <input type="color" id="meta-viewer-bg-color" value="#1a1a2e">
-                            <span class="color-hex-label" id="meta-viewer-bg-color-hex">#1a1a2e</span>
-                        </div>
-                    </div>
-                </div>
             </div>
 
-            <!-- KIOSK-STRIP-END: metadata edit tab -->
 
-            <!-- Annotations Mode Content -->
-            <div class="sidebar-mode-content" id="sidebar-annotations">
-                <div id="sidebar-annotations-list"></div>
-                <div class="button-row" style="margin-top: 10px;">
-                    <button id="btn-sidebar-add-annotation" class="action-btn">Add Annotation</button>
+            <!-- ========================================================
+                 ASSETS PANE
+                 ======================================================== -->
+            <div class="props-pane active" id="pane-assets">
+
+                <!-- Load Files -->
+                <div class="prop-section open">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Load Files</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <label for="model-input" class="prop-btn" style="cursor:pointer;"><span style="color:#6a8bce;">+</span> 3D Model (.glb, .gltf, .obj)</label>
+                        <input type="file" id="model-input" accept=".glb,.gltf,.obj" multiple style="display:none" />
+                        <button class="prop-btn" id="btn-load-model-url" style="font-size:10px; color:var(--text-muted);">Model from URL...</button>
+                        <span id="model-filename" class="prop-hint">No file loaded</span>
+
+                        <label for="splat-input" class="prop-btn mt4" style="cursor:pointer;"><span style="color:var(--accent-text);">+</span> Gaussian Splat (.ply, .splat, .ksplat, .spz)</label>
+                        <input type="file" id="splat-input" accept=".ply,.splat,.ksplat,.spz,.sog" style="display:none" />
+                        <button class="prop-btn" id="btn-load-splat-url" style="font-size:10px; color:var(--text-muted);">Splat from URL...</button>
+                        <span id="splat-filename" class="prop-hint">No file loaded</span>
+
+                        <label for="pointcloud-input" class="prop-btn mt4" style="cursor:pointer;"><span style="color:#c4863a;">+</span> Point Cloud (.e57)</label>
+                        <input type="file" id="pointcloud-input" accept=".e57" style="display:none" />
+                        <button class="prop-btn" id="btn-load-pointcloud-url" style="font-size:10px; color:var(--text-muted);">Point Cloud from URL...</button>
+                        <span id="pointcloud-filename" class="prop-hint">No file loaded</span>
+
+                        <label for="stl-input" class="prop-btn mt4" style="cursor:pointer;"><span style="color:#9a7bce;">+</span> STL Model (.stl)</label>
+                        <input type="file" id="stl-input" accept=".stl" style="display:none" />
+                        <button class="prop-btn" id="btn-load-stl-url" style="font-size:10px; color:var(--text-muted);">STL from URL...</button>
+                        <span id="stl-filename" class="prop-hint">No file loaded</span>
+
+                        <label for="archive-input" class="prop-btn mt4" style="cursor:pointer;">Load Archive (.a3d, .a3z)</label>
+                        <input type="file" id="archive-input" accept=".a3d,.a3z" style="display:none" />
+                        <button class="prop-btn" id="btn-load-archive-url" style="font-size:10px; color:var(--text-muted);">Archive from URL...</button>
+                        <span id="archive-filename" class="prop-hint">No archive loaded</span>
+                    </div>
                 </div>
-                <div id="sidebar-annotation-editor" class="hidden">
-                    <div class="subsection-header">Selected Annotation</div>
-                    <div class="metadata-field">
-                        <label for="sidebar-edit-anno-title">Title</label>
-                        <input type="text" id="sidebar-edit-anno-title" placeholder="Annotation title">
+
+                <!-- Display Proxies -->
+                <div class="prop-section archived">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Display Proxies</span>
+                        <span class="archive-tag">archived</span>
+                        <span class="prop-section-chevron">&#9654;</span>
                     </div>
-                    <div class="metadata-field">
-                        <label for="sidebar-edit-anno-body">Description <button type="button" class="insert-image-btn" id="btn-sidebar-insert-image" title="Insert Image"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button></label>
-                        <textarea id="sidebar-edit-anno-body" rows="3" placeholder="Describe this point..."></textarea>
-                    </div>
-                    <div class="button-row">
-                        <button id="btn-sidebar-update-anno-camera" class="action-btn secondary small">Update Camera</button>
-                        <button id="btn-sidebar-delete-anno" class="action-btn secondary small danger">Delete</button>
+                    <div class="prop-section-body">
+                        <label for="proxy-mesh-input" class="prop-btn" style="font-size:10px; cursor:pointer;">Mesh Proxy (.glb, .obj)</label>
+                        <input type="file" id="proxy-mesh-input" accept=".glb,.gltf,.obj" style="display:none" />
+                        <span id="proxy-mesh-filename" class="prop-hint">No proxy loaded</span>
+
+                        <label for="proxy-splat-input" class="prop-btn mt4" style="font-size:10px; cursor:pointer;">Splat Proxy (.ply, .spz)</label>
+                        <input type="file" id="proxy-splat-input" accept=".ply,.spz,.ksplat,.sog,.splat" style="display:none" />
+                        <span id="proxy-splat-filename" class="prop-hint">No proxy loaded</span>
+
+                        <p class="prop-hint mt4">Pre-simplified assets for mobile/tablet viewers.</p>
+
+                        <button class="prop-btn mt4" id="btn-load-full-res" style="display:none;">Load Full Resolution Mesh</button>
                     </div>
                 </div>
-            </div>
 
-            <!-- Footer with close button (always visible) -->
-            <div class="sidebar-footer">
-                <button id="btn-close-sidebar" class="action-btn secondary">Close</button>
-            </div>
-        </div>
-
-        <!-- KIOSK-STRIP-START: export panel -->
-        <div id="export-panel" class="hidden">
-            <h3>Export Archive</h3>
-            <p class="export-description">Configure metadata before exporting for a complete archive.</p>
-
-            <div class="export-section">
-                <label class="export-section-label">Format</label>
-                <div class="radio-group">
-                    <label><input type="radio" name="export-format" value="a3d" checked> .a3d (Standard)</label>
-                    <label><input type="radio" name="export-format" value="a3z"> .a3z (Compressed)</label>
-                </div>
-            </div>
-
-            <div class="export-section">
-                <label class="export-section-label">Include in archive:</label>
-                <div class="checkbox-group">
-                    <input type="checkbox" id="archive-include-splat" checked disabled />
-                    <label for="archive-include-splat">Gaussian Splat</label>
-                </div>
-                <div class="checkbox-group">
-                    <input type="checkbox" id="archive-include-model" checked disabled />
-                    <label for="archive-include-model">3D Model</label>
-                </div>
-                <div class="checkbox-group">
-                    <input type="checkbox" id="archive-include-pointcloud" checked disabled />
-                    <label for="archive-include-pointcloud">Point Cloud</label>
-                </div>
-                <div class="checkbox-group">
-                    <input type="checkbox" id="archive-include-annotations" checked disabled />
-                    <label for="archive-include-annotations">Annotations</label>
-                </div>
-            </div>
-
-            <div class="export-actions">
-                <button id="btn-export-cancel" class="action-btn secondary">Cancel</button>
-                <button id="btn-export-download" class="action-btn">Download Archive</button>
-            </div>
-            <div class="export-section" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #3a3a5a;">
-                <button id="btn-download-viewer" class="action-btn secondary" style="width: 100%;">Download Offline Viewer</button>
-                <p class="export-hint">One-time download. Opens any .a3d/.a3z archive offline.</p>
-            </div>
-        </div>
-        <!-- KIOSK-STRIP-END: export panel -->
-
-        <div id="controls-panel">
-            <h2>Vitrine3D</h2>
-
-            <div class="control-section">
-                <h3>Display Mode</h3>
-                <div class="toggle-group">
-                    <button id="btn-model" class="toggle-btn active">Model</button>
-                    <button id="btn-splat" class="toggle-btn">Splat</button>
-                    <button id="btn-pointcloud" class="toggle-btn">Point Cloud</button>
-                    <button id="btn-stl" class="toggle-btn">STL</button>
-                    <button id="btn-both" class="toggle-btn">Model/Splat</button>
-                    <button id="btn-split" class="toggle-btn">Split M/S</button>
-                </div>
-            </div>
-
-            <div class="control-section collapsible collapsed" id="load-files-section">
-                <h3 class="collapsible-header">Load Files <span class="collapse-icon">▶</span></h3>
-                <div class="collapsible-content">
-                    <div class="load-subsection">
-                        <h4>3D Model (.glb, .gltf, .obj)</h4>
-                        <input type="file" id="model-input" accept=".glb,.gltf,.obj" multiple />
-                        <div class="button-row">
-                            <label for="model-input" class="file-label">From File</label>
-                            <button id="btn-load-model-url" class="action-btn">From URL</button>
-                        </div>
-                        <span id="model-filename" class="filename">No file loaded</span>
+                <!-- Source Files -->
+                <div class="prop-section archived">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Source Files</span>
+                        <span class="archive-tag">archived</span>
+                        <span class="prop-section-chevron">&#9654;</span>
                     </div>
-                    <div class="load-subsection" id="proxy-mesh-subsection">
-                        <h4>Display Proxy (.glb, .gltf, .obj) <span class="optional-label">optional</span></h4>
-                        <input type="file" id="proxy-mesh-input" accept=".glb,.gltf,.obj" />
-                        <div class="button-row">
-                            <label for="proxy-mesh-input" class="file-label">From File</label>
-                        </div>
-                        <span id="proxy-mesh-filename" class="filename">No proxy loaded</span>
-                        <p class="field-hint">Pre-simplified mesh for mobile/tablet viewers. Full-resolution mesh is preserved in the archive.</p>
-                    </div>
-                    <div class="load-subsection" id="proxy-splat-subsection">
-                        <h4>Splat Display Proxy (.ply, .spz, .ksplat, .splat) <span class="optional-label">optional</span></h4>
-                        <input type="file" id="proxy-splat-input" accept=".ply,.spz,.ksplat,.sog,.splat" />
-                        <div class="button-row">
-                            <label for="proxy-splat-input" class="file-label">From File</label>
-                        </div>
-                        <span id="proxy-splat-filename" class="filename">No proxy loaded</span>
-                        <p class="field-hint">Lower-quality splat for mobile/tablet viewers. Full-resolution splat is preserved in the archive.</p>
-                    </div>
-                    <div class="load-subsection">
-                        <h4>STL Model (.stl)</h4>
-                        <input type="file" id="stl-input" accept=".stl" />
-                        <div class="button-row">
-                            <label for="stl-input" class="file-label">From File</label>
-                            <button id="btn-load-stl-url" class="action-btn">From URL</button>
-                        </div>
-                        <span id="stl-filename" class="filename">No file loaded</span>
-                    </div>
-                    <div class="load-subsection">
-                        <h4>Point Cloud (.e57)</h4>
-                        <input type="file" id="pointcloud-input" accept=".e57" />
-                        <div class="button-row">
-                            <label for="pointcloud-input" class="file-label">From File</label>
-                            <button id="btn-load-pointcloud-url" class="action-btn">From URL</button>
-                        </div>
-                        <span id="pointcloud-filename" class="filename">No file loaded</span>
-                    </div>
-                    <div class="load-subsection">
-                        <h4>Gaussian Splat (.ply, .splat, .ksplat, .spz)</h4>
-                        <input type="file" id="splat-input" accept=".ply,.splat,.ksplat,.spz,.sog" />
-                        <div class="button-row">
-                            <label for="splat-input" class="file-label">From File</label>
-                            <button id="btn-load-splat-url" class="action-btn">From URL</button>
-                        </div>
-                        <span id="splat-filename" class="filename">No file loaded</span>
-                    </div>
-                    <div class="load-subsection">
-                        <h4>Archive (.a3d/.a3z)</h4>
-                        <input type="file" id="archive-input" accept=".a3d,.a3z" />
-                        <div class="button-row">
-                            <label for="archive-input" class="file-label">From File</label>
-                            <button id="btn-load-archive-url" class="action-btn">From URL</button>
-                        </div>
-                        <span id="archive-filename" class="filename">No archive loaded</span>
-                    </div>
-
-                    <div class="load-subsection" id="source-files-subsection">
-                        <h4>Source Files <span class="optional-label">optional</span></h4>
+                    <div class="prop-section-body">
+                        <label for="source-files-input" class="prop-btn" style="font-size:10px; cursor:pointer;">+ Add Source Files</label>
                         <input type="file" id="source-files-input" multiple style="display:none" />
-                        <div class="button-row">
-                            <label for="source-files-input" class="file-label">Add Files</label>
-                        </div>
                         <div id="source-files-list" class="source-files-list"></div>
                         <div id="source-files-summary" class="source-files-summary" style="display:none">
                             <span id="source-files-count">0</span> files
                             (<span id="source-files-size">0 MB</span>)
                         </div>
-                        <select id="source-files-category" class="source-files-category">
+                        <select class="prop-select mt4" id="source-files-category" style="font-size:10px;">
                             <option value="">Category (optional)</option>
                             <option value="raw_photography">Raw Photography</option>
                             <option value="processing_report">Processing Report</option>
@@ -1123,310 +509,1232 @@
                             <option value="reference">Reference Material</option>
                             <option value="other">Other</option>
                         </select>
-                        <p class="field-hint">Files archived alongside 3D data for preservation. Not loaded into the viewer.</p>
+                        <p class="prop-hint mt4">Archived alongside 3D data. Not loaded into viewer.</p>
+                    </div>
+                </div>
+
+                <!-- Model Settings -->
+                <div class="prop-section">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Model Settings</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <p class="prop-hint mb4" style="font-style:italic;">Visualization settings are session-only.</p>
+                        <div class="sl-row">
+                            <div class="sl-hd"><span class="sl-label">Scale</span><span class="sl-val" id="model-scale-value">1.0</span></div>
+                            <input type="range" id="model-scale" min="0.1" max="5" step="0.1" value="1">
+                        </div>
+                        <div class="sl-row">
+                            <div class="sl-hd"><span class="sl-label">Opacity</span><span class="sl-val" id="model-opacity-value">1.0</span></div>
+                            <input type="range" id="model-opacity" min="0" max="1" step="0.05" value="1">
+                        </div>
+                        <div class="cb-row mt4">
+                            <input type="checkbox" id="model-wireframe"><label for="model-wireframe">Wireframe</label>
+                        </div>
+                        <div class="cb-row">
+                            <input type="checkbox" id="model-no-texture"><label for="model-no-texture">Hide Textures</label>
+                        </div>
+                        <div class="cb-row">
+                            <input type="checkbox" id="model-matcap"><label for="model-matcap">Matcap</label>
+                        </div>
+                        <div id="matcap-style-group" style="display:none;" class="mt4">
+                            <select class="prop-select" id="matcap-style">
+                                <option value="clay">Clay</option>
+                                <option value="chrome">Chrome</option>
+                                <option value="pearl">Pearl</option>
+                                <option value="jade">Jade</option>
+                                <option value="copper">Copper</option>
+                            </select>
+                        </div>
+                        <div class="cb-row">
+                            <input type="checkbox" id="model-normals"><label for="model-normals">Show Normals</label>
+                        </div>
+                        <div class="cb-row">
+                            <input type="checkbox" id="model-roughness"><label for="model-roughness">Roughness</label>
+                        </div>
+                        <div class="cb-row">
+                            <input type="checkbox" id="model-metalness"><label for="model-metalness">Metalness</label>
+                        </div>
+                        <div class="cb-row">
+                            <input type="checkbox" id="model-specular-f0"><label for="model-specular-f0">Specular F0</label>
+                        </div>
+                        <div style="border-left:2px solid rgba(90,158,151,0.45); padding-left:8px; margin-top:8px;">
+                            <p class="prop-hint mb4" style="color:var(--accent); opacity:0.65; font-style:italic;">Transforms saved in archive</p>
+                            <div class="xyz-block">
+                                <span class="prop-label">Position</span>
+                                <div class="xyz-inputs">
+                                    <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" id="model-pos-x" value="0" step="0.1"></div>
+                                    <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" id="model-pos-y" value="0" step="0.1"></div>
+                                    <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" id="model-pos-z" value="0" step="0.1"></div>
+                                </div>
+                            </div>
+                            <div class="xyz-block">
+                                <span class="prop-label">Rotation (deg)</span>
+                                <div class="xyz-inputs">
+                                    <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" id="model-rot-x" value="0" step="1"></div>
+                                    <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" id="model-rot-y" value="0" step="1"></div>
+                                    <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" id="model-rot-z" value="0" step="1"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Splat Settings -->
+                <div class="prop-section">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Splat Settings</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <p class="prop-hint mb4" style="font-style:italic;">Scale is session-only.</p>
+                        <div class="sl-row">
+                            <div class="sl-hd"><span class="sl-label">Scale</span><span class="sl-val" id="splat-scale-value">1.0</span></div>
+                            <input type="range" id="splat-scale" min="0.1" max="5" step="0.1" value="1">
+                        </div>
+                        <div style="border-left:2px solid rgba(90,158,151,0.45); padding-left:8px; margin-top:8px;">
+                            <p class="prop-hint mb4" style="color:var(--accent); opacity:0.65; font-style:italic;">Transforms saved in archive</p>
+                            <div class="xyz-block">
+                                <span class="prop-label">Position</span>
+                                <div class="xyz-inputs">
+                                    <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" id="splat-pos-x" value="0" step="0.1"></div>
+                                    <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" id="splat-pos-y" value="0" step="0.1"></div>
+                                    <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" id="splat-pos-z" value="0" step="0.1"></div>
+                                </div>
+                            </div>
+                            <div class="xyz-block">
+                                <span class="prop-label">Rotation (deg)</span>
+                                <div class="xyz-inputs">
+                                    <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" id="splat-rot-x" value="0" step="1"></div>
+                                    <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" id="splat-rot-y" value="0" step="1"></div>
+                                    <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" id="splat-rot-z" value="0" step="1"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Point Cloud Settings -->
+                <div class="prop-section">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Point Cloud Settings</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <p class="prop-hint mb4" style="font-style:italic;">Scale, size, and opacity are session-only.</p>
+                        <div class="sl-row">
+                            <div class="sl-hd"><span class="sl-label">Scale</span><span class="sl-val" id="pointcloud-scale-value">1.0</span></div>
+                            <input type="range" id="pointcloud-scale" min="0.1" max="5" step="0.1" value="1">
+                        </div>
+                        <div class="sl-row">
+                            <div class="sl-hd"><span class="sl-label">Point Size</span><span class="sl-val" id="pointcloud-point-size-value">0.01</span></div>
+                            <input type="range" id="pointcloud-point-size" min="0.001" max="0.1" step="0.001" value="0.01">
+                        </div>
+                        <div class="sl-row">
+                            <div class="sl-hd"><span class="sl-label">Opacity</span><span class="sl-val" id="pointcloud-opacity-value">1.0</span></div>
+                            <input type="range" id="pointcloud-opacity" min="0" max="1" step="0.05" value="1">
+                        </div>
+                        <div style="border-left:2px solid rgba(90,158,151,0.45); padding-left:8px; margin-top:8px;">
+                            <p class="prop-hint mb4" style="color:var(--accent); opacity:0.65; font-style:italic;">Transforms saved in archive</p>
+                            <div class="xyz-block">
+                                <span class="prop-label">Position</span>
+                                <div class="xyz-inputs">
+                                    <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" id="pointcloud-pos-x" value="0" step="0.1"></div>
+                                    <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" id="pointcloud-pos-y" value="0" step="0.1"></div>
+                                    <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" id="pointcloud-pos-z" value="0" step="0.1"></div>
+                                </div>
+                            </div>
+                            <div class="xyz-block">
+                                <span class="prop-label">Rotation (deg)</span>
+                                <div class="xyz-inputs">
+                                    <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" id="pointcloud-rot-x" value="0" step="1"></div>
+                                    <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" id="pointcloud-rot-y" value="0" step="1"></div>
+                                    <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" id="pointcloud-rot-z" value="0" step="1"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+
+            <!-- ========================================================
+                 TRANSFORM PANE
+                 ======================================================== -->
+            <div class="props-pane" id="pane-transform">
+
+                <div class="prop-section open">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Active Object</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <p class="prop-hint mb4">Select which object the gizmo controls.</p>
+                        <div class="seg-ctrl">
+                            <button class="seg-btn active" id="btn-select-none">None</button>
+                            <button class="seg-btn" id="btn-select-splat">Splat</button>
+                            <button class="seg-btn" id="btn-select-model">Model</button>
+                            <button class="seg-btn" id="btn-select-both">Both</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="prop-section open">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Gizmo Mode</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <div class="seg-ctrl">
+                            <button class="seg-btn active" id="btn-translate">Translate</button>
+                            <button class="seg-btn" id="btn-rotate">Rotate</button>
+                            <button class="seg-btn" id="btn-scale">Scale</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+
+            <!-- ========================================================
+                 ALIGN PANE
+                 ======================================================== -->
+            <div class="props-pane" id="pane-align">
+
+                <div class="prop-section open">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">3-Point Alignment</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <p style="font-size:11px; color:var(--text-muted); margin-bottom:8px; line-height:1.5;">
+                            Click 3 matching points on each object for precise alignment.
+                        </p>
+                        <button class="prop-btn accent" id="btn-align">Align Objects</button>
+                    </div>
+                </div>
+
+                <div class="prop-section open">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Auto-Align</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <button class="prop-btn" id="btn-reset-alignment">Reset All Transforms</button>
+                    </div>
+                </div>
+
+            </div>
+
+
+            <!-- ========================================================
+                 ANNOTATE PANE
+                 ======================================================== -->
+            <div class="props-pane" id="pane-annotate">
+
+                <div class="prop-section open">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Add Annotation</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <p style="font-size:11px; color:var(--text-muted); margin-bottom:8px; line-height:1.5;">
+                            Click a point on the 3D model to place a new annotation marker.
+                        </p>
+                        <button class="prop-btn accent" id="btn-annotate">+ Place Annotation</button>
+                        <button class="prop-btn mt4" id="btn-toggle-annotations" style="display:none;">Toggle Annotations</button>
+                    </div>
+                </div>
+
+                <div class="prop-section open">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Annotations</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <div id="sidebar-annotations-list"></div>
+                        <div id="sidebar-annotation-editor" class="hidden">
+                            <div class="metadata-field">
+                                <label for="sidebar-edit-anno-title">Title</label>
+                                <input type="text" class="prop-input" id="sidebar-edit-anno-title" placeholder="Annotation title">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="sidebar-edit-anno-body">Description</label>
+                                <textarea class="prop-input" id="sidebar-edit-anno-body" rows="3" placeholder="Annotation description..."></textarea>
+                            </div>
+                            <div class="button-row" style="display:flex; gap:6px; margin-top:8px;">
+                                <button class="prop-btn small" id="btn-sidebar-update-anno-camera" title="Update camera position for this annotation">Update Camera</button>
+                                <button class="prop-btn danger small" id="btn-sidebar-delete-anno" title="Delete this annotation">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+
+            <!-- ========================================================
+                 MEASURE PANE
+                 ======================================================== -->
+            <div class="props-pane" id="pane-measure">
+
+                <div class="prop-section open" id="measure-scale-panel">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Scale</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span style="font-size:11px; color:var(--text-secondary); white-space:nowrap;">1 unit =</span>
+                            <input class="prop-input" type="number" id="measure-scale-value" value="1" min="0.0001" step="any" style="width:60px; text-align:center;">
+                            <select class="prop-select" id="measure-scale-unit" style="width:60px;">
+                                <option value="m">m</option>
+                                <option value="cm">cm</option>
+                                <option value="mm">mm</option>
+                                <option value="in">in</option>
+                                <option value="ft">ft</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="prop-section open">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Measurements</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <p style="font-size:11px; color:var(--text-muted); margin-bottom:8px; line-height:1.5;">
+                            Click two points on the model to measure distance.
+                        </p>
+                        <button class="prop-btn" id="btn-measure">Start Measuring</button>
+                        <button class="prop-btn danger mt4" id="measure-clear-all">Clear All</button>
+                    </div>
+                </div>
+
+            </div>
+
+
+            <!-- ========================================================
+                 CAPTURE PANE
+                 ======================================================== -->
+            <div class="props-pane" id="pane-capture">
+
+                <div class="prop-section open archived">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Screenshots</span>
+                        <span class="archive-tag">archived</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <button class="prop-btn accent" id="btn-capture-screenshot">Capture Screenshot</button>
+                        <button class="prop-btn mt4" id="btn-set-preview">Set Archive Preview Image</button>
+                        <p class="prop-hint mt4">A preview is captured automatically during export. Taking a manual preview overrides that.</p>
+                        <div id="manual-preview-status" style="display:none; margin-top:6px;">
+                            <span style="font-size:10px; color:var(--accent);">Manual preview set</span>
+                            <button id="btn-clear-manual-preview" style="font-size:9px; margin-left:6px; background:none; border:none; color:var(--danger); cursor:pointer;">Clear</button>
+                        </div>
+                        <div id="screenshots-list" class="mt4"></div>
+                    </div>
+                </div>
+
+            </div>
+
+
+            <!-- ========================================================
+                 METADATA PANE
+                 ======================================================== -->
+            <div class="props-pane" id="pane-metadata">
+
+                <div style="padding:4px 12px; font-size:9px; color:var(--accent); opacity:0.65; letter-spacing:0.4px; text-transform:uppercase; font-weight:600; border-left:2px solid rgba(90,158,151,0.45); margin:6px 0 0 0;">All metadata is saved in archive</div>
+
+                <!-- Unified Metadata Sidebar content (moved here from #metadata-sidebar) -->
+                <div id="metadata-sidebar">
+                    <!-- Mobile drag handle (hidden on desktop, visible on mobile kiosk) -->
+                    <div id="sidebar-drag-handle">
+                        <div class="drag-handle-bar"></div>
+                    </div>
+                    <!-- Main mode tabs -->
+                    <div class="sidebar-mode-tabs">
+                        <button class="sidebar-mode-tab active" data-mode="view">View</button>
+                        <button class="sidebar-mode-tab" data-mode="edit">Edit</button>
+                    </div>
+
+                    <!-- View Mode Content -->
+                    <div class="sidebar-mode-content active" id="sidebar-view">
+                        <div class="display-content">
+                            <h1 class="display-title" id="display-title">Untitled</h1>
+                            <p class="display-description" id="display-description"></p>
+                            <div id="display-tags" class="display-tags" style="display:none"></div>
+
+                            <div class="display-divider"></div>
+
+                            <div class="display-details">
+                                <div class="display-detail" id="display-creator-row">
+                                    <span class="display-label">Creator</span>
+                                    <span class="display-value" id="display-creator"></span>
+                                </div>
+                                <div class="display-detail" id="display-date-row">
+                                    <span class="display-label">Date</span>
+                                    <span class="display-value" id="display-date"></span>
+                                </div>
+                                <div class="display-detail" id="display-location-row">
+                                    <span class="display-label">Location</span>
+                                    <span class="display-value" id="display-location"></span>
+                                </div>
+                                <div class="display-detail" id="display-device-row">
+                                    <span class="display-label">Captured with</span>
+                                    <span class="display-value" id="display-device"></span>
+                                </div>
+                            </div>
+
+                            <div class="display-license" id="display-license-row">
+                                <span id="display-license"></span>
+                            </div>
+
+                            <div class="display-stats" id="display-stats">
+                                <div class="display-stat" id="display-splat-stat">
+                                    <span class="stat-number" id="display-splat-count">-</span>
+                                    <span class="stat-label">Gaussians</span>
+                                </div>
+                                <div class="display-stat" id="display-mesh-stat">
+                                    <span class="stat-number" id="display-mesh-count">-</span>
+                                    <span class="stat-label">Polygons</span>
+                                </div>
+                                <div class="display-stat" id="display-pointcloud-stat" style="display: none;">
+                                    <span class="stat-number" id="display-pointcloud-count">-</span>
+                                    <span class="stat-label">Points</span>
+                                </div>
+                                <div class="display-stat" id="display-anno-stat">
+                                    <span class="stat-number" id="display-anno-count">0</span>
+                                    <span class="stat-label">Annotations</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- KIOSK-STRIP-START: metadata edit tab -->
+                    <!-- Edit Mode Content -->
+                    <div class="sidebar-mode-content" id="sidebar-edit">
+                        <div class="edit-category-bar">
+                            <select class="edit-category-select" id="edit-category-select">
+                                <option value="project" selected>Project</option>
+                                <option value="provenance">Provenance</option>
+                                <option value="archival">Archival</option>
+                                <option value="quality">Quality</option>
+                                <option value="material">Material</option>
+                                <option value="preservation">Preservation</option>
+                                <option value="assets">Assets</option>
+                                <option value="integrity">Integrity</option>
+                                <option value="viewer">Default View</option>
+                            </select>
+                        </div>
+                        <div class="metadata-actions">
+                            <button id="btn-import-metadata" class="action-btn" title="Import metadata from a manifest.json file">Import Manifest</button>
+                            <button id="btn-export-metadata" class="action-btn" title="Export current metadata as manifest.json">Export Manifest</button>
+                        </div>
+
+                        <!-- Project Tab -->
+                        <div class="edit-tab-content active" id="edit-tab-project">
+                            <div class="metadata-field">
+                                <label for="meta-title">Title <span class="required">*</span></label>
+                                <input type="text" id="meta-title" placeholder="My 3D Scene">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-id">Project ID</label>
+                                <input type="text" id="meta-id" placeholder="my-3d-scene">
+                                <span class="field-hint">Auto-generated from title if empty</span>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-description">Description <button type="button" class="insert-image-btn" id="btn-desc-insert-image" title="Insert Image"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button></label>
+                                <textarea id="meta-description" rows="3" placeholder="Describe this 3D scene..."></textarea>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-tags">Tags</label>
+                                <input type="text" id="meta-tags" placeholder="scan, heritage, 2024" title="Comma-separated tags">
+                                <small class="field-hint">Separate tags with commas</small>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-license">License</label>
+                                <select id="meta-license">
+                                    <option value="CC0">CC0 Public Domain</option>
+                                    <option value="CC-BY 4.0">CC-BY 4.0</option>
+                                    <option value="CC-BY-SA 4.0">CC-BY-SA 4.0</option>
+                                    <option value="CC-BY-NC 4.0">CC-BY-NC 4.0</option>
+                                    <option value="MIT">MIT License</option>
+                                    <option value="All Rights Reserved">All Rights Reserved</option>
+                                    <option value="custom">Custom...</option>
+                                </select>
+                            </div>
+                            <div class="metadata-field hidden" id="custom-license-field">
+                                <label for="meta-custom-license">Custom License</label>
+                                <input type="text" id="meta-custom-license" placeholder="Enter custom license">
+                            </div>
+
+                            <div class="subsection-header">Relationships</div>
+                            <div class="metadata-field">
+                                <label for="meta-part-of">Part Of</label>
+                                <input type="text" id="meta-part-of" placeholder="Parent collection or project ID">
+                                <span class="field-hint">ID of collection this belongs to</span>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-derived-from">Derived From</label>
+                                <input type="text" id="meta-derived-from" placeholder="Source asset ID">
+                                <span class="field-hint">ID of asset this was derived from</span>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-replaces">Replaces</label>
+                                <input type="text" id="meta-replaces" placeholder="Previous version ID">
+                                <span class="field-hint">ID of asset this supersedes</span>
+                            </div>
+                            <div class="subsection-header">Related Objects</div>
+                            <div id="related-objects-list"></div>
+                            <button id="btn-add-related-object" class="action-btn secondary" style="width: 100%; margin-top: 10px;">
+                                + Add Related Object
+                            </button>
+                        </div>
+
+                        <!-- Provenance Tab -->
+                        <div class="edit-tab-content" id="edit-tab-provenance">
+                            <div class="subsection-header">Capture Information</div>
+                            <div class="metadata-field">
+                                <label for="meta-capture-date">Capture Date</label>
+                                <input type="date" id="meta-capture-date">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-capture-device">Capture Device</label>
+                                <input type="text" id="meta-capture-device" placeholder="e.g., iPhone 15 Pro, Faro Focus">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-device-serial">Device Serial Number</label>
+                                <input type="text" id="meta-device-serial" placeholder="e.g., AL-2024-0847">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-operator">Operator / Creator</label>
+                                <input type="text" id="meta-operator" placeholder="Name or organization">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-operator-orcid">Operator ORCID</label>
+                                <input type="text" id="meta-operator-orcid" placeholder="e.g., 0000-0002-1825-0097">
+                                <span class="field-hint">ORCID identifier for attribution</span>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-location">Capture Location</label>
+                                <input type="text" id="meta-location" placeholder="Where the capture was made">
+                            </div>
+
+                            <div class="subsection-header">Processing Software</div>
+                            <div id="processing-software-list"></div>
+                            <button id="btn-add-processing-software" class="action-btn secondary" style="width: 100%; margin-top: 10px;">
+                                + Add Processing Software
+                            </button>
+
+                            <div class="subsection-header" style="margin-top: 20px;">Processing Notes</div>
+                            <div class="metadata-field">
+                                <label for="meta-processing-notes">Notes</label>
+                                <textarea id="meta-processing-notes" rows="3" placeholder="e.g., Gap fill applied to underside, decimation from 50M to 5M polys"></textarea>
+                                <span class="field-hint">Document any significant processing steps or modifications</span>
+                            </div>
+
+                            <div class="subsection-header">Convention Hints</div>
+                            <div class="metadata-field">
+                                <label for="meta-conventions">References</label>
+                                <input type="text" id="meta-conventions" placeholder="e.g., arxiv:2312.13299">
+                                <span class="field-hint">Comma-separated list of convention references</span>
+                            </div>
+                            <div class="subsection-header">Version History</div>
+                            <div class="field-hint">Track changes between archive versions</div>
+                            <div id="version-history-list"></div>
+                            <button id="btn-add-version-entry" class="action-btn secondary" style="width: 100%; margin-top: 10px;">
+                                + Add Version Entry
+                            </button>
+                            <div class="subsection-header">Custom Fields</div>
+                            <div id="custom-fields-list"></div>
+                            <button id="btn-add-custom-field" class="action-btn secondary" style="width: 100%; margin-top: 10px;">
+                                + Add Custom Field
+                            </button>
+                        </div>
+
+                        <!-- Archival Record Tab (Dublin Core) -->
+                        <div class="edit-tab-content" id="edit-tab-archival">
+                            <div class="metadata-field">
+                                <label for="meta-archival-standard">Metadata Standard</label>
+                                <input type="text" id="meta-archival-standard" value="Smithsonian EDAN / Dublin Core" placeholder="Dublin Core, etc.">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-archival-title">Object Title</label>
+                                <input type="text" id="meta-archival-title" placeholder="Official title of the object">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-archival-alt-titles">Alternate Titles</label>
+                                <input type="text" id="meta-archival-alt-titles" placeholder="Comma-separated list">
+                                <span class="field-hint">Other names this object is known by</span>
+                            </div>
+
+                            <div class="subsection-header">Identifiers</div>
+                            <div class="metadata-field">
+                                <label for="meta-archival-accession">Accession Number</label>
+                                <input type="text" id="meta-archival-accession" placeholder="e.g., 2023.001.001">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-archival-siris">SIRIS ID</label>
+                                <input type="text" id="meta-archival-siris" placeholder="Smithsonian SIRIS identifier">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-archival-uri">URI</label>
+                                <input type="text" id="meta-archival-uri" placeholder="Permanent identifier URL">
+                            </div>
+
+                            <div class="subsection-header">Creation Information</div>
+                            <div class="metadata-field">
+                                <label for="meta-archival-creator">Creator</label>
+                                <input type="text" id="meta-archival-creator" placeholder="Original creator/artist">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-archival-date-created">Date Created</label>
+                                <input type="text" id="meta-archival-date-created" placeholder="e.g., ca. 1850, 15th century">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-archival-period">Period</label>
+                                <input type="text" id="meta-archival-period" placeholder="e.g., Renaissance, Ming Dynasty">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-archival-culture">Culture</label>
+                                <input type="text" id="meta-archival-culture" placeholder="e.g., Japanese, Mayan">
+                            </div>
+
+                            <div class="subsection-header">Physical Description</div>
+                            <div class="metadata-field">
+                                <label for="meta-archival-medium">Medium</label>
+                                <input type="text" id="meta-archival-medium" placeholder="e.g., Bronze, Oil on canvas">
+                            </div>
+                            <div class="metadata-field">
+                                <label>Dimensions</label>
+                                <div class="dimension-inputs">
+                                    <input type="text" id="meta-archival-dim-height" placeholder="Height">
+                                    <input type="text" id="meta-archival-dim-width" placeholder="Width">
+                                    <input type="text" id="meta-archival-dim-depth" placeholder="Depth">
+                                </div>
+                                <span class="field-hint">Include units (e.g., 25 cm, 10 in)</span>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-archival-condition">Condition</label>
+                                <input type="text" id="meta-archival-condition" placeholder="e.g., Good, Minor wear">
+                            </div>
+
+                            <div class="subsection-header">Provenance &amp; Rights</div>
+                            <div class="metadata-field">
+                                <label for="meta-archival-provenance">Provenance</label>
+                                <textarea id="meta-archival-provenance" rows="3" placeholder="Ownership and custody history..."></textarea>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-archival-copyright">Copyright Status</label>
+                                <select id="meta-archival-copyright">
+                                    <option value="">Not specified</option>
+                                    <option value="Public Domain">Public Domain</option>
+                                    <option value="CC0">CC0</option>
+                                    <option value="CC-BY">CC-BY</option>
+                                    <option value="CC-BY-SA">CC-BY-SA</option>
+                                    <option value="CC-BY-NC">CC-BY-NC</option>
+                                    <option value="All Rights Reserved">All Rights Reserved</option>
+                                </select>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-archival-credit">Credit Line</label>
+                                <input type="text" id="meta-archival-credit" placeholder="e.g., Gift of John Doe, 2023">
+                            </div>
+
+                            <div class="subsection-header">Context</div>
+                            <div class="metadata-field">
+                                <label for="meta-archival-context-desc">Description</label>
+                                <textarea id="meta-archival-context-desc" rows="3" placeholder="Historical and cultural context..."></textarea>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-archival-location-history">Location History</label>
+                                <input type="text" id="meta-archival-location-history" placeholder="Previous locations/exhibitions">
+                            </div>
+
+                            <div class="subsection-header">Geographic Coverage</div>
+                            <div class="metadata-field">
+                                <label for="meta-coverage-location">Location Name</label>
+                                <input type="text" id="meta-coverage-location" placeholder="e.g., Lincoln Memorial, Washington DC">
+                            </div>
+                            <div class="metadata-field">
+                                <label>Coordinates</label>
+                                <div class="coordinate-inputs">
+                                    <input type="number" id="meta-coverage-lat" step="0.000001" placeholder="Latitude">
+                                    <input type="number" id="meta-coverage-lon" step="0.000001" placeholder="Longitude">
+                                </div>
+                                <span class="field-hint">WGS84 decimal degrees</span>
+                            </div>
+
+                            <div class="subsection-header">Temporal Coverage</div>
+                            <div class="metadata-field">
+                                <label for="meta-coverage-period">Subject Period</label>
+                                <input type="text" id="meta-coverage-period" placeholder="e.g., 1922-present, Ming Dynasty">
+                                <span class="field-hint">Time period the subject represents</span>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="meta-coverage-circa">
+                                <label for="meta-coverage-circa">Date is approximate (circa)</label>
+                            </div>
+                        </div>
+
+                        <!-- Assets Tab -->
+                        <div class="edit-tab-content" id="edit-tab-assets">
+                            <div class="asset-section" id="splat-asset-section">
+                                <h4>Scene (Gaussian Splat)</h4>
+                                <div class="asset-status" id="splat-asset-status">No splat loaded</div>
+                                <div class="asset-fields hidden" id="splat-asset-fields">
+                                    <div class="metadata-field">
+                                        <label for="meta-splat-created-by">Created By</label>
+                                        <input type="text" id="meta-splat-created-by" placeholder="e.g., nerfstudio, 3DGS">
+                                    </div>
+                                    <div class="metadata-field">
+                                        <label for="meta-splat-version">Tool Version</label>
+                                        <input type="text" id="meta-splat-version" placeholder="e.g., 0.3.4">
+                                    </div>
+                                    <div class="metadata-field">
+                                        <label for="meta-splat-notes">Source Notes</label>
+                                        <textarea id="meta-splat-notes" rows="2" placeholder="Additional notes about this asset..."></textarea>
+                                    </div>
+                                    <div class="metadata-field">
+                                        <label for="meta-splat-role">Data Role</label>
+                                        <select id="meta-splat-role">
+                                            <option value="">Not specified</option>
+                                            <option value="primary">Primary</option>
+                                            <option value="derived">Derived</option>
+                                        </select>
+                                        <span class="field-hint">Primary = original capture, Derived = processed output</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="asset-section" id="mesh-asset-section">
+                                <h4>Mesh (3D Model)</h4>
+                                <div class="asset-status" id="mesh-asset-status">No mesh loaded</div>
+                                <div class="asset-fields hidden" id="mesh-asset-fields">
+                                    <div class="metadata-field">
+                                        <label for="meta-mesh-created-by">Created By</label>
+                                        <input type="text" id="meta-mesh-created-by" placeholder="e.g., Blender, Reality Capture">
+                                    </div>
+                                    <div class="metadata-field">
+                                        <label for="meta-mesh-version">Tool Version</label>
+                                        <input type="text" id="meta-mesh-version" placeholder="e.g., 3.4.0">
+                                    </div>
+                                    <div class="metadata-field">
+                                        <label for="meta-mesh-notes">Source Notes</label>
+                                        <textarea id="meta-mesh-notes" rows="2" placeholder="Additional notes about this asset..."></textarea>
+                                    </div>
+                                    <div class="metadata-field">
+                                        <label for="meta-mesh-role">Data Role</label>
+                                        <select id="meta-mesh-role">
+                                            <option value="">Not specified</option>
+                                            <option value="primary">Primary</option>
+                                            <option value="derived">Derived</option>
+                                        </select>
+                                        <span class="field-hint">Primary = original capture, Derived = processed output</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="asset-group">
+                                <div class="subsection-header">Point Cloud Asset</div>
+                                <div class="asset-status" id="pointcloud-asset-status">No point cloud loaded</div>
+                                <div class="asset-fields hidden" id="pointcloud-asset-fields">
+                                    <div class="metadata-field">
+                                        <label for="meta-pointcloud-created-by">Created By</label>
+                                        <input type="text" id="meta-pointcloud-created-by" placeholder="e.g., FARO Scene, Leica Cyclone">
+                                    </div>
+                                    <div class="metadata-field">
+                                        <label for="meta-pointcloud-version">Tool Version</label>
+                                        <input type="text" id="meta-pointcloud-version" placeholder="e.g., 2024.1">
+                                    </div>
+                                    <div class="metadata-field">
+                                        <label for="meta-pointcloud-notes">Source Notes</label>
+                                        <textarea id="meta-pointcloud-notes" rows="2" placeholder="Additional notes about this point cloud..."></textarea>
+                                    </div>
+                                    <div class="metadata-field">
+                                        <label for="meta-pointcloud-role">Data Role</label>
+                                        <select id="meta-pointcloud-role">
+                                            <option value="">Not specified</option>
+                                            <option value="primary">Primary</option>
+                                            <option value="derived">Derived</option>
+                                        </select>
+                                        <span class="field-hint">Primary = original capture, Derived = processed output</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quality Tab -->
+                        <div class="edit-tab-content" id="edit-tab-quality">
+                            <div class="metadata-field">
+                                <label for="meta-quality-tier">Quality Tier</label>
+                                <select id="meta-quality-tier">
+                                    <option value="">Not specified</option>
+                                    <option value="Tier 1 - Metrology">Tier 1 - Metrology</option>
+                                    <option value="Tier 2 - Reference">Tier 2 - Reference</option>
+                                    <option value="Tier 3 - Visualization">Tier 3 - Visualization</option>
+                                </select>
+                                <span class="field-hint">Tier 1: highest precision, Tier 3: display-optimized</span>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-quality-accuracy">Accuracy Grade</label>
+                                <select id="meta-quality-accuracy">
+                                    <option value="">Not specified</option>
+                                    <option value="A+">A+</option>
+                                    <option value="A">A</option>
+                                    <option value="B+">B+</option>
+                                    <option value="B">B</option>
+                                    <option value="C">C</option>
+                                    <option value="N/A">N/A</option>
+                                </select>
+                            </div>
+
+                            <div class="subsection-header">Capture Resolution</div>
+                            <div class="metadata-field inline-fields">
+                                <div class="field-group">
+                                    <label for="meta-quality-res-value">Value</label>
+                                    <input type="number" id="meta-quality-res-value" step="0.01" placeholder="1.0">
+                                </div>
+                                <div class="field-group">
+                                    <label for="meta-quality-res-unit">Unit</label>
+                                    <select id="meta-quality-res-unit">
+                                        <option value="mm">mm</option>
+                                        <option value="cm">cm</option>
+                                        <option value="m">m</option>
+                                    </select>
+                                </div>
+                                <div class="field-group">
+                                    <label for="meta-quality-res-type">Type</label>
+                                    <input type="text" id="meta-quality-res-type" value="GSD" placeholder="GSD">
+                                </div>
+                            </div>
+
+                            <div class="subsection-header">Alignment Error</div>
+                            <div class="metadata-field inline-fields">
+                                <div class="field-group">
+                                    <label for="meta-quality-align-value">Value</label>
+                                    <input type="number" id="meta-quality-align-value" step="0.01" placeholder="0.5">
+                                </div>
+                                <div class="field-group">
+                                    <label for="meta-quality-align-unit">Unit</label>
+                                    <select id="meta-quality-align-unit">
+                                        <option value="mm">mm</option>
+                                        <option value="cm">cm</option>
+                                        <option value="m">m</option>
+                                    </select>
+                                </div>
+                                <div class="field-group">
+                                    <label for="meta-quality-align-method">Method</label>
+                                    <input type="text" id="meta-quality-align-method" value="RMSE" placeholder="RMSE">
+                                </div>
+                            </div>
+
+                            <div class="metadata-field">
+                                <label for="meta-quality-scale-verify">Scale Verification</label>
+                                <input type="text" id="meta-quality-scale-verify" placeholder="e.g., Reference object measured">
+                            </div>
+
+                            <div class="subsection-header">Asset Statistics (Read-only)</div>
+                            <div class="quality-stats">
+                                <div class="stat-row">
+                                    <span class="stat-label">Splat Count</span>
+                                    <span class="stat-value" id="meta-splat-count">-</span>
+                                </div>
+                                <div class="stat-row">
+                                    <span class="stat-label">Mesh Polygons</span>
+                                    <span class="stat-value" id="meta-mesh-polys">-</span>
+                                </div>
+                                <div class="stat-row">
+                                    <span class="stat-label">Mesh Vertices</span>
+                                    <span class="stat-value" id="meta-mesh-verts">-</span>
+                                </div>
+                                <div class="stat-row">
+                                    <span class="stat-label">Annotation Count</span>
+                                    <span class="stat-value" id="meta-anno-count">0</span>
+                                </div>
+                            </div>
+                            <div class="subsection-header">File Sizes</div>
+                            <div class="quality-stats">
+                                <div class="stat-row">
+                                    <span class="stat-label">Splat File</span>
+                                    <span class="stat-value" id="meta-splat-size">-</span>
+                                </div>
+                                <div class="stat-row">
+                                    <span class="stat-label">Mesh File</span>
+                                    <span class="stat-value" id="meta-mesh-size">-</span>
+                                </div>
+                                <div class="stat-row">
+                                    <span class="stat-label">Est. Archive Size</span>
+                                    <span class="stat-value" id="meta-archive-size">-</span>
+                                </div>
+                            </div>
+
+                            <div class="subsection-header">Data Quality / Known Limitations</div>
+                            <div class="metadata-field">
+                                <label for="meta-quality-coverage-gaps">Coverage Gaps</label>
+                                <textarea id="meta-quality-coverage-gaps" rows="2" placeholder="e.g., Underside of base not captured, rear of object occluded"></textarea>
+                                <span class="field-hint">Areas not captured or with missing data</span>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-quality-reconstruction">Reconstruction Areas</label>
+                                <textarea id="meta-quality-reconstruction" rows="2" placeholder="e.g., Left ear interpolated from symmetry, hole filled algorithmically"></textarea>
+                                <span class="field-hint">Areas that were reconstructed or interpolated</span>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-quality-color-calibration">Color Calibration</label>
+                                <input type="text" id="meta-quality-color-calibration" placeholder="e.g., X-Rite ColorChecker verified, uncalibrated">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-quality-uncertainty">Measurement Uncertainty</label>
+                                <input type="text" id="meta-quality-uncertainty" placeholder="e.g., +/-0.05mm at 95% confidence">
+                                <span class="field-hint">Statistical confidence interval for measurements</span>
+                            </div>
+                        </div>
+
+                        <!-- Material Standard Tab -->
+                        <div class="edit-tab-content" id="edit-tab-material">
+                            <div class="metadata-field">
+                                <label for="meta-material-workflow">PBR Workflow</label>
+                                <select id="meta-material-workflow">
+                                    <option value="">Not specified</option>
+                                    <option value="Metal/Roughness">Metal/Roughness</option>
+                                    <option value="Specular/Glossiness">Specular/Glossiness</option>
+                                </select>
+                                <span class="field-hint">Physically-based rendering workflow used</span>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="meta-material-occlusion-packed">
+                                <label for="meta-material-occlusion-packed">Occlusion Packed (R=AO, G=Roughness, B=Metalness)</label>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-material-colorspace">Color Space</label>
+                                <select id="meta-material-colorspace">
+                                    <option value="">Not specified</option>
+                                    <option value="Linear sRGB">Linear sRGB</option>
+                                    <option value="sRGB">sRGB</option>
+                                    <option value="ACEScg">ACEScg</option>
+                                </select>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-material-normalspace">Normal Map Space</label>
+                                <select id="meta-material-normalspace">
+                                    <option value="">Not specified</option>
+                                    <option value="OpenGL">OpenGL (+Y up)</option>
+                                    <option value="DirectX">DirectX (-Y up)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Preservation Tab -->
+                        <div class="edit-tab-content" id="edit-tab-preservation">
+                            <div class="subsection-header">Format Registry (PRONOM)</div>
+                            <div class="metadata-field">
+                                <label for="meta-pres-format-glb">GLB Format ID</label>
+                                <input type="text" id="meta-pres-format-glb" value="fmt/861" placeholder="fmt/861">
+                                <span class="field-hint">PRONOM identifier for glTF Binary</span>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-pres-format-obj">OBJ Format ID</label>
+                                <input type="text" id="meta-pres-format-obj" value="fmt/935" placeholder="fmt/935">
+                                <span class="field-hint">PRONOM identifier for Wavefront OBJ</span>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-pres-format-ply">PLY Format ID</label>
+                                <input type="text" id="meta-pres-format-ply" value="fmt/831" placeholder="fmt/831">
+                                <span class="field-hint">PRONOM identifier for Stanford PLY</span>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-pres-format-e57">E57 Format ID</label>
+                                <input type="text" id="meta-pres-format-e57" value="fmt/643" placeholder="fmt/643">
+                                <span class="field-hint">PRONOM identifier for ASTM E57</span>
+                            </div>
+
+                            <div class="subsection-header">Significant Properties</div>
+                            <span class="field-hint" style="display: block; margin-bottom: 10px;">Properties that must be preserved for the asset to remain meaningful</span>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="meta-pres-prop-geometry" checked>
+                                <label for="meta-pres-prop-geometry">Geometry / Mesh Structure</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="meta-pres-prop-vertex-color">
+                                <label for="meta-pres-prop-vertex-color">Vertex Colors</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="meta-pres-prop-uv">
+                                <label for="meta-pres-prop-uv">UV Mapping</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="meta-pres-prop-normals">
+                                <label for="meta-pres-prop-normals">Normal Maps</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="meta-pres-prop-pbr">
+                                <label for="meta-pres-prop-pbr">PBR Materials</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="meta-pres-prop-scale">
+                                <label for="meta-pres-prop-scale">Real-world Scale</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="meta-pres-prop-splat">
+                                <label for="meta-pres-prop-splat">Gaussian Splat Data</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="meta-pres-prop-pointcloud">
+                                <label for="meta-pres-prop-pointcloud">E57 Point Cloud Data</label>
+                            </div>
+
+                            <div class="subsection-header">Rendering Requirements</div>
+                            <div class="metadata-field">
+                                <label for="meta-pres-render-req">Minimum Requirements</label>
+                                <input type="text" id="meta-pres-render-req" value="WebGL 2.0" placeholder="e.g., WebGL 2.0, OpenGL ES 3.0">
+                                <span class="field-hint">Minimum graphics API required for rendering</span>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="meta-pres-render-notes">Rendering Notes</label>
+                                <textarea id="meta-pres-render-notes" rows="2" placeholder="e.g., Requires compute shaders for splat rendering, best viewed in Chrome/Edge"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Integrity Tab -->
+                        <div class="edit-tab-content" id="edit-tab-integrity">
+                            <div id="crypto-warning-banner" class="warning-banner hidden">
+                                <span class="warning-icon">&#9888;</span>
+                                <span>SHA-256 hashing unavailable. This page is not served over HTTPS, so integrity hashes cannot be calculated. Archives will be created without integrity verification.</span>
+                            </div>
+                            <div class="integrity-info">
+                                <div class="stat-row">
+                                    <span class="stat-label">Hash Algorithm</span>
+                                    <span class="stat-value">SHA-256</span>
+                                </div>
+                                <div class="stat-row">
+                                    <span class="stat-label">Manifest Hash</span>
+                                    <span class="stat-value hash-preview" id="meta-manifest-hash">Calculated on export</span>
+                                </div>
+                            </div>
+                            <div class="subsection-header">Asset Hashes</div>
+                            <div id="asset-hashes-list" class="hash-list">
+                                <p class="hash-placeholder">Hashes will be calculated when you export the archive.</p>
+                            </div>
+                            <div class="checkbox-group" style="margin-top: 15px;">
+                                <input type="checkbox" id="meta-include-integrity" checked>
+                                <label for="meta-include-integrity">Include integrity data in manifest</label>
+                            </div>
+                        </div>
+
+                        <!-- Default View Tab -->
+                        <div class="edit-tab-content" id="edit-tab-viewer">
+                            <div class="subsection-header">Mesh Rendering</div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="meta-viewer-single-sided" checked>
+                                <label for="meta-viewer-single-sided">Single Sided</label>
+                            </div>
+                            <span class="field-hint">When enabled, back faces are culled (like Sketchfab default). Disable for thin geometry like leaves, fabric, or paper.</span>
+
+                            <div class="subsection-header" style="margin-top: 20px;">Scene</div>
+                            <div class="metadata-field">
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="meta-viewer-bg-override">
+                                    <label for="meta-viewer-bg-override">Override Background Color</label>
+                                </div>
+                                <span class="field-hint">When unchecked, the viewer theme controls the background color.</span>
+                                <div class="color-input-row" id="meta-viewer-bg-color-row" style="margin-top: 6px; display: none;">
+                                    <input type="color" id="meta-viewer-bg-color" value="#1a1a2e">
+                                    <span class="color-hex-label" id="meta-viewer-bg-color-hex">#1a1a2e</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- KIOSK-STRIP-END: metadata edit tab -->
+
+                    <!-- Footer with close button (always visible) -->
+                    <div class="sidebar-footer">
+                        <button id="btn-close-sidebar" class="action-btn secondary">Close</button>
+                    </div>
+                </div>
+
+            </div>
+
+
+            <!-- ========================================================
+                 EXPORT PANE
+                 ======================================================== -->
+            <!-- KIOSK-STRIP-START: export panel -->
+            <div class="props-pane" id="pane-export">
+                <div id="export-panel">
+
+                    <!-- Archive Contents -->
+                    <div class="prop-section open archived">
+                        <div class="prop-section-hd">
+                            <span class="prop-section-title">Archive Contents</span>
+                            <span class="archive-tag">archived</span>
+                            <span class="prop-section-chevron">&#9654;</span>
+                        </div>
+                        <div class="prop-section-body">
+                            <p class="prop-hint">Files to be included in the archive export.</p>
+                        </div>
+                    </div>
+
+                    <!-- Format -->
+                    <div class="prop-section open">
+                        <div class="prop-section-hd">
+                            <span class="prop-section-title">Format</span>
+                            <span class="prop-section-chevron">&#9654;</span>
+                        </div>
+                        <div class="prop-section-body">
+                            <div class="radio-row">
+                                <input type="radio" name="export-format" value="a3d" id="fmt-a3d" checked>
+                                <label for="fmt-a3d">.a3d (Standard)</label>
+                            </div>
+                            <div class="radio-row">
+                                <input type="radio" name="export-format" value="a3z" id="fmt-a3z">
+                                <label for="fmt-a3z">.a3z (Compressed)</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Include -->
+                    <div class="prop-section open">
+                        <div class="prop-section-hd">
+                            <span class="prop-section-title">Include</span>
+                            <span class="prop-section-chevron">&#9654;</span>
+                        </div>
+                        <div class="prop-section-body">
+                            <div class="cb-row">
+                                <input type="checkbox" id="archive-include-splat" checked disabled><label for="archive-include-splat">Gaussian Splat</label>
+                            </div>
+                            <div class="cb-row">
+                                <input type="checkbox" id="archive-include-model" checked disabled><label for="archive-include-model">3D Model</label>
+                            </div>
+                            <div class="cb-row">
+                                <input type="checkbox" id="archive-include-pointcloud" checked disabled><label for="archive-include-pointcloud">Point Cloud</label>
+                            </div>
+                            <div class="cb-row">
+                                <input type="checkbox" id="archive-include-annotations" checked disabled><label for="archive-include-annotations">Annotations</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Export Actions -->
+                    <div class="prop-section open">
+                        <div class="prop-section-hd">
+                            <span class="prop-section-title">Export</span>
+                            <span class="prop-section-chevron">&#9654;</span>
+                        </div>
+                        <div class="prop-section-body">
+                            <button class="prop-btn accent" id="btn-export-download" style="margin-bottom:6px;">Download Archive</button>
+                            <!-- Offline viewer temporarily disabled — styling incomplete -->
+                            <button class="prop-btn" id="btn-download-viewer" style="display:none">Download Offline Viewer</button>
+                            <button class="prop-btn mt4" id="btn-export-cancel" style="display:none;">Cancel Export</button>
+                        </div>
+                    </div>
+
+                    <!-- Share -->
+                    <div class="prop-section open">
+                        <div class="prop-section-hd">
+                            <span class="prop-section-title">Share</span>
+                            <span class="prop-section-chevron">&#9654;</span>
+                        </div>
+                        <div class="prop-section-body">
+                            <button class="prop-btn" id="btn-share">Copy Share Link</button>
+                            <p class="prop-hint mt4">Only works for files loaded via URL.</p>
+                            <button class="prop-btn mt4" id="btn-preview-kiosk">Preview Kiosk Mode</button>
+                        </div>
+                    </div>
+
+                    <!-- Archive Info -->
+                    <div class="prop-section" id="archive-metadata-section" style="display:none;">
+                        <div class="prop-section-hd">
+                            <span class="prop-section-title">Archive Info</span>
+                            <span class="prop-section-chevron">&#9654;</span>
+                        </div>
+                        <div class="prop-section-body">
+                            <div id="archive-info-panel">
+                                <div class="prop-row"><span class="prop-row-label">Version</span><span class="font-mono" id="archive-version" style="font-size:10px; color:var(--text-secondary);">-</span></div>
+                                <div class="prop-row"><span class="prop-row-label">Packer</span><span class="font-mono" id="archive-packer" style="font-size:10px; color:var(--text-secondary);">-</span></div>
+                                <div class="prop-row"><span class="prop-row-label">Created</span><span class="font-mono" id="archive-created" style="font-size:10px; color:var(--text-secondary);">-</span></div>
+                            </div>
+                            <div id="archive-entries-list"></div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            <!-- KIOSK-STRIP-END: export panel -->
+
+
+            <!-- ========================================================
+                 SETTINGS PANE
+                 ======================================================== -->
+            <div class="props-pane" id="pane-settings">
+                <div class="prop-section open">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Info</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <div class="prop-row"><span class="prop-row-label">Splat count</span><span class="font-mono" id="splat-vertices" style="font-size:10px; color:var(--text-secondary);">-</span></div>
+                        <div class="prop-row"><span class="prop-row-label">Model faces</span><span class="font-mono" id="model-faces" style="font-size:10px; color:var(--text-secondary);">-</span></div>
+                        <div class="prop-row"><span class="prop-row-label">Point cloud</span><span class="font-mono" id="pointcloud-points" style="font-size:10px; color:var(--text-secondary);">-</span></div>
+                        <div class="prop-row"><span class="prop-row-label">FPS</span><span class="font-mono" id="fps-counter" style="font-size:10px; color:var(--accent-text);">-</span></div>
                     </div>
                 </div>
             </div>
 
-            <div class="control-section collapsible collapsed" id="scene-settings-section">
-                <h3 class="collapsible-header">Scene Settings <span class="collapse-icon">▶</span></h3>
-                <div class="collapsible-content">
-                    <div class="slider-group">
-                        <label for="camera-fov">FOV: <span id="camera-fov-value">60</span>°</label>
-                        <input type="range" id="camera-fov" min="10" max="120" step="1" value="60" />
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="toggle-gridlines" checked>
-                        <label for="toggle-gridlines">Show Grid</label>
-                    </div>
-                    <div class="setting-group">
-                        <label>Background</label>
-                        <div class="color-presets">
-                            <button class="color-preset active" data-color="#1a1a2e" title="Dark Blue" style="background: #1a1a2e;"></button>
-                            <button class="color-preset" data-color="#0a0a0a" title="Near Black" style="background: #0a0a0a;"></button>
-                            <button class="color-preset" data-color="#2d2d2d" title="Dark Gray" style="background: #2d2d2d;"></button>
-                            <button class="color-preset" data-color="#4a4a4a" title="Medium Gray" style="background: #4a4a4a;"></button>
-                            <button class="color-preset" data-color="#808080" title="Gray" style="background: #808080;"></button>
-                            <button class="color-preset" data-color="#f0f0f0" title="Light Gray" style="background: #f0f0f0; border-color: #ccc;"></button>
-                        </div>
-                        <div class="color-custom">
-                            <input type="color" id="bg-color-picker" value="#1a1a2e">
-                            <label for="bg-color-picker">Custom</label>
-                        </div>
-                    </div>
-                    <div class="setting-group">
-                        <label>Background Image</label>
-                        <div class="button-row">
-                            <label for="bg-image-input" class="file-label" style="font-size:0.75rem;">From File</label>
-                            <button id="btn-load-bg-image-url" class="action-btn" style="font-size:0.75rem;">From URL</button>
-                        </div>
-                        <input type="file" id="bg-image-input" accept=".png,.jpg,.jpeg,.webp" style="display:none" />
-                        <div class="button-row" style="margin-top:4px;">
-                            <span id="bg-image-filename" class="filename" style="display:none;"></span>
-                            <button id="btn-clear-bg-image" class="action-btn secondary" style="font-size:0.75rem; display:none;">Clear</button>
-                        </div>
-                    </div>
-                    <div class="setting-group">
-                        <label>Tone Mapping</label>
-                        <select id="tone-mapping-select" style="width:100%; padding:6px 8px; background:#2a2a3a; color:#ccc; border:1px solid #3a3a5a; border-radius:4px; font-size:0.8rem;">
-                            <option value="None" selected>None</option>
-                            <option value="Linear">Linear</option>
-                            <option value="Reinhard">Reinhard</option>
-                            <option value="Cineon">Cineon</option>
-                            <option value="ACESFilmic">ACES Filmic</option>
-                            <option value="AgX">AgX</option>
-                        </select>
-                    </div>
-                    <div class="slider-group">
-                        <label for="tone-mapping-exposure">Exposure: <span id="tone-mapping-exposure-value">1.0</span></label>
-                        <input type="range" id="tone-mapping-exposure" min="0.1" max="3" step="0.1" value="1" />
-                    </div>
-                    <div class="setting-group">
-                        <label>Environment (IBL)</label>
-                        <select id="env-map-select" style="width:100%; padding:6px 8px; background:#2a2a3a; color:#ccc; border:1px solid #3a3a5a; border-radius:4px; font-size:0.8rem;">
-                            <option value="">None</option>
-                            <option value="preset:0">Outdoor</option>
-                            <option value="preset:1">Studio</option>
-                            <option value="preset:2">Sunset</option>
-                        </select>
-                        <div class="button-row" style="margin-top:6px;">
-                            <label for="hdr-file-input" class="file-label" style="font-size:0.75rem;">HDR File</label>
-                            <button id="btn-load-hdr-url" class="action-btn" style="font-size:0.75rem;">HDR URL</button>
-                        </div>
-                        <input type="file" id="hdr-file-input" accept=".hdr" style="display:none" />
-                        <span id="hdr-filename" class="filename" style="display:none;"></span>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="toggle-env-background" />
-                        <label for="toggle-env-background">Show Environment as Background</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="toggle-shadows" />
-                        <label for="toggle-shadows">Enable Shadows</label>
-                    </div>
-                    <div class="slider-group" id="shadow-opacity-group" style="display:none;">
-                        <label for="shadow-opacity">Shadow Opacity: <span id="shadow-opacity-value">0.3</span></label>
-                        <input type="range" id="shadow-opacity" min="0.05" max="1" step="0.05" value="0.3" />
-                    </div>
+        </aside>
+
+
+        <!-- ============================================================
+             STATUS BAR (bottom, full-width)
+             ============================================================ -->
+        <footer id="status-bar">
+            <div class="status-left">
+                <div class="status-item">
+                    <span class="status-badge badge-webgpu" id="status-renderer">WebGL</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-dot"></span>
+                    <span class="status-num" id="status-fps">- fps</span>
+                </div>
+                <div class="status-item">
+                    <span style="color:var(--text-faint);">&#9651;</span>
+                    <span class="status-num" id="status-tris">- tris</span>
+                </div>
+                <div class="status-item">
+                    <span style="color:var(--text-faint);">&#183;&#183;&#183;</span>
+                    <span class="status-num" id="status-splats">- splats</span>
+                </div>
+                <div class="status-item" id="status-camera-mode">
+                    Orbit mode
                 </div>
             </div>
-
-            <div class="control-section collapsible collapsed">
-                <h3 class="collapsible-header">Model Settings <span class="collapse-icon">▶</span></h3>
-                <div class="collapsible-content">
-                    <div class="slider-group">
-                        <label for="model-scale">Scale: <span id="model-scale-value">1.0</span></label>
-                        <input type="range" id="model-scale" min="0.1" max="5" step="0.1" value="1" />
-                    </div>
-                    <div class="slider-group">
-                        <label for="model-opacity">Opacity: <span id="model-opacity-value">1.0</span></label>
-                        <input type="range" id="model-opacity" min="0" max="1" step="0.05" value="1" />
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="model-wireframe" />
-                        <label for="model-wireframe">Wireframe</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="model-no-texture" />
-                        <label for="model-no-texture">Hide Textures</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="model-matcap" />
-                        <label for="model-matcap">Matcap</label>
-                    </div>
-                    <div class="slider-group" id="matcap-style-group" style="display:none;">
-                        <label for="matcap-style">Style:</label>
-                        <select id="matcap-style">
-                            <option value="clay">Clay</option>
-                            <option value="chrome">Chrome</option>
-                            <option value="pearl">Pearl</option>
-                            <option value="jade">Jade</option>
-                            <option value="copper">Copper</option>
-                        </select>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="model-normals" />
-                        <label for="model-normals">Show Normals</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="model-roughness" />
-                        <label for="model-roughness">Roughness</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="model-metalness" />
-                        <label for="model-metalness">Metalness</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="model-specular-f0" />
-                        <label for="model-specular-f0">Specular F0</label>
-                    </div>
-                    <div class="position-inputs">
-                        <label>Position:</label>
-                        <div class="xyz-inputs">
-                            <input type="number" id="model-pos-x" value="0" step="0.1" />
-                            <input type="number" id="model-pos-y" value="0" step="0.1" />
-                            <input type="number" id="model-pos-z" value="0" step="0.1" />
-                        </div>
-                    </div>
-                    <div class="position-inputs">
-                        <label>Rotation (deg):</label>
-                        <div class="xyz-inputs">
-                            <input type="number" id="model-rot-x" value="0" step="1" />
-                            <input type="number" id="model-rot-y" value="0" step="1" />
-                            <input type="number" id="model-rot-z" value="0" step="1" />
-                        </div>
-                    </div>
-
-                    <div class="subsection-header">Lighting</div>
-                    <div class="slider-group">
-                        <label for="ambient-intensity">Ambient: <span id="ambient-intensity-value">0.8</span></label>
-                        <input type="range" id="ambient-intensity" min="0" max="2" step="0.1" value="0.8" />
-                    </div>
-                    <div class="slider-group">
-                        <label for="hemisphere-intensity">Hemisphere: <span id="hemisphere-intensity-value">0.6</span></label>
-                        <input type="range" id="hemisphere-intensity" min="0" max="2" step="0.1" value="0.6" />
-                    </div>
-                    <div class="slider-group">
-                        <label for="directional1-intensity">Directional 1: <span id="directional1-intensity-value">1.5</span></label>
-                        <input type="range" id="directional1-intensity" min="0" max="3" step="0.1" value="1.5" />
-                    </div>
-                    <div class="slider-group">
-                        <label for="directional2-intensity">Directional 2: <span id="directional2-intensity-value">0.5</span></label>
-                        <input type="range" id="directional2-intensity" min="0" max="3" step="0.1" value="0.5" />
-                    </div>
+            <div class="status-right">
+                <div class="status-item hidden" id="quality-toggle-container">
+                    <button id="btn-quality-sd" class="quality-toggle-btn" data-tier="sd">SD</button>
+                    <button id="btn-quality-hd" class="quality-toggle-btn active" data-tier="hd">HD</button>
+                </div>
+                <div class="status-item" id="status-filename">
                 </div>
             </div>
+        </footer>
 
-            <div class="control-section collapsible collapsed">
-                <h3 class="collapsible-header">Point Cloud Settings <span class="collapse-icon">▶</span></h3>
-                <div class="collapsible-content">
-                    <div class="slider-group">
-                        <label for="pointcloud-scale">Scale: <span id="pointcloud-scale-value">1.0</span></label>
-                        <input type="range" id="pointcloud-scale" min="0.1" max="5" step="0.1" value="1" />
-                    </div>
-                    <div class="slider-group">
-                        <label for="pointcloud-point-size">Point Size: <span id="pointcloud-point-size-value">0.01</span></label>
-                        <input type="range" id="pointcloud-point-size" min="0.001" max="0.1" step="0.001" value="0.01" />
-                    </div>
-                    <div class="slider-group">
-                        <label for="pointcloud-opacity">Opacity: <span id="pointcloud-opacity-value">1.0</span></label>
-                        <input type="range" id="pointcloud-opacity" min="0" max="1" step="0.05" value="1" />
-                    </div>
-                    <div class="position-inputs">
-                        <label>Position:</label>
-                        <div class="xyz-inputs">
-                            <input type="number" id="pointcloud-pos-x" value="0" step="0.1" />
-                            <input type="number" id="pointcloud-pos-y" value="0" step="0.1" />
-                            <input type="number" id="pointcloud-pos-z" value="0" step="0.1" />
-                        </div>
-                    </div>
-                    <div class="position-inputs">
-                        <label>Rotation (deg):</label>
-                        <div class="xyz-inputs">
-                            <input type="number" id="pointcloud-rot-x" value="0" step="1" />
-                            <input type="number" id="pointcloud-rot-y" value="0" step="1" />
-                            <input type="number" id="pointcloud-rot-z" value="0" step="1" />
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <div class="control-section collapsible collapsed">
-                <h3 class="collapsible-header">Splat Settings <span class="collapse-icon">▶</span></h3>
-                <div class="collapsible-content">
-                    <div class="slider-group">
-                        <label for="splat-scale">Scale: <span id="splat-scale-value">1.0</span></label>
-                        <input type="range" id="splat-scale" min="0.1" max="5" step="0.1" value="1" />
-                    </div>
-                    <div class="position-inputs">
-                        <label>Position:</label>
-                        <div class="xyz-inputs">
-                            <input type="number" id="splat-pos-x" value="0" step="0.1" />
-                            <input type="number" id="splat-pos-y" value="0" step="0.1" />
-                            <input type="number" id="splat-pos-z" value="0" step="0.1" />
-                        </div>
-                    </div>
-                    <div class="position-inputs">
-                        <label>Rotation (deg):</label>
-                        <div class="xyz-inputs">
-                            <input type="number" id="splat-rot-x" value="0" step="1" />
-                            <input type="number" id="splat-rot-y" value="0" step="1" />
-                            <input type="number" id="splat-rot-z" value="0" step="1" />
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <!-- Annotation markers container -->
+        <div id="annotation-markers"></div>
 
-            <div class="control-section collapsible collapsed">
-                <h3 class="collapsible-header">Alignment <span class="collapse-icon">▶</span></h3>
-                <div class="collapsible-content">
-                    <button id="btn-align" class="action-btn">Align Objects</button>
-                    <p class="hint-text" style="margin: 5px 0; font-size: 0.75em; opacity: 0.7;">
-                        Click 3 matching points on each object for precise alignment
-                    </p>
-                    <button id="btn-reset-alignment" class="action-btn secondary">Reset All</button>
-                </div>
-            </div>
+        <!-- Measurement markers container -->
+        <div id="measurement-markers"></div>
 
-            <div class="control-section collapsible collapsed">
-                <h3 class="collapsible-header">Camera <span class="collapse-icon">▶</span></h3>
-                <div class="collapsible-content">
-                    <button id="btn-reset-camera" class="action-btn">Reset Camera</button>
-                    <button id="btn-fit-view" class="action-btn">Fit to View</button>
-                </div>
-            </div>
+        <!-- Measurement scale panel (legacy, kept for kiosk compatibility) -->
 
-            <div id="section-screenshots" class="control-section collapsible collapsed">
-                <h3 class="collapsible-header">Screenshots <span class="collapse-icon">▶</span></h3>
-                <div class="collapsible-content">
-                    <button id="btn-capture-screenshot" class="action-btn">Capture Screenshot</button>
-                    <button id="btn-set-preview" class="action-btn secondary" style="margin-top:6px;">Set Archive Preview Image</button>
-                    <p class="hint-text" style="margin:8px 0; font-size:0.75em; opacity:0.6;">
-                        A preview is captured automatically during export. Taking a manual preview overrides that.
-                    </p>
-                    <div id="manual-preview-status" style="display:none; margin-bottom:8px;">
-                        <span style="font-size:0.75em; color:#4CAF50;">Manual preview set</span>
-                        <button id="btn-clear-manual-preview" style="font-size:0.7em; margin-left:6px; background:none; border:none; color:#f44336; cursor:pointer;">Clear</button>
-                    </div>
-                    <div id="screenshots-list"></div>
-                </div>
-            </div>
+        <!-- Alignment markers container -->
+        <div id="alignment-markers"></div>
 
-            <div class="control-section">
-                <h3>Share</h3>
-                <div>
-                    <button id="btn-share" class="action-btn">Copy Share Link</button>
-                    <p class="hint-text" style="margin-top:5px; font-size:0.8em; opacity:0.7;">
-                        Generates a link to the current scene. Only works for files loaded via URL.
-                    </p>
-                    <button id="btn-preview-kiosk" class="action-btn" style="margin-top:8px;">Preview Kiosk Mode</button>
-                </div>
-            </div>
-
-            <div class="control-section">
-                <h3>Info</h3>
-                <div id="info-panel">
-                    <p>Splat count: <span id="splat-vertices">-</span></p>
-                    <p>Model faces: <span id="model-faces">-</span></p>
-                    <p>Point cloud: <span id="pointcloud-points">-</span></p>
-                    <p>FPS: <span id="fps-counter">-</span></p>
-                </div>
-            </div>
-
-            <div class="control-section collapsible" id="archive-metadata-section" style="display: none;">
-                <h3 class="collapsible-header">Archive Info <span class="collapse-icon">▼</span></h3>
-                <div class="collapsible-content">
-                    <div id="archive-info-panel">
-                        <p>Version: <span id="archive-version">-</span></p>
-                        <p>Packer: <span id="archive-packer">-</span></p>
-                        <p>Created: <span id="archive-created">-</span></p>
-                        <div id="archive-entries-list"></div>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-
+        <!-- Loading overlay -->
         <div id="loading-overlay" class="hidden">
             <!-- Branded loading content (populated by kiosk-main.js) -->
             <div id="loading-brand" class="hidden">
@@ -1442,6 +1750,40 @@
             <p id="loading-progress-text" class="hidden">0%</p>
         </div>
     </div>
+
+    <!-- Annotation info popup (appears when clicking markers) -->
+    <div id="annotation-info-popup" class="hidden">
+        <div class="annotation-info-header">
+            <span class="annotation-info-number"></span>
+            <h4 class="annotation-info-title"></h4>
+        </div>
+        <div class="annotation-info-body"></div>
+    </div>
+
+    <!-- Annotation bar at bottom -->
+    <div id="annotation-bar" class="hidden">
+        <div id="annotation-chips"></div>
+    </div>
+
+    <!-- Annotation panel popup -->
+    <!-- KIOSK-STRIP-START: annotation creation panel -->
+    <div id="annotation-panel" class="hidden">
+        <h3>New Annotation</h3>
+        <div class="coords-display">
+            Position: <span id="anno-pos-display">-</span>
+        </div>
+        <label for="anno-id">ID</label>
+        <input type="text" id="anno-id" placeholder="anno_1">
+        <label for="anno-title">Title</label>
+        <input type="text" id="anno-title" placeholder="Feature name">
+        <label for="anno-body">Description <button type="button" class="insert-image-btn" id="btn-anno-insert-image" title="Insert Image"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button></label>
+        <textarea id="anno-body" placeholder="Describe this point of interest..."></textarea>
+        <div class="btn-group">
+            <button id="btn-anno-cancel" class="action-btn secondary">Cancel</button>
+            <button id="btn-anno-save" class="action-btn">Save</button>
+        </div>
+    </div>
+    <!-- KIOSK-STRIP-END: annotation creation panel -->
 
     <script src="pre-module.js"></script>
     <script type="module" src="main.ts"></script>

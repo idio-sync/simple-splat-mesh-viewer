@@ -643,9 +643,6 @@ function onDirectFileLoaded(fileName: string | null): void {
         // Standard kiosk UI
         createViewSwitcher();
 
-        // Show toolbar
-        const toolbar = document.getElementById('left-toolbar');
-        if (toolbar) toolbar.style.display = 'flex';
     }
 
     // Set filename as display title if available
@@ -709,7 +706,16 @@ async function showClickGate(archiveUrl: string): Promise<void> {
         if (contentInfo.hasSplat) types.push('Gaussian Splat');
         if (contentInfo.hasMesh) types.push('Mesh');
         if (contentInfo.hasPointcloud) types.push('Point Cloud');
-        if (typesEl && types.length) typesEl.textContent = types.join(' + ');
+        
+        if (typesEl) {
+            typesEl.innerHTML = '';
+            types.forEach(t => {
+                const span = document.createElement('span');
+                span.className = 'kiosk-gate-pill';
+                span.textContent = t;
+                typesEl.appendChild(span);
+            });
+        }
 
         // Remove poster blob URL from loader's tracked URLs before dispose
         // so it isn't revoked before the <img> finishes loading
@@ -1040,10 +1046,6 @@ async function handleArchiveFile(file: File): Promise<void> {
             showMetadataSidebar('view', { state: state as any, annotationSystem, imageAssets: state.imageAssets });
             populateAnnotationList();
         } else {
-            // Show toolbar now that archive is loaded
-            const toolbar = document.getElementById('left-toolbar');
-            if (toolbar) toolbar.style.display = 'flex';
-
             // Add export section to settings tab now that archive data is available
             createExportSection();
 
@@ -2444,33 +2446,18 @@ function updateInfoPanel(): void {
 // =============================================================================
 
 function hideEditorOnlyUI(): void {
-    // Hide entire toolbar until archive is loaded
-    hideEl('left-toolbar');
+    // Hide tool rail, props panel, status bar (CSS already does this for body.kiosk-mode,
+    // but belt-and-suspenders for robustness)
+    hideEl('tool-rail');
+    hideEl('props-panel');
+    hideEl('status-bar');
 
     // Hide bottom annotation bar (annotations shown in sidebar instead)
     hideEl('annotation-bar');
 
-    // Hide editor-only toolbar buttons (stay hidden even after toolbar is shown)
-    hideEl('btn-annotate');
-    hideEl('btn-export-archive');
-    hideEl('btn-toggle-controls'); // Settings now live in sidebar tab
-
-    // Hide editor-only control sections
-    hideEl('load-files-section');
-
     // Uncheck grid checkbox — grid is never created in kiosk mode
     const gridCb = document.getElementById('toggle-gridlines') as HTMLInputElement;
     if (gridCb) gridCb.checked = false;
-
-    // Hide Alignment and Share sections (no IDs, find by header text)
-    const sections = document.querySelectorAll('#controls-panel .control-section');
-    sections.forEach(section => {
-        const header = section.querySelector('h3');
-        const text = header?.textContent?.trim().toLowerCase() || '';
-        if (text.startsWith('alignment') || text.startsWith('share')) {
-            (section as HTMLElement).style.display = 'none';
-        }
-    });
 
     // Hide editor-only sidebar tabs
     const editTab = document.querySelector('.sidebar-mode-tab[data-mode="edit"]') as HTMLElement;
@@ -2482,7 +2469,7 @@ function hideEditorOnlyUI(): void {
     const viewTab = document.querySelector('.sidebar-mode-tab[data-mode="view"]');
     if (viewTab) viewTab.textContent = 'Info';
 
-    // Move settings controls into sidebar as a tab
+    // Move scene settings into sidebar as a tab
     moveSettingsToSidebar();
 }
 
@@ -2492,14 +2479,14 @@ function hideEl(id: string): void {
 }
 
 /**
- * Move controls panel content into the metadata sidebar as a "Settings" tab.
- * Uses DOM appendChild which preserves all event listeners attached by
- * setupViewerUI() and setupCollapsibles().
+ * Move scene settings into the metadata sidebar as a "Settings" tab.
+ * In the new layout, scene settings live in #pane-scene inside the props panel.
+ * Uses DOM appendChild which preserves all event listeners.
  */
 function moveSettingsToSidebar(): void {
     const sidebar = document.getElementById('metadata-sidebar');
-    const controlsPanel = document.getElementById('controls-panel');
-    if (!sidebar || !controlsPanel) return;
+    const scenePane = document.getElementById('pane-scene');
+    if (!sidebar || !scenePane) return;
 
     // 1. Add "Settings" tab button
     const tabBar = sidebar.querySelector('.sidebar-mode-tabs');
@@ -2519,18 +2506,13 @@ function moveSettingsToSidebar(): void {
     settingsContent.className = 'sidebar-mode-content';
     settingsContent.id = 'sidebar-settings';
 
-    // 3. Move .control-section elements from controls panel (preserves event listeners)
-    const controlSections = Array.from(controlsPanel.querySelectorAll('.control-section'));
-    controlSections.forEach(section => {
+    // 3. Move .prop-section elements from scene pane (preserves event listeners)
+    const sections = Array.from(scenePane.querySelectorAll('.prop-section'));
+    sections.forEach(section => {
         settingsContent.appendChild(section);
     });
 
-    // 4. Hide position/rotation inputs (editor-only repositioning)
-    settingsContent.querySelectorAll('.position-inputs').forEach(el => {
-        (el as HTMLElement).style.display = 'none';
-    });
-
-    // 5. Insert into sidebar before footer
+    // 4. Insert into sidebar before footer
     const footer = sidebar.querySelector('.sidebar-footer');
     if (footer) {
         sidebar.insertBefore(settingsContent, footer);
@@ -2538,9 +2520,7 @@ function moveSettingsToSidebar(): void {
         sidebar.appendChild(settingsContent);
     }
 
-    // 6. Hide the now-empty controls panel
-    controlsPanel.style.display = 'none';
-    log.info('Settings controls moved into sidebar');
+    log.info('Scene settings moved into sidebar');
 }
 
 /**
@@ -2686,13 +2666,13 @@ function getFileExtension(filename: string): string {
  * Show only settings sections and display mode buttons relevant to the loaded data.
  */
 function showRelevantSettings(hasSplat: boolean, hasMesh: boolean, hasPointcloud: boolean): void {
-    // After DOM move, sections live in #sidebar-settings
-    const container = document.getElementById('sidebar-settings')
-                   || document.getElementById('controls-panel');
+    // After DOM move, sections live in #sidebar-settings (from #pane-scene)
+    const container = document.getElementById('sidebar-settings');
+    if (!container) return;
 
-    const sections = container.querySelectorAll('.control-section.collapsible');
+    const sections = container.querySelectorAll('.prop-section');
     sections.forEach(section => {
-        const header = section.querySelector('h3');
+        const header = section.querySelector('.prop-section-title');
         const text = header?.textContent?.trim().toLowerCase() || '';
         if (text.startsWith('model settings') && !hasMesh) (section as HTMLElement).style.display = 'none';
         if (text.startsWith('splat settings') && !hasSplat) (section as HTMLElement).style.display = 'none';
@@ -2715,7 +2695,7 @@ function showRelevantSettings(hasSplat: boolean, hasMesh: boolean, hasPointcloud
     });
     // Hide entire splat and pointcloud settings (no useful kiosk controls remain)
     sections.forEach(section => {
-        const header = section.querySelector('h3');
+        const header = section.querySelector('.prop-section-title');
         const text = header?.textContent?.trim().toLowerCase() || '';
         if (text.startsWith('splat settings')) (section as HTMLElement).style.display = 'none';
         if (text.startsWith('point cloud settings')) (section as HTMLElement).style.display = 'none';
@@ -2991,10 +2971,10 @@ function repositionAnnotationToggle(): void {
             document.body.appendChild(annoBtn);
         }
     } else {
-        // Return to toolbar on desktop
-        const toolbar = document.getElementById('left-toolbar');
-        if (toolbar && annoBtn.parentElement !== toolbar) {
-            toolbar.appendChild(annoBtn);
+        // Keep in viewer container on desktop kiosk
+        const viewer = document.getElementById('viewer-container');
+        if (viewer && annoBtn.parentElement !== viewer) {
+            viewer.appendChild(annoBtn);
         }
     }
 }

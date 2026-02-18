@@ -23,7 +23,6 @@ const log = Logger.getLogger('metadata-manager');
 export interface MetadataDeps {
     state?: AppState;
     annotationSystem?: any; // TODO: Create AnnotationSystem interface
-    updateAnnotationsList?: () => void;
     onAddAnnotation?: () => void;
     onUpdateAnnotationCamera?: () => void;
     onDeleteAnnotation?: () => void;
@@ -272,8 +271,6 @@ export function switchSidebarMode(mode: string, deps: MetadataDeps = {}): void {
     } else if (mode === 'edit') {
         updateMetadataStats(deps);
         updateAssetStatus(deps);
-    } else if (mode === 'annotations' && deps.updateAnnotationsList) {
-        deps.updateAnnotationsList();
     }
 }
 
@@ -360,16 +357,13 @@ export function setupMetadataSidebar(deps: MetadataDeps = {}): void {
         });
     });
 
-    // Edit sub-tabs
-    const editTabs = document.querySelectorAll('.edit-tab');
-    editTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const tabName = (tab as HTMLElement).dataset.tab;
-            if (tabName) {
-                switchEditTab(tabName);
-            }
+    // Edit category dropdown
+    const editCategorySelect = document.getElementById('edit-category-select') as HTMLSelectElement | null;
+    if (editCategorySelect) {
+        editCategorySelect.addEventListener('change', () => {
+            switchEditTab(editCategorySelect.value);
         });
-    });
+    }
 
     // Close button
     const closeBtn = document.getElementById('btn-close-sidebar');

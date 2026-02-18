@@ -1,15 +1,6 @@
 # Kiosk Viewer
 
-Kiosk view mode is a read only mode used for presentation or 3D data. It can be accessed via a url augment, a compiled executable or via a n offline usable bundled HTML file.
-
-The **Download Viewer** button in the archive export prompt generates a self-contained HTML file (~1 MB before archive data) that works entirely offline with zero network access. This is designed for delivering 3D scan data to clients who may not have internet access or technical expertise.
-
-## How It Works
-
-1. The generator fetches all CDN dependencies (Three.js, Spark.js, fflate) and application modules at export time
-2. Everything is base64-encoded and embedded inside a single HTML file
-3. Import specifiers are rewritten to blob URLs at runtime so ES modules work without a server
-4. The user opens the HTML file in any modern browser and loads an `.a3d`/`.a3z` archive via file picker or drag-and-drop
+Kiosk view mode is a read-only mode used for presentation of 3D data. It can be accessed via a URL parameter (`?kiosk=true`), a compiled Tauri desktop executable, or a Docker deployment.
 
 ## Capabilities
 
@@ -67,7 +58,7 @@ Total initial transfer: **~100-120KB** instead of the full archive.
 
 ## Themes
 
-The kiosk viewer supports themes — self-contained packages that control colors, typography, and layout. Add `?theme=name` to the viewer URL to activate a theme. Themes also carry into offline kiosk HTML files generated with "Download Viewer".
+The kiosk viewer supports themes — self-contained packages that control colors, typography, and layout. Add `?theme=name` to the viewer URL to activate a theme.
 
 ### Built-in themes
 

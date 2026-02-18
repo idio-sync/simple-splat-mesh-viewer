@@ -232,8 +232,9 @@ export interface EventWiringDeps {
     share: {
         copyShareLink: () => void;
     };
-    controls: {
-        toggleControlsPanel: () => void;
+    transform: {
+        setSelectedObject: (selection: SelectedObject) => void;
+        setTransformMode: (mode: TransformMode) => void;
     };
     tauri: {
         wireNativeDialogsIfAvailable: () => void;

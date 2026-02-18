@@ -13,6 +13,8 @@ import { ENVIRONMENT } from './constants.js';
 import {
     addListener,
     setupCollapsibles,
+    activateTool,
+    getActiveTool,
     hideExportPanel,
     showLoading,
     hideLoading
@@ -20,8 +22,7 @@ import {
 import {
     addCustomField,
     setupMetadataTabs,
-    setupLicenseField,
-    hideMetadataSidebar
+    setupLicenseField
 } from './metadata-manager.js';
 import {
     updatePointcloudPointSize,
@@ -41,32 +42,16 @@ export function setupUIEvents(deps: EventWiringDeps): void {
 
     log.info(' Setting up UI events...');
 
-    // ─── Controls panel toggle ───────────────────────────────
-    const toggleBtn = document.getElementById('btn-toggle-controls');
-    log.info(' Toggle button found:', !!toggleBtn);
-    if (toggleBtn) {
-        toggleBtn.onclick = function(e: Event) {
-            log.info(' Toggle button clicked');
-            e.preventDefault();
-            e.stopPropagation();
-            try {
-                deps.controls.toggleControlsPanel();
-            } catch (err) {
-                log.error(' Error in toggleControlsPanel:', err);
-                // Fallback: use class-based toggle (no inline display styles)
-                const panel = document.getElementById('controls-panel');
-                if (panel) {
-                    const isHidden = panel.classList.contains('panel-hidden');
-                    if (isHidden) {
-                        panel.classList.remove('panel-hidden');
-                    } else {
-                        panel.classList.add('panel-hidden');
-                    }
-                    state.controlsVisible = !isHidden;
-                }
-            }
-        };
-    }
+    // ─── Tool rail — pane switching ─────────────────────────
+    document.querySelectorAll('#tool-rail .tool-btn[data-tool]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tool = (btn as HTMLElement).dataset.tool;
+            if (!tool) return;
+            // Fullscreen is action-only — handled by setupFullscreen()
+            if (tool === 'fullscreen') return;
+            activateTool(tool);
+        });
+    });
 
     // ─── Display mode toggles ────────────────────────────────
     addListener('btn-splat', 'click', () => deps.display.setDisplayMode('splat'));
@@ -308,6 +293,15 @@ export function setupUIEvents(deps: EventWiringDeps): void {
         if (sceneRefs.directionalLight2) sceneRefs.directionalLight2.intensity = intensity;
     });
 
+    // ─── Transform controls ─────────────────────────────────
+    addListener('btn-select-none', 'click', () => deps.transform.setSelectedObject('none' as any));
+    addListener('btn-select-splat', 'click', () => deps.transform.setSelectedObject('splat' as any));
+    addListener('btn-select-model', 'click', () => deps.transform.setSelectedObject('model' as any));
+    addListener('btn-select-both', 'click', () => deps.transform.setSelectedObject('both' as any));
+    addListener('btn-translate', 'click', () => deps.transform.setTransformMode('translate' as any));
+    addListener('btn-rotate', 'click', () => deps.transform.setTransformMode('rotate' as any));
+    addListener('btn-scale', 'click', () => deps.transform.setTransformMode('scale' as any));
+
     // ─── Alignment (landmark) ────────────────────────────────
     addListener('btn-align', 'click', deps.alignment.toggleAlignment);
 
@@ -331,7 +325,7 @@ export function setupUIEvents(deps: EventWiringDeps): void {
     });
 
     // ─── Export/archive creation controls ─────────────────────
-    addListener('btn-export-archive', 'click', deps.export.showExportPanel);
+    // btn-export-archive is now a tool rail button — pane switching handled by activateTool()
     addListener('btn-export-cancel', 'click', hideExportPanel);
     addListener('btn-export-download', 'click', deps.export.downloadArchive);
 
@@ -356,8 +350,7 @@ export function setupUIEvents(deps: EventWiringDeps): void {
     setupMetadataTabs();
     setupLicenseField();
 
-    // Metadata display toggle (toolbar button)
-    addListener('btn-metadata', 'click', deps.metadata.toggleMetadataDisplay);
+    // btn-metadata is now a tool rail button — pane switching handled by activateTool()
 
     // ─── Scene settings — Camera FOV ─────────────────────────
     addListener('camera-fov', 'input', (e: Event) => {
@@ -376,12 +369,12 @@ export function setupUIEvents(deps: EventWiringDeps): void {
     });
 
     // ─── Scene settings — Background color presets ───────────
-    document.querySelectorAll('.color-preset').forEach(btn => {
+    document.querySelectorAll('.swatch[data-color]').forEach(btn => {
         btn.addEventListener('click', () => {
             const color = (btn as HTMLElement).dataset.color!;
             deps.display.setBackgroundColor(color);
             // Update active state
-            document.querySelectorAll('.color-preset').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.swatch[data-color]').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             // Update color picker
             const picker = document.getElementById('bg-color-picker') as HTMLInputElement | null;
@@ -560,15 +553,30 @@ export function setupUIEvents(deps: EventWiringDeps): void {
             return;
         }
 
-        if (e.key.toLowerCase() === 'a' && !e.ctrlKey && !e.metaKey) {
-            deps.annotations.toggleAnnotationMode();
-        } else if (e.key.toLowerCase() === 'm' && !e.ctrlKey && !e.metaKey) {
-            deps.metadata.toggleMetadataDisplay();
-        } else if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey) {
-            deps.camera.toggleFlyMode();
-        } else if (e.key === 'Escape') {
+        if (e.ctrlKey || e.metaKey) return;
+
+        const key = e.key.toLowerCase();
+
+        // Tool rail pane shortcuts (match data-tooltip in HTML)
+        switch (key) {
+            case 's': activateTool('scene'); break;
+            case 'a': activateTool('assets'); break;
+            case 't': activateTool('transform'); break;
+            case 'l': activateTool('align'); break;
+            case 'n': activateTool('annotate'); break;
+            case 'm': activateTool('measure'); break;
+            case 'c': activateTool('capture'); break;
+            case 'd': activateTool('metadata'); break;
+            case ',': activateTool('settings'); break;
+            case 'f': deps.camera.toggleFlyMode(); break;
+            default: break;
+        }
+
+        if (e.key === 'Escape') {
             deps.annotations.dismissPopup();
-            hideMetadataSidebar();
+            // Close props panel if open (replaces old hideMetadataSidebar)
+            const active = getActiveTool();
+            if (active) activateTool(active); // toggle off
         }
     });
 
