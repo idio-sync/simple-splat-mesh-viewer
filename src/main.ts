@@ -455,7 +455,19 @@ function createMetadataDeps(): any {
         onAddAnnotation: toggleAnnotationMode,
         onUpdateAnnotationCamera: updateSelectedAnnotationCamera,
         onDeleteAnnotation: deleteSelectedAnnotation,
-        onAnnotationUpdated: () => { updateAnnotationsUI(); updateSidebarAnnotationsList(); }
+        onAnnotationUpdated: () => { updateAnnotationsUI(); updateSidebarAnnotationsList(); },
+        getCameraState: () => ({
+            position: {
+                x: parseFloat(camera.position.x.toFixed(4)),
+                y: parseFloat(camera.position.y.toFixed(4)),
+                z: parseFloat(camera.position.z.toFixed(4))
+            },
+            target: {
+                x: parseFloat(controls.target.x.toFixed(4)),
+                y: parseFloat(controls.target.y.toFixed(4)),
+                z: parseFloat(controls.target.z.toFixed(4))
+            }
+        }),
     };
 }
 

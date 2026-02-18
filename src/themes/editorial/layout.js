@@ -182,6 +182,14 @@ function createInfoOverlay(manifest, deps) {
         colRight.appendChild(grid);
     };
 
+    const metadataProfile = deps.metadataProfile || 'archival';
+    const shouldShow = (title) => {
+        const tiers = deps.EDITORIAL_SECTION_TIERS;
+        const tier = tiers?.[title];
+        if (!tier || !deps.isTierVisible) return true;
+        return deps.isTierVisible(tier, metadataProfile);
+    };
+
     // 1. Capture details
     const captureDetails = [];
     const captureDate = manifest?.date || manifest?.provenance?.capture_date || manifest?.archival_record?.creation?.date;
@@ -193,7 +201,7 @@ function createInfoOverlay(manifest, deps) {
     const captureLocation = manifest?.location || manifest?.provenance?.location || manifest?.archival_record?.creation?.place;
     if (captureLocation) captureDetails.push({ label: 'Location', value: captureLocation });
     if (manifest?.provenance?.operator_orcid) captureDetails.push({ label: 'ORCID', value: manifest.provenance.operator_orcid });
-    addSection('Capture', captureDetails);
+    if (shouldShow('Capture')) addSection('Capture', captureDetails);
 
     // 2. Quality & accuracy
     const qm = manifest?.quality_metrics;
@@ -216,7 +224,7 @@ function createInfoOverlay(manifest, deps) {
             });
         }
     }
-    addSection('Quality', qualityDetails);
+    if (shouldShow('Quality')) addSection('Quality', qualityDetails);
 
     // 3. Processing
     const prov = manifest?.provenance;
@@ -231,7 +239,7 @@ function createInfoOverlay(manifest, deps) {
         if (prov.processing_notes) processDetails.push({ label: 'Notes', value: prov.processing_notes });
         if (prov.convention_hints?.length) processDetails.push({ label: 'Conventions', value: Array.isArray(prov.convention_hints) ? prov.convention_hints.join(', ') : prov.convention_hints });
     }
-    addSection('Processing', processDetails);
+    if (shouldShow('Processing')) addSection('Processing', processDetails);
 
     // 4. Archival record
     const ar = manifest?.archival_record;
@@ -259,7 +267,7 @@ function createInfoOverlay(manifest, deps) {
             });
         }
     }
-    addSection('Archival Record', archivalDetails);
+    if (shouldShow('Archival Record')) addSection('Archival Record', archivalDetails);
 
     // 5. Data assets
     const entries = manifest?.data_entries;
@@ -270,7 +278,7 @@ function createInfoOverlay(manifest, deps) {
             assetDetails.push({ label: entry.role || 'File', value: name });
         });
     }
-    addSection('Data Assets', assetDetails);
+    if (shouldShow('Data Assets')) addSection('Data Assets', assetDetails);
 
     // 6. Relationships
     const rel = manifest?.relationships;
@@ -280,7 +288,7 @@ function createInfoOverlay(manifest, deps) {
         if (rel.derived_from) relDetails.push({ label: 'Derived From', value: rel.derived_from });
         if (rel.replaces) relDetails.push({ label: 'Replaces', value: rel.replaces });
     }
-    addSection('Relationships', relDetails);
+    if (shouldShow('Relationships')) addSection('Relationships', relDetails);
 
     // 7. Integrity
     const integ = manifest?.integrity;
@@ -289,7 +297,7 @@ function createInfoOverlay(manifest, deps) {
         if (integ.algorithm) integDetails.push({ label: 'Algorithm', value: integ.algorithm });
         if (integ.manifest_hash) integDetails.push({ label: 'Hash', value: integ.manifest_hash });
     }
-    addSection('Integrity', integDetails);
+    if (shouldShow('Integrity')) addSection('Integrity', integDetails);
 
     // Stats row
     const contentInfo = state.archiveLoader ? state.archiveLoader.getContentInfo() : null;

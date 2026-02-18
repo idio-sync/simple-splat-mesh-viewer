@@ -48,6 +48,8 @@ import {
 import { loadTheme } from './theme-loader.js';
 import type { LayoutModule } from './theme-loader.js';
 import { ArchiveLoader } from './archive-loader.js';
+import { KIOSK_SECTION_TIERS, EDITORIAL_SECTION_TIERS, isTierVisible } from './metadata-profile.js';
+import type { MetadataProfile } from './metadata-profile.js';
 
 
 // =============================================================================
@@ -1050,6 +1052,11 @@ async function handleArchiveFile(file: File): Promise<void> {
         } else if (state.pointcloudLoaded) {
             state.displayMode = 'pointcloud';
         }
+        // Override with saved display mode if specified
+        const savedDisplayMode = manifest?.viewer_settings?.display_mode;
+        if (savedDisplayMode && ['splat', 'model', 'pointcloud', 'both'].includes(savedDisplayMode)) {
+            state.displayMode = savedDisplayMode;
+        }
         setDisplayMode(state.displayMode as DisplayMode, createDisplayModeDeps());
 
         // Show only relevant settings
@@ -1062,10 +1069,11 @@ async function handleArchiveFile(file: File): Promise<void> {
         sceneManager.enableShadows(true);
         sceneManager.applyShadowProperties(modelGroup);
 
-        // Enable auto-rotate by default in kiosk mode
-        controls.autoRotate = true;
+        // Enable auto-rotate by default in kiosk mode, unless manifest overrides it
+        const savedAutoRotate = manifest?.viewer_settings?.auto_rotate;
+        controls.autoRotate = savedAutoRotate !== false;
         const autoRotateBtn = document.getElementById('btn-auto-rotate');
-        if (autoRotateBtn) autoRotateBtn.classList.add('active');
+        if (controls.autoRotate && autoRotateBtn) autoRotateBtn.classList.add('active');
 
         // Branch UI setup based on resolved layout (theme + ?layout= override)
         const layoutModule = getLayoutModule();
@@ -1103,6 +1111,20 @@ async function handleArchiveFile(file: File): Promise<void> {
             if (manifest.viewer_settings.background_color && scene) {
                 scene.background = new THREE.Color(manifest.viewer_settings.background_color);
             }
+            // Apply saved camera position and target (overrides fitCameraToScene result)
+            const savedCamPos = manifest.viewer_settings.camera_position;
+            const savedCamTarget = manifest.viewer_settings.camera_target;
+            if (savedCamPos && savedCamTarget && camera && controls) {
+                camera.position.set(savedCamPos.x, savedCamPos.y, savedCamPos.z);
+                controls.target.set(savedCamTarget.x, savedCamTarget.y, savedCamTarget.z);
+                controls.update();
+            }
+            // Apply annotations visibility setting
+            if (manifest.viewer_settings.annotations_visible === false && annotationSystem) {
+                state.annotationsVisible = false;
+                const markersContainer = document.getElementById('annotation-markers');
+                if (markersContainer) markersContainer.style.display = 'none';
+            }
             log.info('Applied viewer settings:', manifest.viewer_settings);
         }
 
@@ -1122,12 +1144,12 @@ async function handleArchiveFile(file: File): Promise<void> {
             // Add export section to settings tab now that archive data is available
             createExportSection();
 
-            // Show annotation toggle button if annotations exist, active by default
+            // Show annotation toggle button if annotations exist; reflect saved visibility state
             if (annotationSystem.hasAnnotations()) {
                 const annoBtn = document.getElementById('btn-toggle-annotations');
                 if (annoBtn) {
                     annoBtn.style.display = '';
-                    annoBtn.classList.add('active');
+                    annoBtn.classList.toggle('active', state.annotationsVisible);
                 }
                 // Trigger intro glow on markers
                 triggerMarkerGlowIntro();
@@ -1394,7 +1416,10 @@ function createLayoutDeps(): any {
         themeAssets: window.__KIOSK_THEME_ASSETS__ || {},
         hasAnyProxy: hasAnyProxy(state.archiveLoader ? state.archiveLoader.getContentInfo() : {}),
         qualityResolved: state.qualityResolved,
-        switchQualityTier
+        switchQualityTier,
+        metadataProfile: state.archiveManifest?.metadata_profile || 'archival',
+        isTierVisible,
+        EDITORIAL_SECTION_TIERS,
     };
 }
 
@@ -2611,7 +2636,16 @@ function populateDetailedMetadata(manifest: any): void {
         if (content.children.length > 0) sections.push(section);
     }
 
-    if (sections.length === 0) return;
+    // Filter sections by metadata profile
+    const profile = (manifest?.metadata_profile || 'archival') as MetadataProfile;
+    const filteredSections = sections.filter(section => {
+        const titleEl = section.querySelector('.kiosk-detail-title');
+        const title = titleEl?.textContent || '';
+        const tier = KIOSK_SECTION_TIERS[title];
+        return !tier || isTierVisible(tier, profile);
+    });
+
+    if (filteredSections.length === 0) return;
 
     // Insert before annotation section if it exists, otherwise append
     const annoHeader = viewContent.querySelector('.kiosk-anno-header');
@@ -2624,13 +2658,13 @@ function populateDetailedMetadata(manifest: any): void {
 
     if (insertBefore) {
         viewContent.insertBefore(divider, insertBefore);
-        sections.forEach(s => viewContent.insertBefore(s, insertBefore));
+        filteredSections.forEach(s => viewContent.insertBefore(s, insertBefore));
     } else {
         viewContent.appendChild(divider);
-        sections.forEach(s => viewContent.appendChild(s));
+        filteredSections.forEach(s => viewContent.appendChild(s));
     }
 
-    log.info(`Populated ${sections.length} detailed metadata sections`);
+    log.info(`Populated ${filteredSections.length} detailed metadata sections`);
 }
 
 function formatBytes(bytes: number): string {

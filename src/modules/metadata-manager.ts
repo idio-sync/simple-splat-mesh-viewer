@@ -13,8 +13,12 @@
 
 import { Logger, parseMarkdown, resolveAssetRefs } from './utilities.js';
 import type { AppState, Annotation } from '@/types.js';
+import type { MetadataProfile } from './metadata-profile.js';
+import { TAB_TIERS, isTierVisible, computeCompleteness } from './metadata-profile.js';
 
 const log = Logger.getLogger('metadata-manager');
+
+let activeProfile: MetadataProfile = 'standard';
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -29,6 +33,7 @@ export interface MetadataDeps {
     onAnnotationUpdated?: () => void;
     onExportMetadata?: () => void;
     onImportMetadata?: () => void;
+    getCameraState?: () => { position: { x: number; y: number; z: number }; target: { x: number; y: number; z: number } };
     imageAssets?: Map<string, { blob: Blob; url: string; name: string }>;
     currentSplatBlob?: Blob | null;
     currentMeshBlob?: Blob | null;
@@ -172,6 +177,11 @@ export interface AssetMetadata {
 export interface ViewerSettings {
     singleSided: boolean;
     backgroundColor: string | null;
+    displayMode: string;
+    cameraPosition: { x: number; y: number; z: number } | null;
+    cameraTarget: { x: number; y: number; z: number } | null;
+    autoRotate: boolean;
+    annotationsVisible: boolean;
 }
 
 export interface VersionHistoryEntry {
@@ -343,6 +353,98 @@ export function setupMetadataTabs(): void {
 }
 
 /**
+ * Get the currently active metadata profile.
+ */
+export function getActiveProfile(): MetadataProfile {
+    return activeProfile;
+}
+
+/**
+ * Set the active metadata profile. Updates UI visibility and completeness indicator.
+ */
+export function setActiveProfile(profile: MetadataProfile): void {
+    activeProfile = profile;
+
+    // Update button active states
+    document.querySelectorAll('#metadata-profile-selector .profile-btn').forEach(btn => {
+        (btn as HTMLElement).classList.toggle('active', (btn as HTMLElement).dataset.profile === profile);
+    });
+
+    // Set data attribute for CSS-driven tier visibility
+    const editPanel = document.getElementById('sidebar-edit');
+    if (editPanel) editPanel.dataset.activeProfile = profile;
+
+    // Update dropdown options visibility (hidden + disabled for Safari compat)
+    const select = document.getElementById('edit-category-select') as HTMLSelectElement | null;
+    if (select) {
+        Array.from(select.options).forEach(opt => {
+            const tabTier = TAB_TIERS[opt.value] as MetadataProfile | undefined;
+            if (tabTier) {
+                const visible = isTierVisible(tabTier, profile);
+                opt.hidden = !visible;
+                opt.disabled = !visible;
+            }
+        });
+
+        // If current tab is now hidden, switch to first visible tab
+        const currentOpt = select.options[select.selectedIndex];
+        if (currentOpt?.hidden) {
+            const firstVisible = Array.from(select.options).find(o => !o.hidden);
+            if (firstVisible) {
+                select.value = firstVisible.value;
+                switchEditTab(firstVisible.value);
+            }
+        }
+    }
+
+    updateCompleteness();
+}
+
+/**
+ * Update the completeness indicator based on the active profile.
+ */
+export function updateCompleteness(): void {
+    const { filled, total } = computeCompleteness(activeProfile);
+    const percent = total > 0 ? Math.round((filled / total) * 100) : 0;
+
+    const fill = document.getElementById('completeness-fill');
+    const text = document.getElementById('completeness-text');
+    if (fill) fill.style.width = `${percent}%`;
+    if (text) text.textContent = `${filled} / ${total}`;
+}
+
+/**
+ * Wire up the profile selector buttons.
+ */
+function setupProfileSelector(): void {
+    const container = document.getElementById('metadata-profile-selector');
+    if (!container) return;
+
+    container.addEventListener('click', (e) => {
+        const btn = (e.target as HTMLElement).closest('.profile-btn') as HTMLElement | null;
+        if (!btn?.dataset.profile) return;
+        setActiveProfile(btn.dataset.profile as MetadataProfile);
+    });
+
+    // Set initial state
+    setActiveProfile(activeProfile);
+
+    // Debounced completeness updates on field changes
+    let completenessTimer: ReturnType<typeof setTimeout>;
+    const editPanel = document.getElementById('sidebar-edit');
+    if (editPanel) {
+        editPanel.addEventListener('input', () => {
+            clearTimeout(completenessTimer);
+            completenessTimer = setTimeout(updateCompleteness, 300);
+        });
+        editPanel.addEventListener('change', () => {
+            clearTimeout(completenessTimer);
+            completenessTimer = setTimeout(updateCompleteness, 300);
+        });
+    }
+}
+
+/**
  * Setup metadata sidebar event handlers
  */
 export function setupMetadataSidebar(deps: MetadataDeps = {}): void {
@@ -510,6 +612,35 @@ export function setupMetadataSidebar(deps: MetadataDeps = {}): void {
 
     // Setup field validation
     setupFieldValidation();
+
+    // Profile selector
+    setupProfileSelector();
+
+    // Camera save/clear buttons
+    const saveCameraBtn = document.getElementById('btn-save-camera');
+    if (saveCameraBtn) {
+        saveCameraBtn.addEventListener('click', () => {
+            if (deps.getCameraState) {
+                const cam = deps.getCameraState();
+                setCameraHiddenFields('pos', cam.position);
+                setCameraHiddenFields('target', cam.target);
+                updateCameraSaveDisplay();
+                updateCompleteness();
+            }
+        });
+    }
+
+    const clearCameraBtn = document.getElementById('btn-clear-camera');
+    if (clearCameraBtn) {
+        clearCameraBtn.addEventListener('click', () => {
+            ['pos-x', 'pos-y', 'pos-z', 'target-x', 'target-y', 'target-z'].forEach(suffix => {
+                const el = document.getElementById(`meta-viewer-camera-${suffix}`) as HTMLInputElement | null;
+                if (el) el.value = '';
+            });
+            updateCameraSaveDisplay();
+            updateCompleteness();
+        });
+    }
 }
 
 /**
@@ -918,6 +1049,46 @@ export function setupFieldValidation(): void {
 // METADATA COLLECTION
 // =============================================================================
 
+function getCameraFromHiddenFields(prefix: 'pos' | 'target'): { x: number; y: number; z: number } | null {
+    const x = (document.getElementById(`meta-viewer-camera-${prefix}-x`) as HTMLInputElement)?.value;
+    const y = (document.getElementById(`meta-viewer-camera-${prefix}-y`) as HTMLInputElement)?.value;
+    const z = (document.getElementById(`meta-viewer-camera-${prefix}-z`) as HTMLInputElement)?.value;
+    if (!x && !y && !z) return null;
+    return { x: parseFloat(x) || 0, y: parseFloat(y) || 0, z: parseFloat(z) || 0 };
+}
+
+function setCameraHiddenFields(prefix: 'pos' | 'target', coords: { x: number; y: number; z: number }): void {
+    const setVal = (suffix: string, val: number) => {
+        const el = document.getElementById(`meta-viewer-camera-${prefix}-${suffix}`) as HTMLInputElement | null;
+        if (el) el.value = val.toFixed(4);
+    };
+    setVal('x', coords.x);
+    setVal('y', coords.y);
+    setVal('z', coords.z);
+}
+
+function updateCameraSaveDisplay(): void {
+    const pos = getCameraFromHiddenFields('pos');
+    const target = getCameraFromHiddenFields('target');
+    const savedInfo = document.getElementById('camera-saved-info');
+    const hint = document.getElementById('camera-save-hint');
+    const clearBtn = document.getElementById('btn-clear-camera');
+    const posDisplay = document.getElementById('camera-pos-display');
+    const targetDisplay = document.getElementById('camera-target-display');
+
+    if (pos && target) {
+        if (savedInfo) savedInfo.style.display = '';
+        if (hint) hint.style.display = 'none';
+        if (clearBtn) clearBtn.style.display = '';
+        if (posDisplay) posDisplay.textContent = `${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}`;
+        if (targetDisplay) targetDisplay.textContent = `${target.x.toFixed(2)}, ${target.y.toFixed(2)}, ${target.z.toFixed(2)}`;
+    } else {
+        if (savedInfo) savedInfo.style.display = 'none';
+        if (hint) hint.style.display = '';
+        if (clearBtn) clearBtn.style.display = 'none';
+    }
+}
+
 /**
  * Collect all metadata from the panel
  */
@@ -1059,7 +1230,12 @@ export function collectMetadata(): CollectedMetadata {
             singleSided: (document.getElementById('meta-viewer-single-sided') as HTMLInputElement)?.checked ?? true,
             backgroundColor: (document.getElementById('meta-viewer-bg-override') as HTMLInputElement)?.checked
                 ? ((document.getElementById('meta-viewer-bg-color') as HTMLInputElement)?.value || '#1a1a2e')
-                : null
+                : null,
+            displayMode: (document.getElementById('meta-viewer-display-mode') as HTMLSelectElement)?.value || '',
+            cameraPosition: getCameraFromHiddenFields('pos'),
+            cameraTarget: getCameraFromHiddenFields('target'),
+            autoRotate: (document.getElementById('meta-viewer-auto-rotate') as HTMLInputElement)?.checked ?? false,
+            annotationsVisible: (document.getElementById('meta-viewer-annotations-visible') as HTMLInputElement)?.checked ?? true,
         }
     };
 
@@ -1544,6 +1720,31 @@ export function prefillMetadataFromArchive(manifest: any): void {
             const hexLabel = document.getElementById('meta-viewer-bg-color-hex');
             if (hexLabel) hexLabel.textContent = manifest.viewer_settings.background_color;
         }
+
+        // Display mode
+        const displayModeEl = document.getElementById('meta-viewer-display-mode') as HTMLSelectElement | null;
+        if (displayModeEl && manifest.viewer_settings.display_mode) {
+            displayModeEl.value = manifest.viewer_settings.display_mode;
+        }
+
+        // Camera position
+        if (manifest.viewer_settings.camera_position) {
+            const cp = manifest.viewer_settings.camera_position;
+            setCameraHiddenFields('pos', cp);
+        }
+        if (manifest.viewer_settings.camera_target) {
+            const ct = manifest.viewer_settings.camera_target;
+            setCameraHiddenFields('target', ct);
+        }
+        updateCameraSaveDisplay();
+
+        // Auto-rotate
+        const autoRotateEl = document.getElementById('meta-viewer-auto-rotate') as HTMLInputElement | null;
+        if (autoRotateEl) autoRotateEl.checked = manifest.viewer_settings.auto_rotate ?? false;
+
+        // Annotations visible
+        const annoVisEl = document.getElementById('meta-viewer-annotations-visible') as HTMLInputElement | null;
+        if (annoVisEl) annoVisEl.checked = manifest.viewer_settings.annotations_visible ?? true;
     }
 
     // Custom fields from _meta
@@ -1580,6 +1781,11 @@ export function prefillMetadataFromArchive(manifest: any): void {
                 }
             }
         }
+    }
+
+    // Restore metadata profile if present in manifest
+    if (manifest.metadata_profile && ['basic', 'standard', 'archival'].includes(manifest.metadata_profile)) {
+        setActiveProfile(manifest.metadata_profile as MetadataProfile);
     }
 }
 

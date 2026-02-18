@@ -111,6 +111,11 @@ export interface ArchivalRecord {
 export interface ViewerSettings {
     singleSided?: boolean;
     backgroundColor?: string | null;
+    displayMode?: string;
+    cameraPosition?: { x: number; y: number; z: number } | null;
+    cameraTarget?: { x: number; y: number; z: number } | null;
+    autoRotate?: boolean;
+    annotationsVisible?: boolean;
 }
 
 export interface MaterialStandard {
@@ -170,6 +175,7 @@ export interface IntegrityData {
 export interface Manifest {
     container_version: string;
     metadata_schema_version: string;
+    metadata_profile: string;
     packer: string;
     packer_version: string;
     _creation_date: string;
@@ -266,6 +272,11 @@ export interface Manifest {
     viewer_settings: {
         single_sided: boolean;
         background_color: string | null;
+        display_mode: string;
+        camera_position: { x: number; y: number; z: number } | null;
+        camera_target: { x: number; y: number; z: number } | null;
+        auto_rotate: boolean;
+        annotations_visible: boolean;
     };
     preservation: {
         format_registry: {
@@ -508,6 +519,7 @@ export class ArchiveCreator {
         return {
             container_version: "1.0",
             metadata_schema_version: "1.0",
+            metadata_profile: 'standard',
             packer: "vitrine3d",
             packer_version: "1.0.0",
             _creation_date: "",
@@ -609,7 +621,12 @@ export class ArchiveCreator {
             },
             viewer_settings: {
                 single_sided: true,
-                background_color: null
+                background_color: null,
+                display_mode: '',
+                camera_position: null,
+                camera_target: null,
+                auto_rotate: false,
+                annotations_visible: true,
             },
             preservation: {
                 format_registry: {
@@ -1074,6 +1091,11 @@ export class ArchiveCreator {
 
         if (settings.singleSided !== undefined) this.manifest.viewer_settings.single_sided = settings.singleSided;
         if (settings.backgroundColor !== undefined) this.manifest.viewer_settings.background_color = settings.backgroundColor;
+        if (settings.displayMode !== undefined) this.manifest.viewer_settings.display_mode = settings.displayMode;
+        if (settings.cameraPosition !== undefined) this.manifest.viewer_settings.camera_position = settings.cameraPosition;
+        if (settings.cameraTarget !== undefined) this.manifest.viewer_settings.camera_target = settings.cameraTarget;
+        if (settings.autoRotate !== undefined) this.manifest.viewer_settings.auto_rotate = settings.autoRotate;
+        if (settings.annotationsVisible !== undefined) this.manifest.viewer_settings.annotations_visible = settings.annotationsVisible;
     }
 
     setMaterialStandard(material: MaterialStandard): void {
@@ -1395,6 +1417,15 @@ export class ArchiveCreator {
         return Object.keys(this.manifest.data_entries)
             .filter(k => k.startsWith(prefix))
             .length;
+    }
+
+    /**
+     * Set the metadata detail profile used when authoring this archive.
+     */
+    setMetadataProfile(profile: string): void {
+        if (['basic', 'standard', 'archival'].includes(profile)) {
+            this.manifest.metadata_profile = profile;
+        }
     }
 
     setQualityStats(stats: QualityStats): void {

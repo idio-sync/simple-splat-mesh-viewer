@@ -882,16 +882,29 @@
                     <!-- KIOSK-STRIP-START: metadata edit tab -->
                     <!-- Edit Mode Content -->
                     <div class="sidebar-mode-content" id="sidebar-edit">
+                        <div class="metadata-profile-bar">
+                            <div class="metadata-profile-selector" id="metadata-profile-selector">
+                                <button class="profile-btn" data-profile="basic">Basic</button>
+                                <button class="profile-btn active" data-profile="standard">Standard</button>
+                                <button class="profile-btn" data-profile="archival">Archival</button>
+                            </div>
+                            <div class="metadata-completeness" id="metadata-completeness">
+                                <div class="completeness-bar">
+                                    <div class="completeness-fill" id="completeness-fill"></div>
+                                </div>
+                                <span class="completeness-text" id="completeness-text">0 / 0</span>
+                            </div>
+                        </div>
                         <div class="edit-category-bar">
                             <select class="edit-category-select" id="edit-category-select">
                                 <option value="project" selected>Project</option>
                                 <option value="provenance">Provenance</option>
-                                <option value="archival">Archival</option>
-                                <option value="quality">Quality</option>
-                                <option value="material">Material</option>
-                                <option value="preservation">Preservation</option>
-                                <option value="assets">Assets</option>
-                                <option value="integrity">Integrity</option>
+                                <option value="archival" data-tier="archival">Archival</option>
+                                <option value="quality" data-tier="standard">Quality</option>
+                                <option value="material" data-tier="archival">Material</option>
+                                <option value="preservation" data-tier="archival">Preservation</option>
+                                <option value="assets" data-tier="standard">Assets</option>
+                                <option value="integrity" data-tier="archival">Integrity</option>
                                 <option value="viewer">Default View</option>
                             </select>
                         </div>
@@ -971,7 +984,7 @@
                                 <label for="meta-capture-device">Capture Device</label>
                                 <input type="text" id="meta-capture-device" placeholder="e.g., iPhone 15 Pro, Faro Focus">
                             </div>
-                            <div class="metadata-field">
+                            <div class="metadata-field" data-tier="standard">
                                 <label for="meta-device-serial">Device Serial Number</label>
                                 <input type="text" id="meta-device-serial" placeholder="e.g., AL-2024-0847">
                             </div>
@@ -979,7 +992,7 @@
                                 <label for="meta-operator">Operator / Creator</label>
                                 <input type="text" id="meta-operator" placeholder="Name or organization">
                             </div>
-                            <div class="metadata-field">
+                            <div class="metadata-field" data-tier="standard">
                                 <label for="meta-operator-orcid">Operator ORCID</label>
                                 <input type="text" id="meta-operator-orcid" placeholder="e.g., 0000-0002-1825-0097">
                                 <span class="field-hint">ORCID identifier for attribution</span>
@@ -989,6 +1002,7 @@
                                 <input type="text" id="meta-location" placeholder="Where the capture was made">
                             </div>
 
+                            <div data-tier="standard">
                             <div class="subsection-header">Processing Software</div>
                             <div id="processing-software-list"></div>
                             <button id="btn-add-processing-software" class="action-btn secondary" style="width: 100%; margin-top: 10px;">
@@ -1019,6 +1033,7 @@
                             <button id="btn-add-custom-field" class="action-btn secondary" style="width: 100%; margin-top: 10px;">
                                 + Add Custom Field
                             </button>
+                            </div>
                         </div>
 
                         <!-- Archival Record Tab (Dublin Core) -->
@@ -1510,6 +1525,52 @@
                                     <span class="color-hex-label" id="meta-viewer-bg-color-hex">#1a1a2e</span>
                                 </div>
                             </div>
+
+                            <div class="subsection-header" style="margin-top: 20px;">Display Mode</div>
+                            <div class="metadata-field">
+                                <label for="meta-viewer-display-mode">Default Asset View</label>
+                                <select id="meta-viewer-display-mode">
+                                    <option value="">Auto (show primary asset)</option>
+                                    <option value="splat">Splat</option>
+                                    <option value="model">Model</option>
+                                    <option value="pointcloud">Point Cloud</option>
+                                    <option value="both">All Assets</option>
+                                </select>
+                                <span class="field-hint">Which asset(s) to display when the viewer opens. Auto selects the first loaded asset.</span>
+                            </div>
+
+                            <div class="subsection-header" style="margin-top: 20px;">Opening Camera</div>
+                            <div class="metadata-field">
+                                <div class="camera-save-controls">
+                                    <button id="btn-save-camera" class="action-btn secondary" style="flex: 1;">Save Current View</button>
+                                    <button id="btn-clear-camera" class="action-btn secondary" style="flex: 0 0 auto; display: none;">Clear</button>
+                                </div>
+                                <span class="field-hint" id="camera-save-hint">Saves the current camera position as the default opening view.</span>
+                                <div id="camera-saved-info" style="display: none;">
+                                    <div class="saved-camera-display">
+                                        <span class="field-hint">Position: <span id="camera-pos-display"></span></span>
+                                        <span class="field-hint">Target: <span id="camera-target-display"></span></span>
+                                    </div>
+                                </div>
+                                <input type="hidden" id="meta-viewer-camera-pos-x">
+                                <input type="hidden" id="meta-viewer-camera-pos-y">
+                                <input type="hidden" id="meta-viewer-camera-pos-z">
+                                <input type="hidden" id="meta-viewer-camera-target-x">
+                                <input type="hidden" id="meta-viewer-camera-target-y">
+                                <input type="hidden" id="meta-viewer-camera-target-z">
+                            </div>
+
+                            <div class="subsection-header" style="margin-top: 20px;">Viewer Behavior</div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="meta-viewer-auto-rotate">
+                                <label for="meta-viewer-auto-rotate">Auto-Rotate</label>
+                            </div>
+                            <span class="field-hint">Slowly rotate the scene when the viewer first opens.</span>
+                            <div class="checkbox-group" style="margin-top: 8px;">
+                                <input type="checkbox" id="meta-viewer-annotations-visible" checked>
+                                <label for="meta-viewer-annotations-visible">Show Annotations</label>
+                            </div>
+                            <span class="field-hint">Display annotation markers when the viewer opens.</span>
                         </div>
                     </div>
 

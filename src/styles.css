@@ -2504,7 +2504,9 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 .metadata-field input[type="text"],
+.metadata-field input[type="number"],
 .metadata-field input[type="date"],
+.metadata-field input[type="color"],
 .metadata-field textarea,
 .metadata-field select {
     width: 100%;
@@ -3408,6 +3410,98 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .edit-category-select option {
     background: var(--bg-input);
     color: var(--text-primary);
+}
+
+/* Metadata Profile Selector */
+.metadata-profile-bar {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+}
+
+.metadata-profile-selector {
+    display: flex;
+    border: 1px solid var(--border-default, rgba(255,255,255,0.12));
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.profile-btn {
+    flex: 1;
+    padding: 5px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: none;
+    background: var(--bg-input, #1e1e2e);
+    color: var(--text-secondary, #888);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.profile-btn + .profile-btn {
+    border-left: 1px solid var(--border-default, rgba(255,255,255,0.12));
+}
+.profile-btn:hover {
+    background: var(--bg-elevated, #2a2a3e);
+}
+.profile-btn.active {
+    background: var(--accent, #6c8cbf);
+    color: #fff;
+}
+
+.metadata-completeness {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+}
+.completeness-bar {
+    flex: 1;
+    height: 3px;
+    background: var(--bg-input, #1e1e2e);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.completeness-fill {
+    height: 100%;
+    background: var(--accent, #6c8cbf);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+.completeness-text {
+    font-size: 10px;
+    color: var(--text-secondary, #888);
+    white-space: nowrap;
+    min-width: 36px;
+    text-align: right;
+}
+
+/* Camera save controls */
+.camera-save-controls {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.saved-camera-display {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 4px;
+    padding: 6px 8px;
+    background: var(--bg-input, #1e1e2e);
+    border: 1px solid var(--border-default, rgba(255,255,255,0.12));
+    border-radius: var(--radius-sm, 4px);
+    font-family: monospace;
+    font-size: 10px;
+}
+
+/* Metadata profile tier visibility — CSS-driven via data-active-profile attribute */
+#sidebar-edit[data-active-profile="basic"] [data-tier="standard"],
+#sidebar-edit[data-active-profile="basic"] [data-tier="archival"],
+#sidebar-edit[data-active-profile="standard"] [data-tier="archival"] {
+    display: none !important;
 }
 
 .metadata-actions {

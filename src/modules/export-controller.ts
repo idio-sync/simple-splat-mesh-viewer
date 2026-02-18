@@ -7,7 +7,7 @@
 
 import { captureScreenshot } from './archive-creator.js';
 import { Logger, notify } from './utilities.js';
-import { formatFileSize } from './metadata-manager.js';
+import { formatFileSize, getActiveProfile } from './metadata-manager.js';
 import { getStore } from './asset-store.js';
 import type { ExportDeps } from '@/types.js';
 
@@ -271,6 +271,9 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
         }
     }
 
+    // Apply metadata profile
+    archiveCreator.setMetadataProfile(getActiveProfile());
+
     // Set quality stats
     log.info(' Setting quality stats');
     archiveCreator.setQualityStats({
@@ -415,6 +418,7 @@ export async function exportMetadataManifest(deps: ExportDeps): Promise<void> {
 
     const metadata = metadataFns.collectMetadata();
     tempCreator.applyMetadata(metadata);
+    tempCreator.setMetadataProfile(getActiveProfile());
 
     // Include annotations if present
     if (annotationSystem && annotationSystem.hasAnnotations()) {

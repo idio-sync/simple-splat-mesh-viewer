@@ -1,0 +1,140 @@
+/**
+ * Metadata completeness profile system.
+ * Defines three tiers — Basic, Standard, Archival — that control
+ * which metadata fields are visible in the editor, kiosk, and editorial theme.
+ */
+
+export type MetadataProfile = 'basic' | 'standard' | 'archival';
+
+export const PROFILE_ORDER: Record<MetadataProfile, number> = {
+    basic: 0,
+    standard: 1,
+    archival: 2,
+};
+
+/** Returns true if fieldTier is at or below the activeProfile */
+export function isTierVisible(fieldTier: MetadataProfile, activeProfile: MetadataProfile): boolean {
+    return PROFILE_ORDER[fieldTier] <= PROFILE_ORDER[activeProfile];
+}
+
+/** Maps each edit tab name (from #edit-category-select option values) to its minimum profile tier */
+export const TAB_TIERS: Record<string, MetadataProfile> = {
+    project:      'basic',
+    provenance:   'basic',     // tab visible at basic; individual fields gated within
+    quality:      'standard',
+    assets:       'standard',
+    archival:     'archival',
+    material:     'archival',
+    preservation: 'archival',
+    integrity:    'archival',
+    viewer:       'basic',
+};
+
+/** Maps kiosk detail section titles (from createDetailSection() in kiosk-main.ts) to tiers */
+export const KIOSK_SECTION_TIERS: Record<string, MetadataProfile> = {
+    'Quality & Accuracy':   'standard',
+    'Processing Details':   'standard',
+    'Data Assets':          'standard',
+    'Relationships':        'standard',
+    'Version History':      'standard',
+    'Custom Fields':        'standard',
+    'Archival Record':      'archival',
+    'Material Properties':  'archival',
+    'Preservation':         'archival',
+    'Integrity':            'archival',
+};
+
+/** Maps editorial theme section titles (from addSection() in layout.js) to tiers */
+export const EDITORIAL_SECTION_TIERS: Record<string, MetadataProfile> = {
+    'Capture':          'basic',
+    'Quality':          'standard',
+    'Processing':       'standard',
+    'Data Assets':      'standard',
+    'Relationships':    'standard',
+    'Archival Record':  'archival',
+    'Integrity':        'archival',
+};
+
+/**
+ * User-fillable metadata field IDs mapped to their minimum profile tier.
+ * Used for completeness scoring — only fields at or below the active profile are counted.
+ * Excludes auto-populated stats (splat count, mesh polys, etc.) and read-only display fields.
+ */
+export const COMPLETENESS_FIELDS: Record<string, MetadataProfile> = {
+    // Project tab (basic)
+    'meta-title':           'basic',
+    'meta-description':     'basic',
+    'meta-tags':            'basic',
+    'meta-license':         'basic',
+
+    // Provenance tab — basic fields
+    'meta-capture-date':    'basic',
+    'meta-capture-device':  'basic',
+    'meta-operator':        'basic',
+    'meta-location':        'basic',
+
+    // Provenance tab — standard fields
+    'meta-device-serial':       'standard',
+    'meta-operator-orcid':      'standard',
+    'meta-processing-notes':    'standard',
+    'meta-conventions':         'standard',
+
+    // Quality tab (standard)
+    'meta-quality-tier':            'standard',
+    'meta-quality-accuracy':        'standard',
+    'meta-quality-res-value':       'standard',
+    'meta-quality-scale-verify':    'standard',
+
+    // Assets tab (standard)
+    'meta-splat-created-by':        'standard',
+    'meta-mesh-created-by':         'standard',
+    'meta-pointcloud-created-by':   'standard',
+
+    // Archival tab (archival)
+    'meta-archival-title':          'archival',
+    'meta-archival-creator':        'archival',
+    'meta-archival-date-created':   'archival',
+    'meta-archival-medium':         'archival',
+    'meta-archival-provenance':     'archival',
+    'meta-archival-copyright':      'archival',
+    'meta-coverage-location':       'archival',
+    'meta-coverage-lat':            'archival',
+    'meta-coverage-lon':            'archival',
+
+    // Material tab (archival)
+    'meta-material-workflow':       'archival',
+    'meta-material-colorspace':     'archival',
+
+    // Preservation tab (archival)
+    'meta-pres-render-req':         'archival',
+};
+
+/**
+ * Get all field IDs that should count toward completeness for a given profile.
+ */
+export function getFieldsForProfile(profile: MetadataProfile): string[] {
+    return Object.entries(COMPLETENESS_FIELDS)
+        .filter(([, tier]) => isTierVisible(tier, profile))
+        .map(([id]) => id);
+}
+
+/**
+ * Count filled vs total user-fillable fields for a given profile.
+ * Reads DOM values directly.
+ */
+export function computeCompleteness(profile: MetadataProfile): { filled: number; total: number } {
+    const fields = getFieldsForProfile(profile);
+    let filled = 0;
+    for (const id of fields) {
+        const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+        if (!el) continue;
+        const val = el.value?.trim() ?? '';
+        // For selects, skip default/empty options
+        if (el instanceof HTMLSelectElement) {
+            if (val && val !== 'Not specified' && val !== '') filled++;
+        } else {
+            if (val) filled++;
+        }
+    }
+    return { filled, total: fields.length };
+}
