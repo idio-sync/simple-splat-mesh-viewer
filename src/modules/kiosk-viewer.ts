@@ -214,8 +214,12 @@ export async function fetchDependencies(onProgress?: ProgressCallback): Promise<
     // 3. Fetch HTML, CSS, and pre-module.js from same origin
     const baseUrl = appBase;
 
-    progress('Fetching styles.css...');
-    const stylesCSS = await fetchText(new URL('styles.css', baseUrl).href);
+    progress('Fetching CSS...');
+    const [mainCSS, kioskCSS] = await Promise.all([
+        fetchText(new URL('styles.css', baseUrl).href),
+        fetchText(new URL('kiosk.css', baseUrl).href)
+    ]);
+    const stylesCSS = mainCSS + '\n' + kioskCSS;
 
     progress('Fetching index.html...');
     const indexHTML = await fetchText(new URL('index.html', baseUrl).href);
@@ -451,7 +455,7 @@ export function generateGenericViewer(deps: FetchDependenciesResult): string {
         ? '\n<style id="kiosk-layout">\n' + deps.layoutCSS + '\n</style>'
         : '';
     html = html.replace(
-        /<link\s+rel="stylesheet"\s+href="styles\.css"\s*\/?>/,
+        /<link\s+rel="stylesheet"\s+href="styles\.css"\s*\/?>[\s\S]*?<link\s+rel="stylesheet"\s+href="kiosk\.css"\s*\/?>/,
         '<style>\n' + deps.stylesCSS + '\n</style>' + themeBlock + layoutBlock
     );
 

@@ -54,8 +54,9 @@ function copyRuntimeAssets() {
             copyFileSync(resolve(srcDir, 'config.js'), resolve(distDir, 'config.js'));
             copyFileSync(resolve(srcDir, 'pre-module.js'), resolve(distDir, 'pre-module.js'));
 
-            // Copy raw styles.css for kiosk viewer inlining
+            // Copy raw CSS for kiosk viewer inlining
             copyFileSync(resolve(srcDir, 'styles.css'), resolve(distDir, 'styles.css'));
+            copyFileSync(resolve(srcDir, 'kiosk.css'), resolve(distDir, 'kiosk.css'));
 
             // Copy themes directory for dynamic loading
             const themesDir = resolve(srcDir, 'themes');

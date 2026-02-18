@@ -23,49 +23,13 @@
     ">
 
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="kiosk.css">
     <script src="config.js"></script>
 </head>
 <body>
     <script>if(window.APP_CONFIG&&window.APP_CONFIG.kiosk)document.body.classList.add('kiosk-mode');</script>
-    <!-- Kiosk file picker overlay (hidden by default, shown by kiosk-main.js) -->
-    <div id="kiosk-file-picker" class="hidden">
-        <div class="kiosk-picker-content">
-            <h1>Vitrine3D</h1>
-            <p>Open a 3D file or archive to view its content.</p>
-            <div class="kiosk-picker-box" id="kiosk-drop-zone">
-                <div class="kiosk-picker-icon">&#128194;</div>
-                <p>Select a <strong>3D file</strong> or <strong>archive</strong></p>
-                <button id="kiosk-picker-btn" type="button">Select File</button>
-                <p class="kiosk-picker-hint">or drag and drop it here</p>
-                <p class="kiosk-picker-formats">
-                    Archives: .a3d, .a3z<br>
-                    Models: .glb, .gltf, .obj, .stl<br>
-                    Splats: .ply, .splat, .ksplat, .spz, .sog<br>
-                    Point Clouds: .e57
-                </p>
-            </div>
-            <input type="file" id="kiosk-picker-input" accept=".a3z,.a3d,.glb,.gltf,.obj,.stl,.ply,.splat,.ksplat,.spz,.sog,.e57" multiple style="display:none">
-            <input type="file" id="image-insert-input" accept=".png,.jpg,.jpeg,.webp,.gif" style="display:none">
-        </div>
-    </div>
-
-    <!-- Click-to-load gate (shown when ?autoload=false) -->
-    <div id="kiosk-click-gate" class="hidden">
-        <div class="kiosk-gate-vignette"></div>
-        <img id="kiosk-gate-poster" alt="" />
-        <div class="kiosk-gate-card">
-            <h2 id="kiosk-gate-title"></h2>
-            <p id="kiosk-gate-description" class="hidden"></p>
-            <div id="kiosk-gate-tags" class="display-tags hidden"></div>
-            <button id="kiosk-gate-play" type="button" aria-label="Load 3D viewer">
-                <svg viewBox="0 0 24 24" width="32" height="32">
-                    <polygon points="8,5 19,12 8,19" />
-                </svg>
-            </button>
-            <p id="kiosk-gate-cta" class="hidden">Touch to begin</p>
-            <div id="kiosk-gate-types"></div>
-        </div>
-    </div>
+    <!-- Hidden file input for annotation image insertion (used by metadata-manager) -->
+    <input type="file" id="image-insert-input" accept=".png,.jpg,.jpeg,.webp,.gif" style="display:none">
 
     <!-- ================================================================
          APP GRID LAYOUT

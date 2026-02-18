@@ -11,6 +11,16 @@
 
 // ---- Private helpers (duplicated because originals are module-private) ----
 
+function formatDate(raw, style) {
+    if (!raw) return raw;
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return raw;
+    if (style === 'medium') {
+        return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+    }
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
 function hasValue(val) {
     if (val === null || val === undefined || val === '') return false;
     if (Array.isArray(val)) return val.length > 0;
@@ -175,7 +185,7 @@ function createInfoOverlay(manifest, deps) {
     // 1. Capture details
     const captureDetails = [];
     const captureDate = manifest?.date || manifest?.provenance?.capture_date || manifest?.archival_record?.creation?.date;
-    if (captureDate) captureDetails.push({ label: 'Date', value: captureDate });
+    if (captureDate) captureDetails.push({ label: 'Date', value: formatDate(captureDate) || captureDate });
     if (manifest?.provenance?.capture_device) captureDetails.push({ label: 'Device', value: manifest.provenance.capture_device });
     if (manifest?.provenance?.device_serial) captureDetails.push({ label: 'Serial', value: manifest.provenance.device_serial });
     const operator = manifest?.creator || manifest?.provenance?.operator || manifest?.archival_record?.creation?.creator;
@@ -345,7 +355,8 @@ export function setup(manifest, deps) {
 
     const title = manifest?.title || manifest?.project?.title || manifest?.archival_record?.title || '';
     const location = manifest?.location || manifest?.provenance?.location || manifest?.archival_record?.creation?.place || '';
-    const date = manifest?.date || manifest?.provenance?.capture_date || manifest?.archival_record?.creation?.date || '';
+    const rawDate = manifest?.date || manifest?.provenance?.capture_date || manifest?.archival_record?.creation?.date || '';
+    const date = formatDate(rawDate, 'medium') || rawDate;
     const metaParts = [location, date].filter(Boolean);
 
     titleBlock.innerHTML = `

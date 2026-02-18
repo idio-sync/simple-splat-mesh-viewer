@@ -112,6 +112,7 @@ interface LoadArchiveAssetDeps {
         onApplyModelTransform?: (transform: any) => void;
         onApplyPointcloudTransform?: (transform: any) => void;
     };
+    onProgress?: (percent: number, stage: string) => void;
 }
 
 interface LoadFullResDeps {
@@ -361,7 +362,7 @@ export async function loadSplatFromBlobUrl(blobUrl: string, fileName: string, de
 /**
  * Load GLTF/GLB model
  */
-export function loadGLTF(source: File | string): Promise<THREE.Group> {
+export function loadGLTF(source: File | string, onProgress?: (loaded: number, total: number) => void): Promise<THREE.Group> {
     return new Promise((resolve, reject) => {
         const loader = new GLTFLoader();
         const url = source instanceof File ? URL.createObjectURL(source) : source;
@@ -374,7 +375,7 @@ export function loadGLTF(source: File | string): Promise<THREE.Group> {
                 processMeshMaterials(gltf.scene);
                 resolve(gltf.scene);
             },
-            undefined,
+            onProgress ? (event) => { if (event.lengthComputable) onProgress(event.loaded, event.total); } : undefined,
             (error) => {
                 if (isFile) URL.revokeObjectURL(url);
                 reject(error);
@@ -457,7 +458,7 @@ function loadOBJWithoutMaterials(
 /**
  * Load OBJ from URL
  */
-export function loadOBJFromUrl(url: string): Promise<THREE.Group> {
+export function loadOBJFromUrl(url: string, onProgress?: (loaded: number, total: number) => void): Promise<THREE.Group> {
     return new Promise((resolve, reject) => {
         const loader = new OBJLoader();
         loader.load(
@@ -466,7 +467,7 @@ export function loadOBJFromUrl(url: string): Promise<THREE.Group> {
                 processMeshMaterials(object, { forceDefaultMaterial: true, preserveTextures: true });
                 resolve(object);
             },
-            undefined,
+            onProgress ? (event) => { if (event.lengthComputable) onProgress(event.loaded, event.total); } : undefined,
             (error) => reject(error)
         );
     });
@@ -507,7 +508,7 @@ export function loadSTL(fileOrUrl: File | string): Promise<THREE.Mesh> {
 /**
  * Load STL from URL (no blob URL revocation needed)
  */
-export function loadSTLFromUrl(url: string): Promise<THREE.Mesh> {
+export function loadSTLFromUrl(url: string, onProgress?: (loaded: number, total: number) => void): Promise<THREE.Mesh> {
     return new Promise((resolve, reject) => {
         const loader = new STLLoader();
         loader.load(
@@ -524,7 +525,7 @@ export function loadSTLFromUrl(url: string): Promise<THREE.Mesh> {
                 mesh.name = 'stl_model';
                 resolve(mesh);
             },
-            undefined,
+            onProgress ? (event) => { if (event.lengthComputable) onProgress(event.loaded, event.total); } : undefined,
             (error) => reject(error)
         );
     });
@@ -711,7 +712,7 @@ export async function loadModelFromUrl(url: string, deps: LoadModelDeps, onProgr
 /**
  * Load model from a blob URL (used by archive loader)
  */
-export async function loadModelFromBlobUrl(blobUrl: string, fileName: string, deps: Pick<LoadModelDeps, 'modelGroup' | 'state'>): Promise<ModelLoadResult> {
+export async function loadModelFromBlobUrl(blobUrl: string, fileName: string, deps: Pick<LoadModelDeps, 'modelGroup' | 'state'>, onProgress?: (loaded: number, total: number) => void): Promise<ModelLoadResult> {
     const { modelGroup, state } = deps;
 
     // Clear existing model
@@ -725,11 +726,11 @@ export async function loadModelFromBlobUrl(blobUrl: string, fileName: string, de
     let loadedObject: THREE.Object3D | undefined;
 
     if (extension === 'glb' || extension === 'gltf') {
-        loadedObject = await loadGLTF(blobUrl);
+        loadedObject = await loadGLTF(blobUrl, onProgress);
     } else if (extension === 'obj') {
-        loadedObject = await loadOBJFromUrl(blobUrl);
+        loadedObject = await loadOBJFromUrl(blobUrl, onProgress);
     } else if (extension === 'stl') {
-        loadedObject = await loadSTLFromUrl(blobUrl);
+        loadedObject = await loadSTLFromUrl(blobUrl, onProgress);
     }
 
     if (loadedObject) {
@@ -931,6 +932,7 @@ export async function loadArchiveAsset(archiveLoader: ArchiveLoader, assetType: 
     }
 
     state.assetStates[assetType] = ASSET_STATE.LOADING;
+    deps.onProgress?.(10, 'Preparing...');
 
     try {
         if (assetType === 'splat') {
@@ -947,13 +949,28 @@ export async function loadArchiveAsset(archiveLoader: ArchiveLoader, assetType: 
             const useProxy = qualityTier === 'sd' && contentInfo.hasSceneProxy && proxyEntry;
             const entryToLoad = useProxy ? proxyEntry : sceneEntry;
 
+            deps.onProgress?.(40, 'Decompressing splat...');
             const splatData = await archiveLoader.extractFile(entryToLoad.file_name);
             if (!splatData) {
                 state.assetStates[assetType] = ASSET_STATE.ERROR;
                 return { loaded: false, blob: null, error: 'Failed to extract splat file' };
             }
 
-            await loadSplatFromBlobUrl(splatData.url, entryToLoad.file_name, deps);
+            deps.onProgress?.(60, 'Parsing splat data...');
+            // Spark.js SplatMesh has no progress callback — simulate gradual progress
+            let simInterval: ReturnType<typeof setInterval> | undefined;
+            if (deps.onProgress) {
+                let simPct = 60;
+                simInterval = setInterval(() => {
+                    simPct = Math.min(simPct + 3, 92);
+                    deps.onProgress!(simPct, 'Parsing splat data...');
+                }, 100);
+            }
+            try {
+                await loadSplatFromBlobUrl(splatData.url, entryToLoad.file_name, deps);
+            } finally {
+                if (simInterval) clearInterval(simInterval);
+            }
 
             // Apply transform from the primary scene entry (proxy inherits the same transform)
             const transform = archiveLoader.getEntryTransform(sceneEntry);
@@ -978,13 +995,18 @@ export async function loadArchiveAsset(archiveLoader: ArchiveLoader, assetType: 
             const useProxy = qualityTier === 'sd' && contentInfo.hasMeshProxy && proxyEntry;
             const entryToLoad = useProxy ? proxyEntry : meshEntry;
 
+            deps.onProgress?.(40, 'Decompressing model...');
             const meshData = await archiveLoader.extractFile(entryToLoad.file_name);
             if (!meshData) {
                 state.assetStates[assetType] = ASSET_STATE.ERROR;
                 return { loaded: false, blob: null, error: 'Failed to extract mesh file' };
             }
 
-            const result = await loadModelFromBlobUrl(meshData.url, entryToLoad.file_name, deps);
+            deps.onProgress?.(60, 'Parsing model data...');
+            const parseProgress = deps.onProgress ? (loaded: number, total: number) => {
+                if (total > 0) deps.onProgress!(60 + Math.round((loaded / total) * 35), 'Parsing model data...');
+            } : undefined;
+            const result = await loadModelFromBlobUrl(meshData.url, entryToLoad.file_name, deps, parseProgress);
 
             // Apply transform from the primary mesh entry (proxy inherits the same transform)
             const transform = archiveLoader.getEntryTransform(meshEntry);
@@ -1016,13 +1038,18 @@ export async function loadArchiveAsset(archiveLoader: ArchiveLoader, assetType: 
             }
 
             const pcEntry = pcEntries[0].entry;
+            deps.onProgress?.(40, 'Decompressing point cloud...');
             const pcData = await archiveLoader.extractFile(pcEntry.file_name);
             if (!pcData) {
                 state.assetStates[assetType] = ASSET_STATE.ERROR;
                 return { loaded: false, blob: null, error: 'Failed to extract pointcloud file' };
             }
 
-            const result = await loadPointcloudFromBlobUrl(pcData.url, pcEntry.file_name, deps);
+            deps.onProgress?.(60, 'Parsing point cloud data...');
+            const parseProgress = deps.onProgress ? (loaded: number, total: number) => {
+                if (total > 0) deps.onProgress!(60 + Math.round((loaded / total) * 35), 'Parsing point cloud data...');
+            } : undefined;
+            const result = await loadPointcloudFromBlobUrl(pcData.url, pcEntry.file_name, deps, parseProgress);
 
             // Apply transform if present
             const transform = archiveLoader.getEntryTransform(pcEntry);
@@ -1601,7 +1628,7 @@ export function updateModelSpecularF0(modelGroup: THREE.Group, enabled: boolean)
  * E57 files from surveying/scanning use Z-up convention, so we rotate
  * the geometry to Three.js Y-up coordinate system.
  */
-export async function loadE57(url: string): Promise<THREE.Group> {
+export async function loadE57(url: string, onProgress?: (loaded: number, total: number) => void): Promise<THREE.Group> {
     const E57Loader = await getE57Loader();
     if (!E57Loader) {
         throw new Error('E57 point cloud loading is not available. The three-e57-loader module could not be loaded (requires network access).');
@@ -1624,7 +1651,7 @@ export async function loadE57(url: string): Promise<THREE.Group> {
                 group.add(points);
                 resolve(group);
             },
-            undefined,
+            onProgress ? (event: any) => { if (event.lengthComputable) onProgress(event.loaded, event.total); } : undefined,
             (error: any) => {
                 reject(error);
             }
@@ -1748,7 +1775,7 @@ export async function loadPointcloudFromUrl(url: string, deps: LoadPointcloudDep
 /**
  * Load a point cloud from a blob URL (used by archive loader)
  */
-export async function loadPointcloudFromBlobUrl(blobUrl: string, fileName: string, deps: Pick<LoadPointcloudDeps, 'pointcloudGroup'>): Promise<PointcloudLoadResult> {
+export async function loadPointcloudFromBlobUrl(blobUrl: string, fileName: string, deps: Pick<LoadPointcloudDeps, 'pointcloudGroup'>, onProgress?: (loaded: number, total: number) => void): Promise<PointcloudLoadResult> {
     const { pointcloudGroup } = deps;
 
     log.info('Loading point cloud from blob URL:', fileName);
@@ -1762,7 +1789,7 @@ export async function loadPointcloudFromBlobUrl(blobUrl: string, fileName: strin
         }
     }
 
-    const loadedObject = await loadE57(blobUrl);
+    const loadedObject = await loadE57(blobUrl, onProgress);
     pointcloudGroup.add(loadedObject);
 
     // Compute point count
