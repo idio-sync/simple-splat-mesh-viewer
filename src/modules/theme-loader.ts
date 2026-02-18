@@ -8,7 +8,7 @@
  *
  * Metadata is parsed from the first CSS comment block in theme.css:
  *   @theme   Display Name
- *   @layout  sidebar|editorial
+ *   @layout  sidebar|{custom}  (custom names match a layout.js module, e.g. editorial)
  *   @scene-bg #hex
  */
 
@@ -16,11 +16,37 @@ import { Logger } from './utilities.js';
 
 const log = Logger.getLogger('theme-loader');
 
+/** Contract for a kiosk layout module (registered on window.__KIOSK_LAYOUTS__). */
+export interface LayoutModule {
+    /** Main UI setup — called after archive loads (or for direct-file loads). */
+    setup(manifest: any, deps: any): void;
+    /** Customize the loading overlay before archive loading begins. */
+    initLoadingScreen?(container: HTMLElement, deps: any): void;
+    /** Customize the click-to-load gate. */
+    initClickGate?(container: HTMLElement, deps: any): void;
+    /** Customize the file picker overlay. */
+    initFilePicker?(container: HTMLElement, deps: any): void;
+
+    /** Called when an annotation is selected (e.g. highlight a sequence number). */
+    onAnnotationSelect?(annotationId: string): void;
+    /** Called when an annotation is deselected. */
+    onAnnotationDeselect?(): void;
+    /** Called when the active display/view mode changes. */
+    onViewModeChange?(mode: string): void;
+    /** Called for keyboard shortcuts. Return true if the layout handled the key. */
+    onKeyboardShortcut?(key: string): boolean;
+
+    /** If true, the layout creates its own info/metadata panel (kiosk-main skips wall label + info overlay). */
+    hasOwnInfoPanel?: boolean;
+    /** If true, the layout creates its own SD/HD quality toggle. */
+    hasOwnQualityToggle?: boolean;
+}
+
 interface ThemeMeta {
     layout: string;
     sceneBg: string | null;
     name: string | null;
-    layoutModule: any | null;
+    layoutModule: LayoutModule | null;
 }
 
 const DEFAULT_META: ThemeMeta = { layout: 'sidebar', sceneBg: null, name: null, layoutModule: null };
@@ -31,7 +57,7 @@ interface LoadThemeOptions {
 
 declare global {
     interface Window {
-        __KIOSK_LAYOUTS__?: Record<string, any>;
+        __KIOSK_LAYOUTS__?: Record<string, LayoutModule>;
     }
 }
 
@@ -91,7 +117,7 @@ export function parseThemeMeta(css: string): ThemeMeta {
 /**
  * Look up a layout module from the global registry.
  */
-function getLayoutModule(layoutName: string): any | null {
+function getLayoutModule(layoutName: string): LayoutModule | null {
     const registry = window.__KIOSK_LAYOUTS__;
     return (registry && registry[layoutName]) ? registry[layoutName] : null;
 }

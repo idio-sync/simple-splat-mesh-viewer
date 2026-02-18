@@ -917,6 +917,51 @@ function initFilePicker(container, deps) {
     `;
 }
 
+// ---- Layout module hooks (called by kiosk-main.ts) ----
+
+function onAnnotationSelect(annotationId) {
+    document.querySelectorAll('.editorial-anno-seq-num.active').forEach(n => n.classList.remove('active'));
+    const el = document.querySelector(`.editorial-anno-seq-num[data-anno-id="${annotationId}"]`);
+    if (el) el.classList.add('active');
+}
+
+function onAnnotationDeselect() {
+    document.querySelectorAll('.editorial-anno-seq-num.active').forEach(n => n.classList.remove('active'));
+}
+
+function onViewModeChange(mode) {
+    document.querySelectorAll('.editorial-view-mode-link').forEach(link => {
+        link.classList.toggle('active', link.dataset.mode === mode);
+    });
+}
+
+function onKeyboardShortcut(key) {
+    if (key === 'm') {
+        const panel = document.querySelector('.editorial-info-overlay');
+        const btn = document.querySelector('.editorial-details-link');
+        if (panel) {
+            const isOpen = panel.classList.toggle('open');
+            if (btn) btn.classList.toggle('active', isOpen);
+        }
+        return true;
+    }
+    if (key === 'escape') {
+        const panel = document.querySelector('.editorial-info-overlay');
+        const btn = document.querySelector('.editorial-details-link');
+        if (panel && panel.classList.contains('open')) {
+            panel.classList.remove('open');
+            if (btn) btn.classList.remove('active');
+            return true;
+        }
+    }
+    return false;
+}
+
 // ---- Self-register for offline kiosk discovery ----
 if (!window.__KIOSK_LAYOUTS__) window.__KIOSK_LAYOUTS__ = {};
-window.__KIOSK_LAYOUTS__['editorial'] = { setup, initLoadingScreen, initClickGate, initFilePicker };
+window.__KIOSK_LAYOUTS__['editorial'] = {
+    setup, initLoadingScreen, initClickGate, initFilePicker,
+    onAnnotationSelect, onAnnotationDeselect, onViewModeChange, onKeyboardShortcut,
+    hasOwnInfoPanel: true,
+    hasOwnQualityToggle: true
+};

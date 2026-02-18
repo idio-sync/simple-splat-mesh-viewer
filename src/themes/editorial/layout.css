@@ -705,23 +705,25 @@ body.kiosk-mode.kiosk-editorial .editorial-info-stat-label {
 /* --- Annotation Marker Adjustments — gold at various opacities --- */
 
 body.kiosk-mode.kiosk-editorial .annotation-marker {
-    background: var(--kiosk-accent);
-    border-color: rgba(var(--kiosk-accent-rgb),0.4);
-    color: #1a1a2e;
-    opacity: 0.12;
+    background: rgba(var(--kiosk-accent-rgb), 0.25);
+    border: 2px solid rgba(var(--kiosk-surface-rgb), 0.5);
+    color: rgba(26, 26, 46, 0.25);
+    opacity: 1;
     z-index: 50;
     box-shadow: 0 2px 8px rgba(var(--kiosk-accent-rgb),0.12);
-    transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+    transition: transform 0.15s, box-shadow 0.2s, background 0.2s, border-color 0.2s;
 }
 
 body.kiosk-mode.kiosk-editorial .annotation-marker:hover {
-    opacity: 0.85;
+    background: rgba(var(--kiosk-accent-rgb), 0.85);
+    color: #1a1a2e;
     box-shadow: 0 4px 16px rgba(var(--kiosk-accent-rgb),0.4);
     border-color: rgba(var(--kiosk-accent-rgb),0.8);
 }
 
 body.kiosk-mode.kiosk-editorial .annotation-marker.selected {
-    opacity: 0.95;
+    background: rgba(var(--kiosk-accent-rgb), 0.95);
+    color: #1a1a2e;
     box-shadow: 0 0 0 3px rgba(var(--kiosk-accent-rgb),0.3), 0 4px 16px rgba(var(--kiosk-accent-rgb),0.5);
     border-color: rgba(255, 255, 255, 0.6);
 }

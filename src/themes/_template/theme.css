@@ -9,7 +9,11 @@
  *
  * Available layouts:
  *   sidebar    — Side panel with metadata and annotations (default)
- *   editorial  — Full-bleed scene with edge-anchored overlays
+ *   {custom}   — Any name that matches a layout.js module (e.g. editorial)
+ *
+ * Custom layouts: Add layout.css + layout.js to your theme folder.
+ * The layout.js must self-register on window.__KIOSK_LAYOUTS__[name].
+ * See src/themes/editorial/ for a full example.
  */
 
 body.kiosk-mode {

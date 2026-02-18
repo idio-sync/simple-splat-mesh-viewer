@@ -46,6 +46,7 @@ import {
     showAnnotationPopup, hideAnnotationPopup, updateAnnotationPopupPosition
 } from './metadata-manager.js';
 import { loadTheme } from './theme-loader.js';
+import type { LayoutModule } from './theme-loader.js';
 import { ArchiveLoader } from './archive-loader.js';
 
 
@@ -94,6 +95,7 @@ interface AppConfig {
     };
     _resolvedLayout?: string;
     _themeMeta?: any;
+    _layoutModule?: LayoutModule | null;
 }
 
 interface WindowWithConfig extends Window {
@@ -156,6 +158,11 @@ let fpsElement: HTMLElement | null = null;
 let currentPopupAnnotationId: string | null = null;
 let annotationLineEl: SVGLineElement | null = null;
 let currentSheetSnap: SheetSnap = 'peek'; // 'peek' | 'half' | 'full'
+
+/** Get the resolved layout module, if any. */
+function getLayoutModule(): LayoutModule | null {
+    return (window.APP_CONFIG as any)?._layoutModule || null;
+}
 
 const state: KioskState = {
     displayMode: 'both',
@@ -262,8 +269,8 @@ export async function init(): Promise<void> {
             annotationSystem.selectedAnnotation = null;
             document.querySelectorAll('.annotation-marker.selected').forEach(m => m.classList.remove('selected'));
             document.querySelectorAll('.kiosk-anno-item.active').forEach(c => c.classList.remove('active'));
-            // Clear editorial sequence highlight
-            document.querySelectorAll('.editorial-anno-seq-num.active').forEach(n => n.classList.remove('active'));
+            // Notify layout module of deselection
+            getLayoutModule()?.onAnnotationDeselect?.();
             return;
         }
         // Highlight the corresponding sidebar item
@@ -271,10 +278,8 @@ export async function init(): Promise<void> {
         const item = document.querySelector(`.kiosk-anno-item[data-anno-id="${annotation.id}"]`);
         if (item) item.classList.add('active');
 
-        // Highlight editorial sequence number
-        document.querySelectorAll('.editorial-anno-seq-num.active').forEach(n => n.classList.remove('active'));
-        const seqNum = document.querySelector(`.editorial-anno-seq-num[data-anno-id="${annotation.id}"]`);
-        if (seqNum) seqNum.classList.add('active');
+        // Notify layout module of selection
+        getLayoutModule()?.onAnnotationSelect?.(annotation.id);
 
         if (isMobileKiosk()) {
             currentPopupAnnotationId = annotation.id;
@@ -294,57 +299,49 @@ export async function init(): Promise<void> {
     // ?layout= overrides theme's @layout; theme overrides default 'sidebar'
     const requestedLayout = config.layout || themeMeta.layout || 'sidebar';
 
-    // Only commit to editorial if the layout module is actually available
-    const hasEditorialModule = requestedLayout === 'editorial' && themeMeta.layoutModule;
-    const layoutStyle = hasEditorialModule ? 'editorial' : (requestedLayout === 'editorial' ? 'sidebar' : requestedLayout);
-    const isEditorial = layoutStyle === 'editorial';
+    // Only use a custom layout if its module is available; fall back to sidebar otherwise
+    const hasLayoutModule = !!themeMeta.layoutModule;
+    const layoutStyle = hasLayoutModule ? requestedLayout : (requestedLayout !== 'sidebar' ? 'sidebar' : requestedLayout);
 
-    // Store resolved layout for other code paths
+    // Store resolved layout + module for other code paths
     config._resolvedLayout = layoutStyle;
     config._themeMeta = themeMeta;
+    config._layoutModule = themeMeta.layoutModule || null;
 
-    if (isEditorial) {
-        document.body.classList.add('kiosk-editorial');
-        log.info('Editorial layout enabled');
+    if (hasLayoutModule) {
+        document.body.classList.add(`kiosk-${layoutStyle}`);
+        log.info(`Layout module enabled: ${layoutStyle}`);
 
-        // Let editorial layout customize loading screen before any archive loading
-        if (themeMeta.layoutModule?.initLoadingScreen) {
+        const layoutModule = themeMeta.layoutModule!;
+        const layoutOpts = {
+            themeAssets: (themeMeta as any).themeAssets || {},
+            themeBaseUrl: `themes/${config.theme}/`
+        };
+
+        // Let layout module customize loading screen before any archive loading
+        if (layoutModule.initLoadingScreen) {
             const overlay = document.getElementById('loading-overlay');
-            if (overlay) {
-                themeMeta.layoutModule.initLoadingScreen(overlay, {
-                    themeAssets: (themeMeta as any).themeAssets || {},
-                    themeBaseUrl: `themes/${config.theme}/`
-                });
-            }
+            if (overlay) layoutModule.initLoadingScreen(overlay, layoutOpts);
         }
 
-        // Let editorial layout customize click gate
-        if (themeMeta.layoutModule?.initClickGate) {
+        // Let layout module customize click gate
+        if (layoutModule.initClickGate) {
             const gate = document.getElementById('kiosk-click-gate');
-            if (gate) {
-                themeMeta.layoutModule.initClickGate(gate, {
-                    themeAssets: (themeMeta as any).themeAssets || {},
-                    themeBaseUrl: `themes/${config.theme}/`
-                });
-            }
+            if (gate) layoutModule.initClickGate(gate, layoutOpts);
         }
-        // Let editorial layout customize file picker
-        if (themeMeta.layoutModule?.initFilePicker) {
+
+        // Let layout module customize file picker
+        if (layoutModule.initFilePicker) {
             const picker = document.getElementById('kiosk-file-picker');
-            if (picker) {
-                themeMeta.layoutModule.initFilePicker(picker, {
-                    themeAssets: (themeMeta as any).themeAssets || {},
-                    themeBaseUrl: `themes/${config.theme}/`
-                });
-            }
+            if (picker) layoutModule.initFilePicker(picker, layoutOpts);
         }
-    } else if (requestedLayout === 'editorial' && !hasEditorialModule) {
-        log.warn('Editorial layout requested but no layout module available — using sidebar');
+    } else if (requestedLayout !== 'sidebar') {
+        log.warn(`Layout "${requestedLayout}" requested but no layout module available — using sidebar`);
     }
 
     // Wire up UI
     setupViewerUI();
-    // Always set up sidebar (editorial hides it via CSS but needs it as mobile fallback)
+    // Always set up sidebar (layout modules hide it via CSS but need it as mobile fallback)
     setupMetadataSidebar({ state: state as any, annotationSystem, imageAssets: state.imageAssets });
     setupCollapsibles();
     setupViewerKeyboardShortcuts();
@@ -361,7 +358,7 @@ export async function init(): Promise<void> {
     // Handle window resize
     window.addEventListener('resize', onWindowResize);
 
-    // Setup mobile bottom sheet drag (always — editorial uses sidebar as mobile fallback)
+    // Setup mobile bottom sheet drag (always — layout modules use sidebar as mobile fallback)
     setupBottomSheetDrag();
     if (isMobileKiosk()) setSheetSnap('peek');
 
@@ -628,21 +625,16 @@ function onDirectFileLoaded(fileName: string | null): void {
     if (autoRotateBtn) autoRotateBtn.classList.add('active');
 
     // Branch UI setup based on resolved layout (theme + ?layout= override)
-    const isEditorial = (window.APP_CONFIG || {})._resolvedLayout === 'editorial';
+    const layoutModule = getLayoutModule();
 
-    if (isEditorial) {
-        // Delegate to theme's layout module — it creates its own ribbon/toolbar
-        const appConfig = window.APP_CONFIG || {};
-        const layoutModule = appConfig._themeMeta && appConfig._themeMeta.layoutModule;
-        if (layoutModule && layoutModule.setup) {
-            layoutModule.setup(null, createLayoutDeps());
-        }
-        // View switcher as mobile fallback (hidden on desktop by editorial CSS)
+    if (layoutModule) {
+        // Delegate to layout module — it creates its own ribbon/toolbar
+        layoutModule.setup(null, createLayoutDeps());
+        // View switcher as mobile fallback (hidden on desktop by layout CSS)
         createViewSwitcher();
     } else {
         // Standard kiosk UI
         createViewSwitcher();
-
     }
 
     // Set filename as display title if available
@@ -1000,16 +992,14 @@ async function handleArchiveFile(file: File): Promise<void> {
         if (autoRotateBtn) autoRotateBtn.classList.add('active');
 
         // Branch UI setup based on resolved layout (theme + ?layout= override)
-        const isEditorial = (window.APP_CONFIG || {})._resolvedLayout === 'editorial';
+        const layoutModule = getLayoutModule();
 
-        if (isEditorial) {
-            // Delegate to theme's layout module
-            const appConfig = window.APP_CONFIG || {};
-            const layoutModule = (appConfig._themeMeta && appConfig._themeMeta.layoutModule);
+        if (layoutModule) {
+            // Delegate to layout module — it creates its own UI
             layoutModule.setup(manifest, createLayoutDeps());
 
             // Also populate the sidebar content as a mobile fallback
-            // (editorial CSS hides it on desktop, media query shows it on mobile)
+            // (layout CSS hides it on desktop, media query shows it on mobile)
             createViewSwitcher();
             updateInfoPanel();
         } else {
@@ -1048,8 +1038,8 @@ async function handleArchiveFile(file: File): Promise<void> {
         // Reveal wall label after transition settles
         setTimeout(showWallLabel, 1400);
 
-        if (isEditorial) {
-            // Populate sidebar content for mobile fallback (hidden on desktop by CSS)
+        if (layoutModule) {
+            // Populate sidebar content for mobile fallback (hidden on desktop by layout CSS)
             showMetadataSidebar('view', { state: state as any, annotationSystem, imageAssets: state.imageAssets });
             populateAnnotationList();
         } else {
@@ -1072,8 +1062,8 @@ async function handleArchiveFile(file: File): Promise<void> {
             hideMetadataSidebar();
         }
 
-        // Show quality toggle if archive has any proxies (editorial handles its own)
-        if (hasAnyProxy(contentInfo) && !isEditorial) {
+        // Show quality toggle if archive has proxies (layout modules with own toggle handle this)
+        if (hasAnyProxy(contentInfo) && !layoutModule?.hasOwnQualityToggle) {
             showQualityToggle();
         }
 
@@ -1130,7 +1120,7 @@ async function handleArchiveFile(file: File): Promise<void> {
 
 /**
  * Show the SD/HD quality toggle. Uses existing HTML element if present,
- * otherwise creates one dynamically (for kiosk/editorial without index.html).
+ * otherwise creates one dynamically (for kiosk without index.html).
  */
 function showQualityToggle(): void {
     let container = document.getElementById('quality-toggle-container');
@@ -1337,9 +1327,8 @@ function createLayoutDeps(): any {
 // =============================================================================
 
 function setupViewerUI(): void {
-    // Standard kiosk: create wall label + info overlay (editorial has its own UI)
-    const isEditorialLayout = (window.APP_CONFIG || {})._resolvedLayout === 'editorial';
-    if (!isEditorialLayout) {
+    // Standard kiosk: create wall label + info overlay (layout modules with own panels skip this)
+    if (!getLayoutModule()?.hasOwnInfoPanel) {
         createWallLabel();
         createInfoOverlay();
     }
@@ -1750,28 +1739,13 @@ function setupViewerUI(): void {
     repositionAnnotationToggle();
 }
 
-// =============================================================================
-// EDITORIAL LAYOUT — Moved to src/themes/editorial/layout.js
-// Layout CSS, JS, and color tokens are now part of the editorial theme package.
-// See: themes/editorial/layout.css, layout.js, theme.css
-// =============================================================================
-
 function setupViewerKeyboardShortcuts(): void {
-    const isEditorial = (window.APP_CONFIG || {})._resolvedLayout === 'editorial';
+    const lm = getLayoutModule();
     setupKeyboardShortcuts({
         'f': () => toggleFlyMode(),
         'm': () => {
-            if (isEditorial) {
-                // Toggle editorial info overlay
-                const panel = document.querySelector('.editorial-info-overlay');
-                const detailsBtn = document.querySelector('.editorial-details-link');
-                if (panel) {
-                    const isOpen = panel.classList.toggle('open');
-                    if (detailsBtn) detailsBtn.classList.toggle('active', isOpen);
-                }
-            } else {
-                toggleInfoOverlay();
-            }
+            if (lm?.onKeyboardShortcut?.('m')) return;
+            toggleInfoOverlay();
         },
         '1': () => switchViewMode('model'),
         '2': () => switchViewMode('splat'),
@@ -1781,16 +1755,8 @@ function setupViewerKeyboardShortcuts(): void {
             if (cb) { cb.checked = !cb.checked; sceneManager.toggleGrid(cb.checked); }
         },
         'escape': () => {
-            if (isEditorial) {
-                // Close editorial info overlay
-                const panel = document.querySelector('.editorial-info-overlay');
-                const detailsBtn = document.querySelector('.editorial-details-link');
-                if (panel && panel.classList.contains('open')) {
-                    panel.classList.remove('open');
-                    if (detailsBtn) detailsBtn.classList.remove('active');
-                }
-            } else {
-                // Close standard info overlay
+            if (!lm?.onKeyboardShortcut?.('escape')) {
+                // Default: close standard info overlay
                 const overlay = document.getElementById('kiosk-info-overlay');
                 if (overlay && overlay.classList.contains('open')) {
                     toggleInfoOverlay(false);
@@ -1818,10 +1784,8 @@ function switchViewMode(mode: string): void {
         btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
         (btn as HTMLElement).tabIndex = isActive ? 0 : -1;
     });
-    // Update active state (editorial layout)
-    document.querySelectorAll('.editorial-view-mode-link').forEach(link => {
-        link.classList.toggle('active', (link as HTMLElement).dataset.mode === mode);
-    });
+    // Notify layout module of view mode change
+    getLayoutModule()?.onViewModeChange?.(mode);
 }
 
 // =============================================================================
