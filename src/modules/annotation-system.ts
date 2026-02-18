@@ -310,7 +310,16 @@ export class AnnotationSystem {
         markerEl.className = 'annotation-marker';
         markerEl.textContent = number.toString();
         markerEl.dataset.annotationId = annotation.id;
+        markerEl.setAttribute('role', 'button');
+        markerEl.setAttribute('tabindex', '0');
+        markerEl.setAttribute('aria-label', `Annotation ${number}: ${annotation.title || 'untitled'}`);
         markerEl.addEventListener('click', () => this.selectAnnotation(annotation.id));
+        markerEl.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.selectAnnotation(annotation.id);
+            }
+        });
 
         this.markerContainer?.appendChild(markerEl);
 

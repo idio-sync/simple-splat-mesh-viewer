@@ -969,6 +969,10 @@ async function handleArchiveFile(file: File): Promise<void> {
         populateSourceFilesList(archiveLoader);
         reorderKioskSidebar();
 
+        // Populate the wall label and info overlay with key metadata
+        populateWallLabel(manifest);
+        populateInfoOverlay(manifest);
+
         // Set display mode: default to model, fall back to splat, then pointcloud
         updateProgress(90, 'Finalizing...');
         if (state.modelLoaded) {
@@ -1041,6 +1045,9 @@ async function handleArchiveFile(file: File): Promise<void> {
         // Smooth entry transition: fade overlay + camera ease-in
         smoothTransitionIn();
 
+        // Reveal wall label after transition settles
+        setTimeout(showWallLabel, 1400);
+
         if (isEditorial) {
             // Populate sidebar content for mobile fallback (hidden on desktop by CSS)
             showMetadataSidebar('view', { state: state as any, annotationSystem, imageAssets: state.imageAssets });
@@ -1060,8 +1067,9 @@ async function handleArchiveFile(file: File): Promise<void> {
                 triggerMarkerGlowIntro();
             }
 
-            // Open metadata sidebar by default
+            // Populate sidebar content but start hidden — user opens via info button
             showMetadataSidebar('view', { state: state as any, annotationSystem, imageAssets: state.imageAssets });
+            hideMetadataSidebar();
         }
 
         // Show quality toggle if archive has any proxies (editorial handles its own)
@@ -1329,6 +1337,13 @@ function createLayoutDeps(): any {
 // =============================================================================
 
 function setupViewerUI(): void {
+    // Standard kiosk: create wall label + info overlay (editorial has its own UI)
+    const isEditorialLayout = (window.APP_CONFIG || {})._resolvedLayout === 'editorial';
+    if (!isEditorialLayout) {
+        createWallLabel();
+        createInfoOverlay();
+    }
+
     // Display mode buttons (with lazy loading trigger)
     ['model', 'splat', 'pointcloud', 'both', 'split'].forEach(mode => {
         addListener(`btn-${mode}`, 'click', () => {
@@ -1442,14 +1457,18 @@ function setupViewerUI(): void {
         }
     });
 
-    // Metadata sidebar toggle
+    // Metadata info toggle — overlay on desktop, sidebar on mobile
     addListener('btn-metadata', 'click', () => {
-        const sidebar = document.getElementById('metadata-sidebar');
-        if (sidebar && !sidebar.classList.contains('hidden')) {
-            hideMetadataSidebar();
+        if (isMobileKiosk()) {
+            const sidebar = document.getElementById('metadata-sidebar');
+            if (sidebar && !sidebar.classList.contains('hidden')) {
+                hideMetadataSidebar();
+            } else {
+                showMetadataSidebar('view', { state: state as any, annotationSystem, imageAssets: state.imageAssets });
+                setSheetSnap('half');
+            }
         } else {
-            showMetadataSidebar('view', { state: state as any, annotationSystem, imageAssets: state.imageAssets });
-            if (isMobileKiosk()) setSheetSnap('half');
+            toggleInfoOverlay();
         }
     });
 
@@ -1459,11 +1478,11 @@ function setupViewerUI(): void {
     });
 
     // Background color presets
-    document.querySelectorAll('.color-preset').forEach(btn => {
+    document.querySelectorAll('.swatch[data-color]').forEach(btn => {
         btn.addEventListener('click', () => {
             const color = (btn as HTMLElement).dataset.color;
             sceneManager.setBackgroundColor(color!);
-            document.querySelectorAll('.color-preset').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.swatch[data-color]').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             const picker = document.getElementById('bg-color-picker') as HTMLInputElement;
             if (picker) picker.value = color!;
@@ -1473,7 +1492,7 @@ function setupViewerUI(): void {
     // Custom background color
     addListener('bg-color-picker', 'input', (e) => {
         sceneManager.setBackgroundColor((e.target as HTMLInputElement).value);
-        document.querySelectorAll('.color-preset').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.swatch[data-color]').forEach(b => b.classList.remove('active'));
     });
 
     // Model settings
@@ -1751,12 +1770,7 @@ function setupViewerKeyboardShortcuts(): void {
                     if (detailsBtn) detailsBtn.classList.toggle('active', isOpen);
                 }
             } else {
-                const sidebar = document.getElementById('metadata-sidebar');
-                if (sidebar && !sidebar.classList.contains('hidden')) {
-                    hideMetadataSidebar();
-                } else {
-                    showMetadataSidebar('view', { state: state as any, annotationSystem, imageAssets: state.imageAssets });
-                }
+                toggleInfoOverlay();
             }
         },
         '1': () => switchViewMode('model'),
@@ -1768,12 +1782,18 @@ function setupViewerKeyboardShortcuts(): void {
         },
         'escape': () => {
             if (isEditorial) {
-                // Close info overlay and annotation popup
+                // Close editorial info overlay
                 const panel = document.querySelector('.editorial-info-overlay');
                 const detailsBtn = document.querySelector('.editorial-details-link');
                 if (panel && panel.classList.contains('open')) {
                     panel.classList.remove('open');
                     if (detailsBtn) detailsBtn.classList.remove('active');
+                }
+            } else {
+                // Close standard info overlay
+                const overlay = document.getElementById('kiosk-info-overlay');
+                if (overlay && overlay.classList.contains('open')) {
+                    toggleInfoOverlay(false);
                 }
             }
             hideAnnotationPopup();
@@ -1793,12 +1813,233 @@ function switchViewMode(mode: string): void {
 
     // Update active button state (sidebar layout)
     document.querySelectorAll('.kiosk-view-btn').forEach(btn => {
-        btn.classList.toggle('active', (btn as HTMLElement).dataset.mode === mode);
+        const isActive = (btn as HTMLElement).dataset.mode === mode;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        (btn as HTMLElement).tabIndex = isActive ? 0 : -1;
     });
     // Update active state (editorial layout)
     document.querySelectorAll('.editorial-view-mode-link').forEach(link => {
         link.classList.toggle('active', (link as HTMLElement).dataset.mode === mode);
     });
+}
+
+// =============================================================================
+// Full-Screen Info Overlay (replaces sidebar on desktop)
+// =============================================================================
+
+function createInfoOverlay(): void {
+    if (document.getElementById('kiosk-info-overlay')) return;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'kiosk-info-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-label', 'Object details');
+
+    overlay.innerHTML = `
+        <button class="kiosk-info-close" aria-label="Close details">\u00d7</button>
+        <div class="kiosk-info-spread">
+            <div class="kiosk-info-col-left">
+                <h2 class="kiosk-info-title"></h2>
+                <hr class="kiosk-info-rule">
+                <p class="kiosk-info-byline"></p>
+                <div class="kiosk-info-description"></div>
+                <div class="kiosk-info-tags"></div>
+                <div class="kiosk-info-license"></div>
+            </div>
+            <div class="kiosk-info-divider"></div>
+            <div class="kiosk-info-col-right"></div>
+        </div>
+    `;
+
+    // Close button
+    const closeBtn = overlay.querySelector('.kiosk-info-close');
+    if (closeBtn) closeBtn.addEventListener('click', () => toggleInfoOverlay(false));
+
+    // Click backdrop to close
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) toggleInfoOverlay(false);
+    });
+
+    document.body.appendChild(overlay);
+}
+
+function populateInfoOverlay(manifest: any): void {
+    const overlay = document.getElementById('kiosk-info-overlay');
+    if (!overlay) return;
+
+    const titleEl = overlay.querySelector('.kiosk-info-title') as HTMLElement | null;
+    const bylineEl = overlay.querySelector('.kiosk-info-byline') as HTMLElement | null;
+    const descEl = overlay.querySelector('.kiosk-info-description') as HTMLElement | null;
+    const tagsEl = overlay.querySelector('.kiosk-info-tags') as HTMLElement | null;
+    const licenseEl = overlay.querySelector('.kiosk-info-license') as HTMLElement | null;
+    const rightCol = overlay.querySelector('.kiosk-info-col-right') as HTMLElement | null;
+
+    const title = manifest.project?.title;
+    const creator = manifest.provenance?.operator;
+    const captureDate = manifest.provenance?.captureDate;
+    const location = manifest.provenance?.location;
+    const description = manifest.project?.description;
+    const tags = manifest.project?.tags;
+    const license = manifest.archival_record?.rights || manifest.project?.license;
+
+    // Title
+    if (titleEl) titleEl.textContent = title || 'Untitled';
+
+    // Byline: creator · date · location
+    if (bylineEl) {
+        const parts: string[] = [];
+        if (creator) parts.push(creator);
+        if (captureDate) {
+            const d = new Date(captureDate);
+            parts.push(isNaN(d.getTime()) ? captureDate : d.getFullYear().toString());
+        }
+        if (location) parts.push(location);
+        if (parts.length > 0) {
+            bylineEl.textContent = parts.join(' \u00b7 ');
+        } else {
+            bylineEl.style.display = 'none';
+        }
+    }
+
+    // Description (markdown rendered)
+    if (descEl) {
+        if (description) {
+            descEl.innerHTML = parseMarkdown(resolveAssetRefs(description, state.imageAssets));
+        } else {
+            descEl.style.display = 'none';
+        }
+    }
+
+    // Tags
+    if (tagsEl) {
+        const tagList = Array.isArray(tags) ? tags : (typeof tags === 'string' && tags ? tags.split(',').map(t => t.trim()) : []);
+        if (tagList.length > 0) {
+            tagsEl.innerHTML = tagList.map(t => `<span class="kiosk-info-tag">${t}</span>`).join('');
+        } else {
+            tagsEl.style.display = 'none';
+        }
+    }
+
+    // License
+    if (licenseEl) {
+        if (license) {
+            licenseEl.textContent = license;
+        } else {
+            licenseEl.style.display = 'none';
+        }
+    }
+
+    // Right column: move sidebar display-content into overlay via DOM reparenting
+    if (rightCol) {
+        const sidebarContent = document.querySelector('#sidebar-view .display-content');
+        if (sidebarContent) {
+            rightCol.appendChild(sidebarContent);
+        }
+    }
+}
+
+function toggleInfoOverlay(show?: boolean): void {
+    const overlay = document.getElementById('kiosk-info-overlay');
+    if (!overlay) return;
+
+    const isOpen = overlay.classList.contains('open');
+    const shouldShow = show !== undefined ? show : !isOpen;
+
+    overlay.classList.toggle('open', shouldShow);
+
+    // Update toolbar button active state
+    const btn = document.getElementById('btn-metadata');
+    if (btn) btn.classList.toggle('active', shouldShow);
+}
+
+// =============================================================================
+// Wall Label — persistent metadata placard (museum-style)
+// =============================================================================
+
+function createWallLabel(): void {
+    // Don't duplicate
+    if (document.getElementById('kiosk-wall-label')) return;
+
+    const label = document.createElement('aside');
+    label.id = 'kiosk-wall-label';
+    label.setAttribute('aria-label', 'Object information');
+
+    label.innerHTML = `
+        <h2 class="wall-label-title"></h2>
+        <p class="wall-label-byline"></p>
+        <p class="wall-label-desc"></p>
+        <button class="wall-label-details-btn" aria-label="Show full details">Details &#8250;</button>
+    `;
+
+    // Wire details button to open info overlay (falls back to sidebar on mobile)
+    const detailsBtn = label.querySelector('.wall-label-details-btn');
+    if (detailsBtn) {
+        detailsBtn.addEventListener('click', () => {
+            if (window.innerWidth > 768) {
+                toggleInfoOverlay(true);
+            } else {
+                showMetadataSidebar('view', { state: state as any, annotationSystem, imageAssets: state.imageAssets });
+            }
+        });
+    }
+
+    document.body.appendChild(label);
+}
+
+function populateWallLabel(manifest: any): void {
+    const label = document.getElementById('kiosk-wall-label');
+    if (!label) return;
+
+    const titleEl = label.querySelector('.wall-label-title') as HTMLElement | null;
+    const bylineEl = label.querySelector('.wall-label-byline') as HTMLElement | null;
+    const descEl = label.querySelector('.wall-label-desc') as HTMLElement | null;
+
+    const title = manifest.project?.title;
+    const creator = manifest.provenance?.operator;
+    const captureDate = manifest.provenance?.captureDate;
+    const description = manifest.project?.description;
+
+    // Title
+    if (titleEl) {
+        titleEl.textContent = title || 'Untitled';
+    }
+
+    // Byline: "Creator · Year" or just one
+    if (bylineEl) {
+        const parts: string[] = [];
+        if (creator) parts.push(creator);
+        if (captureDate) {
+            const d = new Date(captureDate);
+            parts.push(isNaN(d.getTime()) ? captureDate : d.getFullYear().toString());
+        }
+        if (parts.length > 0) {
+            bylineEl.textContent = parts.join(' \u00b7 ');
+        } else {
+            bylineEl.style.display = 'none';
+        }
+    }
+
+    // Description (plain text, no markdown in the wall label)
+    if (descEl) {
+        if (description) {
+            // Strip markdown to plain text for the wall label
+            descEl.textContent = description.replace(/[#*_`[\]()>~-]/g, '').trim();
+        } else {
+            descEl.style.display = 'none';
+        }
+    }
+
+    // Hide details button if no meaningful metadata beyond title
+    if (!creator && !captureDate && !description) {
+        const btn = label.querySelector('.wall-label-details-btn') as HTMLElement | null;
+        if (btn) btn.style.display = 'none';
+    }
+}
+
+function showWallLabel(): void {
+    const label = document.getElementById('kiosk-wall-label');
+    if (label) label.classList.add('visible');
 }
 
 function createViewSwitcher(): void {
@@ -1807,56 +2048,60 @@ function createViewSwitcher(): void {
     if (existing) existing.remove();
 
     // Use contentInfo from archive to know what types are available
-    // (assets may not be loaded yet but will lazy-load on switch)
     const contentInfo = state.archiveLoader ? state.archiveLoader.getContentInfo() : null;
-    const types = [];
+    const types: { mode: string; label: string }[] = [];
     if (contentInfo) {
-        if (contentInfo.hasMesh) types.push({ mode: 'model', label: 'Model' });
-        if (contentInfo.hasSplat) types.push({ mode: 'splat', label: 'Splat' });
-        if (contentInfo.hasPointcloud) types.push({ mode: 'pointcloud', label: 'Point Cloud' });
+        if (contentInfo.hasMesh) types.push({ mode: 'model', label: 'Mesh' });
+        if (contentInfo.hasSplat) types.push({ mode: 'splat', label: 'Scan' });
+        if (contentInfo.hasPointcloud) types.push({ mode: 'pointcloud', label: 'Points' });
     } else {
-        if (state.modelLoaded) types.push({ mode: 'model', label: 'Model' });
-        if (state.splatLoaded) types.push({ mode: 'splat', label: 'Splat' });
-        if (state.pointcloudLoaded) types.push({ mode: 'pointcloud', label: 'Point Cloud' });
+        if (state.modelLoaded) types.push({ mode: 'model', label: 'Mesh' });
+        if (state.splatLoaded) types.push({ mode: 'splat', label: 'Scan' });
+        if (state.pointcloudLoaded) types.push({ mode: 'pointcloud', label: 'Points' });
     }
 
-    // Only show if 2+ types available
+    // Only show view buttons if 2+ types available
     if (types.length < 2) return;
 
+    const toolbar = document.getElementById('kiosk-toolbar');
+    if (!toolbar) return;
+
+    // Add separator between tool buttons and view buttons
+    const sep = document.createElement('div');
+    sep.className = 'kiosk-toolbar-sep';
+    toolbar.appendChild(sep);
+
+    // Create view switcher wrapper (display:contents — children flow into toolbar)
     const pill = document.createElement('div');
     pill.id = 'kiosk-view-switcher';
     pill.className = 'kiosk-view-switcher';
+    pill.setAttribute('role', 'tablist');
+    pill.setAttribute('aria-label', 'View mode');
 
     types.forEach(({ mode, label }) => {
         const btn = document.createElement('button');
         btn.className = 'kiosk-view-btn';
         btn.dataset.mode = mode;
         btn.textContent = label;
+        btn.setAttribute('role', 'tab');
+        btn.setAttribute('aria-selected', state.displayMode === mode ? 'true' : 'false');
         if (state.displayMode === mode) btn.classList.add('active');
+        if (state.displayMode !== mode) btn.setAttribute('tabindex', '-1');
         btn.addEventListener('click', () => switchViewMode(mode));
+        btn.addEventListener('keydown', (e: KeyboardEvent) => {
+            const btns = Array.from(pill.querySelectorAll('.kiosk-view-btn')) as HTMLButtonElement[];
+            let idx = btns.indexOf(btn);
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); idx = (idx + 1) % btns.length; btns[idx].focus(); btns[idx].click(); }
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); idx = (idx - 1 + btns.length) % btns.length; btns[idx].focus(); btns[idx].click(); }
+        });
         pill.appendChild(btn);
     });
 
-    // Desktop: append to document.body (position:fixed bottom-center)
-    // Mobile: insert into #sidebar-drag-handle alongside the drag bar
-    if (isMobileKiosk()) {
-        const handle = document.getElementById('sidebar-drag-handle');
-        if (handle) handle.appendChild(pill);
-    } else {
-        document.body.appendChild(pill);
-    }
+    toolbar.appendChild(pill);
 }
 
 function repositionViewSwitcher(): void {
-    const pill = document.getElementById('kiosk-view-switcher');
-    if (!pill) return;
-
-    const handle = document.getElementById('sidebar-drag-handle');
-    if (isMobileKiosk()) {
-        if (pill.parentElement !== handle && handle) handle.appendChild(pill);
-    } else {
-        if (pill.parentElement !== document.body) document.body.appendChild(pill);
-    }
+    // View switcher now lives inside the toolbar — no repositioning needed
 }
 
 // =============================================================================
@@ -2446,6 +2691,15 @@ function updateInfoPanel(): void {
 // =============================================================================
 
 function hideEditorOnlyUI(): void {
+    // Move metadata sidebar OUT of #props-panel before hiding it.
+    // In the editor layout, #metadata-sidebar lives inside #props-panel.
+    // Kiosk mode hides #props-panel (display:none), which would hide the sidebar too.
+    const sidebar = document.getElementById('metadata-sidebar');
+    const appContainer = document.getElementById('app');
+    if (sidebar && appContainer && sidebar.closest('#props-panel')) {
+        appContainer.appendChild(sidebar);
+    }
+
     // Hide tool rail, props panel, status bar (CSS already does this for body.kiosk-mode,
     // but belt-and-suspenders for robustness)
     hideEl('tool-rail');
@@ -2459,6 +2713,9 @@ function hideEditorOnlyUI(): void {
     const gridCb = document.getElementById('toggle-gridlines') as HTMLInputElement;
     if (gridCb) gridCb.checked = false;
 
+    // Create floating kiosk toolbar — move essential buttons out of hidden containers
+    createKioskToolbar();
+
     // Hide editor-only sidebar tabs
     const editTab = document.querySelector('.sidebar-mode-tab[data-mode="edit"]') as HTMLElement;
     if (editTab) editTab.style.display = 'none';
@@ -2471,6 +2728,48 @@ function hideEditorOnlyUI(): void {
 
     // Move scene settings into sidebar as a tab
     moveSettingsToSidebar();
+}
+
+/**
+ * Create a floating toolbar for kiosk mode with essential control buttons.
+ * Moves buttons from their hidden parent containers (tool-rail, props-panel)
+ * into a fixed-position toolbar overlay.
+ */
+// SVG icon paths (24x24 viewBox, stroke-based, 2px stroke)
+const KIOSK_ICONS: Record<string, string> = {
+    info: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+    fullscreen: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>',
+    pin: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+    ruler: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20l20-20"/><path d="M5.5 13.5L8 11"/><path d="M9.5 9.5L12 7"/><path d="M13.5 5.5L16 3"/></svg>',
+};
+
+function createKioskToolbar(): void {
+    const toolbar = document.createElement('div');
+    toolbar.id = 'kiosk-toolbar';
+
+    // Buttons to move: [id, label, iconKey]
+    const buttons: [string, string, string][] = [
+        ['btn-metadata', 'Info', 'info'],
+        ['btn-fullscreen', 'Fullscreen', 'fullscreen'],
+        ['btn-toggle-annotations', 'Annotations', 'pin'],
+        ['btn-measure', 'Measure', 'ruler'],
+    ];
+
+    for (const [id, label, iconKey] of buttons) {
+        const existing = document.getElementById(id);
+        if (existing) {
+            existing.className = 'kiosk-tool-btn';
+            existing.id = id;
+            existing.setAttribute('aria-label', label);
+            existing.setAttribute('title', label);
+            existing.innerHTML = KIOSK_ICONS[iconKey] || '';
+            toolbar.appendChild(existing);
+        }
+    }
+
+    if (toolbar.children.length > 0) {
+        document.body.appendChild(toolbar);
+    }
 }
 
 function hideEl(id: string): void {
@@ -2545,21 +2844,19 @@ function createExportSection(): void {
     const meshEntry = state.archiveLoader.getMeshEntry();
     const pcEntry = state.archiveLoader.getPointcloudEntry();
 
-    // Build the collapsible section using the standard control-section pattern
+    // Build the collapsible section using the standard prop-section pattern
     const section = document.createElement('div');
-    section.className = 'control-section collapsible collapsed export-section';
+    section.className = 'prop-section export-section';
 
-    const header = document.createElement('h3');
-    header.className = 'collapsible-header';
-    header.innerHTML = 'Export <span class="collapse-icon">▶</span>';
+    const header = document.createElement('div');
+    header.className = 'prop-section-hd';
+    header.innerHTML = '<span class="prop-section-title">Export</span><span class="prop-section-chevron">&#9654;</span>';
     header.addEventListener('click', () => {
-        section.classList.toggle('collapsed');
-        const icon = header.querySelector('.collapse-icon');
-        if (icon) icon.textContent = section.classList.contains('collapsed') ? '▶' : '▼';
+        section.classList.toggle('open');
     });
 
     const content = document.createElement('div');
-    content.className = 'collapsible-content';
+    content.className = 'prop-section-body';
 
     // --- Full archive download (only when loaded from URL) ---
     if (state.archiveSourceUrl) {
@@ -2687,10 +2984,10 @@ function showRelevantSettings(hasSplat: boolean, hasMesh: boolean, hasPointcloud
     ];
     hideByIds.forEach(id => {
         const el = document.getElementById(id);
-        if (el) (el.closest('.slider-group') as HTMLElement)?.style.setProperty('display', 'none');
+        if (el) (el.closest('.sl-row') as HTMLElement)?.style.setProperty('display', 'none');
     });
     // Hide all position/rotation inputs
-    container.querySelectorAll('.position-inputs').forEach(el => {
+    container.querySelectorAll('.xyz-block').forEach(el => {
         (el as HTMLElement).style.display = 'none';
     });
     // Hide entire splat and pointcloud settings (no useful kiosk controls remain)
@@ -2713,10 +3010,10 @@ function showRelevantSettings(hasSplat: boolean, hasMesh: boolean, hasPointcloud
     if (!isSTL) hideEl('btn-stl');
 
     // Hide entire Display Mode section if 0 or 1 button visible
-    const displaySection = Array.from(container.querySelectorAll('.control-section'))
-        .find(s => s.querySelector('h3')?.textContent?.trim() === 'Display Mode');
+    const displaySection = Array.from(container.querySelectorAll('.prop-section'))
+        .find(s => s.querySelector('.prop-section-title')?.textContent?.trim() === 'Display Mode');
     if (displaySection) {
-        const visibleButtons = displaySection.querySelectorAll('.toggle-btn:not([style*="display: none"])');
+        const visibleButtons = displaySection.querySelectorAll('.prop-btn:not([style*="display: none"])');
         if (visibleButtons.length <= 1) (displaySection as HTMLElement).style.display = 'none';
     }
 }

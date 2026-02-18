@@ -13,7 +13,9 @@ body.kiosk-mode.kiosk-editorial {
 /* --- Hide Sidebar Layout Elements --- */
 
 body.kiosk-mode.kiosk-editorial #metadata-sidebar,
-body.kiosk-mode.kiosk-editorial .kiosk-view-switcher {
+body.kiosk-mode.kiosk-editorial .kiosk-view-switcher,
+body.kiosk-mode.kiosk-editorial #kiosk-toolbar,
+body.kiosk-mode.kiosk-editorial #kiosk-wall-label {
     display: none !important;
 }
 
