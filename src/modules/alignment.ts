@@ -657,7 +657,12 @@ export class LandmarkAlignment {
 
         // Filter: only accept hits on the current target object
         const targetObj = this._phase === 'anchor' ? this._anchorObj : this._moverObj;
-        const hit = intersects.find(h => this._isDescendantOf(h.object, targetObj));
+        let hit = intersects.find(h => this._isDescendantOf(h.object, targetObj));
+
+        // If no hit via standard raycasting and target is a splat mesh, try custom splat raycasting
+        if (!hit && targetObj && this._isSplatMesh(targetObj)) {
+            hit = this._raycastSplatMesh(targetObj);
+        }
 
         if (!hit) return;
 
@@ -712,6 +717,63 @@ export class LandmarkAlignment {
             current = current.parent;
         }
         return false;
+    }
+
+    /**
+     * Check if an object is a splat mesh (has packedSplats property)
+     */
+    private _isSplatMesh(obj: Object3D): boolean {
+        return !!(obj as any).packedSplats;
+    }
+
+    /**
+     * Manual raycasting for splat meshes (Spark.js doesn't implement Three.js raycast)
+     * Samples splat points and finds the closest one to the ray.
+     */
+    private _raycastSplatMesh(splatMeshObj: Object3D): { point: Vector3; distance: number } | null {
+        const splatMesh = splatMeshObj as SplatMesh;
+        if (!splatMesh.packedSplats || typeof splatMesh.packedSplats.forEachSplat !== 'function') {
+            return null;
+        }
+
+        splatMesh.updateMatrixWorld(true);
+        const worldMatrix = splatMesh.matrixWorld;
+        const ray = this._raycaster.ray;
+
+        let closestPoint: Vector3 | null = null;
+        let closestDistance = Infinity;
+
+        const splatCount = (splatMesh.packedSplats as any).splatCount || 0;
+        if (splatCount === 0) return null;
+
+        // Sample at most 5000 splats for performance (adjust stride)
+        const maxSamples = 5000;
+        const stride = Math.max(1, Math.floor(splatCount / maxSamples));
+
+        splatMesh.packedSplats.forEachSplat((index: number, center: Point3D) => {
+            if (index % stride !== 0) return;
+
+            // Transform splat center to world space
+            const worldPos = new THREE.Vector3(center.x, center.y, center.z);
+            worldPos.applyMatrix4(worldMatrix);
+
+            // Find distance from ray to this point
+            const distToRay = ray.distanceToPoint(worldPos);
+            if (distToRay < closestDistance) {
+                closestDistance = distToRay;
+                closestPoint = worldPos;
+            }
+        });
+
+        // Only accept if within reasonable click tolerance (e.g., 0.5 units in world space)
+        if (closestPoint && closestDistance < 0.5) {
+            return {
+                point: closestPoint,
+                distance: ray.origin.distanceTo(closestPoint)
+            };
+        }
+
+        return null;
     }
 
     /**
