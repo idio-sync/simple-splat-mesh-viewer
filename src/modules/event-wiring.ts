@@ -49,6 +49,21 @@ export function setupUIEvents(deps: EventWiringDeps): void {
             // Fullscreen is action-only — handled by setupFullscreen()
             if (tool === 'fullscreen') return;
             activateTool(tool);
+            // Show/hide transform gizmo based on active tool
+            if (sceneRefs.transformControls) {
+                try {
+                    sceneRefs.transformControls.getHelper().visible = (tool === 'transform');
+                    sceneRefs.transformControls.enabled = (tool === 'transform');
+                } catch { /* ignore */ }
+            }
+            // Auto-select first loaded object when opening transform pane with no selection
+            if (tool === 'transform' && state.selectedObject === 'none') {
+                if (sceneRefs.splatMesh) {
+                    deps.transform.setSelectedObject('splat' as any);
+                } else if (sceneRefs.modelGroup && sceneRefs.modelGroup.children.length > 0) {
+                    deps.transform.setSelectedObject('model' as any);
+                }
+            }
         });
     });
 
@@ -102,19 +117,6 @@ export function setupUIEvents(deps: EventWiringDeps): void {
         }
     });
 
-    // Splat position inputs
-    ['x', 'y', 'z'].forEach(axis => {
-        addListener(`splat-pos-${axis}`, 'change', (e: Event) => {
-            if (sceneRefs.splatMesh) {
-                sceneRefs.splatMesh.position[axis] = parseFloat((e.target as HTMLInputElement).value) || 0;
-            }
-        });
-        addListener(`splat-rot-${axis}`, 'change', (e: Event) => {
-            if (sceneRefs.splatMesh) {
-                sceneRefs.splatMesh.rotation[axis] = THREE.MathUtils.degToRad(parseFloat((e.target as HTMLInputElement).value) || 0);
-            }
-        });
-    });
 
     // ─── Model settings ──────────────────────────────────────
     addListener('model-scale', 'input', (e: Event) => {
@@ -194,19 +196,6 @@ export function setupUIEvents(deps: EventWiringDeps): void {
         updateModelTextures(sceneRefs.modelGroup, !(e.target as HTMLInputElement).checked);
     });
 
-    // Model position inputs
-    ['x', 'y', 'z'].forEach(axis => {
-        addListener(`model-pos-${axis}`, 'change', (e: Event) => {
-            if (sceneRefs.modelGroup) {
-                sceneRefs.modelGroup.position[axis] = parseFloat((e.target as HTMLInputElement).value) || 0;
-            }
-        });
-        addListener(`model-rot-${axis}`, 'change', (e: Event) => {
-            if (sceneRefs.modelGroup) {
-                sceneRefs.modelGroup.rotation[axis] = THREE.MathUtils.degToRad(parseFloat((e.target as HTMLInputElement).value) || 0);
-            }
-        });
-    });
 
     // ─── Point cloud settings ────────────────────────────────
     addListener('pointcloud-scale', 'input', (e: Event) => {
@@ -232,19 +221,6 @@ export function setupUIEvents(deps: EventWiringDeps): void {
         updatePointcloudOpacity(sceneRefs.pointcloudGroup, state.pointcloudOpacity);
     });
 
-    // Point cloud position inputs
-    ['x', 'y', 'z'].forEach(axis => {
-        addListener(`pointcloud-pos-${axis}`, 'change', (e: Event) => {
-            if (sceneRefs.pointcloudGroup) {
-                sceneRefs.pointcloudGroup.position[axis] = parseFloat((e.target as HTMLInputElement).value) || 0;
-            }
-        });
-        addListener(`pointcloud-rot-${axis}`, 'change', (e: Event) => {
-            if (sceneRefs.pointcloudGroup) {
-                sceneRefs.pointcloudGroup.rotation[axis] = THREE.MathUtils.degToRad(parseFloat((e.target as HTMLInputElement).value) || 0);
-            }
-        });
-    });
 
     // ─── Alignment ───────────────────────────────────────────
     addListener('btn-reset-alignment', 'click', deps.alignment.resetAlignment);
@@ -300,6 +276,40 @@ export function setupUIEvents(deps: EventWiringDeps): void {
     addListener('btn-translate', 'click', () => deps.transform.setTransformMode('translate' as any));
     addListener('btn-rotate', 'click', () => deps.transform.setTransformMode('rotate' as any));
     addListener('btn-scale', 'click', () => deps.transform.setTransformMode('scale' as any));
+
+    // ─── Transform pane inputs ────────────────────────────────
+    (['x', 'y', 'z'] as const).forEach(axis => {
+        addListener(`transform-pos-${axis}`, 'change', (e: Event) => {
+            const val = parseFloat((e.target as HTMLInputElement).value) || 0;
+            const sel = state.selectedObject;
+            if (sel === 'splat' && sceneRefs.splatMesh) {
+                (sceneRefs.splatMesh as any).position[axis] = val;
+            } else if (sel === 'model' && sceneRefs.modelGroup) {
+                (sceneRefs.modelGroup as any).position[axis] = val;
+            } else if (sel === 'both') {
+                if (sceneRefs.splatMesh) (sceneRefs.splatMesh as any).position[axis] = val;
+                if (sceneRefs.modelGroup) (sceneRefs.modelGroup as any).position[axis] = val;
+                if (sceneRefs.pointcloudGroup) (sceneRefs.pointcloudGroup as any).position[axis] = val;
+            }
+        });
+        addListener(`transform-rot-${axis}`, 'change', (e: Event) => {
+            const val = parseFloat((e.target as HTMLInputElement).value) || 0;
+            const rad = THREE.MathUtils.degToRad(val);
+            const sel = state.selectedObject;
+            if (sel === 'splat' && sceneRefs.splatMesh) {
+                (sceneRefs.splatMesh as any).rotation[axis] = rad;
+            } else if (sel === 'model' && sceneRefs.modelGroup) {
+                (sceneRefs.modelGroup as any).rotation[axis] = rad;
+            } else if (sel === 'both') {
+                if (sceneRefs.splatMesh) (sceneRefs.splatMesh as any).rotation[axis] = rad;
+                if (sceneRefs.modelGroup) (sceneRefs.modelGroup as any).rotation[axis] = rad;
+                if (sceneRefs.pointcloudGroup) (sceneRefs.pointcloudGroup as any).rotation[axis] = rad;
+            }
+        });
+    });
+
+    // ─── Reset transform button ──────────────────────────────
+    addListener('btn-reset-transform', 'click', deps.transform.resetTransform);
 
     // ─── Alignment (landmark) ────────────────────────────────
     addListener('btn-align', 'click', deps.alignment.toggleAlignment);
@@ -557,18 +567,34 @@ export function setupUIEvents(deps: EventWiringDeps): void {
         const key = e.key.toLowerCase();
 
         // Tool rail pane shortcuts (match data-tooltip in HTML)
+        let activatedTool: string | null = null;
         switch (key) {
-            case 's': activateTool('scene'); break;
-            case 'a': activateTool('assets'); break;
-            case 't': activateTool('transform'); break;
-            case 'l': activateTool('align'); break;
-            case 'n': activateTool('annotate'); break;
-            case 'm': activateTool('measure'); break;
-            case 'c': activateTool('capture'); break;
-            case 'd': activateTool('metadata'); break;
-            case ',': activateTool('settings'); break;
+            case 's': activateTool('scene'); activatedTool = 'scene'; break;
+            case 'a': activateTool('assets'); activatedTool = 'assets'; break;
+            case 't':
+                activateTool('transform'); activatedTool = 'transform';
+                if (state.selectedObject === 'none') {
+                    if (sceneRefs.splatMesh) {
+                        deps.transform.setSelectedObject('splat' as any);
+                    } else if (sceneRefs.modelGroup && sceneRefs.modelGroup.children.length > 0) {
+                        deps.transform.setSelectedObject('model' as any);
+                    }
+                }
+                break;
+            case 'n': activateTool('annotate'); activatedTool = 'annotate'; break;
+            case 'm': activateTool('measure'); activatedTool = 'measure'; break;
+            case 'c': activateTool('capture'); activatedTool = 'capture'; break;
+            case 'd': activateTool('metadata'); activatedTool = 'metadata'; break;
+            case ',': activateTool('settings'); activatedTool = 'settings'; break;
             case 'f': deps.camera.toggleFlyMode(); break;
             default: break;
+        }
+        // Show/hide transform gizmo based on active tool
+        if (activatedTool && sceneRefs.transformControls) {
+            try {
+                sceneRefs.transformControls.getHelper().visible = (activatedTool === 'transform');
+                sceneRefs.transformControls.enabled = (activatedTool === 'transform');
+            } catch { /* ignore */ }
         }
 
         if (e.key === 'Escape') {

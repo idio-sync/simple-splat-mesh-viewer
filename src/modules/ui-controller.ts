@@ -202,7 +202,6 @@ const TOOL_PANE_MAP: Record<string, { pane: string; title: string }> = {
     scene:     { pane: 'pane-scene',     title: 'Scene' },
     assets:    { pane: 'pane-assets',    title: 'Assets' },
     transform: { pane: 'pane-transform', title: 'Transform' },
-    align:     { pane: 'pane-align',     title: 'Alignment' },
     annotate:  { pane: 'pane-annotate',  title: 'Annotations' },
     measure:   { pane: 'pane-measure',   title: 'Measurements' },
     capture:   { pane: 'pane-capture',   title: 'Screenshots' },
@@ -371,38 +370,92 @@ export function updateTransformInputs(
 
     // Update splat inputs
     if (splatMesh) {
-        setInputValue('splat-pos-x', splatMesh.position.x.toFixed(2));
-        setInputValue('splat-pos-y', splatMesh.position.y.toFixed(2));
-        setInputValue('splat-pos-z', splatMesh.position.z.toFixed(2));
-        setInputValue('splat-rot-x', THREE.MathUtils.radToDeg(splatMesh.rotation.x).toFixed(1));
-        setInputValue('splat-rot-y', THREE.MathUtils.radToDeg(splatMesh.rotation.y).toFixed(1));
-        setInputValue('splat-rot-z', THREE.MathUtils.radToDeg(splatMesh.rotation.z).toFixed(1));
         setInputValue('splat-scale', splatMesh.scale.x);
         setTextContent('splat-scale-value', splatMesh.scale.x.toFixed(1));
     }
 
     // Update model inputs
     if (modelGroup) {
-        setInputValue('model-pos-x', modelGroup.position.x.toFixed(2));
-        setInputValue('model-pos-y', modelGroup.position.y.toFixed(2));
-        setInputValue('model-pos-z', modelGroup.position.z.toFixed(2));
-        setInputValue('model-rot-x', THREE.MathUtils.radToDeg(modelGroup.rotation.x).toFixed(1));
-        setInputValue('model-rot-y', THREE.MathUtils.radToDeg(modelGroup.rotation.y).toFixed(1));
-        setInputValue('model-rot-z', THREE.MathUtils.radToDeg(modelGroup.rotation.z).toFixed(1));
         setInputValue('model-scale', modelGroup.scale.x);
         setTextContent('model-scale-value', modelGroup.scale.x.toFixed(1));
     }
 
     // Update pointcloud inputs
     if (pointcloudGroup) {
-        setInputValue('pointcloud-pos-x', pointcloudGroup.position.x.toFixed(2));
-        setInputValue('pointcloud-pos-y', pointcloudGroup.position.y.toFixed(2));
-        setInputValue('pointcloud-pos-z', pointcloudGroup.position.z.toFixed(2));
-        setInputValue('pointcloud-rot-x', THREE.MathUtils.radToDeg(pointcloudGroup.rotation.x).toFixed(1));
-        setInputValue('pointcloud-rot-y', THREE.MathUtils.radToDeg(pointcloudGroup.rotation.y).toFixed(1));
-        setInputValue('pointcloud-rot-z', THREE.MathUtils.radToDeg(pointcloudGroup.rotation.z).toFixed(1));
         setInputValue('pointcloud-scale', pointcloudGroup.scale.x);
         setTextContent('pointcloud-scale-value', pointcloudGroup.scale.x.toFixed(1));
+    }
+
+    // Mirror selected object's values to transform pane inputs
+    const activeBtn = document.querySelector('#pane-transform .seg-ctrl .seg-btn.active');
+    const selection = activeBtn?.id?.replace('btn-select-', '') || 'none';
+
+    if (selection !== 'none') {
+        let src: any = null;
+        if (selection === 'splat' && splatMesh) src = splatMesh;
+        else if (selection === 'model' && modelGroup) src = modelGroup;
+        else if (selection === 'both') src = splatMesh || modelGroup;
+
+        if (src) {
+            setInputValue('transform-pos-x', src.position.x.toFixed(2));
+            setInputValue('transform-pos-y', src.position.y.toFixed(2));
+            setInputValue('transform-pos-z', src.position.z.toFixed(2));
+            setInputValue('transform-rot-x', THREE.MathUtils.radToDeg(src.rotation.x).toFixed(1));
+            setInputValue('transform-rot-y', THREE.MathUtils.radToDeg(src.rotation.y).toFixed(1));
+            setInputValue('transform-rot-z', THREE.MathUtils.radToDeg(src.rotation.z).toFixed(1));
+        }
+    }
+}
+
+/**
+ * Update the transform pane UI to reflect the currently selected object.
+ * Shows/hides the XYZ inputs and updates the label and values.
+ */
+export function updateTransformPaneSelection(
+    selection: string,
+    splatMesh: any,
+    modelGroup: any,
+    pointcloudGroup?: any
+): void {
+    const label = document.getElementById('transform-object-label');
+    const emptyHint = document.getElementById('transform-empty-hint');
+    const valuesGroup = document.getElementById('transform-values-group');
+    const bothHint = document.getElementById('transform-both-hint');
+
+    // Update label
+    const labels: Record<string, string> = {
+        none: 'No object selected',
+        splat: 'Splat selected',
+        model: 'Model selected',
+        both: 'All objects (linked)',
+    };
+    if (label) label.textContent = labels[selection] || 'No object selected';
+
+    // Toggle visibility
+    const showValues = selection !== 'none';
+    if (emptyHint) emptyHint.style.display = showValues ? 'none' : '';
+    if (valuesGroup) valuesGroup.style.display = showValues ? '' : 'none';
+    if (bothHint) bothHint.style.display = selection === 'both' ? '' : 'none';
+
+    // Populate values from selected object
+    if (showValues) {
+        let src: any = null;
+        if (selection === 'splat' && splatMesh) src = splatMesh;
+        else if (selection === 'model' && modelGroup) src = modelGroup;
+        else if (selection === 'both') src = splatMesh || modelGroup;
+
+        if (src) {
+            const setVal = (id: string, value: string | number): void => {
+                const el = document.getElementById(id) as HTMLInputElement | null;
+                if (el) el.value = String(value);
+            };
+            setVal('transform-pos-x', src.position.x.toFixed(2));
+            setVal('transform-pos-y', src.position.y.toFixed(2));
+            setVal('transform-pos-z', src.position.z.toFixed(2));
+            setVal('transform-rot-x', THREE.MathUtils.radToDeg(src.rotation.x).toFixed(1));
+            setVal('transform-rot-y', THREE.MathUtils.radToDeg(src.rotation.y).toFixed(1));
+            setVal('transform-rot-z', THREE.MathUtils.radToDeg(src.rotation.z).toFixed(1));
+        }
     }
 }
 

@@ -330,17 +330,17 @@ export class SceneManager {
             }
         });
 
-        // Add TransformControls to scene
-        log.info('TransformControls instanceof THREE.Object3D:', this.transformControls instanceof THREE.Object3D);
-        if (!(this.transformControls instanceof THREE.Object3D)) {
-            log.error('WARNING: TransformControls is NOT an instance of THREE.Object3D!');
-            log.error('This indicates THREE.js is loaded multiple times (import map issue).');
-        }
+        // Add TransformControls helper to scene
+        // In Three.js 0.170+, TransformControls extends Controls (not Object3D).
+        // The renderable gizmo is accessed via getHelper().
         try {
-            this.scene.add(this.transformControls as unknown as Object3D);
-            log.info('TransformControls added to scene successfully');
+            const helper = this.transformControls.getHelper();
+            helper.visible = false; // Hidden until Transform tool is activated
+            this.transformControls.enabled = false;
+            this.scene.add(helper);
+            log.info('TransformControls helper added to scene successfully');
         } catch (tcError) {
-            log.error('Failed to add TransformControls to scene:', tcError);
+            log.error('Failed to add TransformControls helper to scene:', tcError);
             log.error('Transform gizmos will not be visible, but app should still work');
         }
 
@@ -410,7 +410,7 @@ export class SceneManager {
         // Remove TransformControls listeners and detach before dispose
         if (this.transformControls) {
             try { this.transformControls.detach(); } catch { /* ignore */ }
-            this.scene!.remove(this.transformControls as unknown as Object3D);
+            this.scene!.remove(this.transformControls.getHelper());
             this.transformControls.dispose();
         }
 
@@ -509,9 +509,9 @@ export class SceneManager {
             }
         });
         try {
-            this.scene!.add(this.transformControls as unknown as Object3D);
+            this.scene!.add(this.transformControls.getHelper());
         } catch {
-            log.warn('Failed to re-add TransformControls to scene after renderer switch');
+            log.warn('Failed to re-add TransformControls helper to scene after renderer switch');
         }
 
         // --- Recreate PMREMGenerator if an env map is active ---
@@ -1105,7 +1105,7 @@ export class SceneManager {
         }
 
         if (this.transformControls) {
-            this.scene!.remove(this.transformControls as unknown as Object3D);
+            this.scene!.remove(this.transformControls.getHelper());
             this.transformControls.dispose();
         }
 

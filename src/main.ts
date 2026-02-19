@@ -39,7 +39,8 @@ import {
     ensureToolbarVisibility as ensureToolbarVisibilityHandler,
     applyViewerModeSettings as applyViewerModeSettingsHandler,
     updateStatusBar,
-    updateDisplayPill
+    updateDisplayPill,
+    updateTransformPaneSelection
 } from './modules/ui-controller.js';
 import {
     formatFileSize,
@@ -96,7 +97,8 @@ import {
     setSelectedObject as setSelectedObjectHandler,
     syncBothObjects as syncBothObjectsHandler,
     storeLastPositions as storeLastPositionsHandler,
-    setTransformMode as setTransformModeHandler
+    setTransformMode as setTransformModeHandler,
+    resetTransform as resetTransformHandler
 } from './modules/transform-controller.js';
 import {
     handleSourceFilesInput,
@@ -585,7 +587,7 @@ function createEventWiringDeps(): EventWiringDeps {
         screenshots: { captureScreenshotToList, showViewfinder, captureManualPreview, hideViewfinder },
         metadata: { hideMetadataPanel, toggleMetadataDisplay, setupMetadataSidebar },
         share: { copyShareLink },
-        transform: { setSelectedObject, setTransformMode },
+        transform: { setSelectedObject, setTransformMode, resetTransform },
         tauri: {
             wireNativeDialogsIfAvailable: () => {
                 if (window.__TAURI__ && tauriBridge) {
@@ -854,6 +856,7 @@ function setBackgroundColor(hexColor: string) {
 // Transform controls (delegated to transform-controller.js)
 function setSelectedObject(selection: SelectedObject) {
     setSelectedObjectHandler(selection, { transformControls, splatMesh, modelGroup, state });
+    updateTransformPaneSelection(selection as string, splatMesh, modelGroup, pointcloudGroup);
 }
 
 function syncBothObjects() {
@@ -866,6 +869,11 @@ function storeLastPositions() {
 
 function setTransformMode(mode: TransformMode) {
     setTransformModeHandler(mode, { transformControls, state, splatMesh, modelGroup, pointcloudGroup });
+}
+
+function resetTransform() {
+    resetTransformHandler({ splatMesh, modelGroup, pointcloudGroup, state });
+    updateTransformInputs();
 }
 
 function updateVisibility() {

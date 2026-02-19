@@ -1056,6 +1056,10 @@ export async function loadAlignmentFromUrl(url: string, deps: LoadAlignmentDeps)
 
 /**
  * Center a model on the grid (y=0) when loaded standalone (without a splat).
+ *
+ * Uses pivot centering: offsets children so their collective center is at the
+ * group's local origin, then positions the group so the model sits on y=0.
+ * This ensures TransformControls gizmo appears at the model's visual center.
  */
 export function centerModelOnGrid(modelGroup: Group): void {
     if (!modelGroup || modelGroup.children.length === 0) {
@@ -1071,17 +1075,24 @@ export function centerModelOnGrid(modelGroup: Group): void {
     }
 
     const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
 
-    const offsetX = -center.x;
-    const offsetY = -box.min.y;
-    const offsetZ = -center.z;
+    // Convert world-space center to group's local space for robustness
+    modelGroup.updateMatrixWorld(true);
+    const localCenter = modelGroup.worldToLocal(center.clone());
 
-    modelGroup.position.x += offsetX;
-    modelGroup.position.y += offsetY;
-    modelGroup.position.z += offsetZ;
+    // Offset children so their collective center is at the group's local origin
+    for (const child of modelGroup.children) {
+        child.position.x -= localCenter.x;
+        child.position.y -= localCenter.y;
+        child.position.z -= localCenter.z;
+    }
+
+    // Position group so model sits on the grid (y=0), centered on x/z
+    modelGroup.position.set(0, size.y / 2, 0);
 
     log.info('[centerModelOnGrid] Model centered on grid:', {
         newPosition: modelGroup.position.toArray(),
-        offset: [offsetX, offsetY, offsetZ]
+        childOffset: [-localCenter.x, -localCenter.y, -localCenter.z]
     });
 }

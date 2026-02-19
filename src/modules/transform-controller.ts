@@ -217,3 +217,37 @@ export function setTransformMode(mode: TransformMode, deps: SetTransformModeDeps
     // Store positions when changing mode
     storeLastPositions({ splatMesh, modelGroup, pointcloudGroup });
 }
+
+interface ResetTransformDeps {
+    splatMesh: any;
+    modelGroup: any;
+    pointcloudGroup: any;
+    state: AppState;
+}
+
+/**
+ * Reset position and rotation to zero for the selected object(s).
+ * @param deps - { splatMesh, modelGroup, pointcloudGroup, state }
+ */
+export function resetTransform(deps: ResetTransformDeps): void {
+    const { splatMesh, modelGroup, pointcloudGroup, state } = deps;
+    const sel = state.selectedObject;
+    if (sel === 'none') return;
+
+    if ((sel === 'splat' || sel === 'both') && splatMesh) {
+        splatMesh.position.set(0, 0, 0);
+        splatMesh.rotation.set(0, 0, 0);
+    }
+    if ((sel === 'model' || sel === 'both') && modelGroup) {
+        modelGroup.position.set(0, 0, 0);
+        modelGroup.rotation.set(0, 0, 0);
+    }
+    if (sel === 'both' && pointcloudGroup) {
+        pointcloudGroup.position.set(0, 0, 0);
+        pointcloudGroup.rotation.set(0, 0, 0);
+    }
+
+    // Re-store positions for delta tracking
+    storeLastPositions({ splatMesh, modelGroup, pointcloudGroup });
+    log.info(`Reset transform for: ${sel}`);
+}

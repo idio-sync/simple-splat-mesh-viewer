@@ -240,6 +240,7 @@ export interface EventWiringDeps {
     transform: {
         setSelectedObject: (selection: SelectedObject) => void;
         setTransformMode: (mode: TransformMode) => void;
+        resetTransform: () => void;
     };
     tauri: {
         wireNativeDialogsIfAvailable: () => void;

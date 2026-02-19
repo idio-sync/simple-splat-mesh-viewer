@@ -82,15 +82,6 @@
                 </svg>
             </button>
 
-            <!-- Align — 3-point alignment between objects -->
-            <button class="tool-btn" data-tool="align" data-tooltip="Align  L" title="3-point alignment between objects">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-                    <path d="M4 22V2"/>
-                    <rect x="8" y="6" width="12" height="4"/>
-                    <rect x="8" y="14" width="8" height="4"/>
-                </svg>
-            </button>
-
             <div class="rail-sep"></div>
 
             <!-- Measure — Measure distances on model -->
@@ -523,25 +514,6 @@
                         <div class="cb-row">
                             <input type="checkbox" id="model-specular-f0"><label for="model-specular-f0">Specular F0</label>
                         </div>
-                        <div style="border-left:2px solid rgba(90,158,151,0.45); padding-left:8px; margin-top:8px;">
-                            <p class="prop-hint mb4" style="color:var(--accent); opacity:0.65; font-style:italic;">Transforms saved in archive</p>
-                            <div class="xyz-block">
-                                <span class="prop-label">Position</span>
-                                <div class="xyz-inputs">
-                                    <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" id="model-pos-x" value="0" step="0.1"></div>
-                                    <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" id="model-pos-y" value="0" step="0.1"></div>
-                                    <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" id="model-pos-z" value="0" step="0.1"></div>
-                                </div>
-                            </div>
-                            <div class="xyz-block">
-                                <span class="prop-label">Rotation (deg)</span>
-                                <div class="xyz-inputs">
-                                    <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" id="model-rot-x" value="0" step="1"></div>
-                                    <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" id="model-rot-y" value="0" step="1"></div>
-                                    <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" id="model-rot-z" value="0" step="1"></div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -556,25 +528,6 @@
                         <div class="sl-row">
                             <div class="sl-hd"><span class="sl-label">Scale</span><span class="sl-val" id="splat-scale-value">1.0</span></div>
                             <input type="range" id="splat-scale" min="0.1" max="5" step="0.1" value="1">
-                        </div>
-                        <div style="border-left:2px solid rgba(90,158,151,0.45); padding-left:8px; margin-top:8px;">
-                            <p class="prop-hint mb4" style="color:var(--accent); opacity:0.65; font-style:italic;">Transforms saved in archive</p>
-                            <div class="xyz-block">
-                                <span class="prop-label">Position</span>
-                                <div class="xyz-inputs">
-                                    <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" id="splat-pos-x" value="0" step="0.1"></div>
-                                    <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" id="splat-pos-y" value="0" step="0.1"></div>
-                                    <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" id="splat-pos-z" value="0" step="0.1"></div>
-                                </div>
-                            </div>
-                            <div class="xyz-block">
-                                <span class="prop-label">Rotation (deg)</span>
-                                <div class="xyz-inputs">
-                                    <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" id="splat-rot-x" value="0" step="1"></div>
-                                    <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" id="splat-rot-y" value="0" step="1"></div>
-                                    <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" id="splat-rot-z" value="0" step="1"></div>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -599,25 +552,6 @@
                             <div class="sl-hd"><span class="sl-label">Opacity</span><span class="sl-val" id="pointcloud-opacity-value">1.0</span></div>
                             <input type="range" id="pointcloud-opacity" min="0" max="1" step="0.05" value="1">
                         </div>
-                        <div style="border-left:2px solid rgba(90,158,151,0.45); padding-left:8px; margin-top:8px;">
-                            <p class="prop-hint mb4" style="color:var(--accent); opacity:0.65; font-style:italic;">Transforms saved in archive</p>
-                            <div class="xyz-block">
-                                <span class="prop-label">Position</span>
-                                <div class="xyz-inputs">
-                                    <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" id="pointcloud-pos-x" value="0" step="0.1"></div>
-                                    <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" id="pointcloud-pos-y" value="0" step="0.1"></div>
-                                    <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" id="pointcloud-pos-z" value="0" step="0.1"></div>
-                                </div>
-                            </div>
-                            <div class="xyz-block">
-                                <span class="prop-label">Rotation (deg)</span>
-                                <div class="xyz-inputs">
-                                    <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" id="pointcloud-rot-x" value="0" step="1"></div>
-                                    <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" id="pointcloud-rot-y" value="0" step="1"></div>
-                                    <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" id="pointcloud-rot-z" value="0" step="1"></div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -629,6 +563,7 @@
                  ======================================================== -->
             <div class="props-pane" id="pane-transform">
 
+                <!-- Active Object (enhanced) -->
                 <div class="prop-section open">
                     <div class="prop-section-hd">
                         <span class="prop-section-title">Active Object</span>
@@ -642,9 +577,11 @@
                             <button class="seg-btn" id="btn-select-model">Model</button>
                             <button class="seg-btn" id="btn-select-both">Both</button>
                         </div>
+                        <span id="transform-object-label" class="prop-hint mt4" style="display:block; font-style:italic;">No object selected</span>
                     </div>
                 </div>
 
+                <!-- Gizmo Mode (unchanged) -->
                 <div class="prop-section open">
                     <div class="prop-section-hd">
                         <span class="prop-section-title">Gizmo Mode</span>
@@ -659,17 +596,56 @@
                     </div>
                 </div>
 
-            </div>
-
-
-            <!-- ========================================================
-                 ALIGN PANE
-                 ======================================================== -->
-            <div class="props-pane" id="pane-align">
-
+                <!-- Position & Rotation (NEW) -->
                 <div class="prop-section open">
                     <div class="prop-section-hd">
-                        <span class="prop-section-title">3-Point Alignment</span>
+                        <span class="prop-section-title">Position &amp; Rotation</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <div id="transform-empty-hint">
+                            <p class="prop-hint" style="text-align:center; padding:8px 0; font-style:italic;">Select an object above to edit transforms</p>
+                        </div>
+                        <div id="transform-values-group" style="display:none;">
+                            <div style="border-left:2px solid rgba(90,158,151,0.45); padding-left:8px;">
+                                <p class="prop-hint mb4" style="color:var(--accent); opacity:0.65; font-style:italic;">Transforms saved in archive</p>
+                                <div class="xyz-block">
+                                    <span class="prop-label">Position</span>
+                                    <div class="xyz-inputs">
+                                        <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" id="transform-pos-x" value="0" step="0.1"></div>
+                                        <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" id="transform-pos-y" value="0" step="0.1"></div>
+                                        <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" id="transform-pos-z" value="0" step="0.1"></div>
+                                    </div>
+                                </div>
+                                <div class="xyz-block">
+                                    <span class="prop-label">Rotation (deg)</span>
+                                    <div class="xyz-inputs">
+                                        <div class="xyz-field"><span class="xyz-axis-label x">X</span><input class="xyz-input" type="number" id="transform-rot-x" value="0" step="1"></div>
+                                        <div class="xyz-field"><span class="xyz-axis-label y">Y</span><input class="xyz-input" type="number" id="transform-rot-y" value="0" step="1"></div>
+                                        <div class="xyz-field"><span class="xyz-axis-label z">Z</span><input class="xyz-input" type="number" id="transform-rot-z" value="0" step="1"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <span id="transform-both-hint" class="prop-hint mt4" style="display:none; font-style:italic;">(showing primary object)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions (NEW) -->
+                <div class="prop-section open">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Actions</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <button class="prop-btn danger" id="btn-reset-transform">Reset Transform</button>
+                    </div>
+                </div>
+
+                <!-- Alignment -->
+                <div class="prop-section open">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Alignment</span>
                         <span class="prop-section-chevron">&#9654;</span>
                     </div>
                     <div class="prop-section-body">
@@ -677,16 +653,7 @@
                             Click 3 matching points on each object for precise alignment.
                         </p>
                         <button class="prop-btn accent" id="btn-align">Align Objects</button>
-                    </div>
-                </div>
-
-                <div class="prop-section open">
-                    <div class="prop-section-hd">
-                        <span class="prop-section-title">Auto-Align</span>
-                        <span class="prop-section-chevron">&#9654;</span>
-                    </div>
-                    <div class="prop-section-body">
-                        <button class="prop-btn" id="btn-reset-alignment">Reset All Transforms</button>
+                        <button class="prop-btn mt4" id="btn-reset-alignment">Reset All Transforms</button>
                     </div>
                 </div>
 
