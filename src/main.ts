@@ -87,10 +87,6 @@ import {
     loadPointcloudFromUrl as loadPointcloudFromUrlCtrl
 } from './modules/file-input-handlers.js';
 import {
-    initShareDialog,
-    showShareDialog
-} from './modules/share-dialog.js';
-import {
     captureScreenshotToList as captureScreenshotToListHandler,
     showViewfinder as showViewfinderHandler,
     hideViewfinder as hideViewfinderHandler,
@@ -121,13 +117,6 @@ import {
     updateSidebarAnnotationsList as updateSidebarAnnotationsListHandler,
     loadAnnotationsFromArchive as loadAnnotationsFromArchiveHandler
 } from './modules/annotation-controller.js';
-import {
-    showExportPanel as showExportPanelCtrl,
-    downloadArchive as downloadArchiveCtrl,
-    downloadGenericViewer as downloadGenericViewerCtrl,
-    exportMetadataManifest as exportMetadataManifestCtrl,
-    importMetadataManifest as importMetadataManifestCtrl
-} from './modules/export-controller.js';
 import {
     handleArchiveFile as handleArchiveFileCtrl,
     loadArchiveFromUrl as loadArchiveFromUrlCtrl,
@@ -720,9 +709,6 @@ async function init() {
     // Setup UI events (delegated to event-wiring.ts)
     setupUIEventsCtrl(createEventWiringDeps());
 
-    // Initialize share dialog
-    initShareDialog();
-
     // Apply initial controls visibility and mode
     applyControlsVisibility();
     applyControlsMode();
@@ -995,7 +981,10 @@ function loadAnnotationsFromArchive(annotations: any[]) {
 
 // ==================== Export/Archive Creation Functions (delegated to export-controller.ts) ====================
 
-function showExportPanel() { showExportPanelCtrl(createExportDeps()); }
+async function showExportPanel() {
+    const { showExportPanel: ctrl } = await import('./modules/export-controller.js');
+    ctrl(createExportDeps());
+}
 
 // =============================================================================
 // SCREENSHOT FUNCTIONS (delegated to screenshot-manager.js)
@@ -1018,10 +1007,16 @@ function captureManualPreview() {
 }
 
 // Download archive — delegated to export-controller.ts
-async function downloadArchive() { return downloadArchiveCtrl(createExportDeps()); }
+async function downloadArchive() {
+    const { downloadArchive: ctrl } = await import('./modules/export-controller.js');
+    return ctrl(createExportDeps());
+}
 
 // Download generic offline viewer — delegated to export-controller.ts
-async function downloadGenericViewer() { return downloadGenericViewerCtrl(createExportDeps()); }
+async function downloadGenericViewer() {
+    const { downloadGenericViewer: ctrl } = await import('./modules/export-controller.js');
+    return ctrl(createExportDeps());
+}
 
 // ==================== Metadata Sidebar Functions ====================
 
@@ -1050,8 +1045,14 @@ function setupMetadataSidebar() {
 }
 
 // Export/Import metadata manifest — delegated to export-controller.ts
-async function exportMetadataManifest() { return exportMetadataManifestCtrl(createExportDeps()); }
-function importMetadataManifest() { importMetadataManifestCtrl(createExportDeps()); }
+async function exportMetadataManifest() {
+    const { exportMetadataManifest: ctrl } = await import('./modules/export-controller.js');
+    return ctrl(createExportDeps());
+}
+async function importMetadataManifest() {
+    const { importMetadataManifest: ctrl } = await import('./modules/export-controller.js');
+    ctrl(createExportDeps());
+}
 
 // Prefill metadata panel from archive manifest
 // Prefill metadata - delegates to metadata-manager.js
@@ -1225,7 +1226,7 @@ function loadAlignmentFromUrl(url: string) {
 }
 
 // Open share dialog with current state
-function copyShareLink() {
+async function copyShareLink() {
     // Gather current state for the share dialog
     const shareState = {
         archiveUrl: state.currentArchiveUrl,
@@ -1266,6 +1267,7 @@ function copyShareLink() {
     }
 
     // Show the share dialog
+    const { showShareDialog } = await import('./modules/share-dialog.js');
     showShareDialog(shareState);
 }
 

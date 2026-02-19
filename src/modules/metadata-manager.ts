@@ -12,7 +12,6 @@
  */
 
 import { Logger, parseMarkdown, resolveAssetRefs } from './utilities.js';
-import { openMapPicker } from './map-picker.js';
 import type { AppState, Annotation } from '@/types.js';
 import type { MetadataProfile } from './metadata-profile.js';
 import { TAB_TIERS, isTierVisible, computeCompleteness, PROFILE_ORDER, PRONOM_REGISTRY } from './metadata-profile.js';
@@ -649,7 +648,7 @@ export function setupMapPicker(): void {
     const btn = document.getElementById('btn-pick-map');
     if (!btn) return;
 
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
         const latEl = document.getElementById('meta-coverage-lat') as HTMLInputElement | null;
         const lonEl = document.getElementById('meta-coverage-lon') as HTMLInputElement | null;
         const locEl = document.getElementById('meta-coverage-location') as HTMLInputElement | null;
@@ -657,6 +656,7 @@ export function setupMapPicker(): void {
         const currentLat = latEl?.value ? parseFloat(latEl.value) : undefined;
         const currentLon = lonEl?.value ? parseFloat(lonEl.value) : undefined;
 
+        const { openMapPicker } = await import('./map-picker.js');
         openMapPicker({
             lat: (currentLat !== undefined && !isNaN(currentLat)) ? currentLat : undefined,
             lon: (currentLon !== undefined && !isNaN(currentLon)) ? currentLon : undefined,
