@@ -12,7 +12,7 @@
         default-src 'self';
         script-src 'self' 'unsafe-inline' 'unsafe-eval';
         style-src 'self' 'unsafe-inline';
-        img-src 'self' blob: data:;
+        img-src 'self' blob: data: https://*.tile.openstreetmap.org;
         connect-src 'self' https: blob: data:;
         worker-src 'self' blob:;
         font-src 'self';
@@ -1146,6 +1146,12 @@
                                 <div class="coordinate-inputs">
                                     <input type="number" id="meta-coverage-lat" step="0.000001" placeholder="Latitude">
                                     <input type="number" id="meta-coverage-lon" step="0.000001" placeholder="Longitude">
+                                    <button type="button" id="btn-pick-map" class="btn-pick-map" title="Pick on map">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+                                            <circle cx="12" cy="9" r="2.5"/>
+                                        </svg>
+                                    </button>
                                 </div>
                                 <span class="field-hint">WGS84 decimal degrees</span>
                             </div>
@@ -1808,6 +1814,34 @@
                 <div class="validation-footer">
                     <button id="btn-validation-back" class="action-btn">Go Back</button>
                     <button id="btn-validation-export" class="action-btn secondary">Export Anyway</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Map Picker Modal -->
+        <div id="map-picker-overlay" class="map-picker-overlay hidden">
+            <div class="map-picker-modal">
+                <div class="map-picker-header">
+                    <h3>Pick Location</h3>
+                    <div class="map-picker-search-wrap">
+                        <input type="text" id="map-picker-search" placeholder="Search location..." autocomplete="off">
+                        <div id="map-picker-results" class="map-picker-results hidden"></div>
+                    </div>
+                    <button type="button" id="map-picker-locate" class="map-picker-btn" title="Use my location">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
+                        </svg>
+                    </button>
+                </div>
+                <div id="map-picker-map" class="map-picker-map"></div>
+                <div class="map-picker-footer">
+                    <span id="map-picker-coords" class="map-picker-coords">Click map to place marker</span>
+                    <span id="map-picker-location" class="map-picker-location"></span>
+                    <div class="map-picker-actions">
+                        <button type="button" id="map-picker-cancel" class="btn-secondary">Cancel</button>
+                        <button type="button" id="map-picker-confirm" class="btn-primary" disabled>Confirm</button>
+                    </div>
                 </div>
             </div>
         </div>

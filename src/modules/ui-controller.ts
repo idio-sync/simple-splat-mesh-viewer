@@ -224,12 +224,8 @@ export function activateTool(toolName: string): void {
     // If tool has no pane (e.g. fullscreen), skip pane switching
     if (!TOOL_PANE_MAP[toolName]) return;
 
-    // Toggle: if same tool clicked again, hide props panel
+    // No-op if same tool clicked again — buttons stay active until a different one is selected
     if (_activeTool === toolName && panel && !panel.classList.contains('hidden')) {
-        panel.classList.add('hidden');
-        _activeTool = null;
-        // Remove active from all tool buttons
-        document.querySelectorAll('#tool-rail .tool-btn').forEach(btn => btn.classList.remove('active'));
         return;
     }
 

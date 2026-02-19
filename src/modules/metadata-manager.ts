@@ -12,6 +12,7 @@
  */
 
 import { Logger, parseMarkdown, resolveAssetRefs } from './utilities.js';
+import { openMapPicker } from './map-picker.js';
 import type { AppState, Annotation } from '@/types.js';
 import type { MetadataProfile } from './metadata-profile.js';
 import { TAB_TIERS, isTierVisible, computeCompleteness, PROFILE_ORDER, PRONOM_REGISTRY } from './metadata-profile.js';
@@ -636,6 +637,40 @@ export function setupMetadataSidebar(deps: MetadataDeps = {}): void {
             updateCompleteness();
         });
     }
+
+    // Map picker for GPS coordinates
+    setupMapPicker();
+}
+
+/**
+ * Wire up the map picker button for GPS coordinate selection.
+ */
+export function setupMapPicker(): void {
+    const btn = document.getElementById('btn-pick-map');
+    if (!btn) return;
+
+    btn.addEventListener('click', () => {
+        const latEl = document.getElementById('meta-coverage-lat') as HTMLInputElement | null;
+        const lonEl = document.getElementById('meta-coverage-lon') as HTMLInputElement | null;
+        const locEl = document.getElementById('meta-coverage-location') as HTMLInputElement | null;
+
+        const currentLat = latEl?.value ? parseFloat(latEl.value) : undefined;
+        const currentLon = lonEl?.value ? parseFloat(lonEl.value) : undefined;
+
+        openMapPicker({
+            lat: (currentLat !== undefined && !isNaN(currentLat)) ? currentLat : undefined,
+            lon: (currentLon !== undefined && !isNaN(currentLon)) ? currentLon : undefined,
+            onConfirm: (lat, lon, locationName) => {
+                if (latEl) latEl.value = lat.toFixed(6);
+                if (lonEl) lonEl.value = lon.toFixed(6);
+                // Only fill location if user hasn't already typed something,
+                // or if a location name was found from geocoding
+                if (locEl && locationName && !locEl.value.trim()) {
+                    locEl.value = locationName;
+                }
+            }
+        });
+    });
 }
 
 /**

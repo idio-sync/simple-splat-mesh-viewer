@@ -14,7 +14,6 @@ import {
     addListener,
     setupCollapsibles,
     activateTool,
-    getActiveTool,
     hideExportPanel,
     showLoading,
     hideLoading
@@ -574,9 +573,11 @@ export function setupUIEvents(deps: EventWiringDeps): void {
 
         if (e.key === 'Escape') {
             deps.annotations.dismissPopup();
-            // Close props panel if open (replaces old hideMetadataSidebar)
-            const active = getActiveTool();
-            if (active) activateTool(active); // toggle off
+            // Hide props panel if open (Escape is the only way to dismiss)
+            const propsPanel = document.getElementById('props-panel');
+            if (propsPanel && !propsPanel.classList.contains('hidden')) {
+                propsPanel.classList.add('hidden');
+            }
         }
     });
 
