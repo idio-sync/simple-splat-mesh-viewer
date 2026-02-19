@@ -420,6 +420,57 @@ function computeMeshVertexCount(object: any): number { // THREE.Object3D
 }
 
 /**
+ * Texture map type names to inspect on Three.js materials.
+ */
+const TEXTURE_MAP_TYPES = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'bumpMap', 'displacementMap', 'lightMap'] as const;
+
+/**
+ * Info about textures found in a 3D object.
+ */
+interface TextureMapInfo {
+    type: string;
+    width: number;
+    height: number;
+}
+
+export interface TextureInfo {
+    count: number;
+    maxResolution: number;
+    maps: TextureMapInfo[];
+}
+
+/**
+ * Traverses a 3D object, finds all unique textures across all materials,
+ * and returns resolution info.
+ */
+function computeTextureInfo(object: any): TextureInfo {
+    const seen = new Set<any>();
+    const maps: TextureMapInfo[] = [];
+    let maxRes = 0;
+
+    object.traverse((child: any) => {
+        if (!child.isMesh || !child.material) return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const mat of mats) {
+            if (!mat) continue;
+            for (const mapType of TEXTURE_MAP_TYPES) {
+                const tex = mat[mapType];
+                if (!tex || seen.has(tex)) continue;
+                seen.add(tex);
+                const img = tex.image;
+                if (img && img.width && img.height) {
+                    maps.push({ type: mapType, width: img.width, height: img.height });
+                    const res = Math.max(img.width, img.height);
+                    if (res > maxRes) maxRes = res;
+                }
+            }
+        }
+    });
+
+    return { count: maps.length, maxResolution: maxRes, maps };
+}
+
+/**
  * Disposes of all geometries and materials in a 3D object.
  * Useful for cleanup when removing objects from the scene.
  *
@@ -689,6 +740,7 @@ export {
     processMeshMaterials,
     computeMeshFaceCount,
     computeMeshVertexCount,
+    computeTextureInfo,
     disposeObject,
 
     // Markdown parsing

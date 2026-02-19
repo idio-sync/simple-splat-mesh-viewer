@@ -877,6 +877,7 @@
                                 </div>
                             </div>
                         </div>
+                        <div id="display-extended"></div>
                     </div>
 
                     <!-- KIOSK-STRIP-START: metadata edit tab -->
@@ -1704,6 +1705,7 @@
                     <div class="prop-section-body">
                         <div class="prop-row"><span class="prop-row-label">Splat count</span><span class="font-mono" id="splat-vertices" style="font-size:10px; color:var(--text-secondary);">-</span></div>
                         <div class="prop-row"><span class="prop-row-label">Model faces</span><span class="font-mono" id="model-faces" style="font-size:10px; color:var(--text-secondary);">-</span></div>
+                        <div class="prop-row" style="display:none"><span class="prop-row-label">Textures</span><span class="font-mono" id="model-textures" style="font-size:10px; color:var(--text-secondary);">-</span></div>
                         <div class="prop-row"><span class="prop-row-label">Point cloud</span><span class="font-mono" id="pointcloud-points" style="font-size:10px; color:var(--text-secondary);">-</span></div>
                         <div class="prop-row"><span class="prop-row-label">FPS</span><span class="font-mono" id="fps-counter" style="font-size:10px; color:var(--accent-text);">-</span></div>
                     </div>
@@ -1809,6 +1811,23 @@
         </div>
     </div>
     <!-- KIOSK-STRIP-END: annotation creation panel -->
+
+        <!-- Export Validation Dialog -->
+        <div id="export-validation-overlay" class="validation-overlay hidden">
+            <div class="validation-dialog">
+                <div class="validation-header">
+                    <h3>Missing Metadata</h3>
+                </div>
+                <div class="validation-body">
+                    <p class="validation-message">The following fields are empty for your <strong id="validation-profile-name"></strong> profile:</p>
+                    <ul id="validation-missing-list" class="validation-list"></ul>
+                </div>
+                <div class="validation-footer">
+                    <button id="btn-validation-back" class="action-btn">Go Back</button>
+                    <button id="btn-validation-export" class="action-btn secondary">Export Anyway</button>
+                </div>
+            </div>
+        </div>
 
     <script src="pre-module.js"></script>
     <script type="module" src="main.ts"></script>

@@ -17,7 +17,7 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader } from './archive-loader.js';
 import { TIMING, ASSET_STATE } from './constants.js';
-import { Logger, processMeshMaterials, computeMeshFaceCount, computeMeshVertexCount, disposeObject, fetchWithProgress } from './utilities.js';
+import { Logger, processMeshMaterials, computeMeshFaceCount, computeMeshVertexCount, computeTextureInfo, disposeObject, fetchWithProgress } from './utilities.js';
 import type { AppState, QualityTier } from '@/types.js';
 
 // E57Loader is loaded lazily via dynamic import to allow graceful degradation
@@ -167,6 +167,7 @@ interface AssetLoadResult {
 interface ModelLoadResult {
     object: THREE.Object3D;
     faceCount: number;
+    textureInfo?: import('./utilities.js').TextureInfo;
 }
 
 interface PointcloudLoadResult {
@@ -699,6 +700,7 @@ export async function loadModelFromUrl(url: string, deps: LoadModelDeps, onProgr
         // Count faces and vertices
         const faceCount = computeMeshFaceCount(loadedObject);
         state.meshVertexCount = computeMeshVertexCount(loadedObject);
+        state.meshTextureInfo = computeTextureInfo(loadedObject);
 
         // Call callbacks
         if (callbacks?.onModelLoaded) {
@@ -739,8 +741,9 @@ export async function loadModelFromBlobUrl(blobUrl: string, fileName: string, de
 
         // Count faces
         const faceCount = computeMeshFaceCount(loadedObject);
+        const textureInfo = computeTextureInfo(loadedObject);
 
-        return { object: loadedObject, faceCount };
+        return { object: loadedObject, faceCount, textureInfo };
     }
 
     return { object: loadedObject!, faceCount: 0 };

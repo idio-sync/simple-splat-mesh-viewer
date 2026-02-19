@@ -11,7 +11,7 @@ import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader } from './archive-loader.js';
 import { hasAnyProxy } from './quality-tier.js';
 import { TIMING, ASSET_STATE } from './constants.js';
-import { Logger, notify, computeMeshFaceCount, disposeObject } from './utilities.js';
+import { Logger, notify, computeMeshFaceCount, computeTextureInfo, disposeObject } from './utilities.js';
 import { getStore } from './asset-store.js';
 import {
     loadGLTF,
@@ -118,6 +118,16 @@ async function loadModelFromBlobUrl(blobUrl: string, fileName: string, deps: Arc
         const faceCount = computeMeshFaceCount(loadedObject);
         document.getElementById('model-filename')!.textContent = fileName;
         document.getElementById('model-faces')!.textContent = faceCount.toLocaleString();
+
+        const textureInfo = computeTextureInfo(loadedObject);
+        state.meshTextureInfo = textureInfo;
+
+        const texEl = document.getElementById('model-textures');
+        if (texEl && textureInfo.count > 0) {
+            texEl.textContent = `${textureInfo.count} × ${textureInfo.maxResolution}²`;
+            const texRow = texEl.closest('.prop-row') as HTMLElement;
+            if (texRow) texRow.style.display = '';
+        }
     }
 }
 

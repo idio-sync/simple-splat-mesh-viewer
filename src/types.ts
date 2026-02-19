@@ -44,6 +44,7 @@ export interface AppState {
     screenshots: Array<{ id: string; blob: Blob; dataUrl: string; timestamp: number }>;
     manualPreviewBlob: Blob | null;
     meshVertexCount?: number;              // Dynamically set by file-handlers.js after mesh load
+    meshTextureInfo?: import('./modules/utilities.js').TextureInfo;  // Dynamically set after mesh load
     // Allow additional dynamic properties set by JS modules
     [key: string]: any;
 }

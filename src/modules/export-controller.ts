@@ -8,6 +8,7 @@
 import { captureScreenshot } from './archive-creator.js';
 import { Logger, notify } from './utilities.js';
 import { formatFileSize, getActiveProfile } from './metadata-manager.js';
+import { getMissingCriticalFields } from './metadata-profile.js';
 import { getStore } from './asset-store.js';
 import type { ExportDeps } from '@/types.js';
 
@@ -40,6 +41,43 @@ export function updateArchiveAssetCheckboxes(deps: ExportDeps): void {
             el.checked = !!loaded;
             el.disabled = !loaded;
         }
+    });
+}
+
+/**
+ * Show the validation dialog and return true if user chooses to export anyway.
+ */
+function showValidationDialog(missing: Array<{ id: string; label: string }>, profileName: string): Promise<boolean> {
+    return new Promise(resolve => {
+        const overlay = document.getElementById('export-validation-overlay');
+        const list = document.getElementById('validation-missing-list');
+        const profileEl = document.getElementById('validation-profile-name');
+        const backBtn = document.getElementById('btn-validation-back');
+        const exportBtn = document.getElementById('btn-validation-export');
+
+        if (!overlay || !list || !backBtn || !exportBtn) {
+            resolve(true); // If dialog elements missing, proceed with export
+            return;
+        }
+
+        // Populate
+        if (profileEl) profileEl.textContent = profileName;
+        list.innerHTML = missing.map(f => `<li>${f.label}</li>`).join('');
+
+        // Show
+        overlay.classList.remove('hidden');
+
+        const cleanup = () => {
+            overlay.classList.add('hidden');
+            backBtn.removeEventListener('click', onBack);
+            exportBtn.removeEventListener('click', onExport);
+        };
+
+        const onBack = () => { cleanup(); resolve(false); };
+        const onExport = () => { cleanup(); resolve(true); };
+
+        backBtn.addEventListener('click', onBack);
+        exportBtn.addEventListener('click', onExport);
     });
 }
 
@@ -85,6 +123,18 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
         notify.warning('Please enter a project title in the metadata panel before exporting.');
         ui.showMetadataPanel();
         return;
+    }
+
+    // Profile-aware metadata validation
+    const profile = getActiveProfile();
+    const missing = getMissingCriticalFields(profile);
+    if (missing.length > 0) {
+        const profileLabels: Record<string, string> = { basic: 'Basic', standard: 'Standard', archival: 'Archival' };
+        const proceed = await showValidationDialog(missing, profileLabels[profile] || profile);
+        if (!proceed) {
+            ui.showMetadataPanel();
+            return;
+        }
     }
 
     // Apply project info
@@ -283,7 +333,10 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
         splat_file_size: (includeSplat && assets.splatBlob) ? assets.splatBlob.size : 0,
         mesh_file_size: (includeModel && assets.meshBlob) ? assets.meshBlob.size : 0,
         pointcloud_points: (includePointcloud && state.pointcloudLoaded) ? parseInt(document.getElementById('pointcloud-points')?.textContent?.replace(/,/g, '') || '0') || 0 : 0,
-        pointcloud_file_size: (includePointcloud && assets.pointcloudBlob) ? assets.pointcloudBlob.size : 0
+        pointcloud_file_size: (includePointcloud && assets.pointcloudBlob) ? assets.pointcloudBlob.size : 0,
+        texture_count: (includeModel && state.modelLoaded && state.meshTextureInfo) ? state.meshTextureInfo.count : 0,
+        texture_max_resolution: (includeModel && state.modelLoaded && state.meshTextureInfo) ? state.meshTextureInfo.maxResolution : 0,
+        texture_maps: (includeModel && state.modelLoaded && state.meshTextureInfo) ? state.meshTextureInfo.maps : []
     });
 
     // Add preview/thumbnail

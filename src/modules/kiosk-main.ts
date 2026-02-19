@@ -2475,6 +2475,19 @@ function populateDetailedMetadata(manifest: any): void {
             const dq = qm.data_quality;
             Object.keys(dq).forEach(k => addDetailRow(content, k.replace(/_/g, ' '), dq[k]));
         }
+        // Texture info from quality stats
+        const texCount = qm.texture_count || manifest._meta?.quality?.texture_count;
+        const texMaxRes = qm.texture_max_resolution || manifest._meta?.quality?.texture_max_resolution;
+        if (texCount && texCount > 0) {
+            addDetailRow(content, 'Textures', `${texCount} maps, max ${texMaxRes}×${texMaxRes}`);
+        }
+        const texMaps = qm.texture_maps || manifest._meta?.quality?.texture_maps;
+        if (Array.isArray(texMaps) && texMaps.length > 0) {
+            texMaps.forEach((m: any) => {
+                const label = (m.type || '').replace(/([A-Z])/g, ' $1').replace(/^./, (s: string) => s.toUpperCase());
+                addDetailRow(content, `  ${label}`, `${m.width}×${m.height}`);
+            });
+        }
         if (content.children.length > 0) sections.push(section);
     }
 

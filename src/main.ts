@@ -380,6 +380,15 @@ function createFileHandlerDeps(): any {
                 storeLastPositions();
                 assets.meshBlob = file;
                 document.getElementById('model-faces').textContent = (faceCount || 0).toLocaleString();
+                // Update texture info display
+                if (state.meshTextureInfo) {
+                    const texEl = document.getElementById('model-textures');
+                    if (texEl && state.meshTextureInfo.count > 0) {
+                        texEl.textContent = `${state.meshTextureInfo.count} × ${state.meshTextureInfo.maxResolution}²`;
+                        const texRow = texEl.closest('.prop-row') as HTMLElement;
+                        if (texRow) texRow.style.display = '';
+                    }
+                }
                 // Advisory face count warnings
                 if (faceCount > MESH_LOD.DESKTOP_WARNING_FACES) {
                     notify.warning(`Mesh has ${faceCount.toLocaleString()} faces. A display proxy is recommended for broad device support.`);

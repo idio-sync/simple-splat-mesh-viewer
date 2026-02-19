@@ -14,7 +14,7 @@
 import { Logger, parseMarkdown, resolveAssetRefs } from './utilities.js';
 import type { AppState, Annotation } from '@/types.js';
 import type { MetadataProfile } from './metadata-profile.js';
-import { TAB_TIERS, isTierVisible, computeCompleteness } from './metadata-profile.js';
+import { TAB_TIERS, isTierVisible, computeCompleteness, PROFILE_ORDER } from './metadata-profile.js';
 
 const log = Logger.getLogger('metadata-manager');
 
@@ -1976,6 +1976,138 @@ export function populateMetadataDisplay(deps: MetadataDeps = {}): void {
     const statsSection = document.getElementById('display-stats');
     if (statsSection) {
         statsSection.style.display = hasStats ? '' : 'none';
+    }
+
+    // Extended metadata sections (dynamically built from collected data)
+    const extendedContainer = document.getElementById('display-extended');
+    if (extendedContainer) {
+        extendedContainer.replaceChildren();
+        const profile = activeProfile;
+
+        /** Helper: create a detail row (label + value) */
+        function addRow(parent: HTMLElement, label: string, value: string): void {
+            const row = document.createElement('div');
+            row.className = 'display-detail';
+            const labelEl = document.createElement('span');
+            labelEl.className = 'display-label';
+            labelEl.textContent = label;
+            const valueEl = document.createElement('span');
+            valueEl.className = 'display-value';
+            valueEl.textContent = value;
+            row.appendChild(labelEl);
+            row.appendChild(valueEl);
+            parent.appendChild(row);
+        }
+
+        /** Helper: create a collapsible section, returns content div. Returns null if should be hidden by profile. */
+        function addSection(title: string, tier: MetadataProfile): HTMLElement | null {
+            if (PROFILE_ORDER[tier] > PROFILE_ORDER[profile]) return null;
+            const section = document.createElement('div');
+            section.className = 'display-section';
+            const header = document.createElement('div');
+            header.className = 'display-section-header';
+            header.innerHTML = `<span>${title}</span><span class="display-section-chevron">&#9662;</span>`;
+            header.addEventListener('click', () => section.classList.toggle('collapsed'));
+            const content = document.createElement('div');
+            content.className = 'display-section-content';
+            section.appendChild(header);
+            section.appendChild(content);
+            (section as any)._container = extendedContainer;
+            (content as any)._section = section;
+            return content;
+        }
+
+        /** Helper: append section to container only if content div has children */
+        function finalizeSection(content: HTMLElement | null): void {
+            if (!content || content.children.length === 0) return;
+            const section = (content as any)._section as HTMLElement;
+            const container = (section as any)._container as HTMLElement;
+            if (section && container) container.appendChild(section);
+        }
+
+        // --- Quality section (standard tier) ---
+        const qualityContent = addSection('Quality', 'standard');
+        if (qualityContent) {
+            const q = metadata.qualityMetrics;
+            if (q.tier) addRow(qualityContent, 'Tier', q.tier);
+            if (q.accuracyGrade) addRow(qualityContent, 'Accuracy', q.accuracyGrade);
+            if (q.captureResolution?.value) {
+                addRow(qualityContent, 'Resolution', `${q.captureResolution.value} ${q.captureResolution.unit} (${q.captureResolution.type})`);
+            }
+            if (q.alignmentError?.value) {
+                addRow(qualityContent, 'Alignment Error', `${q.alignmentError.value} ${q.alignmentError.unit} (${q.alignmentError.method})`);
+            }
+            if (q.scaleVerification) addRow(qualityContent, 'Scale Verification', q.scaleVerification);
+            // Texture info from mesh state
+            const texInfo = (state as any).meshTextureInfo;
+            if (texInfo && texInfo.count > 0) {
+                addRow(qualityContent, 'Textures', `${texInfo.count} maps, max ${texInfo.maxResolution}²`);
+                for (const m of texInfo.maps) {
+                    const label = (m.type as string).replace(/([A-Z])/g, ' $1').replace(/^./, (s: string) => s.toUpperCase());
+                    addRow(qualityContent, `  ${label}`, `${m.width}×${m.height}`);
+                }
+            }
+            finalizeSection(qualityContent);
+        }
+
+        // --- Processing section (standard tier) ---
+        const processContent = addSection('Processing', 'standard');
+        if (processContent) {
+            const p = metadata.provenance;
+            if (p.deviceSerial) addRow(processContent, 'Device Serial', p.deviceSerial);
+            if (p.operatorOrcid) addRow(processContent, 'ORCID', p.operatorOrcid);
+            if (p.processingSoftware?.length) {
+                const swNames = p.processingSoftware.map((s: any) => s.version ? `${s.name} ${s.version}` : s.name).join(', ');
+                addRow(processContent, 'Software', swNames);
+            }
+            if (p.processingNotes) addRow(processContent, 'Notes', p.processingNotes);
+            if (p.conventions) addRow(processContent, 'Conventions', p.conventions);
+            finalizeSection(processContent);
+        }
+
+        // --- Relationships section (standard tier) ---
+        const relContent = addSection('Relationships', 'standard');
+        if (relContent) {
+            const r = metadata.relationships;
+            if (r.partOf) addRow(relContent, 'Part of', r.partOf);
+            if (r.derivedFrom) addRow(relContent, 'Derived from', r.derivedFrom);
+            if (r.replaces) addRow(relContent, 'Replaces', r.replaces);
+            if (r.relatedObjects?.length) {
+                for (const obj of r.relatedObjects) {
+                    addRow(relContent, obj.title || 'Related', obj.url || obj.description);
+                }
+            }
+            finalizeSection(relContent);
+        }
+
+        // --- Archival Record section (archival tier) ---
+        const archContent = addSection('Archival Record', 'archival');
+        if (archContent) {
+            const a = metadata.archivalRecord;
+            if (a.title) addRow(archContent, 'Title', a.title);
+            if (a.creation?.creator) addRow(archContent, 'Creator', a.creation.creator);
+            if (a.creation?.dateCreated) addRow(archContent, 'Date Created', a.creation.dateCreated);
+            if (a.creation?.period) addRow(archContent, 'Period', a.creation.period);
+            if (a.creation?.culture) addRow(archContent, 'Culture', a.creation.culture);
+            if (a.physicalDescription?.medium) addRow(archContent, 'Medium', a.physicalDescription.medium);
+            if (a.physicalDescription?.condition) addRow(archContent, 'Condition', a.physicalDescription.condition);
+            if (a.provenance) addRow(archContent, 'Provenance', a.provenance);
+            if (a.rights?.copyrightStatus) addRow(archContent, 'Copyright', a.rights.copyrightStatus);
+            if (a.rights?.creditLine) addRow(archContent, 'Credit', a.rights.creditLine);
+            if (a.coverage?.spatial?.locationName) addRow(archContent, 'Location', a.coverage.spatial.locationName);
+            finalizeSection(archContent);
+        }
+
+        // --- Material section (archival tier) ---
+        const matContent = addSection('Material', 'archival');
+        if (matContent) {
+            const m = metadata.materialStandard;
+            if (m.workflow) addRow(matContent, 'Workflow', m.workflow);
+            if (m.colorSpace) addRow(matContent, 'Color Space', m.colorSpace);
+            if (m.normalSpace) addRow(matContent, 'Normal Space', m.normalSpace);
+            if (m.occlusionPacked) addRow(matContent, 'Occlusion Packed', 'Yes');
+            finalizeSection(matContent);
+        }
     }
 }
 

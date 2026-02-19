@@ -314,6 +314,9 @@ export interface QualityStats {
     mesh_file_size?: number;
     pointcloud_points?: number;
     pointcloud_file_size?: number;
+    texture_count?: number;
+    texture_max_resolution?: number;
+    texture_maps?: Array<{ type: string; width: number; height: number }>;
 }
 
 export interface FileInfo {
@@ -1439,6 +1442,9 @@ export class ArchiveCreator {
         if (stats.mesh_file_size !== undefined) this.manifest._meta.quality.mesh_file_size = stats.mesh_file_size;
         if (stats.pointcloud_points !== undefined) this.manifest._meta.quality.pointcloud_points = stats.pointcloud_points;
         if (stats.pointcloud_file_size !== undefined) this.manifest._meta.quality.pointcloud_file_size = stats.pointcloud_file_size;
+        if (stats.texture_count !== undefined) this.manifest._meta.quality.texture_count = stats.texture_count;
+        if (stats.texture_max_resolution !== undefined) this.manifest._meta.quality.texture_max_resolution = stats.texture_max_resolution;
+        if (stats.texture_maps !== undefined) this.manifest._meta.quality.texture_maps = stats.texture_maps;
     }
 
     getQualityStats(): QualityStats {

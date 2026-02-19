@@ -110,6 +110,58 @@ export const COMPLETENESS_FIELDS: Record<string, MetadataProfile> = {
 };
 
 /**
+ * Critical fields per tier — these trigger export warnings when empty.
+ * Maps field IDs to human-readable labels.
+ */
+export const CRITICAL_FIELDS: Record<MetadataProfile, Record<string, string>> = {
+    basic: {
+        'meta-title': 'Title',
+        'meta-operator': 'Creator',
+        'meta-capture-date': 'Capture Date',
+        'meta-description': 'Description',
+    },
+    standard: {
+        'meta-title': 'Title',
+        'meta-operator': 'Creator',
+        'meta-capture-date': 'Capture Date',
+        'meta-description': 'Description',
+        'meta-capture-device': 'Capture Device',
+        'meta-quality-tier': 'Quality Tier',
+        'meta-location': 'Location',
+    },
+    archival: {
+        'meta-title': 'Title',
+        'meta-operator': 'Creator',
+        'meta-capture-date': 'Capture Date',
+        'meta-description': 'Description',
+        'meta-capture-device': 'Capture Device',
+        'meta-quality-tier': 'Quality Tier',
+        'meta-location': 'Location',
+        'meta-archival-title': 'Archival Title',
+        'meta-archival-copyright': 'Copyright Status',
+        'meta-coverage-location': 'Geographic Location',
+    },
+};
+
+/**
+ * Check which critical fields are empty for the given profile.
+ * Returns array of { id, label } for missing fields.
+ */
+export function getMissingCriticalFields(profile: MetadataProfile): Array<{ id: string; label: string }> {
+    const critical = CRITICAL_FIELDS[profile];
+    const missing: Array<{ id: string; label: string }> = [];
+    for (const [id, label] of Object.entries(critical)) {
+        const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+        if (!el) continue;
+        const val = el.value?.trim() ?? '';
+        if (!val || (el instanceof HTMLSelectElement && (val === '' || val === 'Not specified'))) {
+            missing.push({ id, label });
+        }
+    }
+    return missing;
+}
+
+/**
  * Get all field IDs that should count toward completeness for a given profile.
  */
 export function getFieldsForProfile(profile: MetadataProfile): string[] {

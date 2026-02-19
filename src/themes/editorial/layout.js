@@ -97,6 +97,7 @@ function createInfoOverlay(manifest, deps) {
     // Model stats — show geometry info when a mesh is loaded
     if (modelGroup && modelGroup.children.length > 0) {
         let vertexCount = 0, faceCount = 0, meshCount = 0, materialSet = new Set();
+        let textureSet = new Set(), maxTexRes = 0;
         modelGroup.traverse(child => {
             if (child.isMesh && child.geometry) {
                 meshCount++;
@@ -104,9 +105,21 @@ function createInfoOverlay(manifest, deps) {
                 if (geo.attributes.position) vertexCount += geo.attributes.position.count;
                 if (geo.index) faceCount += geo.index.count / 3;
                 else if (geo.attributes.position) faceCount += geo.attributes.position.count / 3;
-                // Count unique materials
+                // Count unique materials and textures
                 const mats = Array.isArray(child.material) ? child.material : [child.material];
-                mats.forEach(m => { if (m) materialSet.add(m); });
+                mats.forEach(m => {
+                    if (m) {
+                        materialSet.add(m);
+                        ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap'].forEach(t => {
+                            const tex = m[t];
+                            if (tex && !textureSet.has(tex)) {
+                                textureSet.add(tex);
+                                const img = tex.image;
+                                if (img && img.width) maxTexRes = Math.max(maxTexRes, img.width, img.height);
+                            }
+                        });
+                    }
+                });
             }
         });
         faceCount = Math.round(faceCount);
@@ -116,6 +129,7 @@ function createInfoOverlay(manifest, deps) {
             parts.push(`${faceCount.toLocaleString()} faces`);
             if (meshCount > 1) parts.push(`${meshCount} meshes`);
             if (materialSet.size > 1) parts.push(`${materialSet.size} materials`);
+            if (textureSet.size > 0) parts.push(`${textureSet.size} textures @ ${maxTexRes}²`);
 
             const statsEl = document.createElement('div');
             statsEl.className = 'editorial-info-model-stats';
