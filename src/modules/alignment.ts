@@ -657,14 +657,24 @@ export class LandmarkAlignment {
 
         // Filter: only accept hits on the current target object
         const targetObj = this._phase === 'anchor' ? this._anchorObj : this._moverObj;
+        const targetType = this._phase === 'anchor' ? this._anchorType : this._moverType;
+
+        log.debug(`[_onClick] Phase: ${this._phase}, target: ${targetType}, isSplatMesh: ${this._isSplatMesh(targetObj || this.splatMesh)}`);
+
         let hit = intersects.find(h => this._isDescendantOf(h.object, targetObj));
 
         // If no hit via standard raycasting and target is a splat mesh, try custom splat raycasting
         if (!hit && targetObj && this._isSplatMesh(targetObj)) {
+            log.debug('[_onClick] No standard raycast hit, trying custom splat raycasting...');
             hit = this._raycastSplatMesh(targetObj);
         }
 
-        if (!hit) return;
+        if (!hit) {
+            log.debug('[_onClick] No hit found');
+            return;
+        }
+
+        log.info(`[_onClick] Hit at [${hit.point.x.toFixed(3)}, ${hit.point.y.toFixed(3)}, ${hit.point.z.toFixed(3)}]`);
 
         const point = hit.point.clone();
 
@@ -733,6 +743,7 @@ export class LandmarkAlignment {
     private _raycastSplatMesh(splatMeshObj: Object3D): { point: Vector3; distance: number } | null {
         const splatMesh = splatMeshObj as SplatMesh;
         if (!splatMesh.packedSplats || typeof splatMesh.packedSplats.forEachSplat !== 'function') {
+            log.warn('[_raycastSplatMesh] No packedSplats or forEachSplat method');
             return null;
         }
 
@@ -744,11 +755,16 @@ export class LandmarkAlignment {
         let closestDistance = Infinity;
 
         const splatCount = (splatMesh.packedSplats as any).splatCount || 0;
-        if (splatCount === 0) return null;
+        if (splatCount === 0) {
+            log.warn('[_raycastSplatMesh] splatCount is 0');
+            return null;
+        }
 
-        // Sample at most 5000 splats for performance (adjust stride)
-        const maxSamples = 5000;
+        // Sample at most 10000 splats for better coverage
+        const maxSamples = 10000;
         const stride = Math.max(1, Math.floor(splatCount / maxSamples));
+
+        log.debug(`[_raycastSplatMesh] Sampling ${splatCount} splats with stride ${stride}`);
 
         splatMesh.packedSplats.forEachSplat((index: number, center: Point3D) => {
             if (index % stride !== 0) return;
@@ -765,14 +781,22 @@ export class LandmarkAlignment {
             }
         });
 
-        // Only accept if within reasonable click tolerance (e.g., 0.5 units in world space)
-        if (closestPoint && closestDistance < 0.5) {
+        // Adaptive tolerance based on camera distance to scene
+        const camToOrigin = this.camera.position.length();
+        const baseTolerance = 0.5;
+        const adaptiveTolerance = Math.max(baseTolerance, camToOrigin * 0.02); // 2% of camera distance
+
+        log.debug(`[_raycastSplatMesh] Closest distance: ${closestDistance.toFixed(3)}, tolerance: ${adaptiveTolerance.toFixed(3)}`);
+
+        if (closestPoint && closestDistance < adaptiveTolerance) {
+            log.info(`[_raycastSplatMesh] Hit! Point: [${closestPoint.x.toFixed(3)}, ${closestPoint.y.toFixed(3)}, ${closestPoint.z.toFixed(3)}]`);
             return {
                 point: closestPoint,
                 distance: ray.origin.distanceTo(closestPoint)
             };
         }
 
+        log.debug('[_raycastSplatMesh] No hit within tolerance');
         return null;
     }
 
