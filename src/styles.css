@@ -2524,6 +2524,36 @@ input[type="range"]::-webkit-slider-thumb:hover {
     transition: border-color 0.2s;
 }
 
+/* Style the date input calendar icon to match theme */
+.metadata-field input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+    filter: invert(1);
+}
+
+.metadata-field input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+}
+
+/* Ensure date input shows full date (day/month/year) */
+.metadata-field input[type="date"] {
+    min-width: 140px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Style the date picker placeholder text */
+.metadata-field input[type="date"]::-webkit-datetime-edit-text,
+.metadata-field input[type="date"]::-webkit-datetime-edit-month-field,
+.metadata-field input[type="date"]::-webkit-datetime-edit-day-field,
+.metadata-field input[type="date"]::-webkit-datetime-edit-year-field {
+    color: var(--text-primary);
+}
+
+.metadata-field input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+}
+
 .metadata-field input:focus,
 .metadata-field textarea:focus,
 .metadata-field select:focus {
