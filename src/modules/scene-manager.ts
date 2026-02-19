@@ -31,7 +31,11 @@ import {
     ToneMapping,
     Vector2,
 } from 'three';
-import { WebGPURenderer } from 'three/webgpu';
+import type { WebGPURenderer } from 'three/webgpu';
+
+// Dynamically loaded when WebGPU is available — prevents Firefox crash
+// (static import of three/webgpu evaluates GPUShaderStage at load time)
+let WebGPURendererClass: typeof WebGPURenderer | null = null;
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
@@ -177,7 +181,7 @@ export class SceneManager {
     private _createRenderer(canvas: HTMLCanvasElement, type: 'webgpu' | 'webgl'): any {
         let newRenderer: any;
         if (type === 'webgpu') {
-            newRenderer = new WebGPURenderer({ canvas, antialias: true });
+            newRenderer = new WebGPURendererClass!({ canvas, antialias: true });
         } else {
             newRenderer = new WebGLRenderer({ canvas, antialias: true });
         }
@@ -210,9 +214,18 @@ export class SceneManager {
         this._canvas = canvas;
         this._canvasRight = canvasRight;
 
-        // Detect WebGPU support
+        // Detect WebGPU support and lazily load the renderer module
         this.webgpuSupported = !!navigator.gpu;
         log.info('WebGPU supported:', this.webgpuSupported);
+        if (this.webgpuSupported && !WebGPURendererClass) {
+            try {
+                const mod = await import('three/webgpu');
+                WebGPURendererClass = mod.WebGPURenderer;
+            } catch (err) {
+                log.warn('Failed to load WebGPU module, falling back to WebGL:', err);
+                this.webgpuSupported = false;
+            }
+        }
 
         // Scene
         this.scene = new Scene();
@@ -359,6 +372,18 @@ export class SceneManager {
         // No-op guards
         if (this.rendererType === target) return;
         if (target === 'webgpu' && !this.webgpuSupported) return;
+
+        // Ensure WebGPU module is loaded if switching to it
+        if (target === 'webgpu' && !WebGPURendererClass) {
+            try {
+                const mod = await import('three/webgpu');
+                WebGPURendererClass = mod.WebGPURenderer;
+            } catch (err) {
+                log.warn('Failed to load WebGPU module:', err);
+                this.webgpuSupported = false;
+                return;
+            }
+        }
 
         log.info(`Switching renderer: ${this.rendererType} -> ${target}`);
 

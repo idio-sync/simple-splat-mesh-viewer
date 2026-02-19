@@ -43,6 +43,10 @@ export interface AppState {
     imageAssets: Map<string, any>;         // Map of asset key → blob URL or metadata
     screenshots: Array<{ id: string; blob: Blob; dataUrl: string; timestamp: number }>;
     manualPreviewBlob: Blob | null;
+    // Detected asset format extensions (set during file load)
+    meshFormat: string | null;
+    pointcloudFormat: string | null;
+    splatFormat: string | null;
     meshVertexCount?: number;              // Dynamically set by file-handlers.js after mesh load
     meshTextureInfo?: import('./modules/utilities.js').TextureInfo;  // Dynamically set after mesh load
     // Allow additional dynamic properties set by JS modules

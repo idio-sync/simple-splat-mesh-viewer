@@ -164,6 +164,19 @@ export function getMissingCriticalFields(profile: MetadataProfile): Array<{ id: 
     return missing;
 }
 
+/** PRONOM format registry — maps file extensions to PUIDs and human-readable names. */
+export const PRONOM_REGISTRY: Record<string, { puid: string; name: string }> = {
+    'glb':    { puid: 'fmt/861', name: 'glTF Binary' },
+    'gltf':   { puid: 'fmt/860', name: 'glTF' },
+    'obj':    { puid: 'fmt/935', name: 'Wavefront OBJ' },
+    'ply':    { puid: 'fmt/831', name: 'Stanford PLY' },
+    'e57':    { puid: 'fmt/643', name: 'ASTM E57' },
+    'stl':    { puid: 'fmt/865', name: 'STL (Stereolithography)' },
+    'splat':  { puid: '', name: 'Gaussian Splat' },
+    'ksplat': { puid: '', name: 'Gaussian Splat (compressed)' },
+    'spz':    { puid: '', name: 'Gaussian Splat (compressed)' },
+};
+
 /**
  * Get all field IDs that should count toward completeness for a given profile.
  */

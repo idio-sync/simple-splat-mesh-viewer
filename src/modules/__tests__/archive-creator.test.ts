@@ -34,12 +34,9 @@ describe('ArchiveCreator', () => {
             expect(creator.manifest.annotations).toEqual([]);
         });
 
-        it('has correct default preservation format registry with PRONOM IDs', () => {
+        it('has correct default preservation format registry', () => {
             const registry = creator.manifest.preservation.format_registry;
-            expect(registry.glb).toBe('fmt/861');
-            expect(registry.obj).toBe('fmt/935');
-            expect(registry.ply).toBe('fmt/831');
-            expect(registry.e57).toBe('fmt/643');
+            expect(registry).toEqual({});
         });
     });
 

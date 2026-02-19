@@ -22,6 +22,7 @@ import {
     getPrimaryAssetType
 } from './file-handlers.js';
 import { centerModelOnGrid } from './alignment.js';
+import { updatePronomRegistry } from './metadata-manager.js';
 import type { ArchivePipelineDeps } from '@/types.js';
 
 const log = Logger.getLogger('archive-pipeline');
@@ -300,7 +301,10 @@ export async function ensureAssetLoaded(assetType: string, deps: ArchivePipeline
                 currentSplat.scale.setScalar(transform.scale);
             }
             assets.splatBlob = splatData.blob;
+            // Detect splat format from archive filename
+            state.splatFormat = sceneEntry.file_name.split('.').pop()?.toLowerCase() || 'splat';
             state.assetStates[assetType] = ASSET_STATE.LOADED;
+            updatePronomRegistry(state);
             return true;
 
         } else if (assetType === 'mesh') {
@@ -342,7 +346,10 @@ export async function ensureAssetLoaded(assetType: string, deps: ArchivePipeline
             } else {
                 assets.meshBlob = meshData.blob;
             }
+            // Detect mesh format from archive filename
+            state.meshFormat = meshEntry.file_name.split('.').pop()?.toLowerCase() || 'glb';
             state.assetStates[assetType] = ASSET_STATE.LOADED;
+            updatePronomRegistry(state);
             return true;
 
         } else if (assetType === 'pointcloud') {
@@ -368,7 +375,10 @@ export async function ensureAssetLoaded(assetType: string, deps: ArchivePipeline
             document.getElementById('pointcloud-filename')!.textContent = pointcloudEntry.file_name.split('/').pop()!;
             document.getElementById('pointcloud-points')!.textContent = result.pointCount.toLocaleString();
             assets.pointcloudBlob = pcData.blob;
+            // Detect point cloud format from archive filename
+            state.pointcloudFormat = pointcloudEntry.file_name.split('.').pop()?.toLowerCase() || 'e57';
             state.assetStates[assetType] = ASSET_STATE.LOADED;
+            updatePronomRegistry(state);
             return true;
         }
 

@@ -133,12 +133,7 @@ export interface Relationships {
 }
 
 export interface Preservation {
-    formatRegistry?: {
-        glb?: string;
-        obj?: string;
-        ply?: string;
-        e57?: string;
-    };
+    formatRegistry?: Record<string, string>;
     significantProperties?: string[];
     renderingRequirements?: string;
     renderingNotes?: string;
@@ -279,12 +274,7 @@ export interface Manifest {
         annotations_visible: boolean;
     };
     preservation: {
-        format_registry: {
-            glb: string;
-            obj: string;
-            ply: string;
-            e57: string;
-        };
+        format_registry: Record<string, string>;
         significant_properties: string[];
         rendering_requirements: string;
         rendering_notes: string;
@@ -632,12 +622,7 @@ export class ArchiveCreator {
                 annotations_visible: true,
             },
             preservation: {
-                format_registry: {
-                    glb: "fmt/861",
-                    obj: "fmt/935",
-                    ply: "fmt/831",
-                    e57: "fmt/643"
-                },
+                format_registry: {},
                 significant_properties: [],
                 rendering_requirements: "",
                 rendering_notes: ""
@@ -1127,18 +1112,7 @@ export class ArchiveCreator {
         if (!preservation) return;
 
         if (preservation.formatRegistry) {
-            if (preservation.formatRegistry.glb !== undefined) {
-                this.manifest.preservation.format_registry.glb = preservation.formatRegistry.glb;
-            }
-            if (preservation.formatRegistry.obj !== undefined) {
-                this.manifest.preservation.format_registry.obj = preservation.formatRegistry.obj;
-            }
-            if (preservation.formatRegistry.ply !== undefined) {
-                this.manifest.preservation.format_registry.ply = preservation.formatRegistry.ply;
-            }
-            if (preservation.formatRegistry.e57 !== undefined) {
-                this.manifest.preservation.format_registry.e57 = preservation.formatRegistry.e57;
-            }
+            Object.assign(this.manifest.preservation.format_registry, preservation.formatRegistry);
         }
 
         if (preservation.significantProperties !== undefined) {

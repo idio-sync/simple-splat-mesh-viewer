@@ -14,7 +14,7 @@
 import { Logger, parseMarkdown, resolveAssetRefs } from './utilities.js';
 import type { AppState, Annotation } from '@/types.js';
 import type { MetadataProfile } from './metadata-profile.js';
-import { TAB_TIERS, isTierVisible, computeCompleteness, PROFILE_ORDER } from './metadata-profile.js';
+import { TAB_TIERS, isTierVisible, computeCompleteness, PROFILE_ORDER, PRONOM_REGISTRY } from './metadata-profile.js';
 
 const log = Logger.getLogger('metadata-manager');
 
@@ -156,12 +156,7 @@ export interface MetadataMaterialStandard {
 }
 
 export interface MetadataPreservation {
-    formatRegistry: {
-        glb: string;
-        obj: string;
-        ply: string;
-        e57: string;
-    };
+    formatRegistry: Record<string, string>;
     significantProperties: string[];
     renderingRequirements: string;
     renderingNotes: string;
@@ -969,26 +964,6 @@ const VALIDATION_RULES: Record<string, ValidationRule> = {
         message: 'Invalid date format',
         emptyOk: true
     },
-    'meta-pres-format-glb': {
-        pattern: /^fmt\/\d+$/,
-        message: 'PRONOM ID must be in format fmt/NNN',
-        emptyOk: true
-    },
-    'meta-pres-format-obj': {
-        pattern: /^fmt\/\d+$/,
-        message: 'PRONOM ID must be in format fmt/NNN',
-        emptyOk: true
-    },
-    'meta-pres-format-ply': {
-        pattern: /^fmt\/\d+$/,
-        message: 'PRONOM ID must be in format fmt/NNN',
-        emptyOk: true
-    },
-    'meta-pres-format-e57': {
-        pattern: /^fmt\/\d+$/,
-        message: 'PRONOM ID must be in format fmt/NNN',
-        emptyOk: true
-    }
 };
 
 /**
@@ -1195,12 +1170,21 @@ export function collectMetadata(): CollectedMetadata {
             normalSpace: (document.getElementById('meta-material-normalspace') as HTMLSelectElement)?.value || ''
         },
         preservation: {
-            formatRegistry: {
-                glb: (document.getElementById('meta-pres-format-glb') as HTMLInputElement)?.value || 'fmt/861',
-                obj: (document.getElementById('meta-pres-format-obj') as HTMLInputElement)?.value || 'fmt/935',
-                ply: (document.getElementById('meta-pres-format-ply') as HTMLInputElement)?.value || 'fmt/831',
-                e57: (document.getElementById('meta-pres-format-e57') as HTMLInputElement)?.value || 'fmt/643'
-            },
+            formatRegistry: (() => {
+                const registry: Record<string, string> = {};
+                const container = document.getElementById('pronom-registry-fields');
+                if (container) {
+                    const inputs = container.querySelectorAll('input[id^="meta-pres-format-"]');
+                    inputs.forEach((input: Element) => {
+                        const el = input as HTMLInputElement;
+                        const ext = el.id.replace('meta-pres-format-', '');
+                        if (el.value && el.value !== 'Not registered') {
+                            registry[ext] = el.value;
+                        }
+                    });
+                }
+                return registry;
+            })(),
             significantProperties: [],
             renderingRequirements: (document.getElementById('meta-pres-render-req') as HTMLTextAreaElement)?.value || '',
             renderingNotes: (document.getElementById('meta-pres-render-notes') as HTMLTextAreaElement)?.value || ''
@@ -1603,15 +1587,12 @@ export function prefillMetadataFromArchive(manifest: any): void {
         const pres = manifest.preservation;
 
         if (pres.format_registry) {
-            const formatFields: Record<string, any> = {
-                'meta-pres-format-glb': pres.format_registry.glb,
-                'meta-pres-format-obj': pres.format_registry.obj,
-                'meta-pres-format-ply': pres.format_registry.ply,
-                'meta-pres-format-e57': pres.format_registry.e57
-            };
-            for (const [id, value] of Object.entries(formatFields)) {
-                const el = document.getElementById(id) as HTMLInputElement | null;
-                if (el && value) el.value = value;
+            // Format registry is populated dynamically by updatePronomRegistry()
+            // after assets are loaded. For archives, set format fields for any
+            // entries already present in the dynamic container.
+            for (const [ext, puid] of Object.entries(pres.format_registry)) {
+                const el = document.getElementById(`meta-pres-format-${ext}`) as HTMLInputElement | null;
+                if (el && puid) el.value = puid as string;
             }
         }
 
@@ -2163,6 +2144,66 @@ export function updateArchiveMetadataUI(manifest: any, archiveLoader: any): void
             div.appendChild(fileSpan);
             entriesContainer.appendChild(div);
         });
+    }
+}
+
+/**
+ * Update the PRONOM format registry display based on detected asset formats.
+ * Dynamically creates fields for each loaded format with its PUID.
+ */
+export function updatePronomRegistry(state: { meshFormat: string | null; pointcloudFormat: string | null; splatFormat: string | null; stlLoaded?: boolean }): void {
+    const container = document.getElementById('pronom-registry-fields');
+    if (!container) return;
+
+    // Collect detected formats (extension → asset type label)
+    const detected: Array<{ ext: string; label: string }> = [];
+
+    if (state.splatFormat) {
+        detected.push({ ext: state.splatFormat, label: 'Splat' });
+    }
+    if (state.meshFormat) {
+        detected.push({ ext: state.meshFormat, label: 'Mesh' });
+    }
+    if (state.pointcloudFormat) {
+        detected.push({ ext: state.pointcloudFormat, label: 'Point Cloud' });
+    }
+    if (state.stlLoaded) {
+        detected.push({ ext: 'stl', label: 'STL' });
+    }
+
+    if (detected.length === 0) {
+        container.innerHTML = '<span class="field-hint" style="display: block; margin-bottom: 8px; font-style: italic;">Load assets to auto-detect format identifiers</span>';
+        return;
+    }
+
+    container.innerHTML = '';
+    for (const { ext, label } of detected) {
+        const entry = PRONOM_REGISTRY[ext];
+        if (!entry) continue;
+
+        const field = document.createElement('div');
+        field.className = 'metadata-field';
+
+        const labelEl = document.createElement('label');
+        labelEl.textContent = `${label} Format ID`;
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.readOnly = true;
+        input.id = `meta-pres-format-${ext}`;
+        input.value = entry.puid || 'Not registered';
+        input.placeholder = entry.puid || 'No PRONOM PUID';
+
+        const hint = document.createElement('span');
+        hint.className = 'field-hint';
+        hint.textContent = entry.puid
+            ? `PRONOM identifier for ${entry.name}`
+            : `${entry.name} — not yet registered in PRONOM`;
+
+        field.appendChild(labelEl);
+        field.appendChild(input);
+        field.appendChild(hint);
+        container.appendChild(field);
     }
 }
 

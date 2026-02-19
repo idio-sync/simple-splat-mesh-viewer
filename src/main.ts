@@ -53,7 +53,8 @@ import {
     updateAnnotationPopupPosition as updateAnnotationPopupPositionHandler,
     hideAnnotationPopup as hideAnnotationPopupHandler,
     setupMetadataSidebar as setupMetadataSidebarHandler,
-    prefillMetadataFromArchive as prefillMetadataFromArchiveHandler
+    prefillMetadataFromArchive as prefillMetadataFromArchiveHandler,
+    updatePronomRegistry
 } from './modules/metadata-manager.js';
 import {
     loadSplatFromFile as loadSplatFromFileHandler,
@@ -265,7 +266,11 @@ const state: AppState = {
     imageAssets: new Map(),
     // Screenshot captures for archive export
     screenshots: [],          // Array of { id, blob, dataUrl, timestamp }
-    manualPreviewBlob: null   // If set, overrides auto-capture during export
+    manualPreviewBlob: null,  // If set, overrides auto-capture during export
+    // Detected asset format extensions (set during file load)
+    meshFormat: null,
+    pointcloudFormat: null,
+    splatFormat: null
 };
 
 // Scene manager instance (handles scene, camera, renderer, controls, lighting)
@@ -349,6 +354,10 @@ function createFileHandlerDeps(): any {
         archiveCreator,
         callbacks: {
             onSplatLoaded: (mesh: any, file: any) => {
+                // Detect splat format from filename
+                const splatName = file?.name || '';
+                const splatExt = splatName.split('.').pop()?.toLowerCase() || 'splat';
+                state.splatFormat = splatExt;
                 // Auto-switch display mode to show the newly loaded splat
                 if (state.modelLoaded && state.displayMode === 'model') {
                     setDisplayMode('both');
@@ -365,8 +374,13 @@ function createFileHandlerDeps(): any {
                     setTimeout(() => autoCenterAlign(), TIMING.AUTO_ALIGN_DELAY);
                 }
                 clearArchiveMetadata();
+                updatePronomRegistry(state);
             },
             onModelLoaded: (object: any, file: any, faceCount: number) => {
+                // Detect mesh format from filename
+                const meshName = file?.name || '';
+                const meshExt = meshName.split('.').pop()?.toLowerCase() || 'glb';
+                state.meshFormat = meshExt;
                 // Auto-switch display mode to show the newly loaded model
                 if (state.splatLoaded && state.displayMode === 'splat') {
                     setDisplayMode('both');
@@ -403,6 +417,7 @@ function createFileHandlerDeps(): any {
                     setTimeout(() => centerModelOnGrid(modelGroup), TIMING.AUTO_ALIGN_DELAY);
                 }
                 clearArchiveMetadata();
+                updatePronomRegistry(state);
             },
             onSTLLoaded: (object: any, file: any, _faceCount: number) => {
                 // Switch to STL display mode
@@ -414,6 +429,7 @@ function createFileHandlerDeps(): any {
                 if (filenameEl) filenameEl.textContent = file.name || 'STL loaded';
                 // Center STL on grid
                 setTimeout(() => centerModelOnGrid(stlGroup), TIMING.AUTO_ALIGN_DELAY);
+                updatePronomRegistry(state);
             }
         }
     };
@@ -1402,6 +1418,10 @@ function createPointcloudDeps(): any {
         archiveCreator,
         callbacks: {
             onPointcloudLoaded: (object: any, file: any, pointCount: number, blob: Blob) => {
+                // Detect point cloud format from filename
+                const pcName = typeof file === 'string' ? file : (file?.name || '');
+                const pcExt = pcName.split('.').pop()?.toLowerCase() || 'e57';
+                state.pointcloudFormat = pcExt;
                 assets.pointcloudBlob = blob;
                 updateVisibility();
                 updateTransformInputs();
@@ -1411,6 +1431,7 @@ function createPointcloudDeps(): any {
                 const fileName = file.name || file;
                 document.getElementById('pointcloud-filename').textContent = fileName;
                 document.getElementById('pointcloud-points').textContent = pointCount.toLocaleString();
+                updatePronomRegistry(state);
             }
         }
     };
