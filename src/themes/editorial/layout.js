@@ -206,13 +206,13 @@ function createInfoOverlay(manifest, deps) {
 
     // 1. Capture details
     const captureDetails = [];
-    const captureDate = manifest?.date || manifest?.provenance?.capture_date || manifest?.archival_record?.creation?.date;
+    const captureDate = manifest?.date || manifest?.provenance?.capture_date;
     if (captureDate) captureDetails.push({ label: 'Date', value: formatDate(captureDate) || captureDate });
     if (manifest?.provenance?.capture_device) captureDetails.push({ label: 'Device', value: manifest.provenance.capture_device });
     if (manifest?.provenance?.device_serial) captureDetails.push({ label: 'Serial', value: manifest.provenance.device_serial });
-    const operator = manifest?.creator || manifest?.provenance?.operator || manifest?.archival_record?.creation?.creator;
+    const operator = manifest?.creator || manifest?.provenance?.operator;
     if (operator) captureDetails.push({ label: 'Operator', value: operator });
-    const captureLocation = manifest?.location || manifest?.provenance?.location || manifest?.archival_record?.creation?.place;
+    const captureLocation = manifest?.location || manifest?.provenance?.location;
     if (captureLocation) captureDetails.push({ label: 'Location', value: captureLocation });
     if (manifest?.provenance?.operator_orcid) captureDetails.push({ label: 'ORCID', value: manifest.provenance.operator_orcid });
     if (shouldShow('Capture')) addSection('Capture', captureDetails);

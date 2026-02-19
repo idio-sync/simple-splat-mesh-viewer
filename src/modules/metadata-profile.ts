@@ -100,6 +100,9 @@ export const COMPLETENESS_FIELDS: Record<string, MetadataProfile> = {
     'meta-coverage-location':       'archival',
     'meta-coverage-lat':            'archival',
     'meta-coverage-lon':            'archival',
+    'meta-archival-condition':      'archival',
+    'meta-archival-credit':         'archival',
+    'meta-archival-context-desc':   'archival',
 
     // Material tab (archival)
     'meta-material-workflow':       'archival',
@@ -116,30 +119,30 @@ export const COMPLETENESS_FIELDS: Record<string, MetadataProfile> = {
 export const CRITICAL_FIELDS: Record<MetadataProfile, Record<string, string>> = {
     basic: {
         'meta-title': 'Title',
-        'meta-operator': 'Creator',
+        'meta-operator': 'Scan Operator',
         'meta-capture-date': 'Capture Date',
         'meta-description': 'Description',
     },
     standard: {
         'meta-title': 'Title',
-        'meta-operator': 'Creator',
+        'meta-operator': 'Scan Operator',
         'meta-capture-date': 'Capture Date',
         'meta-description': 'Description',
         'meta-capture-device': 'Capture Device',
         'meta-quality-tier': 'Quality Tier',
-        'meta-location': 'Location',
+        'meta-location': 'Scan Location',
     },
     archival: {
         'meta-title': 'Title',
-        'meta-operator': 'Creator',
+        'meta-operator': 'Scan Operator',
         'meta-capture-date': 'Capture Date',
         'meta-description': 'Description',
         'meta-capture-device': 'Capture Device',
         'meta-quality-tier': 'Quality Tier',
-        'meta-location': 'Location',
-        'meta-archival-title': 'Archival Title',
-        'meta-archival-copyright': 'Copyright Status',
-        'meta-coverage-location': 'Geographic Location',
+        'meta-location': 'Scan Location',
+        'meta-archival-title': 'Catalog Title',
+        'meta-archival-copyright': 'Original Object Copyright',
+        'meta-coverage-location': 'Subject Location',
     },
 };
 

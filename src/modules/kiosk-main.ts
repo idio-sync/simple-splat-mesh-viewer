@@ -2541,8 +2541,9 @@ function populateDetailedMetadata(manifest: any): void {
         if (hasValue(ar.creation)) {
             const c = ar.creation;
             addDetailRow(content, 'Creator', c.creator);
-            addDetailRow(content, 'Date', c.date);
-            addDetailRow(content, 'Place', c.place);
+            addDetailRow(content, 'Date', c.date_created);
+            addDetailRow(content, 'Period', c.period);
+            addDetailRow(content, 'Culture', c.culture);
         }
         if (hasValue(ar.physical_description)) {
             const pd = ar.physical_description;
@@ -2551,8 +2552,8 @@ function populateDetailedMetadata(manifest: any): void {
         addDetailRow(content, 'Provenance', ar.provenance);
         if (hasValue(ar.rights)) {
             const r = ar.rights;
-            addDetailRow(content, 'Rights', r.statement || r.license);
-            addDetailRow(content, 'Holder', r.holder);
+            addDetailRow(content, 'Copyright', r.copyright_status);
+            addDetailRow(content, 'Credit', r.credit_line);
         }
         if (hasValue(ar.context)) {
             const ctx = ar.context;

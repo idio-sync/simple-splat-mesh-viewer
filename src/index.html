@@ -935,7 +935,7 @@
                                 <small class="field-hint">Separate tags with commas</small>
                             </div>
                             <div class="metadata-field">
-                                <label for="meta-license">License</label>
+                                <label for="meta-license">Scan Data License</label>
                                 <select id="meta-license">
                                     <option value="CC0">CC0 Public Domain</option>
                                     <option value="CC-BY 4.0">CC-BY 4.0</option>
@@ -990,8 +990,8 @@
                                 <input type="text" id="meta-device-serial" placeholder="e.g., AL-2024-0847">
                             </div>
                             <div class="metadata-field">
-                                <label for="meta-operator">Operator / Creator</label>
-                                <input type="text" id="meta-operator" placeholder="Name or organization">
+                                <label for="meta-operator">Scan Operator</label>
+                                <input type="text" id="meta-operator" placeholder="Person or company who performed the scan">
                             </div>
                             <div class="metadata-field" data-tier="standard">
                                 <label for="meta-operator-orcid">Operator ORCID</label>
@@ -999,8 +999,8 @@
                                 <span class="field-hint">ORCID identifier for attribution</span>
                             </div>
                             <div class="metadata-field">
-                                <label for="meta-location">Capture Location</label>
-                                <input type="text" id="meta-location" placeholder="Where the capture was made">
+                                <label for="meta-location">Scan Location</label>
+                                <input type="text" id="meta-location" placeholder="Where the scan was performed (e.g., on-site, studio)">
                             </div>
 
                             <div data-tier="standard">
@@ -1044,8 +1044,8 @@
                                 <input type="text" id="meta-archival-standard" value="Smithsonian EDAN / Dublin Core" placeholder="Dublin Core, etc.">
                             </div>
                             <div class="metadata-field">
-                                <label for="meta-archival-title">Object Title</label>
-                                <input type="text" id="meta-archival-title" placeholder="Official title of the object">
+                                <label for="meta-archival-title">Catalog Title</label>
+                                <input type="text" id="meta-archival-title" placeholder="Formal/institutional title (if different from project title)">
                             </div>
                             <div class="metadata-field">
                                 <label for="meta-archival-alt-titles">Alternate Titles</label>
@@ -1106,11 +1106,11 @@
 
                             <div class="subsection-header">Provenance &amp; Rights</div>
                             <div class="metadata-field">
-                                <label for="meta-archival-provenance">Provenance</label>
-                                <textarea id="meta-archival-provenance" rows="3" placeholder="Ownership and custody history..."></textarea>
+                                <label for="meta-archival-provenance">Ownership History</label>
+                                <textarea id="meta-archival-provenance" rows="3" placeholder="Ownership and custody chain (e.g., Collection of Dr. Smith, 1920-1960)..."></textarea>
                             </div>
                             <div class="metadata-field">
-                                <label for="meta-archival-copyright">Copyright Status</label>
+                                <label for="meta-archival-copyright">Original Object Copyright</label>
                                 <select id="meta-archival-copyright">
                                     <option value="">Not specified</option>
                                     <option value="Public Domain">Public Domain</option>
@@ -1138,8 +1138,8 @@
 
                             <div class="subsection-header">Geographic Coverage</div>
                             <div class="metadata-field">
-                                <label for="meta-coverage-location">Location Name</label>
-                                <input type="text" id="meta-coverage-location" placeholder="e.g., Lincoln Memorial, Washington DC">
+                                <label for="meta-coverage-location">Subject Location</label>
+                                <input type="text" id="meta-coverage-location" placeholder="Where the subject is/was located (e.g., Lincoln Memorial, Washington DC)">
                             </div>
                             <div class="metadata-field">
                                 <label>Coordinates</label>
@@ -1413,22 +1413,22 @@
                             <div class="subsection-header">Format Registry (PRONOM)</div>
                             <div class="metadata-field">
                                 <label for="meta-pres-format-glb">GLB Format ID</label>
-                                <input type="text" id="meta-pres-format-glb" value="fmt/861" placeholder="fmt/861">
+                                <input type="text" id="meta-pres-format-glb" value="fmt/861" placeholder="fmt/861" readonly>
                                 <span class="field-hint">PRONOM identifier for glTF Binary</span>
                             </div>
                             <div class="metadata-field">
                                 <label for="meta-pres-format-obj">OBJ Format ID</label>
-                                <input type="text" id="meta-pres-format-obj" value="fmt/935" placeholder="fmt/935">
+                                <input type="text" id="meta-pres-format-obj" value="fmt/935" placeholder="fmt/935" readonly>
                                 <span class="field-hint">PRONOM identifier for Wavefront OBJ</span>
                             </div>
                             <div class="metadata-field">
                                 <label for="meta-pres-format-ply">PLY Format ID</label>
-                                <input type="text" id="meta-pres-format-ply" value="fmt/831" placeholder="fmt/831">
+                                <input type="text" id="meta-pres-format-ply" value="fmt/831" placeholder="fmt/831" readonly>
                                 <span class="field-hint">PRONOM identifier for Stanford PLY</span>
                             </div>
                             <div class="metadata-field">
                                 <label for="meta-pres-format-e57">E57 Format ID</label>
-                                <input type="text" id="meta-pres-format-e57" value="fmt/643" placeholder="fmt/643">
+                                <input type="text" id="meta-pres-format-e57" value="fmt/643" placeholder="fmt/643" readonly>
                                 <span class="field-hint">PRONOM identifier for ASTM E57</span>
                             </div>
 
