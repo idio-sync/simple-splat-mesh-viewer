@@ -659,18 +659,18 @@ export class LandmarkAlignment {
         const targetObj = this._phase === 'anchor' ? this._anchorObj : this._moverObj;
         const targetType = this._phase === 'anchor' ? this._anchorType : this._moverType;
 
-        log.debug(`[_onClick] Phase: ${this._phase}, target: ${targetType}, isSplatMesh: ${this._isSplatMesh(targetObj || this.splatMesh)}`);
+        log.info(`[_onClick] Phase: ${this._phase}, target: ${targetType}, isSplatMesh: ${this._isSplatMesh(targetObj || this.splatMesh)}`);
 
         let hit = intersects.find(h => this._isDescendantOf(h.object, targetObj));
 
         // If no hit via standard raycasting and target is a splat mesh, try custom splat raycasting
         if (!hit && targetObj && this._isSplatMesh(targetObj)) {
-            log.debug('[_onClick] No standard raycast hit, trying custom splat raycasting...');
+            log.info('[_onClick] No standard raycast hit, trying custom splat raycasting...');
             hit = this._raycastSplatMesh(targetObj);
         }
 
         if (!hit) {
-            log.debug('[_onClick] No hit found');
+            log.info('[_onClick] No hit found');
             return;
         }
 
@@ -764,7 +764,7 @@ export class LandmarkAlignment {
         const maxSamples = 10000;
         const stride = Math.max(1, Math.floor(splatCount / maxSamples));
 
-        log.debug(`[_raycastSplatMesh] Sampling ${splatCount} splats with stride ${stride}`);
+        log.info(`[_raycastSplatMesh] Sampling ${splatCount} splats with stride ${stride}`);
 
         splatMesh.packedSplats.forEachSplat((index: number, center: Point3D) => {
             if (index % stride !== 0) return;
@@ -786,7 +786,7 @@ export class LandmarkAlignment {
         const baseTolerance = 0.5;
         const adaptiveTolerance = Math.max(baseTolerance, camToOrigin * 0.02); // 2% of camera distance
 
-        log.debug(`[_raycastSplatMesh] Closest distance: ${closestDistance.toFixed(3)}, tolerance: ${adaptiveTolerance.toFixed(3)}`);
+        log.info(`[_raycastSplatMesh] Closest distance: ${closestDistance.toFixed(3)}, tolerance: ${adaptiveTolerance.toFixed(3)}`);
 
         if (closestPoint && closestDistance < adaptiveTolerance) {
             log.info(`[_raycastSplatMesh] Hit! Point: [${closestPoint.x.toFixed(3)}, ${closestPoint.y.toFixed(3)}, ${closestPoint.z.toFixed(3)}]`);
@@ -796,7 +796,7 @@ export class LandmarkAlignment {
             };
         }
 
-        log.debug('[_raycastSplatMesh] No hit within tolerance');
+        log.info('[_raycastSplatMesh] No hit within tolerance');
         return null;
     }
 
