@@ -648,6 +648,8 @@ async function loadDirectFilesFromUrls(config: AppConfig): Promise<void> {
                 if (alignment.splat.position) splatMesh.position.fromArray(alignment.splat.position);
                 if (alignment.splat.rotation) splatMesh.rotation.set(...alignment.splat.rotation as [number, number, number]);
                 if (alignment.splat.scale != null) splatMesh.scale.setScalar(alignment.splat.scale);
+                // Force matrix world update after transforms
+                splatMesh.updateMatrixWorld(true);
             }
             if (alignment.model && modelGroup) {
                 if (alignment.model.position) modelGroup.position.fromArray(alignment.model.position);
@@ -940,6 +942,12 @@ async function handleArchiveFile(file: File): Promise<void> {
         const glContext = renderer ? renderer.getContext() : null;
         state.qualityResolved = resolveQualityTier(state.qualityTier, glContext);
         log.info('Quality tier resolved:', state.qualityResolved);
+
+        // Switch to WebGL BEFORE loading if archive contains splat (Spark.js requires WebGL)
+        // This avoids renderer switching mid-load which can cause rendering corruption
+        if (contentInfo.hasSplat && sceneManager) {
+            await sceneManager.ensureWebGLRenderer();
+        }
 
         // Show branded loading screen with thumbnail, title, and content types
         await showBrandedLoading(archiveLoader);
@@ -1325,6 +1333,8 @@ function createArchiveDeps(): any {
                 if (transform.scale != null) {
                     splatMesh.scale.setScalar(transform.scale);
                 }
+                // Force matrix world update after transforms
+                splatMesh.updateMatrixWorld(true);
             },
             onApplyModelTransform: (transform) => {
                 if (!modelGroup || !transform) return;
@@ -1401,9 +1411,66 @@ function createDisplayModeDeps(): any {
             const showSplat = state.displayMode === 'splat' || state.displayMode === 'both' || state.displayMode === 'split';
             const showModel = state.displayMode === 'model' || state.displayMode === 'both' || state.displayMode === 'split';
             const showPointcloud = state.displayMode === 'pointcloud' || state.displayMode === 'both' || state.displayMode === 'split';
-            if (splatMesh) splatMesh.visible = showSplat;
-            if (modelGroup) modelGroup.visible = showModel;
-            if (pointcloudGroup) pointcloudGroup.visible = showPointcloud;
+
+            // Helper to set opacity on all materials in an object
+            const setOpacity = (obj: any, opacity: number) => {
+                obj.traverse((child: any) => {
+                    if (child.material) {
+                        const mats = Array.isArray(child.material) ? child.material : [child.material];
+                        mats.forEach((m: any) => {
+                            m.transparent = true;
+                            m.opacity = opacity;
+                            m.needsUpdate = true;
+                        });
+                    }
+                });
+            };
+
+            // Helper to animate fade-in for regular meshes
+            const fadeIn = (obj: any, duration: number = 500) => {
+                obj.visible = true;
+                setOpacity(obj, 0);
+                const startTime = performance.now();
+                const animate = () => {
+                    const elapsed = performance.now() - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    setOpacity(obj, progress);
+                    if (progress < 1) requestAnimationFrame(animate);
+                };
+                animate();
+            };
+
+            // Helper to animate fade-in for SplatMesh (uses .opacity property)
+            const fadeInSplat = (splat: any, duration: number = 500) => {
+                splat.visible = true;
+                splat.opacity = 0;
+                const startTime = performance.now();
+                const animate = () => {
+                    const elapsed = performance.now() - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    splat.opacity = progress;
+                    if (progress < 1) requestAnimationFrame(animate);
+                };
+                animate();
+            };
+
+            // Splat: instant hide, fade-in show (uses SplatMesh.opacity property)
+            if (splatMesh) {
+                if (showSplat && !splatMesh.visible) fadeInSplat(splatMesh);
+                else if (!showSplat) splatMesh.visible = false;
+            }
+
+            // Model: instant hide, fade-in show
+            if (modelGroup) {
+                if (showModel && !modelGroup.visible) fadeIn(modelGroup);
+                else if (!showModel) modelGroup.visible = false;
+            }
+
+            // Pointcloud: instant hide, fade-in show
+            if (pointcloudGroup) {
+                if (showPointcloud && !pointcloudGroup.visible) fadeIn(pointcloudGroup);
+                else if (!showPointcloud) pointcloudGroup.visible = false;
+            }
         }
     };
 }
@@ -2247,8 +2314,19 @@ function fitCameraToScene(): void {
     let hasContent = false;
 
     if (splatMesh && splatMesh.visible) {
-        box.expandByObject(splatMesh);
-        hasContent = true;
+        // Use SplatMesh.getBoundingBox() instead of expandByObject()
+        // expandByObject() doesn't work correctly with Spark.js SplatMesh
+        if (typeof splatMesh.getBoundingBox === 'function') {
+            const splatBox = splatMesh.getBoundingBox(false); // centers_only=false for full extent
+            if (splatBox && !splatBox.isEmpty()) {
+                box.union(splatBox);
+                hasContent = true;
+            }
+        } else {
+            // Fallback to expandByObject if getBoundingBox doesn't exist
+            box.expandByObject(splatMesh);
+            hasContent = true;
+        }
     }
     if (modelGroup && modelGroup.children.length > 0) {
         box.expandByObject(modelGroup);

@@ -207,6 +207,13 @@ export async function loadSplatFromFile(file: File, deps: LoadSplatDeps): Promis
     // Apply default rotation to correct upside-down orientation
     splatMesh.rotation.x = Math.PI;
 
+    // Disable frustum culling to prevent clipping issues with rotated splats
+    splatMesh.frustumCulled = false;
+
+    // Force matrix auto-update and set render order
+    splatMesh.matrixAutoUpdate = true;
+    splatMesh.renderOrder = 0;
+
     // Verify SplatMesh is a valid THREE.Object3D
     if (!(splatMesh instanceof THREE.Object3D)) {
         log.warn('WARNING: SplatMesh is not an instance of THREE.Object3D!');
@@ -283,6 +290,9 @@ export async function loadSplatFromUrl(url: string, deps: LoadSplatDeps, onProgr
     // Apply default rotation
     splatMesh.rotation.x = Math.PI;
 
+    // Disable frustum culling to prevent clipping issues with rotated splats
+    splatMesh.frustumCulled = false;
+
     // Verify SplatMesh
     if (!(splatMesh instanceof THREE.Object3D)) {
         log.warn('WARNING: SplatMesh is not an instance of THREE.Object3D!');
@@ -333,6 +343,9 @@ export async function loadSplatFromBlobUrl(blobUrl: string, fileName: string, de
 
     // Apply default rotation
     splatMesh.rotation.x = Math.PI;
+
+    // Disable frustum culling to prevent clipping issues with rotated splats
+    splatMesh.frustumCulled = false;
 
     // Verify SplatMesh
     if (!(splatMesh instanceof THREE.Object3D)) {

@@ -5,7 +5,7 @@
  * by this project are declared here.
  */
 declare module '@sparkjsdev/spark' {
-    import { Object3D, WebGLRenderer, Euler, Vector3 } from 'three';
+    import { Object3D, WebGLRenderer, Euler, Vector3, Box3 } from 'three';
 
     export class SplatMesh extends Object3D {
         rotation: Euler;
@@ -22,5 +22,12 @@ declare module '@sparkjsdev/spark' {
         loadUrl(url: string, onProgress?: (progress: number) => void): Promise<void>;
         loadFile(file: File, onProgress?: (progress: number) => void): Promise<void>;
         dispose(): void;
+
+        /**
+         * Calculate bounding box of the splat mesh.
+         * @param centers_only - If true (default), uses only splat center positions.
+         *                       If false, includes full extent of splats.
+         */
+        getBoundingBox(centers_only?: boolean): Box3;
     }
 }
