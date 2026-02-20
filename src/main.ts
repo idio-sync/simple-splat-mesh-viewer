@@ -1,6 +1,6 @@
 // ES Module imports (these are hoisted - execute first before any other code)
 import * as THREE from 'three';
-import { SplatMesh } from '@sparkjsdev/spark';
+import { SplatMesh, SparkRenderer } from '@sparkjsdev/spark';
 import { ArchiveLoader } from './modules/archive-loader.js';
 // hasAnyProxy moved to archive-pipeline.ts (Phase 2.2)
 import { AnnotationSystem } from './modules/annotation-system.js';
@@ -275,6 +275,7 @@ let renderer: any; // WebGLRenderer | WebGPURenderer — widened for auto-switch
 let controls: any; // OrbitControls
 let transformControls: any; // TransformControls
 let flyControls: any = null; // FlyControls (custom)
+let sparkRenderer: any = null; // SparkRenderer instance
 let splatMesh: any = null; // SplatMesh from Spark
 let modelGroup: THREE.Group;
 let pointcloudGroup: THREE.Group;
@@ -646,6 +647,17 @@ async function init() {
     // Initialize fly camera controls (disabled by default, orbit mode is default)
     flyControls = new FlyControls(camera, renderer.domElement);
 
+    // Create SparkRenderer with custom clipXY to prevent edge clipping
+    // Default clipXY=1.4 causes chunks to disappear at certain camera angles
+    // Higher values (3.0) retain splats further beyond view frustum edges
+    sparkRenderer = new SparkRenderer({
+        renderer: renderer,
+        clipXY: 3.0,           // Prevent aggressive frustum culling (default: 1.4)
+        autoUpdate: true
+    });
+    scene.add(sparkRenderer);
+    log.info('SparkRenderer created with clipXY=3.0 to prevent clipping');
+
     // Register callback for renderer switches (WebGPU <-> WebGL)
     sceneManager.onRendererChanged = (newRenderer: any) => {
         renderer = newRenderer;
@@ -661,7 +673,18 @@ async function init() {
         if (landmarkAlignment) {
             landmarkAlignment.updateRenderer(newRenderer);
         }
-        log.info('Renderer changed, module-scope references updated');
+        // Recreate SparkRenderer with new renderer instance
+        if (sparkRenderer) {
+            scene.remove(sparkRenderer);
+            sparkRenderer.dispose();
+        }
+        sparkRenderer = new SparkRenderer({
+            renderer: newRenderer,
+            clipXY: 3.0,
+            autoUpdate: true
+        });
+        scene.add(sparkRenderer);
+        log.info('Renderer changed, module-scope references updated - SparkRenderer recreated');
     };
 
     // Set up SceneManager callbacks for transform controls

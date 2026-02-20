@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import type { Annotation, DisplayMode } from '@/types.js';
 import { SceneManager } from './scene-manager.js';
+import { SparkRenderer } from '@sparkjsdev/spark';
 
 // Local AssetType (not exported from types.ts)
 type AssetType = 'splat' | 'mesh' | 'pointcloud';
@@ -172,6 +173,7 @@ let flyControls: FlyControls | null = null;
 let annotationSystem: AnnotationSystem | null = null;
 let crossSection: CrossSectionTool | null = null;
 let measurementSystem: MeasurementSystem | null = null;
+let sparkRenderer: any = null; // SparkRenderer instance
 let splatMesh: any = null; // TODO: SplatMesh type
 let fpsElement: HTMLElement | null = null;
 let currentPopupAnnotationId: string | null = null;
@@ -254,6 +256,17 @@ export async function init(): Promise<void> {
     pointcloudGroup = sceneManager.pointcloudGroup;
     fpsElement = document.getElementById('fps-counter');
 
+    // Create SparkRenderer with custom clipXY to prevent edge clipping
+    // Default clipXY=1.4 causes chunks to disappear at certain camera angles
+    // Higher values (3.0) retain splats further beyond view frustum edges
+    sparkRenderer = new SparkRenderer({
+        renderer: renderer,
+        clipXY: 3.0,           // Prevent aggressive frustum culling (default: 1.4)
+        autoUpdate: true
+    });
+    scene.add(sparkRenderer);
+    log.info('SparkRenderer created with clipXY=3.0 to prevent clipping');
+
     // Disable transform controls (viewer only)
     sceneManager.detachTransformControls();
 
@@ -273,7 +286,18 @@ export async function init(): Promise<void> {
             flyControls.dispose();
             flyControls = new FlyControls(camera, newRenderer.domElement);
         }
-        log.info('Renderer changed to', sceneManager!.rendererType);
+        // Recreate SparkRenderer with new renderer instance
+        if (sparkRenderer) {
+            scene.remove(sparkRenderer);
+            sparkRenderer.dispose();
+        }
+        sparkRenderer = new SparkRenderer({
+            renderer: newRenderer,
+            clipXY: 3.0,
+            autoUpdate: true
+        });
+        scene.add(sparkRenderer);
+        log.info('Renderer changed to', sceneManager!.rendererType, '- SparkRenderer recreated');
     };
 
     // Create annotation system

@@ -30,4 +30,22 @@ declare module '@sparkjsdev/spark' {
          */
         getBoundingBox(centers_only?: boolean): Box3;
     }
+
+    /**
+     * SparkRenderer manages Gaussian Splatting rendering within a THREE.Scene.
+     * Automatically created by Spark if not manually instantiated.
+     */
+    export class SparkRenderer extends Object3D {
+        constructor(config: {
+            renderer: WebGLRenderer;
+            autoUpdate?: boolean;
+            clipXY?: number;           // Default: 1.4. Higher values prevent edge clipping
+            maxStdDev?: number;        // Controls Gaussian extent (√5 to √9)
+            blurAmount?: number;       // Anti-aliasing blur
+            originDistance?: number;   // Precision threshold
+            [key: string]: any;
+        });
+
+        dispose(): void;
+    }
 }
