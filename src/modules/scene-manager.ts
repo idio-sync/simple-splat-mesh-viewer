@@ -243,7 +243,10 @@ export class SceneManager {
         this._canvasRight = canvasRight;
 
         // Detect WebGPU support and lazily load the renderer module
-        this.webgpuSupported = !!navigator.gpu;
+        // (preserve false if explicitly disabled before init)
+        if (this.webgpuSupported !== false) {
+            this.webgpuSupported = !!navigator.gpu;
+        }
         log.info('WebGPU supported:', this.webgpuSupported);
         if (this.webgpuSupported && !WebGPURendererClass) {
             try {
