@@ -180,6 +180,29 @@ export class SceneManager {
      * applying standard settings (pixel ratio, color space, tone mapping, shadows).
      * For WebGPU, the caller must also call `await renderer.init()` after this.
      */
+    /**
+     * Patch a WebGPU renderer's backend to work around a Three.js bug where
+     * render target textures are re-created without being destroyed first,
+     * causing "WebGPUTextureUtils: Texture already initialized" errors.
+     */
+    private _patchWebGPURenderer(renderer: any): void {
+        try {
+            const backend = renderer.backend;
+            if (!backend || !backend.textureUtils) return;
+            const origCreate = backend.textureUtils.createTexture.bind(backend.textureUtils);
+            backend.textureUtils.createTexture = function(texture: any, options: any) {
+                const textureData = backend.get(texture);
+                if (textureData.initialized) {
+                    backend.textureUtils.destroyTexture(texture);
+                }
+                return origCreate(texture, options);
+            };
+            log.info('Patched WebGPU renderer texture lifecycle');
+        } catch (e) {
+            log.warn('Failed to patch WebGPU renderer:', e);
+        }
+    }
+
     private _createRenderer(canvas: HTMLCanvasElement, type: 'webgpu' | 'webgl'): any {
         let newRenderer: any;
         if (type === 'webgpu') {
@@ -259,6 +282,7 @@ export class SceneManager {
         if (useWebGPU) {
             try {
                 await (this.renderer as WebGPURenderer).init();
+                this._patchWebGPURenderer(this.renderer);
             } catch (err) {
                 log.warn('WebGPU initialization failed, falling back to WebGL:', err);
                 this.renderer.dispose();
@@ -277,6 +301,7 @@ export class SceneManager {
         if (useWebGPU) {
             try {
                 await (this.rendererRight as WebGPURenderer).init();
+                this._patchWebGPURenderer(this.rendererRight);
             } catch (err) {
                 log.warn('WebGPU initialization failed for right renderer, falling back to WebGL:', err);
                 this.rendererRight.dispose();
@@ -454,6 +479,7 @@ export class SceneManager {
         this.renderer.outputColorSpace = outputColorSpace;
         if (target === 'webgpu') {
             await (this.renderer as WebGPURenderer).init();
+            this._patchWebGPURenderer(this.renderer);
         }
 
         this.rendererRight = this._createRenderer(newCanvasRight, target);
@@ -468,6 +494,7 @@ export class SceneManager {
         this.rendererRight.outputColorSpace = outputColorSpace;
         if (target === 'webgpu') {
             await (this.rendererRight as WebGPURenderer).init();
+            this._patchWebGPURenderer(this.rendererRight);
         }
 
         // --- Recreate OrbitControls ---
