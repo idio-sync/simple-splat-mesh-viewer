@@ -1353,53 +1353,10 @@ function createArchiveDeps(): any {
         sceneManager,
         getSplatMesh: () => splatMesh,
         setSplatMesh: (mesh) => { splatMesh = mesh; },
-        callbacks: {
-            onApplySplatTransform: (transform) => {
-                if (!splatMesh || !transform) return;
-                if (transform.position) {
-                    splatMesh.position.set(transform.position[0], transform.position[1], transform.position[2]);
-                }
-                if (transform.rotation) {
-                    splatMesh.rotation.set(transform.rotation[0], transform.rotation[1], transform.rotation[2]);
-                }
-                if (transform.scale != null) {
-                    splatMesh.scale.setScalar(transform.scale);
-                }
-                // Force matrix world update after transforms
-                splatMesh.updateMatrixWorld(true);
-            },
-            onApplyModelTransform: (transform) => {
-                if (!modelGroup || !transform) return;
-
-                // Center model on grid if no splat is loaded (matches main viewer behavior)
-                // This ensures the model's base position is consistent before applying saved transforms
-                if (!state.splatLoaded && modelGroup.children.length > 0) {
-                    const box = new THREE.Box3().setFromObject(modelGroup);
-                    if (!box.isEmpty()) {
-                        const center = box.getCenter(new THREE.Vector3());
-                        const size = box.getSize(new THREE.Vector3());
-                        modelGroup.updateMatrixWorld(true);
-                        const localCenter = modelGroup.worldToLocal(center.clone());
-                        for (const child of modelGroup.children) {
-                            child.position.x -= localCenter.x;
-                            child.position.y -= localCenter.y;
-                            child.position.z -= localCenter.z;
-                        }
-                        modelGroup.position.set(0, size.y / 2, 0);
-                    }
-                }
-
-                if (transform.position) {
-                    modelGroup.position.set(transform.position[0], transform.position[1], transform.position[2]);
-                }
-                if (transform.rotation) {
-                    modelGroup.rotation.set(transform.rotation[0], transform.rotation[1], transform.rotation[2]);
-                }
-                if (transform.scale != null) {
-                    modelGroup.scale.setScalar(transform.scale);
-                }
-            }
-        }
+        // No per-entry transform callbacks — object transforms are applied
+        // solely via applyGlobalAlignment() after all assets are loaded,
+        // matching the main mode behavior (which also skips per-entry transforms).
+        callbacks: {}
     };
 }
 
