@@ -2,7 +2,7 @@
 // Handles creating .a3d/.a3z archive containers
 // Based on the U3DP Creator Python tool manifest schema
 
-import { Zip, ZipDeflate, ZipPassThrough, strToU8 } from 'fflate';
+import { Zip, ZipPassThrough, strToU8 } from 'fflate';
 import { Logger } from './utilities.js';
 import type { Annotation } from '@/types.js';
 import type { ManifestCompliance } from './sip-validator.js';
@@ -391,7 +391,6 @@ export interface MetadataSummary {
 export interface CreateArchiveOptions {
     format?: 'a3d' | 'a3z';
     includeHashes?: boolean;
-    compression?: 'DEFLATE' | 'STORE';
 }
 
 export interface DownloadArchiveOptions extends CreateArchiveOptions {
@@ -1696,12 +1695,9 @@ export class ArchiveCreator {
         const {
             format = 'a3d',
             includeHashes = true,
-            compression = format === 'a3z' ? 'DEFLATE' : 'STORE'
         } = options;
 
-        // Compression level: 0 = STORE, 6 = good balance for DEFLATE
-        const defaultLevel = compression === 'DEFLATE' ? 6 : 0;
-        log.debug('✓ Using compression:', compression, 'level:', defaultLevel);
+        log.debug('✓ Using compression: STORE (no compression)');
 
         // Calculate hashes if requested (0-20% of progress)
         if (includeHashes) {
@@ -1726,16 +1722,16 @@ export class ArchiveCreator {
             chunks.push(chunk);
         });
 
-        // Add manifest (always use light compression for JSON)
+        // Add manifest (no compression — STORE)
         log.debug('✓ Generating manifest');
         const manifestJson = this.generateManifest();
-        const manifestEntry = new ZipDeflate('manifest.json', { level: 6 });
+        const manifestEntry = new ZipPassThrough('manifest.json');
         zipStream.add(manifestEntry);
         manifestEntry.push(strToU8(manifestJson), true);
 
         // Add plain-text README for long-term discoverability
         const readmeText = this._generateReadme();
-        const readmeEntry = new ZipDeflate('README.txt', { level: 6 });
+        const readmeEntry = new ZipPassThrough('README.txt');
         zipStream.add(readmeEntry);
         readmeEntry.push(strToU8(readmeText), true);
 
@@ -1748,28 +1744,21 @@ export class ArchiveCreator {
         const startZipTime = performance.now();
 
         for (const [path, { blob }] of entries) {
-            // Use STORE (level 0) for already-compressed formats
-            const ext = path.split('.').pop()?.toLowerCase() || '';
-            const alreadyCompressed = ['glb', 'spz', 'sog', 'jpg', 'jpeg', 'png', 'webp', 'e57'].includes(ext);
-            const fileLevel = alreadyCompressed ? 0 : defaultLevel;
-
-            log.debug('✓ Processing file:', path, 'size:', blob.size, 'level:', fileLevel);
+            log.debug('✓ Processing file:', path, 'size:', blob.size, 'level: 0 (STORE)');
 
             // Convert blob to Uint8Array
             const arrayBuffer = await blob.arrayBuffer();
             const uint8Array = new Uint8Array(arrayBuffer);
 
-            // Add to ZIP stream: ZipPassThrough for STORE, ZipDeflate for compression
-            const entry = fileLevel === 0
-                ? new ZipPassThrough(path)
-                : new ZipDeflate(path, { level: fileLevel });
+            // All files use STORE (no compression)
+            const entry = new ZipPassThrough(path);
             zipStream.add(entry);
             entry.push(uint8Array, true);
 
             processedSize += blob.size;
             if (onProgress) {
                 const pct = baseProgress + (processedSize / totalSize) * progressRange;
-                onProgress(Math.round(pct), `Compressing: ${path}`);
+                onProgress(Math.round(pct), `Packing: ${path}`);
             }
 
             // Yield to event loop so browser repaints the progress bar

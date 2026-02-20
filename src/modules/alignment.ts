@@ -1501,22 +1501,17 @@ export function centerModelOnGrid(modelGroup: Group): void {
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
 
-    // Convert world-space center to group's local space for robustness
-    modelGroup.updateMatrixWorld(true);
-    const localCenter = modelGroup.worldToLocal(center.clone());
-
-    // Offset children so their collective center is at the group's local origin
-    for (const child of modelGroup.children) {
-        child.position.x -= localCenter.x;
-        child.position.y -= localCenter.y;
-        child.position.z -= localCenter.z;
-    }
-
-    // Position group so model sits on the grid (y=0), centered on x/z
-    modelGroup.position.set(0, size.y / 2, 0);
+    // Position group so model sits on the grid (y=0), centered on x/z.
+    // Only adjust the group position — do NOT modify children positions,
+    // because child offsets are not saved in the archive manifest and would
+    // be lost on re-import.
+    modelGroup.position.set(
+        -center.x,
+        -center.y + size.y / 2,
+        -center.z
+    );
 
     log.info('[centerModelOnGrid] Model centered on grid:', {
-        newPosition: modelGroup.position.toArray(),
-        childOffset: [-localCenter.x, -localCenter.y, -localCenter.z]
+        newPosition: modelGroup.position.toArray()
     });
 }
