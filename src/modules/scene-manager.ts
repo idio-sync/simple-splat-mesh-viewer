@@ -835,13 +835,15 @@ export class SceneManager {
         );
         const material = new ShadowMaterial({
             opacity: 0.3,
-            color: 0x000000
+            color: 0x000000,
+            depthWrite: false        // Don't write to depth buffer - prevents occluding splats
         });
 
         this.shadowCatcherPlane = new Mesh(geometry, material);
         this.shadowCatcherPlane.rotation.x = -Math.PI / 2;
         this.shadowCatcherPlane.position.y = SHADOWS.GROUND_PLANE_Y;
         this.shadowCatcherPlane.receiveShadow = true;
+        this.shadowCatcherPlane.renderOrder = -1;  // Render before other objects
         this.shadowCatcherPlane.name = 'shadowCatcher';
 
         // Exclude from raycasting so annotations/alignment pass through
