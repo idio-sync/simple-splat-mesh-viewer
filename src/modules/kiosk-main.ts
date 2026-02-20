@@ -2133,7 +2133,7 @@ function populateInfoOverlay(manifest: any): void {
     // License
     if (licenseEl) {
         if (license) {
-            licenseEl.textContent = license;
+            licenseEl.innerHTML = linkifyValue(typeof license === 'object' ? (license.credit_line || license.copyright_status || JSON.stringify(license)) : license);
         } else {
             licenseEl.style.display = 'none';
         }
@@ -2396,7 +2396,25 @@ function fitCameraToScene(): void {
 
 function applyGlobalAlignment(alignment: any): void {
     if (!alignment) return;
-    // Global alignment adjusts the orbit controls target and camera
+
+    // Apply object transforms (position, rotation, scale)
+    if (alignment.splat && splatMesh) {
+        splatMesh.position.fromArray(alignment.splat.position);
+        splatMesh.rotation.set(...alignment.splat.rotation as [number, number, number]);
+        splatMesh.scale.setScalar(alignment.splat.scale);
+    }
+    if (alignment.model && modelGroup) {
+        modelGroup.position.fromArray(alignment.model.position);
+        modelGroup.rotation.set(...alignment.model.rotation as [number, number, number]);
+        modelGroup.scale.setScalar(alignment.model.scale);
+    }
+    if (alignment.pointcloud && pointcloudGroup) {
+        pointcloudGroup.position.fromArray(alignment.pointcloud.position);
+        pointcloudGroup.rotation.set(...alignment.pointcloud.rotation as [number, number, number]);
+        pointcloudGroup.scale.setScalar(alignment.pointcloud.scale);
+    }
+
+    // Apply orbit controls target and camera position
     if (alignment.target) {
         controls.target.set(alignment.target[0], alignment.target[1], alignment.target[2]);
     }
@@ -2573,6 +2591,22 @@ function escapeHtml(str: any): string {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/** Escape HTML, then convert [title](url) markdown links and bare URLs to clickable <a> tags */
+function linkifyValue(str: any): string {
+    let html = escapeHtml(str);
+    // Markdown links: [text](url)
+    html = html.replace(
+        /\[([^\]]+)\]\(([^)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>'
+    );
+    // Auto-link bare URLs not already in href
+    html = html.replace(
+        /(?<!href="|src=")(https?:\/\/[^\s<"&]+)/g,
+        '<a href="$1" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>'
+    );
+    return html;
+}
+
 function createDetailSection(title: string): { section: HTMLElement; content: HTMLElement } {
     const section = document.createElement('div');
     section.className = 'kiosk-detail-section';
@@ -2600,7 +2634,7 @@ function addDetailRow(container: HTMLElement, label: string, value: any): void {
     const row = document.createElement('div');
     row.className = 'display-detail';
     const displayVal = typeof value === 'object' ? JSON.stringify(value) : String(value);
-    row.innerHTML = `<span class="display-label">${escapeHtml(label)}</span><span class="display-value">${escapeHtml(displayVal)}</span>`;
+    row.innerHTML = `<span class="display-label">${escapeHtml(label)}</span><span class="display-value">${linkifyValue(displayVal)}</span>`;
     container.appendChild(row);
 }
 

@@ -191,8 +191,11 @@ export class SceneManager {
         newRenderer.outputColorSpace = THREE.SRGBColorSpace;
         newRenderer.toneMapping = THREE.NoToneMapping;
         newRenderer.toneMappingExposure = 1.0;
-        newRenderer.shadowMap.enabled = false;
-        newRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        // Only configure shadow map on WebGL — WebGPU has texture init bugs with shadow maps
+        if (type === 'webgl') {
+            newRenderer.shadowMap.enabled = false;
+            newRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        }
         return newRenderer;
     }
 
@@ -1057,6 +1060,10 @@ export class SceneManager {
         pointcloudGroup: Group | null,
         stlGroup: Group | null
     ): void {
+        // Skip rendering if WebGPU backend hasn't finished initializing
+        if (this.rendererType === 'webgpu' && !(this.renderer as any)?._initialized) {
+            return;
+        }
         if (displayMode === 'split') {
             // Split view - render splat on left, model + pointcloud + stl on right
             const splatVisible = splatMesh ? splatMesh.visible : false;

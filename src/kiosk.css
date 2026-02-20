@@ -406,7 +406,7 @@ body.kiosk-mode .kiosk-tool-btn:focus-visible {
 /* Left column — title & narrative */
 
 .kiosk-info-col-left {
-    flex: 0 0 38%;
+    flex: 0 0 66%;
     padding-right: 40px;
     display: flex;
     flex-direction: column;
