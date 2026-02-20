@@ -18,6 +18,26 @@ import { TAB_TIERS, isTierVisible, computeCompleteness, PROFILE_ORDER, PRONOM_RE
 
 const log = Logger.getLogger('metadata-manager');
 
+/**
+ * Escape HTML entities and auto-linkify URLs in plain text.
+ * Safe for use with innerHTML — escapes first, then wraps URLs.
+ */
+function linkifyText(text: string): string {
+    // Escape HTML entities
+    let html = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    // Auto-link URLs
+    html = html.replace(
+        /(https?:\/\/[^\s<"&]+)/g,
+        '<a href="$1" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>'
+    );
+    return html;
+}
+
 let activeProfile: MetadataProfile = 'standard';
 
 // =============================================================================
@@ -1855,7 +1875,7 @@ export function populateMetadataDisplay(deps: MetadataDeps = {}): void {
     const creatorEl = document.getElementById('display-creator');
     if (creatorRow && creatorEl) {
         if (metadata.provenance.operator) {
-            creatorEl.textContent = metadata.provenance.operator;
+            creatorEl.innerHTML = linkifyText(metadata.provenance.operator);
             creatorRow.style.display = '';
             hasDetails = true;
         } else {
@@ -1884,7 +1904,7 @@ export function populateMetadataDisplay(deps: MetadataDeps = {}): void {
     const locationEl = document.getElementById('display-location');
     if (locationRow && locationEl) {
         if (metadata.provenance.location) {
-            locationEl.textContent = metadata.provenance.location;
+            locationEl.innerHTML = linkifyText(metadata.provenance.location);
             locationRow.style.display = '';
             hasDetails = true;
         } else {
@@ -1897,7 +1917,7 @@ export function populateMetadataDisplay(deps: MetadataDeps = {}): void {
     const deviceEl = document.getElementById('display-device');
     if (deviceRow && deviceEl) {
         if (metadata.provenance.captureDevice) {
-            deviceEl.textContent = metadata.provenance.captureDevice;
+            deviceEl.innerHTML = linkifyText(metadata.provenance.captureDevice);
             deviceRow.style.display = '';
             hasDetails = true;
         } else {
@@ -1917,12 +1937,12 @@ export function populateMetadataDisplay(deps: MetadataDeps = {}): void {
     if (licenseRow && licenseEl) {
         const license = metadata.project.license;
         if (license && license !== 'custom' && license !== 'CC0') {
-            licenseEl.textContent = license;
+            licenseEl.innerHTML = linkifyText(license);
             licenseRow.style.display = '';
         } else if (license === 'custom') {
             const customLicense = (document.getElementById('meta-custom-license') as HTMLInputElement)?.value;
             if (customLicense) {
-                licenseEl.textContent = customLicense;
+                licenseEl.innerHTML = linkifyText(customLicense);
                 licenseRow.style.display = '';
             } else {
                 licenseRow.style.display = 'none';
@@ -2000,7 +2020,7 @@ export function populateMetadataDisplay(deps: MetadataDeps = {}): void {
         extendedContainer.replaceChildren();
         const profile = activeProfile;
 
-        /** Helper: create a detail row (label + value) */
+        /** Helper: create a detail row (label + value, URLs auto-linked) */
         function addRow(parent: HTMLElement, label: string, value: string): void {
             const row = document.createElement('div');
             row.className = 'display-detail';
@@ -2009,7 +2029,7 @@ export function populateMetadataDisplay(deps: MetadataDeps = {}): void {
             labelEl.textContent = label;
             const valueEl = document.createElement('span');
             valueEl.className = 'display-value';
-            valueEl.textContent = value;
+            valueEl.innerHTML = linkifyText(value);
             row.appendChild(labelEl);
             row.appendChild(valueEl);
             parent.appendChild(row);

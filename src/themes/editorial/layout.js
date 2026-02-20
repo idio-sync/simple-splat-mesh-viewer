@@ -69,29 +69,29 @@ function createInfoOverlay(manifest, deps) {
     });
     overlay.appendChild(closeBtn);
 
-    // Two-column spread
-    const spread = document.createElement('div');
-    spread.className = 'editorial-info-spread';
+    // Scrollable content wrapper
+    const contentWrapper = document.createElement('div');
+    contentWrapper.className = 'editorial-info-content';
 
-    // === Left Column — title & narrative ===
-    const colLeft = document.createElement('div');
-    colLeft.className = 'editorial-info-col-left';
+    // === Full-width header — title, description, provenance ===
+    const headerSection = document.createElement('div');
+    headerSection.className = 'editorial-info-header';
 
     const eyebrow = document.createElement('div');
     eyebrow.className = 'editorial-info-eyebrow';
     eyebrow.textContent = 'Details';
-    colLeft.appendChild(eyebrow);
+    headerSection.appendChild(eyebrow);
 
     const title = manifest?.title || manifest?.project?.title || manifest?.archival_record?.title || '';
     if (title) {
         const titleEl = document.createElement('h2');
         titleEl.className = 'editorial-info-title';
         titleEl.textContent = title;
-        colLeft.appendChild(titleEl);
+        headerSection.appendChild(titleEl);
 
         const titleBar = document.createElement('div');
         titleBar.className = 'editorial-info-title-bar';
-        colLeft.appendChild(titleBar);
+        headerSection.appendChild(titleBar);
     }
 
     // Model stats — show geometry info when a mesh is loaded
@@ -105,7 +105,6 @@ function createInfoOverlay(manifest, deps) {
                 if (geo.attributes.position) vertexCount += geo.attributes.position.count;
                 if (geo.index) faceCount += geo.index.count / 3;
                 else if (geo.attributes.position) faceCount += geo.attributes.position.count / 3;
-                // Count unique materials and textures
                 const mats = Array.isArray(child.material) ? child.material : [child.material];
                 mats.forEach(m => {
                     if (m) {
@@ -134,8 +133,25 @@ function createInfoOverlay(manifest, deps) {
             const statsEl = document.createElement('div');
             statsEl.className = 'editorial-info-model-stats';
             statsEl.textContent = parts.join(' · ');
-            colLeft.appendChild(statsEl);
+            headerSection.appendChild(statsEl);
         }
+    }
+
+    // Provenance / capture byline — full width under title
+    const captureBylineParts = [];
+    const operator = manifest?.creator || manifest?.provenance?.operator;
+    if (operator) captureBylineParts.push(operator);
+    const captureDate = manifest?.date || manifest?.provenance?.capture_date;
+    if (captureDate) captureBylineParts.push(formatDate(captureDate) || captureDate);
+    const captureLocation = manifest?.location || manifest?.provenance?.location;
+    if (captureLocation) captureBylineParts.push(captureLocation);
+    const captureDevice = manifest?.provenance?.capture_device;
+    if (captureDevice) captureBylineParts.push(captureDevice);
+    if (captureBylineParts.length > 0) {
+        const byline = document.createElement('div');
+        byline.className = 'editorial-info-byline';
+        byline.textContent = captureBylineParts.join(' \u00b7 ');
+        headerSection.appendChild(byline);
     }
 
     const desc = manifest?.description || manifest?.project?.description || '';
@@ -143,7 +159,7 @@ function createInfoOverlay(manifest, deps) {
         const descEl = document.createElement('div');
         descEl.className = 'editorial-info-description';
         descEl.innerHTML = parseMarkdown(resolveAssetRefs(desc, state.imageAssets || {}));
-        colLeft.appendChild(descEl);
+        headerSection.appendChild(descEl);
     }
 
     const tags = manifest?.tags || manifest?.project?.tags || [];
@@ -156,7 +172,7 @@ function createInfoOverlay(manifest, deps) {
             chip.textContent = tag;
             tagsRow.appendChild(chip);
         });
-        colLeft.appendChild(tagsRow);
+        headerSection.appendChild(tagsRow);
     }
 
     const license = manifest?.license || manifest?.project?.license || manifest?.archival_record?.rights?.license ||
@@ -165,16 +181,15 @@ function createInfoOverlay(manifest, deps) {
         const licenseEl = document.createElement('div');
         licenseEl.className = 'editorial-info-license';
         licenseEl.textContent = license;
-        colLeft.appendChild(licenseEl);
+        headerSection.appendChild(licenseEl);
     }
 
-    spread.appendChild(colLeft);
+    contentWrapper.appendChild(headerSection);
 
-    const rule = document.createElement('div');
-    rule.className = 'editorial-info-col-rule';
-    spread.appendChild(rule);
+    // === Two-column spread — detail sections ===
+    const spread = document.createElement('div');
+    spread.className = 'editorial-info-spread';
 
-    // === Right Column — data & metrics ===
     const colRight = document.createElement('div');
     colRight.className = 'editorial-info-col-right';
 
@@ -204,16 +219,9 @@ function createInfoOverlay(manifest, deps) {
         return deps.isTierVisible(tier, metadataProfile);
     };
 
-    // 1. Capture details
+    // 1. Capture details (only fields NOT already in the header byline)
     const captureDetails = [];
-    const captureDate = manifest?.date || manifest?.provenance?.capture_date;
-    if (captureDate) captureDetails.push({ label: 'Date', value: formatDate(captureDate) || captureDate });
-    if (manifest?.provenance?.capture_device) captureDetails.push({ label: 'Device', value: manifest.provenance.capture_device });
     if (manifest?.provenance?.device_serial) captureDetails.push({ label: 'Serial', value: manifest.provenance.device_serial });
-    const operator = manifest?.creator || manifest?.provenance?.operator;
-    if (operator) captureDetails.push({ label: 'Operator', value: operator });
-    const captureLocation = manifest?.location || manifest?.provenance?.location;
-    if (captureLocation) captureDetails.push({ label: 'Location', value: captureLocation });
     if (manifest?.provenance?.operator_orcid) captureDetails.push({ label: 'ORCID', value: manifest.provenance.operator_orcid });
     if (shouldShow('Capture')) addSection('Capture', captureDetails);
 
@@ -337,7 +345,8 @@ function createInfoOverlay(manifest, deps) {
     }
 
     spread.appendChild(colRight);
-    overlay.appendChild(spread);
+    contentWrapper.appendChild(spread);
+    overlay.appendChild(contentWrapper);
     return overlay;
 }
 

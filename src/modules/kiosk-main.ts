@@ -256,18 +256,22 @@ export async function init(): Promise<void> {
     pointcloudGroup = sceneManager.pointcloudGroup;
     fpsElement = document.getElementById('fps-counter');
 
-    // Create SparkRenderer with custom clipXY to prevent edge clipping
-    // Default clipXY=1.4 causes chunks to disappear at certain camera angles
-    // Higher values (3.0) retain splats further beyond view frustum edges
-    sparkRenderer = new SparkRenderer({
-        renderer: renderer,
-        clipXY: 3.0,           // Prevent aggressive frustum culling (default: 1.4)
-        autoUpdate: true,
-        minAlpha: 3 / 255,     // Cull near-invisible splats (default: ~0.002)
-        view: { sortDistance: 0.005 }  // Re-sort after 5mm movement (default: 0.01)
-    });
-    scene.add(sparkRenderer);
-    log.info('SparkRenderer created with clipXY=3.0, minAlpha=3/255, sortDistance=0.005');
+    // Create SparkRenderer only when starting with WebGL — Spark.js requires
+    // WebGL context (uses .flush()). If starting with WebGPU, SparkRenderer
+    // will be created in onRendererChanged when switching to WebGL for splat loading.
+    if (sceneManager.rendererType === 'webgl') {
+        sparkRenderer = new SparkRenderer({
+            renderer: renderer,
+            clipXY: 3.0,           // Prevent aggressive frustum culling (default: 1.4)
+            autoUpdate: true,
+            minAlpha: 3 / 255,     // Cull near-invisible splats (default: ~0.002)
+            view: { sortDistance: 0.005 }  // Re-sort after 5mm movement (default: 0.01)
+        });
+        scene.add(sparkRenderer);
+        log.info('SparkRenderer created with clipXY=3.0, minAlpha=3/255, sortDistance=0.005');
+    } else {
+        log.info('SparkRenderer deferred — will be created after WebGL switch');
+    }
 
     // Disable transform controls (viewer only)
     sceneManager.detachTransformControls();
@@ -291,7 +295,7 @@ export async function init(): Promise<void> {
         // Recreate SparkRenderer with new renderer instance
         if (sparkRenderer) {
             scene.remove(sparkRenderer);
-            sparkRenderer.dispose();
+            if (sparkRenderer.dispose) sparkRenderer.dispose();
         }
         sparkRenderer = new SparkRenderer({
             renderer: newRenderer,
