@@ -1942,19 +1942,30 @@ input[type="range"]::-webkit-slider-thumb:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: bold;
-    color: var(--bg-deep);
     pointer-events: none;
 }
 
 .alignment-marker.anchor {
-    background: var(--accent);
+    border-style: solid;
 }
 
 .alignment-marker.mover {
-    background: #ff9f43;
+    border-style: dashed;
 }
+
+/* Pair colors - 10 distinct hues */
+.alignment-marker.pair-0 { background: #e6194b; color: #fff; border-color: #e6194b; }
+.alignment-marker.pair-1 { background: #3cb44b; color: #fff; border-color: #3cb44b; }
+.alignment-marker.pair-2 { background: #4363d8; color: #fff; border-color: #4363d8; }
+.alignment-marker.pair-3 { background: #f58231; color: #fff; border-color: #f58231; }
+.alignment-marker.pair-4 { background: #911eb4; color: #fff; border-color: #911eb4; }
+.alignment-marker.pair-5 { background: #42d4f4; color: #000; border-color: #42d4f4; }
+.alignment-marker.pair-6 { background: #f032e6; color: #fff; border-color: #f032e6; }
+.alignment-marker.pair-7 { background: #bfef45; color: #000; border-color: #bfef45; }
+.alignment-marker.pair-8 { background: #fabed4; color: #000; border-color: #fabed4; }
+.alignment-marker.pair-9 { background: #dcbeff; color: #000; border-color: #dcbeff; }
 
 /* Proxy mesh indicator */
 #proxy-mesh-indicator {

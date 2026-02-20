@@ -724,6 +724,16 @@ async function init() {
             notify.info('Alignment cancelled');
         }
     });
+    addListener('btn-alignment-apply', 'click', () => {
+        if (landmarkAlignment?.isActive()) {
+            landmarkAlignment.apply();
+        }
+    });
+    addListener('btn-alignment-undo', 'click', () => {
+        if (landmarkAlignment?.isActive()) {
+            landmarkAlignment.undo();
+        }
+    });
 
     // Initialize archive creator
     archiveCreator = new ArchiveCreator();
@@ -1517,7 +1527,7 @@ function autoCenterAlign() {
 let _antialiasUpdatePending = false;
 function updateAntialias() {
     if (_antialiasUpdatePending || !sceneManager) return;
-    const needsAA = state.modelLoaded && !state.splatLoaded;
+    const needsAA = state.modelLoaded;
     _antialiasUpdatePending = true;
     sceneManager.setAntialias(needsAA).finally(() => { _antialiasUpdatePending = false; });
 }

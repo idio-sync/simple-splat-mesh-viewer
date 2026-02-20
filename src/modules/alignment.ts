@@ -124,6 +124,29 @@ interface MarkerData {
     element: HTMLDivElement;
     position: Vector3;
     phase: 'anchor' | 'mover';
+    pairIndex: number;
+    colorClass: string;
+}
+
+/** A single anchor-mover point pair */
+interface AlignmentPair {
+    anchor: Vector3;
+    mover: Vector3 | null;
+}
+
+/** Undo stack entry */
+interface UndoAction {
+    type: 'anchor' | 'mover';
+    pairIndex: number;
+    point: Vector3;
+    marker: MarkerData;
+}
+
+/** Saved transform for restoring mover on cancel */
+interface SavedTransform {
+    position: Vector3;
+    quaternion: THREE.Quaternion;
+    scale: Vector3;
 }
 
 /** SplatMesh interface (minimal, for Spark.js internals) */
@@ -412,13 +435,13 @@ function computeRigidTransformFromPoints(srcPts: Vector3[], dstPts: Vector3[]): 
 // =============================================================================
 
 /**
- * Interactive 3-point landmark alignment tool.
+ * Interactive N-point landmark alignment tool.
  *
  * Workflow:
- * 1. User clicks "Align Objects" → enters alignment mode
- * 2. Clicks 3 points on the anchor object (numbered markers appear)
- * 3. Clicks 3 corresponding points on the mover object
- * 4. Rigid transform computed and applied to the mover
+ * 1. User clicks "Align Objects" -- enters alignment mode
+ * 2. Alternating pair-by-pair placement: anchor 1 -> mover 1 -> anchor 2 -> mover 2 -> ...
+ * 3. After 3+ complete pairs: live preview appears, RMSE shown, Apply button enabled
+ * 4. User can continue adding pairs, undo with Ctrl+Z, then Apply or Cancel
  */
 export class LandmarkAlignment {
     private scene: Scene;
@@ -430,25 +453,33 @@ export class LandmarkAlignment {
     private splatMesh: Object3D | null;
     private modelGroup: Group | null;
 
-    // Callbacks from main.js
+    // Callbacks from main.ts
     private updateTransformInputs: () => void;
     private storeLastPositions: () => void;
 
     // State
     private _active: boolean;
-    private _phase: 'anchor' | 'mover' | null;
+    private _phase: 'place-anchor' | 'place-mover' | null;
     private _anchorObj: Object3D | Group | null;
     private _anchorType: string;
     private _moverObj: Object3D | Group | null;
     private _moverType: string;
-    private _anchorPoints: Vector3[];
-    private _moverPoints: Vector3[];
+    private _pairs: AlignmentPair[];
+    private _currentPairIndex: number;
+    private _undoStack: UndoAction[];
+    private _previewGroup: Group | null;
+    private _rmse: number | null;
+    private _lastTransform: Matrix4 | null;
+    private _savedMoverTransform: SavedTransform | null;
 
     // DOM
     private _markerContainer: HTMLDivElement | null;
     private _markers: MarkerData[];
     private _indicatorEl: HTMLElement | null;
     private _instructionEl: HTMLElement | null;
+    private _applyBtnEl: HTMLElement | null;
+    private _undoBtnEl: HTMLElement | null;
+    private _rmseEl: HTMLElement | null;
 
     // Raycaster
     private _raycaster: Raycaster;
@@ -468,7 +499,7 @@ export class LandmarkAlignment {
         this.splatMesh = deps.splatMesh || null;
         this.modelGroup = deps.modelGroup || null;
 
-        // Callbacks from main.js
+        // Callbacks from main.ts
         this.updateTransformInputs = deps.updateTransformInputs;
         this.storeLastPositions = deps.storeLastPositions;
 
@@ -479,14 +510,22 @@ export class LandmarkAlignment {
         this._anchorType = '';
         this._moverObj = null;
         this._moverType = '';
-        this._anchorPoints = [];
-        this._moverPoints = [];
+        this._pairs = [];
+        this._currentPairIndex = 0;
+        this._undoStack = [];
+        this._previewGroup = null;
+        this._rmse = null;
+        this._lastTransform = null;
+        this._savedMoverTransform = null;
 
         // DOM
         this._markerContainer = null;
         this._markers = [];
         this._indicatorEl = null;
         this._instructionEl = null;
+        this._applyBtnEl = null;
+        this._undoBtnEl = null;
+        this._rmseEl = null;
 
         // Raycaster
         this._raycaster = new THREE.Raycaster();
@@ -520,6 +559,9 @@ export class LandmarkAlignment {
 
         this._indicatorEl = document.getElementById('alignment-mode-indicator');
         this._instructionEl = document.getElementById('alignment-instruction');
+        this._applyBtnEl = document.getElementById('btn-alignment-apply');
+        this._undoBtnEl = document.getElementById('btn-alignment-undo');
+        this._rmseEl = document.getElementById('alignment-rmse');
     }
 
     // ── Public API ──────────────────────────────────────────────────
@@ -559,10 +601,16 @@ export class LandmarkAlignment {
             this._moverType = 'splat';
         }
 
-        this._phase = 'anchor';
-        this._anchorPoints = [];
-        this._moverPoints = [];
+        this._phase = 'place-anchor';
+        this._pairs = [];
+        this._currentPairIndex = 0;
+        this._undoStack = [];
         this._clearMarkers();
+
+        // Hide new UI elements initially
+        if (this._applyBtnEl) this._applyBtnEl.classList.add('hidden');
+        if (this._undoBtnEl) this._undoBtnEl.classList.add('hidden');
+        if (this._rmseEl) this._rmseEl.classList.add('hidden');
 
         // Attach listeners
         this.renderer.domElement.addEventListener('click', this._onClickBound, { capture: true });
@@ -607,9 +655,20 @@ export class LandmarkAlignment {
 
         this._active = false;
         this._phase = null;
-        this._anchorPoints = [];
-        this._moverPoints = [];
+        this._pairs = [];
+        this._undoStack = [];
+        this._currentPairIndex = 0;
         this._clearMarkers();
+
+        // Clean up preview
+        this._removePreview();
+        this._lastTransform = null;
+        this._rmse = null;
+
+        // Hide new UI elements
+        if (this._applyBtnEl) this._applyBtnEl.classList.add('hidden');
+        if (this._undoBtnEl) this._undoBtnEl.classList.add('hidden');
+        if (this._rmseEl) this._rmseEl.classList.add('hidden');
 
         // Remove listeners
         this.renderer.domElement.removeEventListener('click', this._onClickBound);
@@ -681,7 +740,7 @@ export class LandmarkAlignment {
         const intersects = this._raycaster.intersectObjects(this.scene.children, true);
 
         // Filter: only accept hits on the current target object
-        const targetObj = this._phase === 'anchor' ? this._anchorObj : this._moverObj;
+        const targetObj = this._phase === 'place-anchor' ? this._anchorObj : this._moverObj;
 
         let hit = intersects.find(h => this._isDescendantOf(h.object, targetObj));
 
@@ -694,26 +753,35 @@ export class LandmarkAlignment {
 
         const point = hit.point.clone();
 
-        if (this._phase === 'anchor') {
-            this._anchorPoints.push(point);
-            this._addMarker(point, this._anchorPoints.length, 'anchor');
-            log.debug(`[LandmarkAlignment] Anchor point ${this._anchorPoints.length}: [${point.x.toFixed(3)}, ${point.y.toFixed(3)}, ${point.z.toFixed(3)}]`);
+        if (this._phase === 'place-anchor') {
+            // Start a new pair with this anchor point
+            this._pairs.push({ anchor: point, mover: null });
+            const marker = this._addMarker(point, this._currentPairIndex, 'anchor');
+            this._undoStack.push({ type: 'anchor', pairIndex: this._currentPairIndex, point, marker });
+            log.debug(`[LandmarkAlignment] Anchor ${this._currentPairIndex + 1}A: [${point.x.toFixed(3)}, ${point.y.toFixed(3)}, ${point.z.toFixed(3)}]`);
 
-            if (this._anchorPoints.length === 3) {
-                this._phase = 'mover';
-            }
+            this._phase = 'place-mover';
+            if (this._undoBtnEl) this._undoBtnEl.classList.remove('hidden');
             this._updateInstruction();
 
-        } else if (this._phase === 'mover') {
-            this._moverPoints.push(point);
-            this._addMarker(point, this._moverPoints.length, 'mover');
-            log.debug(`[LandmarkAlignment] Mover point ${this._moverPoints.length}: [${point.x.toFixed(3)}, ${point.y.toFixed(3)}, ${point.z.toFixed(3)}]`);
+        } else if (this._phase === 'place-mover') {
+            // Complete the current pair with this mover point
+            this._pairs[this._currentPairIndex].mover = point;
+            const marker = this._addMarker(point, this._currentPairIndex, 'mover');
+            this._undoStack.push({ type: 'mover', pairIndex: this._currentPairIndex, point, marker });
+            log.debug(`[LandmarkAlignment] Mover ${this._currentPairIndex + 1}B: [${point.x.toFixed(3)}, ${point.y.toFixed(3)}, ${point.z.toFixed(3)}]`);
 
-            if (this._moverPoints.length === 3) {
-                this._computeAndApply();
-            } else {
-                this._updateInstruction();
+            this._currentPairIndex++;
+            this._phase = 'place-anchor';
+
+            // If 3+ complete pairs, show preview and Apply
+            const completePairs = this._getCompletePairs();
+            if (completePairs.length >= 3) {
+                this._updatePreview();
+                if (this._applyBtnEl) this._applyBtnEl.classList.remove('hidden');
+                if (this._rmseEl) this._rmseEl.classList.remove('hidden');
             }
+            this._updateInstruction();
         }
     }
 
@@ -724,6 +792,9 @@ export class LandmarkAlignment {
         if (event.key === 'Escape') {
             this.cancel();
             notify.info('Alignment cancelled');
+        } else if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
+            event.preventDefault();
+            this.undo();
         }
     }
 
@@ -817,21 +888,26 @@ export class LandmarkAlignment {
     }
 
     /**
-     * Create a numbered DOM marker at a 3D position
+     * Create a color-coded DOM marker at a 3D position with pair label
      */
-    private _addMarker(point: Vector3, number: number, phase: 'anchor' | 'mover'): void {
+    private _addMarker(point: Vector3, pairIndex: number, phase: 'anchor' | 'mover'): MarkerData {
         const el = document.createElement('div');
-        el.className = `alignment-marker ${phase}`;
-        el.textContent = String(number);
+        const colorClass = `pair-${pairIndex % 10}`;
+        el.className = `alignment-marker ${phase} ${colorClass}`;
+        el.textContent = `${pairIndex + 1}${phase === 'anchor' ? 'A' : 'B'}`;
         if (this._markerContainer) {
             this._markerContainer.appendChild(el);
         }
 
-        this._markers.push({
+        const marker: MarkerData = {
             element: el,
             position: point.clone(),
-            phase
-        });
+            phase,
+            pairIndex,
+            colorClass
+        };
+        this._markers.push(marker);
+        return marker;
     }
 
     /**
@@ -850,39 +926,103 @@ export class LandmarkAlignment {
     private _updateInstruction(): void {
         if (!this._instructionEl) return;
 
-        if (this._phase === 'anchor') {
-            const count = this._anchorPoints.length;
+        if (this._phase === 'place-anchor') {
+            const completePairs = this._getCompletePairs().length;
             this._instructionEl.textContent =
-                `Click 3 points on the ${this._anchorType} (${count} of 3)`;
-        } else if (this._phase === 'mover') {
-            const count = this._moverPoints.length;
+                `Point ${this._currentPairIndex + 1}: click on ${this._anchorType} (${completePairs} pairs, min 3)`;
+        } else if (this._phase === 'place-mover') {
             this._instructionEl.textContent =
-                `Now click 3 matching points on the ${this._moverType} (${count} of 3)`;
+                `Point ${this._currentPairIndex + 1}: click on ${this._moverType}`;
         }
     }
 
+    // ── N-point helpers ─────────────────────────────────────────────
+
     /**
-     * Compute and apply the rigid transform from the 6 clicked points
+     * Get all pairs where both anchor and mover are set
      */
-    private _computeAndApply(): void {
-        log.info('[LandmarkAlignment] Computing rigid transform from 3 point pairs...');
+    private _getCompletePairs(): AlignmentPair[] {
+        return this._pairs.filter(p => p.mover !== null);
+    }
 
-        try {
-            if (!this._moverObj) {
-                throw new Error('Mover object is null');
+    /**
+     * Compute RMSE (root mean square error) of the current alignment
+     */
+    private _computeRMSE(): number | null {
+        const complete = this._getCompletePairs();
+        if (complete.length < 3) return null;
+
+        const srcPts = complete.map(p => p.mover!);
+        const dstPts = complete.map(p => p.anchor);
+
+        const transformMatrix = computeRigidTransformFromPoints(srcPts, dstPts);
+
+        let sumSqError = 0;
+        for (let i = 0; i < srcPts.length; i++) {
+            const transformed = srcPts[i].clone().applyMatrix4(transformMatrix);
+            sumSqError += transformed.distanceToSquared(dstPts[i]);
+        }
+
+        return Math.sqrt(sumSqError / complete.length);
+    }
+
+    /**
+     * Update (or create) the live preview and RMSE display
+     */
+    private _updatePreview(): void {
+        const complete = this._getCompletePairs();
+        if (complete.length < 3) {
+            this._removePreview();
+            this._rmse = null;
+            if (this._rmseEl) {
+                this._rmseEl.textContent = '';
+                this._rmseEl.classList.add('hidden');
+            }
+            return;
+        }
+
+        const srcPts = complete.map(p => p.mover!);
+        const dstPts = complete.map(p => p.anchor);
+
+        // Compute transform
+        const transformMatrix = computeRigidTransformFromPoints(srcPts, dstPts);
+        this._lastTransform = transformMatrix;
+
+        // Compute and display RMSE
+        this._rmse = this._computeRMSE();
+        if (this._rmseEl && this._rmse !== null) {
+            this._rmseEl.textContent = `${complete.length} pairs \u2014 RMSE: ${this._rmse.toFixed(4)} units`;
+            this._rmseEl.classList.remove('hidden');
+        }
+
+        if (!this._moverObj) return;
+
+        // Convert world-space transform to local-space parameters for the mover
+        const parentWorldInverse = new THREE.Matrix4();
+        if (this._moverObj.parent) {
+            this._moverObj.parent.updateMatrixWorld(true);
+            parentWorldInverse.copy(this._moverObj.parent.matrixWorld).invert();
+        }
+
+        // For splat mover: move the actual splat (save original on first call)
+        if (this._moverType === 'splat') {
+            if (!this._savedMoverTransform) {
+                this._savedMoverTransform = {
+                    position: this._moverObj.position.clone(),
+                    quaternion: this._moverObj.quaternion.clone(),
+                    scale: this._moverObj.scale.clone()
+                };
             }
 
-            // Source = mover points (in world space), Destination = anchor points (in world space)
-            const transformMatrix = computeRigidTransformFromPoints(this._moverPoints, this._anchorPoints);
-
-            // Convert world-space transform to local space for the mover
-            const parentWorldInverse = new THREE.Matrix4();
+            const oldWorldMatrix = new THREE.Matrix4().compose(
+                this._savedMoverTransform.position,
+                this._savedMoverTransform.quaternion,
+                this._savedMoverTransform.scale
+            );
             if (this._moverObj.parent) {
-                this._moverObj.parent.updateMatrixWorld(true);
-                parentWorldInverse.copy(this._moverObj.parent.matrixWorld).invert();
+                oldWorldMatrix.premultiply(this._moverObj.parent.matrixWorld);
             }
 
-            const oldWorldMatrix = this._moverObj.matrixWorld.clone();
             const newWorldMatrix = transformMatrix.clone().multiply(oldWorldMatrix);
             const newLocalMatrix = parentWorldInverse.clone().multiply(newWorldMatrix);
 
@@ -891,37 +1031,219 @@ export class LandmarkAlignment {
             const newScale = new THREE.Vector3();
             newLocalMatrix.decompose(newPos, newQuat, newScale);
 
-            // Validate
-            if (!isFinite(newPos.x) || !isFinite(newPos.y) || !isFinite(newPos.z) ||
-                !isFinite(newScale.x) || !isFinite(newScale.y) || !isFinite(newScale.z)) {
-                notify.error('Alignment produced an invalid transform — try clicking different points');
-                log.error('[LandmarkAlignment] NaN in computed transform');
-                this.cancel();
-                return;
+            if (isFinite(newPos.x) && isFinite(newPos.y) && isFinite(newPos.z) &&
+                isFinite(newScale.x) && isFinite(newScale.y) && isFinite(newScale.z)) {
+                this._moverObj.position.copy(newPos);
+                this._moverObj.quaternion.copy(newQuat);
+                this._moverObj.scale.copy(newScale);
+                this._moverObj.updateMatrix();
+                this._moverObj.updateMatrixWorld(true);
+            }
+        } else {
+            // For mesh mover: create a transparent clone for preview
+            // Remove old preview first
+            if (this._previewGroup) {
+                this.scene.remove(this._previewGroup);
+                this._previewGroup.traverse((child: Object3D) => {
+                    const mesh = child as THREE.Mesh;
+                    if (mesh.geometry) mesh.geometry.dispose();
+                    if (mesh.material) {
+                        if (Array.isArray(mesh.material)) {
+                            mesh.material.forEach(m => m.dispose());
+                        } else {
+                            mesh.material.dispose();
+                        }
+                    }
+                });
+                this._previewGroup = null;
             }
 
-            // Apply
-            this._moverObj.position.copy(newPos);
-            this._moverObj.quaternion.copy(newQuat);
-            this._moverObj.scale.copy(newScale);
+            // Clone the mover group
+            const clone = this._moverObj.clone(true) as Group;
+
+            // Apply transparent green material to all meshes in the clone
+            clone.traverse((child: Object3D) => {
+                const mesh = child as THREE.Mesh;
+                if (mesh.isMesh) {
+                    mesh.material = new THREE.MeshBasicMaterial({
+                        color: 0x00ff88,
+                        opacity: 0.3,
+                        transparent: true,
+                        depthWrite: false,
+                        side: THREE.DoubleSide
+                    });
+                }
+            });
+
+            // Compute the preview transform
+            const oldWorldMatrix = this._moverObj.matrixWorld.clone();
+            const newWorldMatrix = transformMatrix.clone().multiply(oldWorldMatrix);
+
+            // Apply directly as world transform (preview group has no parent transform)
+            const newPos = new THREE.Vector3();
+            const newQuat = new THREE.Quaternion();
+            const newScale = new THREE.Vector3();
+            newWorldMatrix.decompose(newPos, newQuat, newScale);
+
+            clone.position.copy(newPos);
+            clone.quaternion.copy(newQuat);
+            clone.scale.copy(newScale);
+            clone.updateMatrix();
+
+            this._previewGroup = clone;
+            this.scene.add(this._previewGroup);
+        }
+
+        log.debug(`[LandmarkAlignment] Preview updated: ${complete.length} pairs, RMSE: ${this._rmse?.toFixed(4)}`);
+    }
+
+    /**
+     * Remove the preview (ghost mesh clone or restore splat position)
+     */
+    private _removePreview(): void {
+        // Remove mesh preview clone
+        if (this._previewGroup) {
+            this.scene.remove(this._previewGroup);
+            this._previewGroup.traverse((child: Object3D) => {
+                const mesh = child as THREE.Mesh;
+                if (mesh.geometry) mesh.geometry.dispose();
+                if (mesh.material) {
+                    if (Array.isArray(mesh.material)) {
+                        mesh.material.forEach(m => m.dispose());
+                    } else {
+                        mesh.material.dispose();
+                    }
+                }
+            });
+            this._previewGroup = null;
+        }
+
+        // Restore splat mover to original transform
+        if (this._savedMoverTransform && this._moverObj) {
+            this._moverObj.position.copy(this._savedMoverTransform.position);
+            this._moverObj.quaternion.copy(this._savedMoverTransform.quaternion);
+            this._moverObj.scale.copy(this._savedMoverTransform.scale);
             this._moverObj.updateMatrix();
             this._moverObj.updateMatrixWorld(true);
+        }
+        this._savedMoverTransform = null;
+    }
 
-            log.info(`[LandmarkAlignment] Applied to ${this._moverType}:`,
-                `pos=[${newPos.x.toFixed(3)}, ${newPos.y.toFixed(3)}, ${newPos.z.toFixed(3)}]`,
-                `scale=[${newScale.x.toFixed(3)}, ${newScale.y.toFixed(3)}, ${newScale.z.toFixed(3)}]`);
+    // ── Public: Undo / Apply ──────────────────────────────────────────
+
+    /**
+     * Undo the last placed point
+     */
+    undo(): void {
+        if (this._undoStack.length === 0) return;
+
+        const action = this._undoStack.pop()!;
+
+        // Remove the marker from DOM and from _markers array
+        action.marker.element.remove();
+        const idx = this._markers.indexOf(action.marker);
+        if (idx !== -1) this._markers.splice(idx, 1);
+
+        if (action.type === 'mover') {
+            // Undo mover point: clear the mover from this pair, go back to place-mover
+            this._pairs[action.pairIndex].mover = null;
+            this._phase = 'place-mover';
+            this._currentPairIndex = action.pairIndex;
+        } else {
+            // Undo anchor point: remove the entire pair, go back to place-anchor
+            this._pairs.splice(action.pairIndex, 1);
+            this._currentPairIndex = action.pairIndex;
+            this._phase = 'place-anchor';
+        }
+
+        // Recalculate preview
+        this._updatePreview();
+
+        // Update UI visibility
+        const completePairs = this._getCompletePairs().length;
+        if (completePairs < 3) {
+            if (this._applyBtnEl) this._applyBtnEl.classList.add('hidden');
+            if (this._rmseEl) this._rmseEl.classList.add('hidden');
+        }
+        if (this._undoStack.length === 0) {
+            if (this._undoBtnEl) this._undoBtnEl.classList.add('hidden');
+        }
+
+        this._updateInstruction();
+        log.debug(`[LandmarkAlignment] Undo: removed ${action.type} at pair ${action.pairIndex + 1}`);
+    }
+
+    /**
+     * Apply the computed alignment transform
+     */
+    apply(): void {
+        const completePairs = this._getCompletePairs();
+        if (completePairs.length < 3) return;
+
+        log.info(`[LandmarkAlignment] Applying alignment from ${completePairs.length} point pairs...`);
+
+        try {
+            if (!this._moverObj) {
+                throw new Error('Mover object is null');
+            }
+
+            if (this._moverType === 'splat' && this._savedMoverTransform) {
+                // Splat is already at the preview position -- just keep it there
+                this._savedMoverTransform = null;
+            } else if (this._moverType !== 'splat') {
+                // Mesh mover: apply the transform to the real mover object
+                const transform = this._lastTransform;
+                if (!transform) {
+                    throw new Error('No transform computed');
+                }
+
+                const parentWorldInverse = new THREE.Matrix4();
+                if (this._moverObj.parent) {
+                    this._moverObj.parent.updateMatrixWorld(true);
+                    parentWorldInverse.copy(this._moverObj.parent.matrixWorld).invert();
+                }
+
+                const oldWorldMatrix = this._moverObj.matrixWorld.clone();
+                const newWorldMatrix = transform.clone().multiply(oldWorldMatrix);
+                const newLocalMatrix = parentWorldInverse.clone().multiply(newWorldMatrix);
+
+                const newPos = new THREE.Vector3();
+                const newQuat = new THREE.Quaternion();
+                const newScale = new THREE.Vector3();
+                newLocalMatrix.decompose(newPos, newQuat, newScale);
+
+                if (!isFinite(newPos.x) || !isFinite(newPos.y) || !isFinite(newPos.z) ||
+                    !isFinite(newScale.x) || !isFinite(newScale.y) || !isFinite(newScale.z)) {
+                    notify.error('Alignment produced an invalid transform -- try clicking different points');
+                    log.error('[LandmarkAlignment] NaN in computed transform');
+                    this.cancel();
+                    return;
+                }
+
+                this._moverObj.position.copy(newPos);
+                this._moverObj.quaternion.copy(newQuat);
+                this._moverObj.scale.copy(newScale);
+                this._moverObj.updateMatrix();
+                this._moverObj.updateMatrixWorld(true);
+
+                log.info(`[LandmarkAlignment] Applied to ${this._moverType}:`,
+                    `pos=[${newPos.x.toFixed(3)}, ${newPos.y.toFixed(3)}, ${newPos.z.toFixed(3)}]`,
+                    `scale=[${newScale.x.toFixed(3)}, ${newScale.y.toFixed(3)}, ${newScale.z.toFixed(3)}]`);
+            }
 
             this.updateTransformInputs();
             this.storeLastPositions();
 
-            notify.success(`Alignment complete (moved ${this._moverType})`);
+            const rmseStr = this._rmse !== null ? ` (RMSE: ${this._rmse.toFixed(4)})` : '';
+            notify.success(`Alignment complete${rmseStr} (moved ${this._moverType})`);
         } catch (e) {
             const error = e as Error;
-            log.error('[LandmarkAlignment] Transform computation failed:', error);
+            log.error('[LandmarkAlignment] Apply failed:', error);
             notify.error('Alignment failed: ' + error.message);
         }
 
-        // Clean up regardless of success/failure
+        // Clean up -- clear savedMoverTransform first so cancel() doesn't restore
+        this._savedMoverTransform = null;
         this.cancel();
     }
 }
