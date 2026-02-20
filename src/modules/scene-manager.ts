@@ -444,8 +444,16 @@ export class SceneManager {
             this.transformControls.dispose();
         }
 
+        const wasWebGPU = this.rendererType === 'webgpu';
         this.renderer.dispose();
         this.rendererRight.dispose();
+
+        // After disposing WebGPU renderers, the GPU device destruction is async.
+        // Browsers (especially Firefox) may fail to create WebGL contexts until
+        // the GPU resources are fully released, so yield to let cleanup complete.
+        if (wasWebGPU && target === 'webgl') {
+            await new Promise(r => setTimeout(r, 100));
+        }
 
         // --- Replace main canvas in DOM ---
         const oldCanvas = this._canvas!;
@@ -465,8 +473,23 @@ export class SceneManager {
         oldCanvasRight.parentNode!.replaceChild(newCanvasRight, oldCanvasRight);
         this._canvasRight = newCanvasRight;
 
-        // --- Create new renderers ---
-        this.renderer = this._createRenderer(newCanvas, target);
+        // --- Create new renderers (with retry for WebGPU→WebGL transitions) ---
+        const createWithRetry = async (canvas: HTMLCanvasElement): Promise<any> => {
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    return this._createRenderer(canvas, target);
+                } catch (err) {
+                    if (attempt < 2 && target === 'webgl' && wasWebGPU) {
+                        log.warn(`WebGL context creation failed (attempt ${attempt + 1}/3), retrying...`);
+                        await new Promise(r => setTimeout(r, 200));
+                    } else {
+                        throw err;
+                    }
+                }
+            }
+        };
+
+        this.renderer = await createWithRetry(newCanvas);
         this.renderer.setSize(size.x, size.y);
         this.renderer.setPixelRatio(pixelRatio);
         this.renderer.toneMapping = toneMapping;
@@ -482,7 +505,7 @@ export class SceneManager {
             this._patchWebGPURenderer(this.renderer);
         }
 
-        this.rendererRight = this._createRenderer(newCanvasRight, target);
+        this.rendererRight = await createWithRetry(newCanvasRight);
         this.rendererRight.setPixelRatio(pixelRatio);
         this.rendererRight.toneMapping = toneMapping;
         this.rendererRight.toneMappingExposure = toneMappingExposure;
