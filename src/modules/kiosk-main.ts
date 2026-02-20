@@ -1009,11 +1009,8 @@ async function handleArchiveFile(file: File): Promise<void> {
         updateProgress(80, 'Loading metadata...');
         updateArchiveMetadataUI(manifest, archiveLoader);
         prefillMetadataFromArchive(manifest);
-        populateMetadataDisplay({ state: state as any, annotationSystem, imageAssets: state.imageAssets });
 
-        // In kiosk/offline mode the edit form fields (#meta-title etc.) are stripped,
-        // so populateMetadataDisplay reads empty values from collectMetadata().
-        // Override display fields directly from the manifest.
+        // Populate basic display fields directly from manifest (edit fields are stripped in kiosk mode)
         const displayTitle = document.getElementById('display-title');
         if (displayTitle && manifest.project?.title) displayTitle.textContent = manifest.project.title;
         const displayDesc = document.getElementById('display-description');
@@ -1040,7 +1037,9 @@ async function handleArchiveFile(file: File): Promise<void> {
             displayLocationRow.style.display = '';
         }
 
+        // Populate detailed metadata sections (kiosk-specific, more comprehensive than populateMetadataDisplay)
         populateDetailedMetadata(manifest);
+        populateDisplayStats(annotationSystem);
         populateSourceFilesList(archiveLoader);
         reorderKioskSidebar();
 
@@ -1326,6 +1325,25 @@ function createArchiveDeps(): any {
             },
             onApplyModelTransform: (transform) => {
                 if (!modelGroup || !transform) return;
+
+                // Center model on grid if no splat is loaded (matches main viewer behavior)
+                // This ensures the model's base position is consistent before applying saved transforms
+                if (!state.splatLoaded && modelGroup.children.length > 0) {
+                    const box = new THREE.Box3().setFromObject(modelGroup);
+                    if (!box.isEmpty()) {
+                        const center = box.getCenter(new THREE.Vector3());
+                        const size = box.getSize(new THREE.Vector3());
+                        modelGroup.updateMatrixWorld(true);
+                        const localCenter = modelGroup.worldToLocal(center.clone());
+                        for (const child of modelGroup.children) {
+                            child.position.x -= localCenter.x;
+                            child.position.y -= localCenter.y;
+                            child.position.z -= localCenter.z;
+                        }
+                        modelGroup.position.set(0, size.y / 2, 0);
+                    }
+                }
+
                 if (transform.position) {
                     modelGroup.position.set(transform.position[0], transform.position[1], transform.position[2]);
                 }
@@ -2794,6 +2812,64 @@ function updateInfoPanel(): void {
             }
         });
         setInfo('pointcloud-points', pointCount.toLocaleString());
+    }
+}
+
+function populateDisplayStats(annotationSystem: any): void {
+    // Update display stats in sidebar
+    const splatStat = document.getElementById('display-splat-stat');
+    const splatCount = document.getElementById('display-splat-count');
+    if (splatStat && splatCount) {
+        if (state.splatLoaded) {
+            const count = document.getElementById('splat-vertices')?.textContent || '-';
+            splatCount.textContent = count;
+            splatStat.style.display = '';
+        } else {
+            splatStat.style.display = 'none';
+        }
+    }
+
+    const meshStat = document.getElementById('display-mesh-stat');
+    const meshCount = document.getElementById('display-mesh-count');
+    if (meshStat && meshCount) {
+        if (state.modelLoaded) {
+            const count = document.getElementById('model-faces')?.textContent || '-';
+            meshCount.textContent = count;
+            meshStat.style.display = '';
+        } else {
+            meshStat.style.display = 'none';
+        }
+    }
+
+    const pcStat = document.getElementById('display-pointcloud-stat');
+    const pcCount = document.getElementById('display-pointcloud-count');
+    if (pcStat && pcCount) {
+        if (state.pointcloudLoaded) {
+            const count = document.getElementById('pointcloud-points')?.textContent || '-';
+            pcCount.textContent = count;
+            pcStat.style.display = '';
+        } else {
+            pcStat.style.display = 'none';
+        }
+    }
+
+    const annoStat = document.getElementById('display-anno-stat');
+    const annoCount = document.getElementById('display-anno-count');
+    if (annoStat && annoCount && annotationSystem) {
+        const count = annotationSystem.getCount();
+        if (count > 0) {
+            annoCount.textContent = count.toString();
+            annoStat.style.display = '';
+        } else {
+            annoStat.style.display = 'none';
+        }
+    }
+
+    // Hide stats section if nothing to show
+    const statsSection = document.getElementById('display-stats');
+    if (statsSection) {
+        const hasStats = state.splatLoaded || state.modelLoaded || state.pointcloudLoaded || (annotationSystem && annotationSystem.getCount() > 0);
+        statsSection.style.display = hasStats ? '' : 'none';
     }
 }
 
