@@ -443,8 +443,11 @@ export class SceneManager {
         this.renderer.setPixelRatio(pixelRatio);
         this.renderer.toneMapping = toneMapping;
         this.renderer.toneMappingExposure = toneMappingExposure;
-        this.renderer.shadowMap.enabled = shadowMapEnabled;
-        this.renderer.shadowMap.type = shadowMapType;
+        // Only restore shadow state on WebGL — WebGPU has a shadow map texture bug
+        if (target === 'webgl') {
+            this.renderer.shadowMap.enabled = shadowMapEnabled;
+            this.renderer.shadowMap.type = shadowMapType;
+        }
         this.renderer.outputColorSpace = outputColorSpace;
         if (target === 'webgpu') {
             await (this.renderer as WebGPURenderer).init();
@@ -454,8 +457,11 @@ export class SceneManager {
         this.rendererRight.setPixelRatio(pixelRatio);
         this.rendererRight.toneMapping = toneMapping;
         this.rendererRight.toneMappingExposure = toneMappingExposure;
-        this.rendererRight.shadowMap.enabled = shadowMapEnabled;
-        this.rendererRight.shadowMap.type = shadowMapType;
+        // Only restore shadow state on WebGL — WebGPU has a shadow map texture bug
+        if (target === 'webgl') {
+            this.rendererRight.shadowMap.enabled = shadowMapEnabled;
+            this.rendererRight.shadowMap.type = shadowMapType;
+        }
         this.rendererRight.outputColorSpace = outputColorSpace;
         if (target === 'webgpu') {
             await (this.rendererRight as WebGPURenderer).init();
@@ -795,6 +801,12 @@ export class SceneManager {
      * Enable or disable shadow rendering
      */
     enableShadows(enabled: boolean): void {
+        // WebGPU renderer has a bug with shadow map textures ("Texture already initialized")
+        // so skip shadow operations when using WebGPU
+        if (this.rendererType === 'webgpu') {
+            log.info('Shadows not supported on WebGPU renderer, skipping');
+            return;
+        }
         this.renderer!.shadowMap.enabled = enabled;
         this.rendererRight!.shadowMap.enabled = enabled;
         this.directionalLight1!.castShadow = enabled;
