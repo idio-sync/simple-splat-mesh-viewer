@@ -746,6 +746,7 @@ export {
     // Markdown parsing
     parseMarkdown,
     resolveAssetRefs,
+    escapeHtml,
 
     // Network utilities
     fetchWithProgress,

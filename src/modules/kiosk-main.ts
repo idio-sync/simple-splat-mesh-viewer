@@ -2168,7 +2168,7 @@ function populateInfoOverlay(manifest: any): void {
     if (tagsEl) {
         const tagList = Array.isArray(tags) ? tags : (typeof tags === 'string' && tags ? tags.split(',').map(t => t.trim()) : []);
         if (tagList.length > 0) {
-            tagsEl.innerHTML = tagList.map(t => `<span class="kiosk-info-tag">${t}</span>`).join('');
+            tagsEl.innerHTML = tagList.map(t => `<span class="kiosk-info-tag">${escapeHtml(t)}</span>`).join('');
         } else {
             tagsEl.style.display = 'none';
         }

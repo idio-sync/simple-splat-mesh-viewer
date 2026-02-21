@@ -1,6 +1,6 @@
 import { getStore } from './asset-store.js';
 import { formatFileSize } from './metadata-manager.js';
-import { notify } from './utilities.js';
+import { notify, escapeHtml } from './utilities.js';
 
 export function handleSourceFilesInput(event: Event): void {
     const assets = getStore();
@@ -42,7 +42,8 @@ export function updateSourceFilesUI(): void {
     assets.sourceFiles.forEach((sf, i) => {
         const item = document.createElement('div');
         item.className = 'source-file-item';
-        item.innerHTML = `<span class="source-file-name" title="${sf.name}">${sf.name}</span>` +
+        const safeName = escapeHtml(sf.name);
+        item.innerHTML = `<span class="source-file-name" title="${safeName}">${safeName}</span>` +
             `<span class="source-file-size">${formatFileSize(sf.size)}</span>` +
             (sf.fromArchive ? '' : `<span class="source-file-remove" data-index="${i}" title="Remove">\u00d7</span>`);
         listEl.appendChild(item);
