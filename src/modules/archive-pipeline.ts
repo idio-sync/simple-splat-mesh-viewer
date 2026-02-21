@@ -613,6 +613,19 @@ export function applyViewerSettings(settings: any, deps: ArchivePipelineDeps): v
         if (hexLabel) hexLabel.textContent = settings.background_color;
     }
 
+    // Apply saved camera position and target
+    if (settings.camera_position && settings.camera_target) {
+        const cp = settings.camera_position;
+        const ct = settings.camera_target;
+        const camera = sceneRefs.camera;
+        const controls = sceneRefs.controls;
+        if (camera && controls) {
+            camera.position.set(cp.x, cp.y, cp.z);
+            controls.target.set(ct.x, ct.y, ct.z);
+            controls.update();
+        }
+    }
+
     log.info('Applied viewer settings:', settings);
 }
 

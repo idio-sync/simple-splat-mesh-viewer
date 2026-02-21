@@ -364,10 +364,12 @@ function createFileHandlerDeps(): any {
                 assets.splatBlob = file;
                 document.getElementById('splat-vertices').textContent = 'Loaded';
                 // Auto center-align if model is already loaded
-                if (state.modelLoaded) {
+                if (state.modelLoaded && !state.archiveLoaded) {
                     setTimeout(() => autoCenterAlign(), TIMING.AUTO_ALIGN_DELAY);
                 }
-                clearArchiveMetadata();
+                if (!state.archiveLoaded) {
+                    clearArchiveMetadata();
+                }
                 updatePronomRegistry(state);
             },
             onModelLoaded: (object: any, file: any, faceCount: number) => {
@@ -404,13 +406,16 @@ function createFileHandlerDeps(): any {
                     notify.info(`Mesh has ${faceCount.toLocaleString()} faces — may not display on mobile/tablet. Consider adding a display proxy.`);
                 }
                 // Auto center-align if splat is already loaded, otherwise center on grid
-                if (state.splatLoaded) {
-                    setTimeout(() => autoCenterAlign(), TIMING.AUTO_ALIGN_DELAY);
-                } else {
-                    // Center model on grid when loaded standalone
-                    setTimeout(() => centerModelOnGrid(modelGroup), TIMING.AUTO_ALIGN_DELAY);
+                // Skip when loading from an archive — saved transforms must be preserved
+                if (!state.archiveLoaded) {
+                    if (state.splatLoaded) {
+                        setTimeout(() => autoCenterAlign(), TIMING.AUTO_ALIGN_DELAY);
+                    } else {
+                        // Center model on grid when loaded standalone
+                        setTimeout(() => centerModelOnGrid(modelGroup), TIMING.AUTO_ALIGN_DELAY);
+                    }
+                    clearArchiveMetadata();
                 }
-                clearArchiveMetadata();
                 updatePronomRegistry(state);
             },
             onSTLLoaded: (object: any, file: any, _faceCount: number) => {

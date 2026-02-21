@@ -136,7 +136,7 @@ function showComplianceDialog(result: SIPValidationResult): Promise<boolean> {
  */
 export async function downloadArchive(deps: ExportDeps): Promise<void> {
     const { sceneRefs, state, ui, metadata: metadataFns } = deps;
-    const { archiveCreator, renderer, scene, camera, splatMesh, modelGroup, pointcloudGroup, annotationSystem } = sceneRefs;
+    const { archiveCreator, renderer, scene, camera, controls, splatMesh, modelGroup, pointcloudGroup, annotationSystem } = sceneRefs;
     const assets = getStore();
 
     log.info(' downloadArchive called');
@@ -328,6 +328,27 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
             role: metadata.pointcloudMetadata?.role || ''
         });
     }
+
+    // Save global alignment — definitive scene state for re-import
+    archiveCreator.setAlignment({
+        splat: splatMesh ? {
+            position: [splatMesh.position.x, splatMesh.position.y, splatMesh.position.z],
+            rotation: [splatMesh.rotation.x, splatMesh.rotation.y, splatMesh.rotation.z],
+            scale: splatMesh.scale.x
+        } : null,
+        model: modelGroup ? {
+            position: [modelGroup.position.x, modelGroup.position.y, modelGroup.position.z],
+            rotation: [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z],
+            scale: modelGroup.scale.x
+        } : null,
+        pointcloud: pointcloudGroup ? {
+            position: [pointcloudGroup.position.x, pointcloudGroup.position.y, pointcloudGroup.position.z],
+            rotation: [pointcloudGroup.rotation.x, pointcloudGroup.rotation.y, pointcloudGroup.rotation.z],
+            scale: pointcloudGroup.scale.x
+        } : null,
+        camera: [camera.position.x, camera.position.y, camera.position.z],
+        target: controls ? [controls.target.x, controls.target.y, controls.target.z] : [0, 0, 0]
+    });
 
     // Add annotations if selected
     if (includeAnnotations && annotationSystem && annotationSystem.hasAnnotations()) {

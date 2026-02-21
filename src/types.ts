@@ -116,7 +116,7 @@ export interface AssetStore {
 // ===== Module Dependencies =====
 
 export interface ExportDeps {
-    sceneRefs: Pick<SceneRefs, 'renderer' | 'scene' | 'camera' | 'splatMesh' | 'modelGroup' | 'pointcloudGroup' | 'annotationSystem' | 'archiveCreator'>;
+    sceneRefs: Pick<SceneRefs, 'renderer' | 'scene' | 'camera' | 'controls' | 'splatMesh' | 'modelGroup' | 'pointcloudGroup' | 'annotationSystem' | 'archiveCreator'>;
     state: AppState;
     tauriBridge: any | null;
     ui: {
@@ -136,7 +136,7 @@ export interface ExportDeps {
 }
 
 export interface ArchivePipelineDeps {
-    sceneRefs: Pick<SceneRefs, 'scene' | 'camera' | 'renderer' | 'splatMesh' | 'modelGroup' | 'pointcloudGroup'>;
+    sceneRefs: Pick<SceneRefs, 'scene' | 'camera' | 'controls' | 'renderer' | 'splatMesh' | 'modelGroup' | 'pointcloudGroup'>;
     state: AppState;
     sceneManager: any;
     setSplatMesh: (mesh: any) => void;

@@ -1356,6 +1356,13 @@ function createArchiveDeps(): any {
         callbacks: {
             onApplySplatTransform: (transform) => {
                 if (!splatMesh || !transform) return;
+                // Only apply non-identity transforms (matches main mode behavior).
+                // Identity transforms are skipped because applyGlobalAlignment
+                // will set the final position from the saved alignment data.
+                const hasRealTransform = transform.position?.some((v: number) => v !== 0) ||
+                    transform.rotation?.some((v: number) => v !== 0) ||
+                    (transform.scale != null && transform.scale !== 1);
+                if (!hasRealTransform) return;
                 if (transform.position) {
                     splatMesh.position.set(transform.position[0], transform.position[1], transform.position[2]);
                 }
@@ -1365,38 +1372,43 @@ function createArchiveDeps(): any {
                 if (transform.scale != null) {
                     splatMesh.scale.setScalar(transform.scale);
                 }
-                // Force matrix world update after transforms
                 splatMesh.updateMatrixWorld(true);
             },
             onApplyModelTransform: (transform) => {
                 if (!modelGroup || !transform) return;
 
-                // Center model on grid if no splat is loaded (matches main viewer behavior)
-                // This ensures the model's base position is consistent before applying saved transforms
-                if (!state.splatLoaded && modelGroup.children.length > 0) {
+                const hasRealTransform = transform.position?.some((v: number) => v !== 0) ||
+                    transform.rotation?.some((v: number) => v !== 0) ||
+                    (transform.scale != null && transform.scale !== 1);
+
+                // Center model on grid only when no splat and no saved transform.
+                // Only adjust group position — never mutate children positions,
+                // because child offsets aren't saved and would persist incorrectly
+                // when applyGlobalAlignment later overwrites the group position.
+                if (!state.splatLoaded && !hasRealTransform && modelGroup.children.length > 0) {
                     const box = new THREE.Box3().setFromObject(modelGroup);
                     if (!box.isEmpty()) {
                         const center = box.getCenter(new THREE.Vector3());
                         const size = box.getSize(new THREE.Vector3());
-                        modelGroup.updateMatrixWorld(true);
-                        const localCenter = modelGroup.worldToLocal(center.clone());
-                        for (const child of modelGroup.children) {
-                            child.position.x -= localCenter.x;
-                            child.position.y -= localCenter.y;
-                            child.position.z -= localCenter.z;
-                        }
-                        modelGroup.position.set(0, size.y / 2, 0);
+                        modelGroup.position.set(
+                            -center.x,
+                            -center.y + size.y / 2,
+                            -center.z
+                        );
                     }
                 }
 
-                if (transform.position) {
-                    modelGroup.position.set(transform.position[0], transform.position[1], transform.position[2]);
-                }
-                if (transform.rotation) {
-                    modelGroup.rotation.set(transform.rotation[0], transform.rotation[1], transform.rotation[2]);
-                }
-                if (transform.scale != null) {
-                    modelGroup.scale.setScalar(transform.scale);
+                // Apply saved per-entry transform (may be overwritten by applyGlobalAlignment later)
+                if (hasRealTransform) {
+                    if (transform.position) {
+                        modelGroup.position.set(transform.position[0], transform.position[1], transform.position[2]);
+                    }
+                    if (transform.rotation) {
+                        modelGroup.rotation.set(transform.rotation[0], transform.rotation[1], transform.rotation[2]);
+                    }
+                    if (transform.scale != null) {
+                        modelGroup.scale.setScalar(transform.scale);
+                    }
                 }
             }
         }
@@ -1461,13 +1473,45 @@ function createDisplayModeDeps(): any {
             // Helper to animate fade-in for regular meshes
             const fadeIn = (obj: any, duration: number = 500) => {
                 obj.visible = true;
+                // Save original transparency state before fade-in overrides it
+                const savedStates = new Map<any, { transparent: boolean; opacity: number }>();
+                obj.traverse((child: any) => {
+                    if (child.material) {
+                        const mats = Array.isArray(child.material) ? child.material : [child.material];
+                        mats.forEach((m: any) => {
+                            savedStates.set(m, { transparent: m.transparent, opacity: m.opacity });
+                        });
+                    }
+                });
                 setOpacity(obj, 0);
                 const startTime = performance.now();
                 const animate = () => {
                     const elapsed = performance.now() - startTime;
                     const progress = Math.min(elapsed / duration, 1);
                     setOpacity(obj, progress);
-                    if (progress < 1) requestAnimationFrame(animate);
+                    if (progress < 1) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        // Restore original transparency state so opaque meshes
+                        // render in the opaque pass with depth writing — required
+                        // for correct depth interleaving with Gaussian splats.
+                        obj.traverse((child: any) => {
+                            if (child.material) {
+                                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                                mats.forEach((m: any) => {
+                                    const saved = savedStates.get(m);
+                                    if (saved) {
+                                        m.transparent = saved.transparent;
+                                        m.opacity = saved.opacity;
+                                    } else {
+                                        m.transparent = false;
+                                        m.opacity = 1;
+                                    }
+                                    m.needsUpdate = true;
+                                });
+                            }
+                        });
+                    }
                 };
                 animate();
             };

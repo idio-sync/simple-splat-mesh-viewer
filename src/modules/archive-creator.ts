@@ -274,6 +274,13 @@ export interface Manifest {
         auto_rotate: boolean;
         annotations_visible: boolean;
     };
+    alignment?: {
+        splat?: { position: number[]; rotation: number[]; scale: number } | null;
+        model?: { position: number[]; rotation: number[]; scale: number } | null;
+        pointcloud?: { position: number[]; rotation: number[]; scale: number } | null;
+        camera?: number[];
+        target?: number[];
+    } | null;
     preservation: {
         format_registry: Record<string, string>;
         significant_properties: string[];
@@ -622,6 +629,7 @@ export class ArchiveCreator {
                 auto_rotate: false,
                 annotations_visible: true,
             },
+            alignment: null,
             preservation: {
                 format_registry: {},
                 significant_properties: [],
@@ -1085,6 +1093,16 @@ export class ArchiveCreator {
         if (settings.cameraTarget !== undefined) this.manifest.viewer_settings.camera_target = settings.cameraTarget;
         if (settings.autoRotate !== undefined) this.manifest.viewer_settings.auto_rotate = settings.autoRotate;
         if (settings.annotationsVisible !== undefined) this.manifest.viewer_settings.annotations_visible = settings.annotationsVisible;
+    }
+
+    setAlignment(data: {
+        splat?: { position: number[]; rotation: number[]; scale: number } | null;
+        model?: { position: number[]; rotation: number[]; scale: number } | null;
+        pointcloud?: { position: number[]; rotation: number[]; scale: number } | null;
+        camera?: number[];
+        target?: number[];
+    }): void {
+        this.manifest.alignment = data;
     }
 
     setMaterialStandard(material: MaterialStandard): void {
