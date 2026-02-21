@@ -484,6 +484,7 @@ export class LandmarkAlignment {
     // Raycaster
     private _raycaster: Raycaster;
     private _mouse: Vector2;
+    private _projVec: Vector3;
 
     // Bound handlers
     private _onClickBound: (event: MouseEvent) => void;
@@ -530,6 +531,7 @@ export class LandmarkAlignment {
         // Raycaster
         this._raycaster = new THREE.Raycaster();
         this._mouse = new THREE.Vector2();
+        this._projVec = new THREE.Vector3();
 
         // Bound handlers
         this._onClickBound = this._onClick.bind(this);
@@ -697,7 +699,7 @@ export class LandmarkAlignment {
         const rect = this.renderer.domElement.getBoundingClientRect();
 
         for (const marker of this._markers) {
-            const screenPos = marker.position.clone().project(this.camera);
+            const screenPos = this._projVec.copy(marker.position).project(this.camera);
             const x = (screenPos.x * 0.5 + 0.5) * rect.width + rect.left;
             const y = (-screenPos.y * 0.5 + 0.5) * rect.height + rect.top;
 

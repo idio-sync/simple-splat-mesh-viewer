@@ -45,7 +45,8 @@ import {
     showMetadataSidebar, hideMetadataSidebar, switchSidebarMode,
     setupMetadataSidebar, prefillMetadataFromArchive,
     populateMetadataDisplay, updateArchiveMetadataUI,
-    showAnnotationPopup, hideAnnotationPopup, updateAnnotationPopupPosition
+    showAnnotationPopup, hideAnnotationPopup, updateAnnotationPopupPosition,
+    invalidatePopupLayoutCache
 } from './metadata-manager.js';
 import { loadTheme } from './theme-loader.js';
 import type { LayoutModule } from './theme-loader.js';
@@ -180,6 +181,11 @@ let currentPopupAnnotationId: string | null = null;
 let annotationLineEl: SVGLineElement | null = null;
 let currentSheetSnap: SheetSnap = 'peek'; // 'peek' | 'half' | 'full'
 let _markersContainerEl: HTMLElement | null = null; // Cached for animate loop
+
+// Camera dirty tracking — skip marker DOM updates when camera is stationary
+const _prevCamPos = new THREE.Vector3();
+const _prevCamQuat = new THREE.Quaternion();
+let _markersDirty = true;
 
 /** Get the resolved layout module, if any. */
 function getLayoutModule(): LayoutModule | null {
@@ -3669,6 +3675,8 @@ function onWindowResize(): void {
     const container = document.getElementById('viewer-container');
     if (!container) return;
     sceneManager.onWindowResize(state.displayMode, container);
+    _markersDirty = true; // Viewport changed — marker screen positions are stale
+    invalidatePopupLayoutCache(); // Viewer rect changed
 
     // Move annotation toggle and view switcher based on viewport
     repositionAnnotationToggle();
@@ -3917,20 +3925,30 @@ function animate(): void {
         // Update cross-section plane to track gizmo anchor
         if (crossSection) crossSection.updatePlane();
 
-        // Update annotation marker screen positions (skip when globally hidden, unless single-marker is shown)
-        if (annotationSystem.hasAnnotations()) {
-            if (!_markersContainerEl) _markersContainerEl = document.getElementById('annotation-markers');
-            const markersShown = !_markersContainerEl || _markersContainerEl.style.display !== 'none';
-            if (markersShown) {
-                annotationSystem.updateMarkerPositions();
-            }
-            updateAnnotationPopupPosition(currentPopupAnnotationId);
-            updateAnnotationLine(currentPopupAnnotationId);
-        }
+        // Check if camera moved since last frame (skip marker DOM updates when idle)
+        const camMoved = _markersDirty
+            || !camera.position.equals(_prevCamPos)
+            || !camera.quaternion.equals(_prevCamQuat);
+        if (camMoved) {
+            _prevCamPos.copy(camera.position);
+            _prevCamQuat.copy(camera.quaternion);
+            _markersDirty = false;
 
-        // Update measurement marker screen positions
-        if (measurementSystem) {
-            measurementSystem.updateMarkerPositions();
+            // Update annotation marker screen positions (skip when globally hidden)
+            if (annotationSystem.hasAnnotations()) {
+                if (!_markersContainerEl) _markersContainerEl = document.getElementById('annotation-markers');
+                const markersShown = !_markersContainerEl || _markersContainerEl.style.display !== 'none';
+                if (markersShown) {
+                    annotationSystem.updateMarkerPositions();
+                }
+                updateAnnotationPopupPosition(currentPopupAnnotationId);
+                updateAnnotationLine(currentPopupAnnotationId);
+            }
+
+            // Update measurement marker screen positions
+            if (measurementSystem) {
+                measurementSystem.updateMarkerPositions();
+            }
         }
 
         sceneManager.updateFPS(fpsElement);

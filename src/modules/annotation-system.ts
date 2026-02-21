@@ -65,9 +65,10 @@ export class AnnotationSystem {
     onAnnotationUpdated: ((annotation: Annotation) => void) | null;
     onPlacementModeChanged: ((isEnabled: boolean) => void) | null;
 
-    // Reusable vectors for occlusion checks
+    // Reusable vectors for occlusion checks and projection
     _surfaceNormal: Vector3;
     _viewDir: Vector3;
+    _projVec: Vector3;
 
     // Drag state
     _dragging: DragState | null;
@@ -112,6 +113,7 @@ export class AnnotationSystem {
         // Reusable vectors for occlusion checks
         this._surfaceNormal = new THREE.Vector3();
         this._viewDir = new THREE.Vector3();
+        this._projVec = new THREE.Vector3();
 
         // Drag state
         this._dragging = null;
@@ -444,7 +446,7 @@ export class AnnotationSystem {
         const rect = this.renderer.domElement.getBoundingClientRect();
 
         this.markers.forEach(marker => {
-            const screenPos = marker.position.clone().project(this.camera);
+            const screenPos = this._projVec.copy(marker.position).project(this.camera);
             const x = (screenPos.x * 0.5 + 0.5) * rect.width + rect.left;
             const y = (-screenPos.y * 0.5 + 0.5) * rect.height + rect.top;
 

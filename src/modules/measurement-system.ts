@@ -50,8 +50,9 @@ export class MeasurementSystem {
     private mouse: THREE.Vector2;
     private markersContainer: HTMLElement | null;
 
-    // Reusable vector for midpoint calculation
+    // Reusable vectors for midpoint calculation and projection
     private _mid: THREE.Vector3;
+    private _projVec: THREE.Vector3;
 
     // Bound event handler
     private _onClick: (event: MouseEvent) => void;
@@ -78,6 +79,7 @@ export class MeasurementSystem {
         this.mouse = new THREE.Vector2();
         this.markersContainer = null;
         this._mid = new THREE.Vector3();
+        this._projVec = new THREE.Vector3();
 
         this.onMeasureModeChanged = null;
 
@@ -286,7 +288,7 @@ export class MeasurementSystem {
 
             // Label at geometric midpoint of A and B
             this._mid.addVectors(m.pointA.position, m.pointB.position).multiplyScalar(0.5);
-            const midScreen = this._mid.clone().project(this.camera);
+            const midScreen = this._projVec.copy(this._mid).project(this.camera);
 
             if (midScreen.z > 1) {
                 m.labelEl.style.display = 'none';
@@ -301,7 +303,7 @@ export class MeasurementSystem {
     }
 
     private _projectPoint(el: HTMLElement, pos: THREE.Vector3, rect: DOMRect): void {
-        const screenPos = pos.clone().project(this.camera);
+        const screenPos = this._projVec.copy(pos).project(this.camera);
         if (screenPos.z > 1) {
             el.style.display = 'none';
         } else {

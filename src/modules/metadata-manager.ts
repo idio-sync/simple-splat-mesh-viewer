@@ -2310,11 +2310,30 @@ export function showAnnotationPopup(annotation: Annotation, imageAssets?: Map<st
 
     popup.classList.remove('hidden');
 
+    // Invalidate cached popup dimensions — content just changed
+    _popupDimCache = null;
+
     return annotation.id;
 }
 
 /**
- * Update annotation popup position to follow the marker
+ * Cached popup/viewer dimensions — invalidated on resize and popup content changes.
+ * Avoids per-frame getBoundingClientRect() calls that force synchronous reflow
+ * when interleaved with marker style writes in the animate loop.
+ */
+let _popupDimCache: { w: number; h: number } | null = null;
+let _viewerRectCache: { left: number; right: number; midX: number } | null = null;
+
+/** Invalidate cached popup/viewer dimensions (call on resize or popup content change). */
+export function invalidatePopupLayoutCache(): void {
+    _popupDimCache = null;
+    _viewerRectCache = null;
+}
+
+/**
+ * Update annotation popup position to follow the marker.
+ * Reads marker position from inline styles (set by updateMarkerPositions)
+ * and uses cached dimensions to avoid forced reflows.
  */
 export function updateAnnotationPopupPosition(currentPopupAnnotationId: string | null): void {
     if (!currentPopupAnnotationId) return;
@@ -2335,26 +2354,41 @@ export function updateAnnotationPopupPosition(currentPopupAnnotationId: string |
     }
     popup.style.visibility = 'visible';
 
-    const markerRect = marker.getBoundingClientRect();
-    const popupWidth = popup.getBoundingClientRect().width || 320;
-    const popupHeight = popup.getBoundingClientRect().height || 200;
+    // Read marker position from inline styles (already set by updateMarkerPositions)
+    // instead of getBoundingClientRect, avoiding forced reflow after style writes.
+    const markerX = parseFloat(marker.style.left) || 0;
+    const markerY = parseFloat(marker.style.top) || 0;
+
+    // Cache popup dimensions (only change when popup content changes)
+    if (!_popupDimCache) {
+        _popupDimCache = {
+            w: popup.offsetWidth || 320,
+            h: popup.offsetHeight || 200
+        };
+    }
+    const popupWidth = _popupDimCache.w;
+    const popupHeight = _popupDimCache.h;
+
+    // Cache viewer rect (only changes on resize — invalidated by invalidatePopupLayoutCache)
+    if (!_viewerRectCache) {
+        const viewer = document.getElementById('viewer-container');
+        if (viewer) {
+            const vr = viewer.getBoundingClientRect();
+            _viewerRectCache = { left: vr.left, right: vr.right, midX: (vr.left + vr.right) / 2 };
+        } else {
+            _viewerRectCache = { left: 0, right: window.innerWidth, midX: window.innerWidth / 2 };
+        }
+    }
+
     const edgeMargin = 40;
     const padding = 15;
-    const markerCenterX = markerRect.left + markerRect.width / 2;
-
-    // Use the viewer container to determine the visible midpoint
-    const viewer = document.getElementById('viewer-container');
-    const viewerRect = viewer ? viewer.getBoundingClientRect() : { left: 0, right: window.innerWidth };
-    const viewerMidX = (viewerRect.left + viewerRect.right) / 2;
 
     // Snap popup toward the nearest horizontal edge of the viewer
     let left: number;
-    if (markerCenterX < viewerMidX) {
-        // Marker on left half → popup to the left edge
-        left = viewerRect.left + edgeMargin;
+    if (markerX < _viewerRectCache.midX) {
+        left = _viewerRectCache.left + edgeMargin;
     } else {
-        // Marker on right half → popup to the right edge
-        left = viewerRect.right - popupWidth - edgeMargin;
+        left = _viewerRectCache.right - popupWidth - edgeMargin;
     }
 
     // Vertical: align with marker center, clamped to viewport
@@ -2363,7 +2397,7 @@ export function updateAnnotationPopupPosition(currentPopupAnnotationId: string |
     const topZone = isEditorial ? 95 : padding;
     const bottomZone = isEditorial ? 48 : padding;
 
-    let top = markerRect.top + markerRect.height / 2 - popupHeight / 2;
+    let top = markerY - popupHeight / 2;
     if (top < topZone) top = topZone;
     if (top + popupHeight > window.innerHeight - bottomZone) {
         top = window.innerHeight - popupHeight - bottomZone;

@@ -56,7 +56,8 @@ import {
     hideAnnotationPopup as hideAnnotationPopupHandler,
     setupMetadataSidebar as setupMetadataSidebarHandler,
     prefillMetadataFromArchive as prefillMetadataFromArchiveHandler,
-    updatePronomRegistry
+    updatePronomRegistry,
+    invalidatePopupLayoutCache
 } from './modules/metadata-manager.js';
 import {
     loadSplatFromFile as loadSplatFromFileHandler,
@@ -708,6 +709,7 @@ async function init() {
     // Set up SceneManager callbacks for transform controls
     sceneManager.onTransformChange = () => {
         updateTransformInputs();
+        _markersDirty = true; // Object moved — marker positions may be stale
         // If both selected, sync the other object
         if (state.selectedObject === 'both') {
             syncBothObjects();
@@ -802,6 +804,8 @@ function onWindowResize() {
     if (sceneManager) {
         sceneManager.onWindowResize(state.displayMode, container);
     }
+    _markersDirty = true; // Viewport changed — marker screen positions are stale
+    invalidatePopupLayoutCache(); // Viewer rect changed
 }
 
 function onKeyDown(event: KeyboardEvent) {
@@ -1552,6 +1556,11 @@ const MAX_ANIMATION_ERRORS = 10;
 const fpsElement = document.getElementById('fps-counter');
 let _statusBarFrameCount = 0;
 
+// Camera dirty tracking — skip marker DOM updates when camera is stationary
+const _prevCamPos = new THREE.Vector3();
+const _prevCamQuat = new THREE.Quaternion();
+let _markersDirty = true; // Start dirty so first frame always updates
+
 function animate() {
     requestAnimationFrame(animate);
 
@@ -1574,23 +1583,33 @@ function animate() {
         // Update cross-section plane (syncs THREE.Plane with gizmo anchor each frame)
         if (crossSection) crossSection.updatePlane();
 
-        // Update annotation marker positions
-        if (annotationSystem) {
-            annotationSystem.updateMarkerPositions();
-        }
+        // Check if camera moved since last frame (skip marker DOM updates when idle)
+        const camMoved = _markersDirty
+            || !camera.position.equals(_prevCamPos)
+            || !camera.quaternion.equals(_prevCamQuat);
+        if (camMoved) {
+            _prevCamPos.copy(camera.position);
+            _prevCamQuat.copy(camera.quaternion);
+            _markersDirty = false;
 
-        // Update measurement marker positions
-        if (measurementSystem) {
-            measurementSystem.updateMarkerPositions();
-        }
+            // Update annotation marker positions
+            if (annotationSystem) {
+                annotationSystem.updateMarkerPositions();
+            }
 
-        // Update alignment marker positions
-        if (landmarkAlignment) {
-            landmarkAlignment.updateMarkerPositions();
-        }
+            // Update measurement marker positions
+            if (measurementSystem) {
+                measurementSystem.updateMarkerPositions();
+            }
 
-        // Update annotation popup position to follow marker
-        updateAnnotationPopupPosition();
+            // Update alignment marker positions
+            if (landmarkAlignment) {
+                landmarkAlignment.updateMarkerPositions();
+            }
+
+            // Update annotation popup position to follow marker
+            updateAnnotationPopupPosition();
+        }
 
         sceneManager.updateFPS(fpsElement);
 
