@@ -180,6 +180,14 @@ body.kiosk-mode #app {
     grid-template-areas: "viewport";
 }
 
+/* Prevent Three.js renderer.setSize() inline styles from freezing canvas dimensions.
+   Without !important, the inline pixel values override CSS and the canvas won't
+   resize on fullscreen or viewport changes. */
+body.kiosk-mode #viewer-canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
 /* --- Editor-Only UI: Hidden Immediately via CSS --- */
 
 body.kiosk-mode #annotation-bar {

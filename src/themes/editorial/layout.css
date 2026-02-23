@@ -8,6 +8,9 @@
 
 body.kiosk-mode.kiosk-editorial {
     font-family: var(--kiosk-font-body);
+    font-feature-settings: "liga", "kern";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
 }
 
 /* --- Hide Sidebar Layout Elements --- */
@@ -31,6 +34,7 @@ body.kiosk-mode.kiosk-editorial .editorial-spine {
     opacity: 0.6;
     z-index: 100;
     pointer-events: none;
+    animation: editorialUIFadeIn 0.6s ease-out 0.3s both;
 }
 
 /* --- Title Block — top-left anchor: title, rule, meta --- */
@@ -66,6 +70,8 @@ body.kiosk-mode.kiosk-editorial .editorial-title-rule {
     background: var(--kiosk-accent);
     margin-bottom: 8px;
     box-shadow: 0 0 8px rgba(0,0,0,0.5);
+    transform-origin: left;
+    animation: editorialRuleDraw 0.6s cubic-bezier(0.33, 1, 0.68, 1) 0.3s both;
 }
 
 body.kiosk-mode.kiosk-editorial .editorial-title-meta {
@@ -88,7 +94,7 @@ body.kiosk-mode.kiosk-editorial .editorial-ribbon-logo {
     opacity: 0.9;
     flex-shrink: 0;
     margin-left: auto;
-    filter: brightness(1.5);
+    filter: brightness(1.5) drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5));
 }
 
 /* --- Bottom Ribbon — thin typographic navigation --- */
@@ -102,12 +108,13 @@ body.kiosk-mode.kiosk-editorial .editorial-bottom-ribbon {
     display: flex;
     align-items: center;
     padding: 0 24px;
-    background: rgba(var(--kiosk-surface-rgb), 0.65);
+    background: rgba(var(--kiosk-surface-rgb), 0.88);
     border-top: 1px solid var(--kiosk-border-subtle);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     z-index: 100;
     overflow: visible;
+    animation: editorialUIFadeIn 0.4s ease-out 0.5s both;
 }
 
 /* View modes — text links */
@@ -141,11 +148,24 @@ body.kiosk-mode.kiosk-editorial .editorial-view-mode-link {
     cursor: pointer;
     margin: 0;
     padding: 0;
-    padding-bottom: 1px;
+    padding-bottom: 2px;
     border: none;
-    border-bottom: 1px solid transparent;
     background: none;
-    transition: color 0.15s, border-color 0.15s;
+    position: relative;
+    transition: color 0.15s;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-view-mode-link::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--kiosk-accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.25s cubic-bezier(0.33, 1, 0.68, 1);
 }
 
 body.kiosk-mode.kiosk-editorial .editorial-view-mode-link:hover {
@@ -154,7 +174,10 @@ body.kiosk-mode.kiosk-editorial .editorial-view-mode-link:hover {
 
 body.kiosk-mode.kiosk-editorial .editorial-view-mode-link.active {
     color: var(--kiosk-text-primary);
-    border-bottom-color: var(--kiosk-accent);
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-view-mode-link.active::after {
+    transform: scaleX(1);
 }
 
 /* Quality toggle — reset pill styles, use ribbon link style */
@@ -165,8 +188,8 @@ body.kiosk-mode.kiosk-editorial .quality-toggle-btn {
     border-radius: 0;
     margin: 0;
     padding: 0;
-    padding-bottom: 1px;
-    border-bottom: 1px solid transparent;
+    padding-bottom: 2px;
+    position: relative;
     font-family: var(--kiosk-font-body);
     font-size: 0.72rem;
     font-weight: 500;
@@ -174,13 +197,29 @@ body.kiosk-mode.kiosk-editorial .quality-toggle-btn {
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--kiosk-text-muted);
-    transition: color 0.15s, border-color 0.15s;
+    transition: color 0.15s;
+}
+
+body.kiosk-mode.kiosk-editorial .quality-toggle-btn::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--kiosk-accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.25s cubic-bezier(0.33, 1, 0.68, 1);
 }
 
 body.kiosk-mode.kiosk-editorial .quality-toggle-btn.active {
     background: none;
     color: var(--kiosk-text-primary);
-    border-bottom-color: var(--kiosk-accent);
+}
+
+body.kiosk-mode.kiosk-editorial .quality-toggle-btn.active::after {
+    transform: scaleX(1);
 }
 
 body.kiosk-mode.kiosk-editorial .quality-toggle-btn:hover {
@@ -420,6 +459,45 @@ body.kiosk-mode.kiosk-editorial .editorial-fov-dropdown.open {
     to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
+/* --- Delight Animations — signature gestures for editorial polish --- */
+
+@keyframes editorialRuleDraw {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+}
+
+@keyframes editorialUIFadeIn {
+    from { opacity: 0; }
+}
+
+@keyframes editorialPanelItemIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes editorialShimmer {
+    from { transform: translateX(-200%); }
+    to   { transform: translateX(200%); }
+}
+
+@keyframes editorialPlayBreathe {
+    0%, 100% { border-color: rgba(var(--kiosk-accent-rgb), 0.4); }
+    50%      { border-color: rgba(var(--kiosk-accent-rgb), 0.7); }
+}
+
+@keyframes editorialGateFadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes editorialLineFadeIn {
+    from { stroke-opacity: 0; }
+}
+
+@keyframes editorialMarkerFadeIn {
+    from { opacity: 0; }
+}
+
 body.kiosk-mode.kiosk-editorial .editorial-fov-slider {
     -webkit-appearance: none;
     appearance: none;
@@ -532,12 +610,13 @@ body.kiosk-mode.kiosk-editorial .editorial-image-strip {
 
 body.kiosk-mode.kiosk-editorial .editorial-image-strip img {
     position: absolute;
-    top: 0;
+    top: -20px;
     left: 0;
     width: 100%;
-    height: 100%;
+    height: calc(100% + 40px);
     object-fit: cover;
     object-position: center 20%;
+    will-change: transform;
 }
 
 body.kiosk-mode.kiosk-editorial .editorial-image-strip::after {
@@ -653,6 +732,8 @@ body.kiosk-mode.kiosk-editorial .editorial-info-title-bar {
     height: 3px;
     background: var(--kiosk-accent);
     margin-bottom: 12px;
+    transform-origin: left;
+    animation: editorialRuleDraw 0.5s cubic-bezier(0.33, 1, 0.68, 1) both;
 }
 
 body.kiosk-mode.kiosk-editorial .editorial-info-model-stats {
@@ -768,12 +849,24 @@ body.kiosk-mode.kiosk-editorial .editorial-collapsible.open .editorial-collapsib
 }
 
 body.kiosk-mode.kiosk-editorial .editorial-collapsible-content {
-    display: none;
-    padding-bottom: 16px;
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.3s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-collapsible-inner {
+    overflow: hidden;
+    min-height: 0;
+    padding-bottom: 0;
+    transition: padding-bottom 0.3s cubic-bezier(0.33, 1, 0.68, 1);
 }
 
 body.kiosk-mode.kiosk-editorial .editorial-collapsible.open .editorial-collapsible-content {
-    display: block;
+    grid-template-rows: 1fr;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-collapsible.open .editorial-collapsible-inner {
+    padding-bottom: 16px;
 }
 
 /* --- Quality grid (3-column primary, 2-column secondary) --- */
@@ -1153,13 +1246,13 @@ body.kiosk-mode.kiosk-editorial .editorial-info-license {
 /* --- Annotation Marker Adjustments — gold at various opacities --- */
 
 body.kiosk-mode.kiosk-editorial .annotation-marker {
-    background: rgba(var(--kiosk-accent-rgb), 0.25);
-    border: 2px solid rgba(var(--kiosk-surface-rgb), 0.5);
-    color: rgba(26, 26, 46, 0.25);
+    background: rgba(var(--kiosk-accent-rgb), 0.45);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    color: rgba(26, 26, 46, 0.55);
     opacity: 1;
     z-index: 50;
-    box-shadow: 0 2px 8px rgba(var(--kiosk-accent-rgb),0.12);
-    transition: transform 0.15s, box-shadow 0.2s, background 0.2s, border-color 0.2s;
+    box-shadow: 0 2px 8px rgba(var(--kiosk-accent-rgb),0.2);
+    transition: transform 0.15s, box-shadow 0.2s, background 0.2s, border-color 0.2s, opacity 0.3s ease;
 }
 
 body.kiosk-mode.kiosk-editorial .annotation-marker:hover {
@@ -1183,13 +1276,15 @@ body.kiosk-mode.kiosk-editorial #annotation-markers {
 /* --- Annotation Popup — editorial callout style --- */
 
 body.kiosk-mode.kiosk-editorial #annotation-info-popup {
-    background: transparent;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border: none;
-    box-shadow: none;
-    border-radius: 0;
-    padding: 0;
+    background: rgba(var(--kiosk-surface-rgb), 0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--kiosk-border-subtle);
+    border-radius: 6px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    padding: 0 16px 14px 16px;
+    max-height: calc(100vh - 150px);
+    overflow: visible;
 }
 
 body.kiosk-mode.kiosk-editorial #annotation-info-popup::before {
@@ -1201,22 +1296,8 @@ body.kiosk-mode.kiosk-editorial #annotation-info-popup::before {
     margin-bottom: 12px;
 }
 
-/* Feathered blur backdrop — navy tint matching title/logo areas */
-body.kiosk-mode.kiosk-editorial #annotation-info-popup::after {
-    content: '';
-    position: absolute;
-    inset: -20px -30px -50px -30px;
-    z-index: -1;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    background: rgba(var(--kiosk-surface-rgb), 0.7);
-    border-radius: 8px;
-    pointer-events: none;
-    -webkit-mask-image: radial-gradient(ellipse at center, black 50%, transparent 85%);
-    mask-image: radial-gradient(ellipse at center, black 50%, transparent 85%);
-}
 
-body.kiosk-mode.kiosk-editorial #annotation-info-popup .popup-title {
+body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-title {
     font-family: var(--kiosk-font-body);
     font-weight: 700;
     text-transform: uppercase;
@@ -1224,7 +1305,7 @@ body.kiosk-mode.kiosk-editorial #annotation-info-popup .popup-title {
     color: var(--kiosk-text-primary);
 }
 
-body.kiosk-mode.kiosk-editorial #annotation-info-popup .popup-body {
+body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-body {
     font-family: var(--kiosk-font-body);
     font-weight: 400;
     color: var(--kiosk-text-secondary);
@@ -1233,25 +1314,44 @@ body.kiosk-mode.kiosk-editorial #annotation-info-popup .popup-body {
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: rgba(var(--kiosk-accent-rgb),0.3) transparent;
-    mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
 }
 
-body.kiosk-mode.kiosk-editorial #annotation-info-popup .popup-body::-webkit-scrollbar {
+body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-body::-webkit-scrollbar {
     width: 3px;
 }
 
-body.kiosk-mode.kiosk-editorial #annotation-info-popup .popup-body::-webkit-scrollbar-track {
+body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-body::-webkit-scrollbar-track {
     background: transparent;
 }
 
-body.kiosk-mode.kiosk-editorial #annotation-info-popup .popup-body::-webkit-scrollbar-thumb {
+body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-body::-webkit-scrollbar-thumb {
     background: rgba(var(--kiosk-accent-rgb),0.3);
     border-radius: 2px;
 }
 
-body.kiosk-mode.kiosk-editorial #annotation-info-popup .popup-body::-webkit-scrollbar-thumb:hover {
+body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-body::-webkit-scrollbar-thumb:hover {
     background: rgba(var(--kiosk-accent-rgb),0.5);
+}
+
+/* Markdown content inside popup — editorial palette */
+
+body.kiosk-mode.kiosk-editorial .annotation-info-body .md-link {
+    color: var(--kiosk-accent);
+    border-bottom-color: rgba(var(--kiosk-accent-rgb), 0.4);
+}
+
+body.kiosk-mode.kiosk-editorial .annotation-info-body .md-link:hover {
+    color: var(--kiosk-accent);
+    border-bottom-color: var(--kiosk-accent);
+}
+
+body.kiosk-mode.kiosk-editorial .annotation-info-body .md-code {
+    background: rgba(var(--kiosk-surface-rgb), 0.6);
+    color: rgba(var(--kiosk-text-bright-rgb), 0.9);
+}
+
+body.kiosk-mode.kiosk-editorial .annotation-info-body strong {
+    color: var(--kiosk-text-primary);
 }
 
 /* Annotation number badge — yellow to match 3D markers */
@@ -1283,14 +1383,9 @@ body.kiosk-mode.kiosk-editorial #annotation-line-overlay line {
     stroke-opacity: 0.35;
     stroke-width: 1;
     stroke-dasharray: 6 6;
+    animation: editorialLineFadeIn 0.4s ease-out;
 }
 
-/* Popup scrollbar — full popup overflow for longer annotations */
-
-body.kiosk-mode.kiosk-editorial #annotation-info-popup {
-    max-height: calc(100vh - 150px);
-    overflow: visible;
-}
 
 body.kiosk-mode.kiosk-editorial #annotation-info-popup::-webkit-scrollbar {
     width: 3px;
@@ -1458,6 +1553,19 @@ body.kiosk-mode.kiosk-editorial #loading-progress-bar {
     background: linear-gradient(90deg, var(--kiosk-accent), rgba(var(--kiosk-accent-rgb), 0.6));
     height: 100%;
     border-radius: 1px;
+    position: relative;
+    overflow: hidden;
+}
+
+body.kiosk-mode.kiosk-editorial #loading-progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%);
+    animation: editorialShimmer 2s ease-in-out infinite;
 }
 
 body.kiosk-mode.kiosk-editorial #loading-progress-text {
@@ -1513,20 +1621,23 @@ body.kiosk-mode.kiosk-editorial #kiosk-gate-play {
     width: 72px;
     height: 72px;
     border-radius: 50%;
-    border: 2px solid var(--kiosk-accent);
+    border: 2px solid rgba(var(--kiosk-accent-rgb), 0.4);
     background: rgba(var(--kiosk-accent-rgb), 0.1);
     color: var(--kiosk-accent);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+    transition: background 0.2s, transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    animation: editorialPlayBreathe 4s ease-in-out infinite;
 }
 
 body.kiosk-mode.kiosk-editorial #kiosk-gate-play:hover {
     background: rgba(var(--kiosk-accent-rgb), 0.2);
     transform: scale(1.08);
     box-shadow: 0 0 32px rgba(var(--kiosk-accent-rgb), 0.3);
+    animation: none;
+    border-color: var(--kiosk-accent);
 }
 
 body.kiosk-mode.kiosk-editorial #kiosk-gate-play svg {
@@ -1542,6 +1653,23 @@ body.kiosk-mode.kiosk-editorial .editorial-gate-info {
     padding: 28px 48px 20px 24px;
     z-index: 2;
     max-width: 50%;
+    opacity: 0;
+    animation: editorialGateFadeUp 0.6s cubic-bezier(0.33, 1, 0.68, 1) 0.15s forwards;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-gate-info .editorial-loading-title-bar {
+    transform-origin: left;
+    animation: editorialRuleDraw 0.5s cubic-bezier(0.33, 1, 0.68, 1) 0.45s both;
+}
+
+body.kiosk-mode.kiosk-editorial #kiosk-gate-types {
+    opacity: 0;
+    animation: editorialUIFadeIn 0.4s ease-out 0.55s forwards;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-gate-content {
+    opacity: 0;
+    animation: editorialUIFadeIn 0.5s ease-out 0.65s forwards;
 }
 
 body.kiosk-mode.kiosk-editorial #kiosk-gate-title {
@@ -1840,4 +1968,65 @@ body.kiosk-mode.kiosk-editorial .editorial-tag-chip {
     padding: 1px 7px;
     text-transform: uppercase;
     white-space: nowrap;
+}
+
+/* --- Tabular numerics for data values --- */
+
+body.kiosk-mode.kiosk-editorial .editorial-quality-value,
+body.kiosk-mode.kiosk-editorial .editorial-tech-value,
+body.kiosk-mode.kiosk-editorial .editorial-asset-meta-chip,
+body.kiosk-mode.kiosk-editorial .editorial-info-model-stats,
+body.kiosk-mode.kiosk-editorial .editorial-map-coords {
+    font-variant-numeric: tabular-nums;
+}
+
+/* --- Info panel content stagger on open --- */
+
+body.kiosk-mode.kiosk-editorial .editorial-info-overlay.open .editorial-info-content > * {
+    animation: editorialPanelItemIn 0.3s ease-out both;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-info-overlay.open .editorial-info-content > :nth-child(1) { animation-delay: 0.08s; }
+body.kiosk-mode.kiosk-editorial .editorial-info-overlay.open .editorial-info-content > :nth-child(2) { animation-delay: 0.15s; }
+body.kiosk-mode.kiosk-editorial .editorial-info-overlay.open .editorial-info-content > :nth-child(3) { animation-delay: 0.22s; }
+body.kiosk-mode.kiosk-editorial .editorial-info-overlay.open .editorial-info-content > :nth-child(n+4) { animation-delay: 0.28s; }
+
+/* --- Loading overlay — slower fade for cinematic reveal --- */
+
+body.kiosk-mode.kiosk-editorial #loading-overlay.fade-out {
+    transition: opacity 0.6s ease-out;
+}
+
+/* --- Loading title bar draws itself --- */
+
+body.kiosk-mode.kiosk-editorial .editorial-loading-title-bar {
+    transform-origin: left;
+    animation: editorialRuleDraw 0.5s cubic-bezier(0.33, 1, 0.68, 1) 0.2s both;
+}
+
+/* --- Reduced motion — disable all delight animations --- */
+
+@media (prefers-reduced-motion: reduce) {
+    body.kiosk-mode.kiosk-editorial .editorial-spine,
+    body.kiosk-mode.kiosk-editorial .editorial-title-rule,
+    body.kiosk-mode.kiosk-editorial .editorial-bottom-ribbon,
+    body.kiosk-mode.kiosk-editorial .editorial-info-title-bar,
+    body.kiosk-mode.kiosk-editorial .editorial-loading-title-bar,
+    body.kiosk-mode.kiosk-editorial .editorial-gate-info,
+    body.kiosk-mode.kiosk-editorial .editorial-gate-content,
+    body.kiosk-mode.kiosk-editorial #kiosk-gate-types,
+    body.kiosk-mode.kiosk-editorial #kiosk-gate-play,
+    body.kiosk-mode.kiosk-editorial #loading-progress-bar::after,
+    body.kiosk-mode.kiosk-editorial #annotation-line-overlay line,
+    body.kiosk-mode.kiosk-editorial .editorial-info-overlay.open .editorial-info-content > *,
+    body.kiosk-mode.kiosk-editorial .annotation-marker {
+        animation: none !important;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-view-mode-link::after,
+    body.kiosk-mode.kiosk-editorial .quality-toggle-btn::after,
+    body.kiosk-mode.kiosk-editorial .editorial-collapsible-content,
+    body.kiosk-mode.kiosk-editorial .editorial-collapsible-inner {
+        transition: none !important;
+    }
 }

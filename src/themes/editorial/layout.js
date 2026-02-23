@@ -62,8 +62,11 @@ function createCollapsible(title, openByDefault) {
     section.appendChild(header);
     const content = document.createElement('div');
     content.className = 'editorial-collapsible-content';
+    const inner = document.createElement('div');
+    inner.className = 'editorial-collapsible-inner';
+    content.appendChild(inner);
     section.appendChild(content);
-    return { section, content };
+    return { section, content: inner };
 }
 
 function createQualityDetail(label, value, extraClass) {
@@ -1057,6 +1060,24 @@ export function setup(manifest, deps) {
         const isOpen = overlay.classList.toggle('open');
         detailsLink.classList.toggle('active', isOpen);
     });
+
+    // --- Image strip parallax on info panel scroll ---
+    const panelContent = overlay.querySelector('.editorial-info-content');
+    const stripImg = overlay.querySelector('.editorial-image-strip img');
+    if (panelContent && stripImg) {
+        panelContent.addEventListener('scroll', () => {
+            const offset = Math.max(panelContent.scrollTop * -0.08, -20);
+            stripImg.style.transform = `translateY(${offset}px)`;
+        }, { passive: true });
+    }
+
+    // --- Staggered annotation marker entrance ---
+    setTimeout(() => {
+        const markers = document.querySelectorAll('.annotation-marker');
+        markers.forEach((marker, i) => {
+            marker.style.animation = `editorialMarkerFadeIn 0.4s ease-out ${0.15 + i * 0.12}s both`;
+        });
+    }, 50);
 
     // Close panel on ESC; 'm' toggle handled by exported onKeyboardShortcut()
     document.addEventListener('keydown', (e) => {
