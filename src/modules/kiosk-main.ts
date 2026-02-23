@@ -1009,10 +1009,14 @@ async function handleArchiveFile(file: File): Promise<void> {
         await showBrandedLoading(archiveLoader);
 
         // === Phase 2: Load primary asset for initial display ===
-        // Prefer splat first (matches main mode) so splatMesh exists when
-        // applyGlobalAlignment runs — otherwise splat alignment is silently
-        // skipped because splatMesh is still null.
-        if (contentInfo.hasSplat) {
+        // Determine intended display mode BEFORE choosing which asset to load,
+        // so we load what the user will actually see first. Without this,
+        // archives with both model + splat always block on splat loading even
+        // when the saved display mode is 'model', causing an empty scene gap.
+        const savedDisplayMode = manifest?.viewer_settings?.display_mode;
+        if (savedDisplayMode && ['splat', 'model', 'pointcloud', 'both'].includes(savedDisplayMode)) {
+            state.displayMode = savedDisplayMode;
+        } else if (contentInfo.hasSplat) {
             state.displayMode = 'splat';
         } else if (contentInfo.hasMesh) {
             state.displayMode = 'model';
@@ -1113,19 +1117,14 @@ async function handleArchiveFile(file: File): Promise<void> {
         populateWallLabel(manifest);
         populateInfoOverlay(manifest);
 
-        // Set display mode: default to model, fall back to splat, then pointcloud
+        // displayMode already set in Phase 2 from saved settings / content detection.
+        // If the intended mode's asset didn't load (fallback was used), adjust to
+        // match what actually loaded.
         updateProgress(90, 'Finalizing...');
-        if (state.modelLoaded) {
-            state.displayMode = 'model';
-        } else if (state.splatLoaded) {
-            state.displayMode = 'splat';
-        } else if (state.pointcloudLoaded) {
-            state.displayMode = 'pointcloud';
-        }
-        // Override with saved display mode if specified
-        const savedDisplayMode = manifest?.viewer_settings?.display_mode;
-        if (savedDisplayMode && ['splat', 'model', 'pointcloud', 'both'].includes(savedDisplayMode)) {
-            state.displayMode = savedDisplayMode;
+        if (!primaryLoaded) {
+            if (state.modelLoaded) state.displayMode = 'model';
+            else if (state.splatLoaded) state.displayMode = 'splat';
+            else if (state.pointcloudLoaded) state.displayMode = 'pointcloud';
         }
         setDisplayMode(state.displayMode as DisplayMode, createDisplayModeDeps());
 
