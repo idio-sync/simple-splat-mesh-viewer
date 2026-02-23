@@ -438,7 +438,7 @@ export function generateGenericViewer(deps: FetchDependenciesResult): string {
         "default-src 'self' blob:; " +
         "script-src 'unsafe-inline' 'unsafe-eval' blob:; " +
         "style-src 'unsafe-inline'; " +
-        "img-src 'self' blob: data:; " +
+        "img-src 'self' blob: data: https://*.tile.openstreetmap.org; " +
         "connect-src 'self' blob: data:; " +
         "worker-src 'self' blob:; " +
         "font-src 'self'; " +

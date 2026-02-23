@@ -30,6 +30,87 @@ function hasValue(val) {
     return true;
 }
 
+// ---- Static tile map (no Leaflet — pure DOM + Web Mercator math) ----
+
+/**
+ * Render a static OpenStreetMap tile map centered on the given coordinates.
+ * Creates a 3×3 grid of 256 px tiles, positions via CSS transform so the
+ * target point sits at the container's center, and resolves when done.
+ *
+ * @param {number} lat  Latitude in degrees
+ * @param {number} lng  Longitude in degrees
+ * @param {HTMLElement} container  Map container (must be in the DOM)
+ * @param {number} [zoom=15]  Tile zoom level
+ * @returns {Promise<boolean>} true if at least one tile loaded
+ */
+function createStaticMap(lat, lng, container, zoom) {
+    zoom = zoom || 15;
+    var TILE = 256;
+    var n = Math.pow(2, zoom);
+
+    // Web Mercator: lat/lng → continuous tile coordinates
+    var tileXf = (lng + 180) / 360 * n;
+    var latRad = lat * Math.PI / 180;
+    var tileYf = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
+    tileYf = Math.max(0, Math.min(n - 1, tileYf)); // clamp near poles
+
+    var cx = Math.floor(tileXf);
+    var cy = Math.floor(tileYf);
+    var offX = (tileXf - cx) * TILE;
+    var offY = (tileYf - cy) * TILE;
+
+    var COLS = 3, ROWS = 3;
+    var subs = ['a', 'b', 'c'];
+    var wrapper = document.createElement('div');
+    wrapper.className = 'editorial-map-tiles';
+
+    var loaded = 0, failed = 0, total = COLS * ROWS;
+
+    return new Promise(function (resolve) {
+        var timer = setTimeout(function () { if (loaded === 0) resolve(false); }, 4000);
+
+        function check() {
+            if (loaded + failed === total) {
+                clearTimeout(timer);
+                resolve(loaded > 0);
+            }
+        }
+
+        for (var row = 0; row < ROWS; row++) {
+            for (var col = 0; col < COLS; col++) {
+                var tx = cx - 1 + col;          // one tile left of center
+                var ty = cy - 1 + row;           // one tile above center
+                tx = ((tx % n) + n) % n;        // wrap at date line
+                if (ty < 0 || ty >= n) { total--; continue; }
+
+                var img = document.createElement('img');
+                img.className = 'editorial-map-tile';
+                img.alt = '';
+                img.draggable = false;
+                img.style.gridColumn = String(col + 1);
+                img.style.gridRow = String(row + 1);
+                img.src = 'https://' + subs[(tx + ty) % 3] +
+                    '.tile.openstreetmap.org/' + zoom + '/' + tx + '/' + ty + '.png';
+                img.onload = function () { loaded++; check(); };
+                img.onerror = function () { failed++; this.style.display = 'none'; check(); };
+                wrapper.appendChild(img);
+            }
+        }
+
+        container.appendChild(wrapper);
+
+        // Position grid so the target coordinate is at container center
+        requestAnimationFrame(function () {
+            var cw = container.clientWidth || 360;
+            var ch = container.clientHeight || 170;
+            var targetGX = 1 * TILE + offX;   // col 1 is the center tile
+            var targetGY = 1 * TILE + offY;   // row 1 is the center row
+            wrapper.style.transform =
+                'translate(' + (cw / 2 - targetGX) + 'px,' + (ch / 2 - targetGY) + 'px)';
+        });
+    });
+}
+
 // ---- Auto-fade behavior ----
 
 function setupAutoFade(titleBlock, cornerElement) {
@@ -156,17 +237,14 @@ function createInfoOverlay(manifest, deps) {
     const headerSection = document.createElement('div');
     headerSection.className = 'editorial-info-header';
 
-    const title = manifest?.title || manifest?.project?.title || manifest?.archival_record?.title || '';
-    if (title) {
-        const titleEl = document.createElement('h2');
-        titleEl.className = 'editorial-info-title';
-        titleEl.textContent = title;
-        headerSection.appendChild(titleEl);
+    const infoTitleEl = document.createElement('h2');
+    infoTitleEl.className = 'editorial-info-title';
+    infoTitleEl.textContent = 'Info';
+    headerSection.appendChild(infoTitleEl);
 
-        const titleBar = document.createElement('div');
-        titleBar.className = 'editorial-info-title-bar';
-        headerSection.appendChild(titleBar);
-    }
+    const titleBar = document.createElement('div');
+    titleBar.className = 'editorial-info-title-bar';
+    headerSection.appendChild(titleBar);
 
     // Model stats
     if (modelGroup && modelGroup.children.length > 0) {
@@ -205,21 +283,6 @@ function createInfoOverlay(manifest, deps) {
         }
     }
 
-    // Byline: location · date · capture context
-    const bylineParts = [];
-    const captureLocation = manifest?.location || manifest?.provenance?.location;
-    if (captureLocation) bylineParts.push(captureLocation);
-    const captureDate = manifest?.date || manifest?.provenance?.capture_date;
-    if (captureDate) bylineParts.push(formatDate(captureDate) || captureDate);
-    const captureContext = manifest?.provenance?.capture_context;
-    if (captureContext) bylineParts.push(captureContext);
-    if (bylineParts.length > 0) {
-        const byline = document.createElement('div');
-        byline.className = 'editorial-info-byline';
-        byline.textContent = bylineParts.join(' \u00B7 ');
-        headerSection.appendChild(byline);
-    }
-
     contentWrapper.appendChild(headerSection);
 
     // === Description (reading zone) ===
@@ -251,27 +314,83 @@ function createInfoOverlay(manifest, deps) {
         const creation = ar.creation || {};
         const phys = ar.physical_description || {};
         if (creation.creator) subjectGrid.appendChild(createSubjectDetail('Creator', escapeHtml(creation.creator)));
-        if (creation.date) subjectGrid.appendChild(createSubjectDetail('Date', escapeHtml(String(creation.date))));
+        const creationDate = creation.date || creation.date_created;
+        if (creationDate) subjectGrid.appendChild(createSubjectDetail('Date', escapeHtml(String(creationDate))));
         if (creation.period) subjectGrid.appendChild(createSubjectDetail('Period', escapeHtml(creation.period)));
         if (creation.culture) subjectGrid.appendChild(createSubjectDetail('Culture', escapeHtml(creation.culture)));
         if (phys.medium) subjectGrid.appendChild(createSubjectDetail('Medium', escapeHtml(phys.medium)));
-        if (phys.dimensions) subjectGrid.appendChild(createSubjectDetail('Dimensions', escapeHtml(phys.dimensions)));
+        if (phys.dimensions) {
+            const d = phys.dimensions;
+            const dimStr = typeof d === 'object'
+                ? [d.height, d.width, d.depth].filter(Boolean).join(' × ') || JSON.stringify(d)
+                : String(d);
+            subjectGrid.appendChild(createSubjectDetail('Dimensions', escapeHtml(dimStr)));
+        }
         if (phys.condition) subjectGrid.appendChild(createSubjectDetail('Condition', escapeHtml(phys.condition)));
-        const subjLocation = ar.coverage?.spatial?.place || manifest?.location;
-        if (subjLocation) subjectGrid.appendChild(createSubjectDetail('Location', escapeHtml(subjLocation)));
         if (subjectGrid.children.length > 0) content.appendChild(subjectGrid);
 
-        // GPS coordinates
+        // Location block — combines location name + static tile map
+        const subjLocation = ar.coverage?.spatial?.place || ar.coverage?.spatial?.location_name || manifest?.location;
         const coords = manifest?.coordinates || ar.coverage?.spatial?.coordinates;
-        if (coords) {
-            const mapPlaceholder = document.createElement('div');
-            mapPlaceholder.className = 'editorial-map-placeholder';
-            const lat = coords.latitude || coords.lat;
-            const lng = coords.longitude || coords.lng || coords.lon;
-            if (lat != null && lng != null) {
-                mapPlaceholder.innerHTML = `<span class="editorial-map-pin"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg></span><span class="editorial-map-coords">${escapeHtml(String(lat))}\u00B0N, ${escapeHtml(String(lng))}\u00B0W</span>`;
+        if (subjLocation || coords) {
+            const locLabeled = document.createElement('div');
+            locLabeled.className = 'editorial-prose-labeled';
+            const locLabel = document.createElement('div');
+            locLabel.className = 'editorial-prose-sub-label';
+            locLabel.textContent = 'Location';
+            locLabeled.appendChild(locLabel);
+
+            // Location name text
+            if (subjLocation) {
+                const locName = document.createElement('div');
+                locName.className = 'editorial-location-name';
+                locName.textContent = subjLocation;
+                locLabeled.appendChild(locName);
             }
-            content.appendChild(mapPlaceholder);
+
+            // GPS coordinates — static tile map with graceful fallback
+            if (coords) {
+                let lat, lng;
+                if (Array.isArray(coords) && coords.length >= 2) {
+                    lat = coords[0]; lng = coords[1];
+                } else {
+                    lat = coords.latitude || coords.lat;
+                    lng = coords.longitude || coords.lng || coords.lon;
+                }
+                if (lat != null && lng != null) {
+                    lat = parseFloat(String(lat));
+                    lng = parseFloat(String(lng));
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        const mapContainer = document.createElement('div');
+                        mapContainer.className = 'editorial-map-placeholder';
+
+                        const latDir = lat >= 0 ? 'N' : 'S';
+                        const lngDir = lng >= 0 ? 'E' : 'W';
+                        const latStr = escapeHtml(Math.abs(lat).toFixed(6));
+                        const lngStr = escapeHtml(Math.abs(lng).toFixed(6));
+
+                        const pin = document.createElement('div');
+                        pin.className = 'editorial-map-pin-overlay';
+                        pin.innerHTML = '<svg width="20" height="28" viewBox="0 0 24 34" fill="none"><path d="M12 0C5.37 0 0 5.37 0 12c0 9 12 22 12 22s12-13 12-22C24 5.37 18.63 0 12 0zm0 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8z" fill="currentColor"/></svg>';
+
+                        const footer = document.createElement('div');
+                        footer.className = 'editorial-map-footer';
+                        footer.innerHTML =
+                            '<span class="editorial-map-coords">' + latStr + '\u00B0' + latDir + ', ' + lngStr + '\u00B0' + lngDir + '</span>' +
+                            '<span class="editorial-map-attribution">\u00A9 OpenStreetMap</span>';
+
+                        mapContainer.appendChild(pin);
+                        mapContainer.appendChild(footer);
+                        locLabeled.appendChild(mapContainer);
+
+                        createStaticMap(lat, lng, mapContainer, 15).then(function (ok) {
+                            mapContainer.classList.add(ok ? 'editorial-map-loaded' : 'editorial-map-fallback');
+                        });
+                    }
+                }
+            }
+
+            content.appendChild(locLabeled);
         }
 
         // Historical context prose
@@ -328,7 +447,7 @@ function createInfoOverlay(manifest, deps) {
         const qualityGrid = document.createElement('div');
         qualityGrid.className = 'editorial-quality-grid';
         if (qm) {
-            if (qm.tier) qualityGrid.appendChild(createQualityDetail('Tier', escapeHtml(`Tier ${qm.tier}`)));
+            if (qm.tier) qualityGrid.appendChild(createQualityDetail('Tier', escapeHtml(String(qm.tier))));
             if (qm.accuracy_grade) qualityGrid.appendChild(createQualityDetail('Accuracy', escapeHtml(`Grade ${qm.accuracy_grade}`)));
             if (qm.capture_resolution?.value != null) {
                 const cr = qm.capture_resolution;
@@ -398,7 +517,11 @@ function createInfoOverlay(manifest, deps) {
     }
 
     // === Collapsible: Data Assets ===
-    const entries = manifest?.data_entries;
+    let entries = manifest?.data_entries;
+    // Normalize object-keyed entries to array (manifest may use {scene_0: {...}, mesh_0: {...}} format)
+    if (entries && !Array.isArray(entries) && typeof entries === 'object') {
+        entries = Object.values(entries).filter(e => e && typeof e === 'object');
+    }
     if (Array.isArray(entries) && entries.length > 0 && shouldShow('Data Assets')) {
         const { section, content } = createCollapsible('Data Assets', false);
 
@@ -420,10 +543,11 @@ function createInfoOverlay(manifest, deps) {
             headerEl.appendChild(nameEl);
             item.appendChild(headerEl);
 
-            if (entry.creator) {
+            const entryCreator = entry.creator || entry.created_by;
+            if (entryCreator) {
                 const creatorEl = document.createElement('div');
                 creatorEl.className = 'editorial-asset-creator';
-                creatorEl.textContent = entry.creator;
+                creatorEl.textContent = entryCreator;
                 item.appendChild(creatorEl);
             }
 
@@ -468,12 +592,14 @@ function createInfoOverlay(manifest, deps) {
             const techGrid = document.createElement('div');
             techGrid.className = 'editorial-tech-grid';
             if (ar?.standard) techGrid.appendChild(createTechDetail('Standard', escapeHtml(ar.standard)));
-            if (ar?.rights?.holder) techGrid.appendChild(createTechDetail('Copyright', escapeHtml(ar.rights.holder)));
+            const copyrightVal = ar?.rights?.holder || ar?.rights?.copyright_status;
+            if (copyrightVal) techGrid.appendChild(createTechDetail('Copyright', escapeHtml(copyrightVal)));
             const matStd = manifest?.material_standard;
             if (matStd) {
                 if (matStd.workflow) techGrid.appendChild(createTechDetail('Material', escapeHtml(matStd.workflow)));
                 if (matStd.color_space) techGrid.appendChild(createTechDetail('Color Space', escapeHtml(matStd.color_space)));
-                if (matStd.normal_convention) techGrid.appendChild(createTechDetail('Normal', escapeHtml(matStd.normal_convention)));
+                const normalVal = matStd.normal_convention || matStd.normal_space;
+                if (normalVal) techGrid.appendChild(createTechDetail('Normal', escapeHtml(normalVal)));
             }
             const pres = manifest?.preservation;
             if (pres?.rendering_requirements) techGrid.appendChild(createTechDetail('Rendering', escapeHtml(pres.rendering_requirements)));
@@ -496,20 +622,25 @@ function createInfoOverlay(manifest, deps) {
                 content.appendChild(propsRow);
             }
 
-            // Integrity hashes
+            // Integrity hashes — supports both {checksums: [{file, hash}]} and {assets: {file: hash}} formats
             const integ = manifest?.integrity;
-            if (integ?.checksums?.length > 0) {
+            let hashEntries = [];
+            if (Array.isArray(integ?.checksums) && integ.checksums.length > 0) {
+                hashEntries = integ.checksums.map(cs => ({ file: cs.file || '', hash: cs.hash || cs.value || '' }));
+            } else if (integ?.assets && typeof integ.assets === 'object') {
+                hashEntries = Object.entries(integ.assets).map(([file, hash]) => ({ file, hash: String(hash) }));
+            }
+            if (hashEntries.length > 0) {
                 const subHead = document.createElement('div');
                 subHead.className = 'editorial-tech-sub-header';
                 subHead.textContent = `Integrity \u2014 ${escapeHtml(integ.algorithm || 'SHA-256')}`;
                 content.appendChild(subHead);
                 const hashList = document.createElement('ul');
                 hashList.className = 'editorial-hash-list';
-                integ.checksums.forEach(cs => {
+                hashEntries.forEach(({ file, hash }) => {
                     const li = document.createElement('li');
-                    const hash = cs.hash || cs.value || '';
                     const truncated = hash.length > 16 ? hash.slice(0, 8) + '...' + hash.slice(-8) : hash;
-                    li.innerHTML = `<span>${escapeHtml(cs.file || '')}</span> ${escapeHtml(truncated)}`;
+                    li.innerHTML = `<span>${escapeHtml(file)}</span> ${escapeHtml(truncated)}`;
                     hashList.appendChild(li);
                 });
                 content.appendChild(hashList);

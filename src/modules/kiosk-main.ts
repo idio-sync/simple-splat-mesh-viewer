@@ -2937,7 +2937,15 @@ function populateDetailedMetadata(manifest: any): void {
         }
         if (hasValue(ar.physical_description)) {
             const pd = ar.physical_description;
-            Object.keys(pd).forEach(k => addDetailRow(content, k.replace(/_/g, ' '), pd[k]));
+            Object.keys(pd).forEach(k => {
+                const v = pd[k];
+                if (k === 'dimensions' && typeof v === 'object' && v !== null) {
+                    const dimStr = [v.height, v.width, v.depth].filter(Boolean).join(' \u00d7 ');
+                    if (dimStr) addDetailRow(content, 'dimensions', dimStr);
+                } else {
+                    addDetailRow(content, k.replace(/_/g, ' '), v);
+                }
+            });
         }
         addDetailRow(content, 'Provenance', ar.provenance);
         if (hasValue(ar.rights)) {

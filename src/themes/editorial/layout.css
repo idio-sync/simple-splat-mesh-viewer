@@ -871,6 +871,10 @@ body.kiosk-mode.kiosk-editorial .editorial-collapsible.open .editorial-collapsib
     padding-bottom: 16px;
 }
 
+body.kiosk-mode.kiosk-editorial .editorial-collapsible:last-child.open .editorial-collapsible-inner {
+    padding-bottom: 4px;
+}
+
 /* --- Quality grid (3-column primary, 2-column secondary) --- */
 
 body.kiosk-mode.kiosk-editorial .editorial-quality-grid {
@@ -947,6 +951,10 @@ body.kiosk-mode.kiosk-editorial .editorial-subject-detail {
     gap: 2px;
 }
 
+body.kiosk-mode.kiosk-editorial .editorial-subject-detail:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+}
+
 body.kiosk-mode.kiosk-editorial .editorial-subject-label {
     font-family: var(--kiosk-font-body);
     font-size: 0.58rem;
@@ -963,23 +971,30 @@ body.kiosk-mode.kiosk-editorial .editorial-subject-value {
     color: var(--kiosk-text-primary);
 }
 
-/* Map placeholder */
+/* Location name (above map) */
+
+body.kiosk-mode.kiosk-editorial .editorial-location-name {
+    font-family: var(--kiosk-font-body);
+    font-size: 0.72rem;
+    color: var(--kiosk-text-secondary);
+    line-height: 1.4;
+    margin-bottom: 8px;
+}
+
+/* Static tile map */
 
 body.kiosk-mode.kiosk-editorial .editorial-map-placeholder {
     width: 100%;
-    height: 120px;
+    height: 170px;
     border-radius: 6px;
     background: rgba(var(--kiosk-surface-rgb), 0.6);
     border: 1px solid var(--kiosk-border-subtle);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
     margin-top: 10px;
     position: relative;
     overflow: hidden;
 }
 
+/* Fallback grid pattern — visible until tiles load */
 body.kiosk-mode.kiosk-editorial .editorial-map-placeholder::before {
     content: '';
     position: absolute;
@@ -988,14 +1003,62 @@ body.kiosk-mode.kiosk-editorial .editorial-map-placeholder::before {
         linear-gradient(rgba(var(--kiosk-accent-rgb), 0.04) 1px, transparent 1px),
         linear-gradient(90deg, rgba(var(--kiosk-accent-rgb), 0.04) 1px, transparent 1px);
     background-size: 20px 20px;
+    z-index: 0;
+    transition: opacity 0.4s ease;
 }
 
-body.kiosk-mode.kiosk-editorial .editorial-map-pin {
-    font-size: 1.2rem;
+body.kiosk-mode.kiosk-editorial .editorial-map-placeholder.editorial-map-loaded::before {
+    opacity: 0;
+}
+
+/* Tile grid — positioned via JS transform to center on coordinates */
+body.kiosk-mode.kiosk-editorial .editorial-map-tiles {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 256px);
+    grid-template-rows: repeat(3, 256px);
+    filter: grayscale(0.7) brightness(0.45) contrast(1.1) sepia(0.15);
+    transition: filter 0.3s ease;
+    z-index: 0;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-map-placeholder:hover .editorial-map-tiles {
+    filter: grayscale(0.4) brightness(0.55) contrast(1.1) sepia(0.1);
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-map-tile {
+    width: 256px;
+    height: 256px;
+    display: block;
+}
+
+/* Pin marker — centered on the target coordinate */
+body.kiosk-mode.kiosk-editorial .editorial-map-pin-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -85%);
     color: var(--kiosk-accent);
-    margin-bottom: 4px;
-    position: relative;
-    z-index: 1;
+    z-index: 2;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+    pointer-events: none;
+}
+
+/* Footer bar — coords left, attribution right */
+body.kiosk-mode.kiosk-editorial .editorial-map-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.55), transparent);
+    z-index: 2;
+    pointer-events: none;
 }
 
 body.kiosk-mode.kiosk-editorial .editorial-map-coords {
@@ -1003,8 +1066,43 @@ body.kiosk-mode.kiosk-editorial .editorial-map-coords {
     font-size: 0.6rem;
     color: var(--kiosk-text-muted);
     letter-spacing: 0.02em;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-map-attribution {
+    font-family: var(--kiosk-font-body);
+    font-size: 0.45rem;
+    color: rgba(255, 255, 255, 0.3);
+    letter-spacing: 0.02em;
+}
+
+/* Fallback state — centered pin + coords when tiles fail (offline) */
+body.kiosk-mode.kiosk-editorial .editorial-map-fallback {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-map-fallback .editorial-map-tiles {
+    display: none;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-map-fallback .editorial-map-pin-overlay {
     position: relative;
-    z-index: 1;
+    top: auto;
+    left: auto;
+    transform: none;
+    margin-bottom: 4px;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-map-fallback .editorial-map-footer {
+    position: relative;
+    background: none;
+    justify-content: center;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-map-fallback .editorial-map-attribution {
+    display: none;
 }
 
 /* Prose blocks with accent border */
@@ -1240,8 +1338,8 @@ body.kiosk-mode.kiosk-editorial .editorial-info-license {
     font-size: 0.62rem;
     color: var(--kiosk-text-muted);
     letter-spacing: 0.04em;
-    margin-top: 20px;
-    padding-top: 12px;
+    margin-top: 6px;
+    padding-top: 8px;
     border-top: 1px solid var(--kiosk-border-subtle);
 }
 
@@ -1956,7 +2054,6 @@ body.kiosk-mode.kiosk-editorial .editorial-info-tags {
     display: flex;
     flex-wrap: wrap;
     gap: 5px;
-    margin: 10px 0 0 0;
 }
 
 body.kiosk-mode.kiosk-editorial .editorial-tag-chip {
