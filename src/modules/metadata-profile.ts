@@ -44,15 +44,14 @@ export const KIOSK_SECTION_TIERS: Record<string, MetadataProfile> = {
     'Integrity':            'archival',
 };
 
-/** Maps editorial theme section titles (from addSection() in layout.js) to tiers */
+/** Maps editorial theme section titles (from createInfoOverlay() in layout.js) to tiers */
 export const EDITORIAL_SECTION_TIERS: Record<string, MetadataProfile> = {
-    'Capture':          'basic',
-    'Quality':          'standard',
-    'Processing':       'standard',
-    'Data Assets':      'standard',
-    'Relationships':    'standard',
-    'Archival Record':  'archival',
-    'Integrity':        'archival',
+    'The Subject':       'archival',
+    'Quality & Capture': 'standard',
+    'Processing':        'standard',
+    'Data Assets':       'standard',
+    'Technical Details': 'archival',
+    'Tags':              'basic',
 };
 
 /**

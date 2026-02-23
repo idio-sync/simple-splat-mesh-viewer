@@ -50,15 +50,91 @@ function setupAutoFade(titleBlock, cornerElement) {
     }, 4000);
 }
 
-// ---- Info overlay (magazine-spread details panel) ----
+// ---- Info panel (side panel with image strip) ----
+
+function createCollapsible(title, openByDefault) {
+    const section = document.createElement('div');
+    section.className = 'editorial-collapsible' + (openByDefault ? ' open' : '');
+    const header = document.createElement('div');
+    header.className = 'editorial-collapsible-header';
+    header.innerHTML = `<span class="editorial-collapsible-title">${title}</span><span class="editorial-collapsible-chevron">&#9654;</span>`;
+    header.addEventListener('click', () => section.classList.toggle('open'));
+    section.appendChild(header);
+    const content = document.createElement('div');
+    content.className = 'editorial-collapsible-content';
+    section.appendChild(content);
+    return { section, content };
+}
+
+function createQualityDetail(label, value, extraClass) {
+    const el = document.createElement('div');
+    el.className = 'editorial-quality-detail';
+    el.innerHTML = `<span class="editorial-quality-label">${label}</span><span class="editorial-quality-value${extraClass || ''}">${value}</span>`;
+    return el;
+}
+
+function createSubjectDetail(label, value) {
+    const el = document.createElement('div');
+    el.className = 'editorial-subject-detail';
+    el.innerHTML = `<span class="editorial-subject-label">${label}</span><span class="editorial-subject-value">${value}</span>`;
+    return el;
+}
+
+function createTechDetail(label, value) {
+    const el = document.createElement('div');
+    el.className = 'editorial-tech-detail';
+    el.innerHTML = `<span class="editorial-tech-label">${label}</span><span class="editorial-tech-value">${value}</span>`;
+    return el;
+}
 
 function createInfoOverlay(manifest, deps) {
     const { escapeHtml, parseMarkdown, resolveAssetRefs, state, annotationSystem, modelGroup } = deps;
 
+    const metadataProfile = deps.metadataProfile || 'archival';
+    const shouldShow = (title) => {
+        const tiers = deps.EDITORIAL_SECTION_TIERS;
+        const tier = tiers?.[title];
+        if (!tier || !deps.isTierVisible) return true;
+        return deps.isTierVisible(tier, metadataProfile);
+    };
+
     const overlay = document.createElement('div');
     overlay.className = 'editorial-info-overlay';
 
-    // Close button
+    const panelInner = document.createElement('div');
+    panelInner.className = 'editorial-panel-inner';
+
+    // --- Image strip ---
+    const imageAssets = state.imageAssets || {};
+    const desc = manifest?.description || manifest?.project?.description || '';
+    let stripSrc = null;
+    const assetKeys = Object.keys(imageAssets);
+    if (assetKeys.length > 0) {
+        stripSrc = imageAssets['preview.jpg'] || imageAssets['preview.png'] || imageAssets[assetKeys[0]];
+    }
+    if (!stripSrc && desc) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = parseMarkdown(resolveAssetRefs(desc, imageAssets));
+        const firstImg = tmp.querySelector('img');
+        if (firstImg) stripSrc = firstImg.src;
+    }
+
+    const imageStrip = document.createElement('div');
+    imageStrip.className = 'editorial-image-strip';
+    const stripAccent = document.createElement('div');
+    stripAccent.className = 'editorial-strip-accent';
+
+    if (stripSrc) {
+        const stripImg = document.createElement('img');
+        stripImg.src = stripSrc;
+        stripImg.alt = '';
+        stripImg.draggable = false;
+        imageStrip.appendChild(stripImg);
+        panelInner.appendChild(imageStrip);
+        panelInner.appendChild(stripAccent);
+    }
+
+    // --- Close button ---
     const closeBtn = document.createElement('button');
     closeBtn.className = 'editorial-info-close';
     closeBtn.innerHTML = '&times;';
@@ -67,20 +143,15 @@ function createInfoOverlay(manifest, deps) {
         const detailsBtn = document.querySelector('.editorial-details-link');
         if (detailsBtn) detailsBtn.classList.remove('active');
     });
-    overlay.appendChild(closeBtn);
+    panelInner.appendChild(closeBtn);
 
-    // Scrollable content wrapper
+    // --- Scrollable content ---
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'editorial-info-content';
 
-    // === Full-width header — title, description, provenance ===
+    // === Title block ===
     const headerSection = document.createElement('div');
     headerSection.className = 'editorial-info-header';
-
-    const eyebrow = document.createElement('div');
-    eyebrow.className = 'editorial-info-eyebrow';
-    eyebrow.textContent = 'Details';
-    headerSection.appendChild(eyebrow);
 
     const title = manifest?.title || manifest?.project?.title || manifest?.archival_record?.title || '';
     if (title) {
@@ -94,21 +165,16 @@ function createInfoOverlay(manifest, deps) {
         headerSection.appendChild(titleBar);
     }
 
-    // Model stats — show geometry info when a mesh is loaded
+    // Model stats
     if (modelGroup && modelGroup.children.length > 0) {
-        let vertexCount = 0, faceCount = 0, meshCount = 0, materialSet = new Set();
-        let textureSet = new Set(), maxTexRes = 0;
+        let vertexCount = 0, textureSet = new Set(), maxTexRes = 0;
         modelGroup.traverse(child => {
             if (child.isMesh && child.geometry) {
-                meshCount++;
                 const geo = child.geometry;
                 if (geo.attributes.position) vertexCount += geo.attributes.position.count;
-                if (geo.index) faceCount += geo.index.count / 3;
-                else if (geo.attributes.position) faceCount += geo.attributes.position.count / 3;
                 const mats = Array.isArray(child.material) ? child.material : [child.material];
                 mats.forEach(m => {
                     if (m) {
-                        materialSet.add(m);
                         ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap'].forEach(t => {
                             const tex = m[t];
                             if (tex && !textureSet.has(tex)) {
@@ -121,49 +187,350 @@ function createInfoOverlay(manifest, deps) {
                 });
             }
         });
-        faceCount = Math.round(faceCount);
         if (vertexCount > 0) {
             const parts = [];
-            parts.push(`${vertexCount.toLocaleString()} vertices`);
-            parts.push(`${faceCount.toLocaleString()} faces`);
-            if (meshCount > 1) parts.push(`${meshCount} meshes`);
-            if (materialSet.size > 1) parts.push(`${materialSet.size} materials`);
-            if (textureSet.size > 0) parts.push(`${textureSet.size} textures @ ${maxTexRes}²`);
+            const fmt = (n) => n >= 1000000 ? (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M' : n.toLocaleString();
+            parts.push(`<strong>${fmt(vertexCount)}</strong> vertices`);
+            if (textureSet.size > 0) parts.push(`<strong>${textureSet.size}</strong> textures @ ${maxTexRes}\u00B2`);
+            const annoCount = annotationSystem ? annotationSystem.getAnnotations().length : 0;
+            if (annoCount > 0) parts.push(`<strong>${annoCount}</strong> annotations`);
 
             const statsEl = document.createElement('div');
             statsEl.className = 'editorial-info-model-stats';
-            statsEl.textContent = parts.join(' · ');
+            statsEl.innerHTML = parts.join(' \u00B7 ');
             headerSection.appendChild(statsEl);
         }
     }
 
-    // Provenance / capture byline — full width under title
-    const captureBylineParts = [];
-    const operator = manifest?.creator || manifest?.provenance?.operator;
-    if (operator) captureBylineParts.push(operator);
-    const captureDate = manifest?.date || manifest?.provenance?.capture_date;
-    if (captureDate) captureBylineParts.push(formatDate(captureDate) || captureDate);
+    // Byline: location · date · capture context
+    const bylineParts = [];
     const captureLocation = manifest?.location || manifest?.provenance?.location;
-    if (captureLocation) captureBylineParts.push(captureLocation);
-    const captureDevice = manifest?.provenance?.capture_device;
-    if (captureDevice) captureBylineParts.push(captureDevice);
-    if (captureBylineParts.length > 0) {
+    if (captureLocation) bylineParts.push(captureLocation);
+    const captureDate = manifest?.date || manifest?.provenance?.capture_date;
+    if (captureDate) bylineParts.push(formatDate(captureDate) || captureDate);
+    const captureContext = manifest?.provenance?.capture_context;
+    if (captureContext) bylineParts.push(captureContext);
+    if (bylineParts.length > 0) {
         const byline = document.createElement('div');
         byline.className = 'editorial-info-byline';
-        byline.textContent = captureBylineParts.join(' \u00b7 ');
+        byline.textContent = bylineParts.join(' \u00B7 ');
         headerSection.appendChild(byline);
     }
 
-    const desc = manifest?.description || manifest?.project?.description || '';
+    contentWrapper.appendChild(headerSection);
+
+    // === Description (reading zone) ===
     if (desc) {
         const descEl = document.createElement('div');
         descEl.className = 'editorial-info-description';
-        descEl.innerHTML = parseMarkdown(resolveAssetRefs(desc, state.imageAssets || {}));
-        headerSection.appendChild(descEl);
+        descEl.innerHTML = parseMarkdown(resolveAssetRefs(desc, imageAssets));
+        // Remove first image if it's already shown in the image strip
+        if (stripSrc) {
+            const firstImg = descEl.querySelector('img');
+            if (firstImg) {
+                // Remove if src matches strip, or if strip was extracted from description
+                const parent = firstImg.parentElement;
+                firstImg.remove();
+                // Clean up empty <p> wrapper left behind
+                if (parent && parent.tagName === 'P' && parent.textContent.trim() === '') parent.remove();
+            }
+        }
+        contentWrapper.appendChild(descEl);
     }
 
+    // === Collapsible: The Subject ===
+    const ar = manifest?.archival_record;
+    if (ar && hasValue(ar) && shouldShow('The Subject')) {
+        const { section, content } = createCollapsible('The Subject', false);
+
+        const subjectGrid = document.createElement('div');
+        subjectGrid.className = 'editorial-subject-grid';
+        const creation = ar.creation || {};
+        const phys = ar.physical_description || {};
+        if (creation.creator) subjectGrid.appendChild(createSubjectDetail('Creator', escapeHtml(creation.creator)));
+        if (creation.date) subjectGrid.appendChild(createSubjectDetail('Date', escapeHtml(String(creation.date))));
+        if (creation.period) subjectGrid.appendChild(createSubjectDetail('Period', escapeHtml(creation.period)));
+        if (creation.culture) subjectGrid.appendChild(createSubjectDetail('Culture', escapeHtml(creation.culture)));
+        if (phys.medium) subjectGrid.appendChild(createSubjectDetail('Medium', escapeHtml(phys.medium)));
+        if (phys.dimensions) subjectGrid.appendChild(createSubjectDetail('Dimensions', escapeHtml(phys.dimensions)));
+        if (phys.condition) subjectGrid.appendChild(createSubjectDetail('Condition', escapeHtml(phys.condition)));
+        const subjLocation = ar.coverage?.spatial?.place || manifest?.location;
+        if (subjLocation) subjectGrid.appendChild(createSubjectDetail('Location', escapeHtml(subjLocation)));
+        if (subjectGrid.children.length > 0) content.appendChild(subjectGrid);
+
+        // GPS coordinates
+        const coords = manifest?.coordinates || ar.coverage?.spatial?.coordinates;
+        if (coords) {
+            const mapPlaceholder = document.createElement('div');
+            mapPlaceholder.className = 'editorial-map-placeholder';
+            const lat = coords.latitude || coords.lat;
+            const lng = coords.longitude || coords.lng || coords.lon;
+            if (lat != null && lng != null) {
+                mapPlaceholder.innerHTML = `<span class="editorial-map-pin"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg></span><span class="editorial-map-coords">${escapeHtml(String(lat))}\u00B0N, ${escapeHtml(String(lng))}\u00B0W</span>`;
+            }
+            content.appendChild(mapPlaceholder);
+        }
+
+        // Historical context prose
+        if (ar.context?.description) {
+            const proseLabeled = document.createElement('div');
+            proseLabeled.className = 'editorial-prose-labeled';
+            const subLabel = document.createElement('div');
+            subLabel.className = 'editorial-prose-sub-label';
+            subLabel.textContent = 'Historical Context';
+            proseLabeled.appendChild(subLabel);
+            const proseBlock = document.createElement('div');
+            proseBlock.className = 'editorial-prose-block';
+            proseBlock.innerHTML = parseMarkdown(ar.context.description);
+            proseLabeled.appendChild(proseBlock);
+            content.appendChild(proseLabeled);
+        }
+
+        // Provenance prose
+        if (ar.provenance) {
+            const proseLabeled = document.createElement('div');
+            proseLabeled.className = 'editorial-prose-labeled';
+            const subLabel = document.createElement('div');
+            subLabel.className = 'editorial-prose-sub-label';
+            subLabel.textContent = 'Provenance';
+            proseLabeled.appendChild(subLabel);
+            const proseBlock = document.createElement('div');
+            proseBlock.className = 'editorial-prose-block';
+            proseBlock.innerHTML = parseMarkdown(ar.provenance);
+            proseLabeled.appendChild(proseBlock);
+            content.appendChild(proseLabeled);
+        }
+
+        contentWrapper.appendChild(section);
+    }
+
+    // === Collapsible: Quality & Capture ===
+    const qm = manifest?.quality_metrics;
+    const prov = manifest?.provenance;
+    const hasQuality = qm && hasValue(qm);
+    const hasCapture = prov && (prov.capture_device || prov.device_serial);
+    const operator = manifest?.creator || prov?.operator;
+    if ((hasQuality || hasCapture || operator) && shouldShow('Quality & Capture')) {
+        const { section, content } = createCollapsible('Quality & Capture', false);
+
+        // Operator credit line
+        if (operator) {
+            const creditLine = document.createElement('div');
+            creditLine.className = 'editorial-info-credit-line';
+            creditLine.innerHTML = `<span class="org">${escapeHtml(operator)}</span>`;
+            content.appendChild(creditLine);
+        }
+
+        // 3-column quality grid
+        const qualityGrid = document.createElement('div');
+        qualityGrid.className = 'editorial-quality-grid';
+        if (qm) {
+            if (qm.tier) qualityGrid.appendChild(createQualityDetail('Tier', escapeHtml(`Tier ${qm.tier}`)));
+            if (qm.accuracy_grade) qualityGrid.appendChild(createQualityDetail('Accuracy', escapeHtml(`Grade ${qm.accuracy_grade}`)));
+            if (qm.capture_resolution?.value != null) {
+                const cr = qm.capture_resolution;
+                qualityGrid.appendChild(createQualityDetail('Resolution', escapeHtml(`${cr.value}${cr.unit || ''} GSD`)));
+            }
+            if (qm.alignment_error?.value != null) {
+                const ae = qm.alignment_error;
+                qualityGrid.appendChild(createQualityDetail('Alignment', escapeHtml(`${ae.value}${ae.unit || ''} RMSE`)));
+            }
+            if (qm.scale_verification) qualityGrid.appendChild(createQualityDetail('Scale Check', escapeHtml(qm.scale_verification)));
+        }
+        if (prov?.capture_device) qualityGrid.appendChild(createQualityDetail('Device', escapeHtml(prov.capture_device)));
+        if (prov?.device_serial) {
+            const serialEl = createQualityDetail('Serial', escapeHtml(prov.device_serial));
+            const valSpan = serialEl.querySelector('.editorial-quality-value');
+            if (valSpan) {
+                valSpan.style.fontFamily = 'var(--kiosk-font-mono)';
+                valSpan.style.fontSize = '0.68rem';
+                valSpan.style.letterSpacing = '0.01em';
+            }
+            qualityGrid.appendChild(serialEl);
+        }
+        if (qualityGrid.children.length > 0) content.appendChild(qualityGrid);
+
+        // Secondary quality grid (data_quality sub-fields)
+        if (qm && hasValue(qm.data_quality)) {
+            const secGrid = document.createElement('div');
+            secGrid.className = 'editorial-quality-secondary';
+            Object.keys(qm.data_quality).forEach(k => {
+                secGrid.appendChild(createQualityDetail(
+                    escapeHtml(k.replace(/_/g, ' ')),
+                    escapeHtml(String(qm.data_quality[k]))
+                ));
+            });
+            content.appendChild(secGrid);
+        }
+
+        contentWrapper.appendChild(section);
+    }
+
+    // === Collapsible: Processing ===
+    if (prov && shouldShow('Processing')) {
+        const hasSoftware = Array.isArray(prov.processing_software) && prov.processing_software.length > 0;
+        const hasNotes = !!prov.processing_notes;
+        if (hasSoftware || hasNotes) {
+            const { section, content } = createCollapsible('Processing', false);
+
+            if (hasSoftware) {
+                const swLine = document.createElement('div');
+                swLine.className = 'editorial-software-line';
+                const names = prov.processing_software.map(sw =>
+                    typeof sw === 'object' ? `${sw.name || ''}${sw.version ? ' ' + sw.version : ''}`.trim() : sw
+                ).filter(Boolean);
+                swLine.innerHTML = `<strong>Software</strong> ${escapeHtml(names.join(' \u00B7 '))}`;
+                content.appendChild(swLine);
+            }
+
+            if (hasNotes) {
+                const proseBlock = document.createElement('div');
+                proseBlock.className = 'editorial-prose-block';
+                proseBlock.innerHTML = parseMarkdown(prov.processing_notes);
+                content.appendChild(proseBlock);
+            }
+
+            contentWrapper.appendChild(section);
+        }
+    }
+
+    // === Collapsible: Data Assets ===
+    const entries = manifest?.data_entries;
+    if (Array.isArray(entries) && entries.length > 0 && shouldShow('Data Assets')) {
+        const { section, content } = createCollapsible('Data Assets', false);
+
+        entries.forEach(entry => {
+            const item = document.createElement('div');
+            item.className = 'editorial-asset-item';
+
+            const headerEl = document.createElement('div');
+            headerEl.className = 'editorial-asset-header';
+            if (entry.role) {
+                const roleEl = document.createElement('span');
+                roleEl.className = 'editorial-asset-role';
+                roleEl.textContent = entry.role;
+                headerEl.appendChild(roleEl);
+            }
+            const nameEl = document.createElement('span');
+            nameEl.className = 'editorial-asset-filename';
+            nameEl.textContent = entry.file_name || entry.filename || '';
+            headerEl.appendChild(nameEl);
+            item.appendChild(headerEl);
+
+            if (entry.creator) {
+                const creatorEl = document.createElement('div');
+                creatorEl.className = 'editorial-asset-creator';
+                creatorEl.textContent = entry.creator;
+                item.appendChild(creatorEl);
+            }
+
+            // Meta chips (file size, counts)
+            const metaChips = [];
+            if (entry.file_size) metaChips.push(entry.file_size);
+            if (entry.splat_count) metaChips.push(`${Number(entry.splat_count).toLocaleString()} splats`);
+            if (entry.polygon_count) metaChips.push(`${Number(entry.polygon_count).toLocaleString()} polygons`);
+            if (entry.vertex_count) metaChips.push(`${Number(entry.vertex_count).toLocaleString()} vertices`);
+            if (metaChips.length > 0) {
+                const metaRow = document.createElement('div');
+                metaRow.className = 'editorial-asset-meta';
+                metaChips.forEach(chip => {
+                    const chipEl = document.createElement('span');
+                    chipEl.className = 'editorial-asset-meta-chip';
+                    chipEl.textContent = chip;
+                    metaRow.appendChild(chipEl);
+                });
+                item.appendChild(metaRow);
+            }
+
+            // Source notes
+            if (entry._source_notes) {
+                const notesEl = document.createElement('div');
+                notesEl.className = 'editorial-asset-notes';
+                notesEl.textContent = entry._source_notes;
+                item.appendChild(notesEl);
+            }
+
+            content.appendChild(item);
+        });
+
+        contentWrapper.appendChild(section);
+    }
+
+    // === Collapsible: Technical Details ===
+    if (shouldShow('Technical Details')) {
+        const hasTech = ar || manifest?.material_standard || manifest?.preservation || manifest?.integrity;
+        if (hasTech) {
+            const { section, content } = createCollapsible('Technical Details', false);
+
+            const techGrid = document.createElement('div');
+            techGrid.className = 'editorial-tech-grid';
+            if (ar?.standard) techGrid.appendChild(createTechDetail('Standard', escapeHtml(ar.standard)));
+            if (ar?.rights?.holder) techGrid.appendChild(createTechDetail('Copyright', escapeHtml(ar.rights.holder)));
+            const matStd = manifest?.material_standard;
+            if (matStd) {
+                if (matStd.workflow) techGrid.appendChild(createTechDetail('Material', escapeHtml(matStd.workflow)));
+                if (matStd.color_space) techGrid.appendChild(createTechDetail('Color Space', escapeHtml(matStd.color_space)));
+                if (matStd.normal_convention) techGrid.appendChild(createTechDetail('Normal', escapeHtml(matStd.normal_convention)));
+            }
+            const pres = manifest?.preservation;
+            if (pres?.rendering_requirements) techGrid.appendChild(createTechDetail('Rendering', escapeHtml(pres.rendering_requirements)));
+            if (techGrid.children.length > 0) content.appendChild(techGrid);
+
+            // Significant properties
+            if (pres?.significant_properties?.length > 0) {
+                const subHead = document.createElement('div');
+                subHead.className = 'editorial-tech-sub-header';
+                subHead.textContent = 'Significant Properties';
+                content.appendChild(subHead);
+                const propsRow = document.createElement('div');
+                propsRow.className = 'editorial-sig-props';
+                pres.significant_properties.forEach(prop => {
+                    const chip = document.createElement('span');
+                    chip.className = 'editorial-sig-prop';
+                    chip.textContent = prop;
+                    propsRow.appendChild(chip);
+                });
+                content.appendChild(propsRow);
+            }
+
+            // Integrity hashes
+            const integ = manifest?.integrity;
+            if (integ?.checksums?.length > 0) {
+                const subHead = document.createElement('div');
+                subHead.className = 'editorial-tech-sub-header';
+                subHead.textContent = `Integrity \u2014 ${escapeHtml(integ.algorithm || 'SHA-256')}`;
+                content.appendChild(subHead);
+                const hashList = document.createElement('ul');
+                hashList.className = 'editorial-hash-list';
+                integ.checksums.forEach(cs => {
+                    const li = document.createElement('li');
+                    const hash = cs.hash || cs.value || '';
+                    const truncated = hash.length > 16 ? hash.slice(0, 8) + '...' + hash.slice(-8) : hash;
+                    li.innerHTML = `<span>${escapeHtml(cs.file || '')}</span> ${escapeHtml(truncated)}`;
+                    hashList.appendChild(li);
+                });
+                content.appendChild(hashList);
+            }
+
+            // Creation / modified dates
+            const creationDate = manifest?._creation_date || manifest?._meta?.created;
+            const modifiedDate = manifest?._last_modified || manifest?._meta?.modified;
+            if (creationDate || modifiedDate) {
+                const datesRow = document.createElement('div');
+                datesRow.className = 'editorial-dates-row';
+                if (creationDate) datesRow.appendChild(createTechDetail('Created', escapeHtml(String(creationDate))));
+                if (modifiedDate) datesRow.appendChild(createTechDetail('Last Modified', escapeHtml(String(modifiedDate))));
+                content.appendChild(datesRow);
+            }
+
+            contentWrapper.appendChild(section);
+        }
+    }
+
+    // === Collapsible: Tags ===
     const tags = manifest?.tags || manifest?.project?.tags || [];
-    if (tags.length > 0) {
+    if (tags.length > 0 && shouldShow('Tags')) {
+        const { section, content } = createCollapsible('Tags', false);
         const tagsRow = document.createElement('div');
         tagsRow.className = 'editorial-info-tags';
         tags.forEach(tag => {
@@ -172,181 +539,22 @@ function createInfoOverlay(manifest, deps) {
             chip.textContent = tag;
             tagsRow.appendChild(chip);
         });
-        headerSection.appendChild(tagsRow);
+        content.appendChild(tagsRow);
+        contentWrapper.appendChild(section);
     }
 
+    // === Footer ===
     const license = manifest?.license || manifest?.project?.license || manifest?.archival_record?.rights?.license ||
                     manifest?.archival_record?.rights?.statement || '';
     if (license) {
         const licenseEl = document.createElement('div');
         licenseEl.className = 'editorial-info-license';
         licenseEl.textContent = license;
-        headerSection.appendChild(licenseEl);
+        contentWrapper.appendChild(licenseEl);
     }
 
-    contentWrapper.appendChild(headerSection);
-
-    // === Two-column spread — detail sections ===
-    const spread = document.createElement('div');
-    spread.className = 'editorial-info-spread';
-
-    const colRight = document.createElement('div');
-    colRight.className = 'editorial-info-col-right';
-
-    const addSection = (headerText, details) => {
-        if (details.length === 0) return;
-        const header = document.createElement('div');
-        header.className = 'editorial-info-section-header';
-        header.textContent = headerText;
-        colRight.appendChild(header);
-
-        const grid = document.createElement('div');
-        grid.className = 'editorial-info-detail-grid';
-        details.forEach(({ label, value }) => {
-            const detail = document.createElement('div');
-            detail.className = 'editorial-info-detail';
-            detail.innerHTML = `<span class="editorial-info-detail-label">${escapeHtml(label)}</span><span class="editorial-info-detail-value">${escapeHtml(String(value))}</span>`;
-            grid.appendChild(detail);
-        });
-        colRight.appendChild(grid);
-    };
-
-    const metadataProfile = deps.metadataProfile || 'archival';
-    const shouldShow = (title) => {
-        const tiers = deps.EDITORIAL_SECTION_TIERS;
-        const tier = tiers?.[title];
-        if (!tier || !deps.isTierVisible) return true;
-        return deps.isTierVisible(tier, metadataProfile);
-    };
-
-    // 1. Capture details (only fields NOT already in the header byline)
-    const captureDetails = [];
-    if (manifest?.provenance?.device_serial) captureDetails.push({ label: 'Serial', value: manifest.provenance.device_serial });
-    if (manifest?.provenance?.operator_orcid) captureDetails.push({ label: 'ORCID', value: manifest.provenance.operator_orcid });
-    if (shouldShow('Capture')) addSection('Capture', captureDetails);
-
-    // 2. Quality & accuracy
-    const qm = manifest?.quality_metrics;
-    const qualityDetails = [];
-    if (qm) {
-        if (qm.tier) qualityDetails.push({ label: 'Tier', value: `Tier ${qm.tier}` });
-        if (qm.accuracy_grade) qualityDetails.push({ label: 'Accuracy', value: `Grade ${qm.accuracy_grade}` });
-        if (qm.capture_resolution?.value != null) {
-            const cr = qm.capture_resolution;
-            qualityDetails.push({ label: 'Resolution', value: `${cr.value}${cr.unit || ''} GSD` });
-        }
-        if (qm.alignment_error?.value != null) {
-            const ae = qm.alignment_error;
-            qualityDetails.push({ label: 'Alignment', value: `${ae.value}${ae.unit || ''} RMSE` });
-        }
-        if (qm.scale_verification) qualityDetails.push({ label: 'Scale Check', value: qm.scale_verification });
-        if (hasValue(qm.data_quality)) {
-            Object.keys(qm.data_quality).forEach(k => {
-                qualityDetails.push({ label: k.replace(/_/g, ' '), value: qm.data_quality[k] });
-            });
-        }
-    }
-    if (shouldShow('Quality')) addSection('Quality', qualityDetails);
-
-    // 3. Processing
-    const prov = manifest?.provenance;
-    const processDetails = [];
-    if (prov) {
-        if (Array.isArray(prov.processing_software)) {
-            prov.processing_software.forEach(sw => {
-                const val = typeof sw === 'object' ? `${sw.name || ''} ${sw.version || ''}`.trim() : sw;
-                if (val) processDetails.push({ label: 'Software', value: val });
-            });
-        }
-        if (prov.processing_notes) processDetails.push({ label: 'Notes', value: prov.processing_notes });
-        if (prov.convention_hints?.length) processDetails.push({ label: 'Conventions', value: Array.isArray(prov.convention_hints) ? prov.convention_hints.join(', ') : prov.convention_hints });
-    }
-    if (shouldShow('Processing')) addSection('Processing', processDetails);
-
-    // 4. Archival record
-    const ar = manifest?.archival_record;
-    const archivalDetails = [];
-    if (ar) {
-        if (ar.standard) archivalDetails.push({ label: 'Standard', value: ar.standard });
-        if (hasValue(ar.ids)) {
-            Object.keys(ar.ids).forEach(k => archivalDetails.push({ label: `ID (${k})`, value: ar.ids[k] }));
-        }
-        if (hasValue(ar.physical_description)) {
-            Object.keys(ar.physical_description).forEach(k => {
-                archivalDetails.push({ label: k.replace(/_/g, ' '), value: ar.physical_description[k] });
-            });
-        }
-        if (ar.provenance) archivalDetails.push({ label: 'Provenance', value: ar.provenance });
-        if (ar.rights?.holder) archivalDetails.push({ label: 'Rights Holder', value: ar.rights.holder });
-        if (hasValue(ar.context)) {
-            Object.keys(ar.context).forEach(k => {
-                archivalDetails.push({ label: k.replace(/_/g, ' '), value: ar.context[k] });
-            });
-        }
-        if (hasValue(ar.coverage?.spatial)) {
-            Object.keys(ar.coverage.spatial).forEach(k => {
-                archivalDetails.push({ label: `Spatial ${k}`, value: ar.coverage.spatial[k] });
-            });
-        }
-    }
-    if (shouldShow('Archival Record')) addSection('Archival Record', archivalDetails);
-
-    // 5. Data assets
-    const entries = manifest?.data_entries;
-    const assetDetails = [];
-    if (Array.isArray(entries)) {
-        entries.forEach(entry => {
-            const name = entry.file_name || entry.filename;
-            assetDetails.push({ label: entry.role || 'File', value: name });
-        });
-    }
-    if (shouldShow('Data Assets')) addSection('Data Assets', assetDetails);
-
-    // 6. Relationships
-    const rel = manifest?.relationships;
-    const relDetails = [];
-    if (hasValue(rel)) {
-        if (rel.part_of) relDetails.push({ label: 'Part Of', value: rel.part_of });
-        if (rel.derived_from) relDetails.push({ label: 'Derived From', value: rel.derived_from });
-        if (rel.replaces) relDetails.push({ label: 'Replaces', value: rel.replaces });
-    }
-    if (shouldShow('Relationships')) addSection('Relationships', relDetails);
-
-    // 7. Integrity
-    const integ = manifest?.integrity;
-    const integDetails = [];
-    if (hasValue(integ)) {
-        if (integ.algorithm) integDetails.push({ label: 'Algorithm', value: integ.algorithm });
-        if (integ.manifest_hash) integDetails.push({ label: 'Hash', value: integ.manifest_hash });
-    }
-    if (shouldShow('Integrity')) addSection('Integrity', integDetails);
-
-    // Stats row
-    const contentInfo = state.archiveLoader ? state.archiveLoader.getContentInfo() : null;
-    if (contentInfo) {
-        const statsRow = document.createElement('div');
-        statsRow.className = 'editorial-info-stats-row';
-
-        const statItems = [];
-        if (contentInfo.hasSplat) statItems.push({ num: '1', label: 'Splat' });
-        if (contentInfo.hasMesh) statItems.push({ num: '1', label: 'Mesh' });
-        if (contentInfo.hasPointcloud) statItems.push({ num: '1', label: 'Point Cloud' });
-        const annoCount = annotationSystem.getAnnotations().length;
-        if (annoCount > 0) statItems.push({ num: String(annoCount), label: 'Annotations' });
-
-        statItems.forEach(({ num, label }) => {
-            const stat = document.createElement('div');
-            stat.className = 'editorial-info-stat';
-            stat.innerHTML = `<div class="editorial-info-stat-number">${escapeHtml(num)}</div><div class="editorial-info-stat-label">${escapeHtml(label)}</div>`;
-            statsRow.appendChild(stat);
-        });
-
-        colRight.appendChild(statsRow);
-    }
-
-    spread.appendChild(colRight);
-    contentWrapper.appendChild(spread);
-    overlay.appendChild(contentWrapper);
+    panelInner.appendChild(contentWrapper);
+    overlay.appendChild(panelInner);
     return overlay;
 }
 
@@ -380,7 +588,7 @@ export function setup(manifest, deps) {
     spine.className = 'editorial-spine';
     viewerContainer.appendChild(spine);
 
-    // --- 2. Title Block ---
+    // --- 2. Title Block — title, gold rule, meta ---
     const titleBlock = document.createElement('div');
     titleBlock.className = 'editorial-title-block';
 
@@ -397,20 +605,12 @@ export function setup(manifest, deps) {
     `;
     viewerContainer.appendChild(titleBlock);
 
-    // --- 3. Corner Logo ---
-    const cornerLogo = document.createElement('div');
-    cornerLogo.className = 'editorial-corner-logo';
-    const logoImg = document.createElement('img');
-    logoImg.className = 'editorial-corner-logo-img';
-    logoImg.src = (deps.themeAssets && deps.themeAssets['logo.png'])
-        || (deps.themeBaseUrl || 'themes/editorial/') + 'logo.png';
-    logoImg.alt = '';
-    logoImg.draggable = false;
-    cornerLogo.appendChild(logoImg);
-    viewerContainer.appendChild(cornerLogo);
+    // Auto-fade behavior for title block
+    setupAutoFade(titleBlock, null);
 
-    // Auto-fade behavior for title block and corner logo
-    setupAutoFade(titleBlock, cornerLogo);
+    // Logo src for ribbon
+    const logoSrc = (deps.themeAssets && deps.themeAssets['logo.png'])
+        || (deps.themeBaseUrl || 'themes/editorial/') + 'logo.png';
 
     // --- 4. Bottom Ribbon ---
     const ribbon = document.createElement('div');
@@ -477,30 +677,26 @@ export function setup(manifest, deps) {
         });
     }
 
-    // Details link
-    const detailsSep = document.createElement('span');
-    detailsSep.className = 'editorial-view-mode-sep';
-    detailsSep.textContent = '|';
-    viewModes.appendChild(detailsSep);
-
+    // Info link — last item in viewModes
+    const infoSep = document.createElement('span');
+    infoSep.className = 'editorial-view-mode-sep';
+    infoSep.textContent = '|';
+    viewModes.appendChild(infoSep);
     const detailsLink = document.createElement('button');
     detailsLink.className = 'editorial-view-mode-link editorial-details-link';
-    detailsLink.textContent = 'Details';
+    detailsLink.textContent = 'Info';
     viewModes.appendChild(detailsLink);
 
     // Measure dropdown (like material view — self-contained, replaces global scale panel)
+    let measureWrapper = null;
     if (deps.measurementSystem) {
-        const measureSep = document.createElement('span');
-        measureSep.className = 'editorial-view-mode-sep';
-        measureSep.textContent = '|';
-        viewModes.appendChild(measureSep);
-
-        const measureWrapper = document.createElement('div');
+        measureWrapper = document.createElement('div');
         measureWrapper.className = 'editorial-measure-wrapper';
 
         const measureBtn = document.createElement('button');
-        measureBtn.className = 'editorial-view-mode-link editorial-measure-btn';
-        measureBtn.textContent = 'Measure';
+        measureBtn.className = 'editorial-marker-toggle editorial-measure-btn';
+        measureBtn.title = 'Measure';
+        measureBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2l20 20"/><path d="M5.5 5.5L8 3"/><path d="M9.5 9.5L12 7"/><path d="M13.5 13.5L16 11"/><path d="M17.5 17.5L20 15"/></svg>';
 
         const measureDropdown = document.createElement('div');
         measureDropdown.className = 'editorial-measure-dropdown';
@@ -572,10 +768,18 @@ export function setup(manifest, deps) {
 
         measureWrapper.appendChild(measureBtn);
         measureWrapper.appendChild(measureDropdown);
-        viewModes.appendChild(measureWrapper);
     }
 
     ribbon.appendChild(viewModes);
+
+    // Separator after Info / before tools
+    const infoToolsRule = document.createElement('div');
+    infoToolsRule.className = 'editorial-ribbon-rule';
+    ribbon.appendChild(infoToolsRule);
+
+    // Right-side tools wrapper — keeps tools grouped and prevents viewModes overlap
+    const toolsGroup = document.createElement('div');
+    toolsGroup.className = 'editorial-ribbon-tools';
 
     // Annotation sequence chain + marker toggle
     const annotations = annotationSystem.getAnnotations();
@@ -590,10 +794,6 @@ export function setup(manifest, deps) {
     };
 
     if (annotations.length > 0) {
-        const ruleEl = document.createElement('div');
-        ruleEl.className = 'editorial-ribbon-rule';
-        ribbon.appendChild(ruleEl);
-
         const sequence = document.createElement('div');
         sequence.className = 'editorial-anno-sequence';
 
@@ -630,12 +830,11 @@ export function setup(manifest, deps) {
             sequence.appendChild(num);
         });
 
-        ribbon.appendChild(sequence);
+        toolsGroup.appendChild(sequence);
 
         // Marker visibility toggle
         markerToggle = document.createElement('button');
         markerToggle.className = 'editorial-marker-toggle';
-        markerToggle.style.marginLeft = 'auto';
         markerToggle.title = 'Toggle annotation markers';
         markerToggle.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
         markerToggle.addEventListener('click', () => {
@@ -649,14 +848,22 @@ export function setup(manifest, deps) {
                 sequence.querySelectorAll('.editorial-anno-seq-num.active').forEach(n => n.classList.remove('active'));
             }
         });
-        ribbon.appendChild(markerToggle);
+        toolsGroup.appendChild(markerToggle);
+        if (measureWrapper) toolsGroup.appendChild(measureWrapper);
+    } else if (measureWrapper) {
+        // Measure without annotations
+        toolsGroup.appendChild(measureWrapper);
     }
+
+    // Rule separator between annotation and visualization groups
+    const vizRule = document.createElement('div');
+    vizRule.className = 'editorial-ribbon-rule';
+    toolsGroup.appendChild(vizRule);
 
     // Mesh visualization tools
     // Texture toggle
     const textureToggle = document.createElement('button');
     textureToggle.className = 'editorial-marker-toggle';
-    if (annotations.length === 0) textureToggle.style.marginLeft = 'auto';
     textureToggle.title = 'Toggle textures';
     textureToggle.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>';
     let texturesVisible = true;
@@ -665,7 +872,7 @@ export function setup(manifest, deps) {
         updateModelTextures(modelGroup, texturesVisible);
         textureToggle.classList.toggle('off', !texturesVisible);
     });
-    ribbon.appendChild(textureToggle);
+    toolsGroup.appendChild(textureToggle);
 
     // Combined Material Views dropdown (wireframe, normals, PBR channels, matcap presets)
     const matcapPresets = ['clay', 'chrome', 'pearl', 'jade', 'copper'];
@@ -676,7 +883,7 @@ export function setup(manifest, deps) {
     materialWrapper.className = 'editorial-matcap-wrapper';
 
     const materialBtn = document.createElement('button');
-    materialBtn.className = 'editorial-marker-toggle off';
+    materialBtn.className = 'editorial-marker-toggle';
     materialBtn.title = 'Material views';
     materialBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><ellipse cx="12" cy="12" rx="4" ry="10"/><path d="M2 12h20"/></svg>';
 
@@ -709,8 +916,8 @@ export function setup(manifest, deps) {
             else if (activeView === 'specularF0') updateModelSpecularF0(modelGroup, true);
             else if (activeView.startsWith('matcap:')) updateModelMatcap(modelGroup, true, activeView.split(':')[1]);
         }
-        // Update button
-        materialBtn.classList.toggle('off', !activeView);
+        // Update button — highlight when a view is active, but never dim to .off
+        materialBtn.classList.toggle('active', !!activeView);
         const label = activeView
             ? (viewLabels[activeView] || matcapLabels[matcapPresets.indexOf((activeView.split(':')[1]) || '')] || activeView)
             : null;
@@ -755,11 +962,19 @@ export function setup(manifest, deps) {
 
     materialWrapper.appendChild(materialBtn);
     materialWrapper.appendChild(materialDropdown);
-    ribbon.appendChild(materialWrapper);
+    toolsGroup.appendChild(materialWrapper);
 
-    // FOV slider — compact inline control
+    // FOV — camera icon with popover (same pattern as material dropdown)
     const fovWrapper = document.createElement('div');
     fovWrapper.className = 'editorial-fov-wrapper';
+
+    const fovBtn = document.createElement('button');
+    fovBtn.className = 'editorial-marker-toggle';
+    fovBtn.title = 'Field of view';
+    fovBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+
+    const fovDropdown = document.createElement('div');
+    fovDropdown.className = 'editorial-fov-dropdown';
 
     const fovLabel = document.createElement('span');
     fovLabel.className = 'editorial-fov-label';
@@ -772,7 +987,6 @@ export function setup(manifest, deps) {
     fovSlider.step = '1';
     fovSlider.value = '60';
     fovSlider.className = 'editorial-fov-slider';
-    fovSlider.title = 'Field of view';
 
     fovSlider.addEventListener('input', () => {
         const fov = parseInt(fovSlider.value, 10);
@@ -783,16 +997,23 @@ export function setup(manifest, deps) {
         }
     });
 
-    fovWrapper.appendChild(fovSlider);
-    fovWrapper.appendChild(fovLabel);
-    ribbon.appendChild(fovWrapper);
+    fovDropdown.appendChild(fovLabel);
+    fovDropdown.appendChild(fovSlider);
 
-    // Fullscreen button — far right of ribbon
+    fovBtn.addEventListener('click', (e) => { e.stopPropagation(); fovDropdown.classList.toggle('open'); });
+    document.addEventListener('click', () => { fovDropdown.classList.remove('open'); });
+    fovDropdown.addEventListener('click', (e) => { e.stopPropagation(); });
+
+    fovWrapper.appendChild(fovBtn);
+    fovWrapper.appendChild(fovDropdown);
+    toolsGroup.appendChild(fovWrapper);
+
+    // Fullscreen button — appended next to logo on far right
+    let fsBtn = null;
     if (document.fullscreenEnabled) {
-        const fsBtn = document.createElement('button');
+        fsBtn = document.createElement('button');
         fsBtn.className = 'editorial-marker-toggle editorial-fullscreen-btn';
         fsBtn.title = 'Toggle Fullscreen (F11)';
-        fsBtn.style.marginLeft = '8px';
         fsBtn.innerHTML = `<svg class="icon-expand" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg><svg class="icon-compress" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="10" y1="14" x2="3" y2="21"></line><line x1="21" y1="3" x2="14" y2="10"></line></svg>`;
         fsBtn.addEventListener('click', () => {
             if (!document.fullscreenElement) {
@@ -808,30 +1029,36 @@ export function setup(manifest, deps) {
             if (expand) expand.style.display = isFs ? 'none' : '';
             if (compress) compress.style.display = isFs ? '' : 'none';
         });
-        ribbon.appendChild(fsBtn);
     }
 
+    ribbon.appendChild(toolsGroup);
+
+    // Right group — logo + fullscreen, pushed far right
+    const ribbonLogo = document.createElement('img');
+    ribbonLogo.className = 'editorial-ribbon-logo';
+    ribbonLogo.src = logoSrc;
+    ribbonLogo.alt = '';
+    ribbonLogo.draggable = false;
+    ribbon.appendChild(ribbonLogo);
+    if (fsBtn) {
+        const logoFsRule = document.createElement('div');
+        logoFsRule.className = 'editorial-ribbon-rule';
+        ribbon.appendChild(logoFsRule);
+        ribbon.appendChild(fsBtn);
+    }
     viewerContainer.appendChild(ribbon);
 
-    // --- 5. Info Overlay ---
+    // --- 5. Info Panel (side panel) ---
     const overlay = createInfoOverlay(manifest, deps);
     viewerContainer.appendChild(overlay);
 
-    // Wire details link to overlay
+    // Wire details link to panel
     detailsLink.addEventListener('click', () => {
         const isOpen = overlay.classList.toggle('open');
         detailsLink.classList.toggle('active', isOpen);
     });
 
-    // Close overlay when clicking the backdrop
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-            overlay.classList.remove('open');
-            detailsLink.classList.remove('active');
-        }
-    });
-
-    // Close overlay or exit measure mode on ESC key
+    // Close panel on ESC; 'm' toggle handled by exported onKeyboardShortcut()
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
         if (overlay.classList.contains('open')) {

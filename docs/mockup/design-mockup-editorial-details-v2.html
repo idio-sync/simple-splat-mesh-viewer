@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Editorial Details v2 — Side Panel with Image Strip</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Editorial Details v2 — Side Panel ("Magazine Spread")
+   Scene visible on left, details panel slides in from right.
+   Portrait image as vertical strip at panel left edge.
+   ============================================================ */
+
+:root {
+    --bg-deep:        #0c1f33;
+    --bg-canvas:      #11304e;
+    --bg-canvas-end:  #0d2740;
+    --bg-surface:     #1a3d5c;
+    --bg-surface-rgb: 17, 48, 78;
+
+    --border-subtle:  rgba(255, 255, 255, 0.08);
+    --border-default: #24455f;
+
+    --accent:         #FEC03A;
+    --accent-rgb:     254, 192, 58;
+
+    --text-primary:   #e8ecf0;
+    --text-secondary: #becdd7;
+    --text-muted:     #8ca0b4;
+    --text-faint:     #3a5a74;
+
+    --font-sans:      'Source Sans 3', 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono:      'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+
+    --panel-width:    54%;
+    --strip-width:    220px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: var(--font-sans);
+    background: var(--bg-canvas);
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.5;
+    overflow: hidden;
+    height: 100vh;
+}
+
+/* ============================================================
+   Viewport Layout — scene left, panel right
+   ============================================================ */
+
+.viewport {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+}
+
+/* ============================================================
+   Scene (left side) — placeholder for 3D viewer
+   ============================================================ */
+
+.scene {
+    flex: 1;
+    position: relative;
+    background: linear-gradient(160deg, var(--bg-canvas) 0%, var(--bg-canvas-end) 100%);
+    overflow: hidden;
+}
+
+.scene-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(42, 84, 120, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(42, 84, 120, 0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+}
+
+.scene-placeholder {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 280px;
+    height: 280px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at 35% 35%, #2f5f85 0%, #1a3d5c 38%, #0c1f33 80%);
+    box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.3);
+    opacity: 0.3;
+}
+
+.scene-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text-faint);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: center;
+    pointer-events: none;
+}
+
+/* Gold spine on scene left edge */
+.spine {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    opacity: 0.6;
+    z-index: 100;
+}
+
+/* Title block on scene (faded, like editorial default view) */
+.scene-title-block {
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 28px 40px 28px 24px;
+    z-index: 90;
+    opacity: 0.15;
+    background: linear-gradient(135deg, rgba(var(--bg-surface-rgb),0.95) 0%, rgba(var(--bg-surface-rgb),0.7) 50%, transparent 100%);
+}
+
+.scene-title-block h1 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.scene-title-rule {
+    width: 36px;
+    height: 3px;
+    background: var(--accent);
+    margin-bottom: 8px;
+}
+
+.scene-title-meta {
+    font-size: 0.68rem;
+    font-weight: 400;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* ============================================================
+   Details Panel (right side)
+   ============================================================ */
+
+.panel {
+    width: var(--panel-width);
+    max-width: 720px;
+    height: 100%;
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    background: rgba(var(--bg-surface-rgb), 0.94);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-left: 1px solid var(--border-subtle);
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.35), -2px 0 8px rgba(0, 0, 0, 0.2);
+    z-index: 200;
+    animation: panelSlideIn 0.35s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+@keyframes panelSlideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* ============================================================
+   Image Strip — vertical bleed along panel left edge
+   ============================================================ */
+
+.image-strip {
+    width: var(--strip-width);
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 4px 0 16px rgba(0, 0, 0, 0.25), 1px 0 4px rgba(0, 0, 0, 0.15);
+    z-index: 1;
+}
+
+.image-strip img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 20%;
+}
+
+/* Fade at bottom */
+.image-strip::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 40%;
+    background: linear-gradient(to top, rgba(var(--bg-surface-rgb), 1) 0%, rgba(var(--bg-surface-rgb), 0.6) 40%, transparent 100%);
+    pointer-events: none;
+}
+
+/* Subtle inner shadow at right edge for depth */
+.image-strip::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 20px;
+    background: linear-gradient(to left, rgba(var(--bg-surface-rgb), 0.5), transparent);
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* Gold accent line between strip and content */
+.strip-accent {
+    width: 2px;
+    flex-shrink: 0;
+    background: linear-gradient(to bottom, var(--accent) 0%, rgba(var(--accent-rgb), 0.3) 50%, transparent 80%);
+}
+
+/* ============================================================
+   Panel Content — scrollable area
+   ============================================================ */
+
+.panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 32px 40px 24px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--accent-rgb), 0.25) transparent;
+    mask-image: linear-gradient(to bottom, black 96%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 96%, transparent 100%);
+}
+
+.panel-content::-webkit-scrollbar { width: 3px; }
+.panel-content::-webkit-scrollbar-track { background: transparent; }
+.panel-content::-webkit-scrollbar-thumb { background: rgba(var(--accent-rgb), 0.25); border-radius: 2px; }
+.panel-content::-webkit-scrollbar-thumb:hover { background: rgba(var(--accent-rgb), 0.4); }
+
+/* Close button */
+.close-btn {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    z-index: 10;
+    font-size: 18px;
+    color: var(--text-muted);
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: var(--font-sans);
+    font-weight: 300;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: color 0.12s, background 0.12s;
+}
+
+.close-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* ============================================================
+   Title Block
+   ============================================================ */
+
+.title-block {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--text-primary);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    padding-right: 32px; /* clear close button */
+}
+
+.title-bar {
+    width: 40px;
+    height: 3px;
+    background: var(--accent);
+    margin-bottom: 12px;
+}
+
+.credit-line {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
+    margin-bottom: 6px;
+}
+
+.credit-line .org {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.model-stats {
+    font-size: 0.65rem;
+    font-weight: 400;
+    color: var(--text-muted);
+    letter-spacing: 0.03em;
+    margin-bottom: 6px;
+}
+
+.model-stats strong {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.byline {
+    font-size: 0.68rem;
+    font-weight: 400;
+    color: var(--text-muted);
+    letter-spacing: 0.03em;
+    margin-bottom: 0;
+    line-height: 1.5;
+}
+
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 12px;
+}
+
+.tag {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: var(--text-muted);
+    font-size: 0.6rem;
+    letter-spacing: 0.05em;
+    padding: 1px 7px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+/* Map placeholder */
+.map-placeholder {
+    width: 100%;
+    height: 120px;
+    border-radius: 6px;
+    background: rgba(var(--bg-surface-rgb), 0.6);
+    border: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-top: 10px;
+    position: relative;
+    overflow: hidden;
+}
+
+.map-placeholder::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(42, 84, 120, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(42, 84, 120, 0.06) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+.map-pin {
+    font-size: 1.2rem;
+    color: var(--accent);
+    margin-bottom: 4px;
+    position: relative;
+    z-index: 1;
+}
+
+.map-coords {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+    position: relative;
+    z-index: 1;
+}
+
+/* Asset meta stats */
+.asset-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.asset-meta-chip {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 0.56rem;
+    color: var(--text-muted);
+    padding: 1px 5px;
+    letter-spacing: 0.01em;
+}
+
+/* Dates row */
+.dates-row {
+    display: flex;
+    gap: 20px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+/* ============================================================
+   Description (reading zone)
+   ============================================================ */
+
+.description {
+    margin-bottom: 20px;
+}
+
+.description h2 {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin: 16px 0 8px 0;
+}
+
+.description h2:first-child {
+    margin-top: 0;
+}
+
+.description p {
+    font-size: 0.82rem;
+    font-weight: 400;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.description a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-color: rgba(var(--accent-rgb), 0.35);
+    text-underline-offset: 2px;
+}
+
+.description a:hover {
+    text-decoration-color: var(--accent);
+}
+
+/* ============================================================
+   Section Headers (shared)
+   ============================================================ */
+
+.section-header {
+    font-size: 0.6rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding-bottom: 6px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.zone-sep {
+    height: 1px;
+    background: var(--border-subtle);
+    margin: 20px 0;
+}
+
+/* ============================================================
+   Quality & Capture (scanning zone — data card)
+   ============================================================ */
+
+.quality-section {
+    margin-bottom: 20px;
+}
+
+.quality-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px 20px;
+    margin-bottom: 14px;
+}
+
+.quality-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.quality-label {
+    font-size: 0.58rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.quality-value {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.quality-secondary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 20px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.quality-secondary .quality-value {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+}
+
+/* ============================================================
+   Processing (mixed zone)
+   ============================================================ */
+
+.processing-section {
+    margin-bottom: 20px;
+}
+
+.software-line {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+.software-line strong {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.65rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-right: 6px;
+}
+
+/* Prose accent block */
+.prose-block {
+    border-left: 2px solid rgba(var(--accent-rgb), 0.25);
+    padding-left: 14px;
+}
+
+.prose-block p {
+    font-size: 0.8rem;
+    font-weight: 400;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.prose-block p:last-child {
+    margin-bottom: 0;
+}
+
+.prose-block a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-color: rgba(var(--accent-rgb), 0.35);
+    text-underline-offset: 2px;
+}
+
+/* ============================================================
+   Collapsible Sections
+   ============================================================ */
+
+.collapsible {
+    border-top: 1px solid var(--border-subtle);
+}
+
+.collapsible-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    cursor: pointer;
+    user-select: none;
+}
+
+.collapsible-header:hover .collapsible-title {
+    color: var(--text-secondary);
+}
+
+.collapsible-title {
+    font-size: 0.6rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: color 0.12s;
+}
+
+.collapsible-chevron {
+    font-size: 0.55rem;
+    color: var(--text-faint);
+    transition: transform 0.2s, color 0.15s;
+}
+
+.collapsible.open .collapsible-chevron {
+    transform: rotate(90deg);
+    color: var(--accent);
+}
+
+.collapsible-content {
+    display: none;
+    padding-bottom: 16px;
+}
+
+.collapsible.open .collapsible-content {
+    display: block;
+}
+
+/* Subject grid */
+.subject-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 20px;
+    margin-bottom: 16px;
+}
+
+.subject-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.subject-label {
+    font-size: 0.58rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.subject-value {
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: var(--text-primary);
+}
+
+/* Prose sub-label */
+.prose-labeled {
+    margin-bottom: 16px;
+}
+
+.prose-labeled:last-child {
+    margin-bottom: 0;
+}
+
+.prose-sub-label {
+    font-size: 0.55rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+/* Asset items */
+.asset-item {
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.asset-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.asset-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 3px;
+}
+
+.asset-role {
+    font-size: 0.55rem;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.asset-filename {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+}
+
+.asset-creator {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+}
+
+.asset-notes {
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.65;
+    color: var(--text-secondary);
+    border-left: 2px solid rgba(var(--accent-rgb), 0.15);
+    padding-left: 10px;
+}
+
+/* Tech grid */
+.tech-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 20px;
+    margin-bottom: 12px;
+}
+
+.tech-label {
+    font-size: 0.55rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.tech-value {
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+    word-break: break-all;
+}
+
+.tech-sub-header {
+    font-size: 0.52rem;
+    font-weight: 500;
+    color: var(--text-faint);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin: 10px 0 6px;
+}
+
+.sig-props {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+}
+
+.sig-prop {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 3px;
+    font-size: 0.58rem;
+    color: var(--text-muted);
+    padding: 1px 6px;
+    letter-spacing: 0.02em;
+}
+
+.hash-list {
+    list-style: none;
+}
+
+.hash-list li {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    color: var(--text-faint);
+    line-height: 1.7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hash-list li span {
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: 0.6rem;
+    margin-right: 4px;
+}
+
+/* ============================================================
+   Footer
+   ============================================================ */
+
+.footer {
+    margin-top: 20px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.license {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+}
+
+.stats-inline {
+    font-size: 0.62rem;
+    color: var(--text-faint);
+    letter-spacing: 0.03em;
+}
+
+.stats-inline strong {
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* ============================================================
+   Bottom Ribbon (mockup representation)
+   ============================================================ */
+
+.ribbon {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    background: rgba(12, 31, 51, 0.65);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-top: 1px solid var(--border-subtle);
+    z-index: 300;
+}
+
+.ribbon-links {
+    display: flex;
+    gap: 16px;
+    align-items: baseline;
+}
+
+.ribbon-link {
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 0;
+    padding-bottom: 1px;
+    border-bottom: 1px solid transparent;
+    transition: color 0.15s;
+}
+
+.ribbon-link.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--accent);
+}
+
+.ribbon-sep {
+    color: var(--border-subtle);
+    font-size: 0.65rem;
+    opacity: 0.5;
+}
+
+.ribbon-link.details-active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.ribbon-anno {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex: 1;
+    justify-content: center;
+}
+
+.ribbon-anno-num {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 2px 4px;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+}
+
+.ribbon-anno-dash {
+    width: 16px;
+    height: 1px;
+    background: var(--border-subtle);
+}
+
+.ribbon-brand {
+    font-size: 0.58rem;
+    font-weight: 400;
+    color: var(--text-faint);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-left: auto;
+}
+
+/* ============================================================
+   Mockup chrome
+   ============================================================ */
+
+.mockup-label {
+    position: fixed;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    font-weight: 600;
+    color: #999;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 4px 12px;
+    border-radius: 3px;
+    z-index: 1000;
+    white-space: nowrap;
+}
+</style>
+</head>
+<body>
+
+<div class="mockup-label">Editorial Details v2 — Side Panel + Image Strip</div>
+
+<!-- ============================================================
+     Full Viewport Layout
+     ============================================================ -->
+<div class="viewport">
+
+    <!-- Scene (left side — interactive 3D viewer) -->
+    <div class="scene">
+        <div class="scene-grid"></div>
+        <div class="scene-placeholder"></div>
+        <div class="scene-label">3D Scene<br>(interactive)</div>
+
+        <!-- Gold spine -->
+        <div class="spine"></div>
+
+        <!-- Faded title block on scene -->
+        <div class="scene-title-block">
+            <h1>National Katy&#324;<br>Memorial</h1>
+            <div class="scene-title-rule"></div>
+            <span class="scene-title-meta">On-site &middot; September 2025</span>
+        </div>
+    </div>
+
+    <!-- Details Panel (right side) -->
+    <div class="panel">
+
+        <!-- Vertical Image Strip -->
+        <div class="image-strip">
+            <img src="file:///C:/Users/Jake/Downloads/national_katyn_memorial_1771613966094.jpg" alt="" />
+        </div>
+
+        <!-- Gold accent line between strip and content -->
+        <div class="strip-accent"></div>
+
+        <!-- Close button -->
+        <button class="close-btn">&times;</button>
+
+        <!-- Scrollable Content -->
+        <div class="panel-content">
+
+            <!-- Title Block -->
+            <div class="title-block">
+                <h2 class="title">National Katy&#324; Memorial</h2>
+                <div class="title-bar"></div>
+                <div class="model-stats"><strong>2M</strong> vertices &middot; <strong>4</strong> textures @ 8192&sup2; &middot; <strong>4</strong> annotations</div>
+                <div class="byline">Katy&#324; Circle, Baltimore &middot; September 23, 2025 &middot; On-site</div>
+            </div>
+
+            <!-- Description -->
+            <div class="description">
+                <h2>The Memorial</h2>
+                <p>The <a href="#">National Katy&#324; Memorial</a> is a monument in Baltimore, Maryland, which memorializes the victims of the <a href="#">1940 Katy&#324; massacre</a> of Polish nationals carried out by Soviet forces. Baltimore's Polish-American community was instrumental in having the monument built. The monument was unveiled in 2000 and is the tallest statue in Baltimore. The statue itself is 44 feet (13.4 m) high, the whole monument, with base, is 56 feet (17 m).</p>
+                <p>The statue by sculptor <a href="#">Andrzej Pity&#324;ski</a> was delivered from Poland and established in the Inner Harbor East at Aliceanna and President streets.</p>
+
+                <h2>The Scan</h2>
+                <p>The collection of 3D data for the National Katy&#324; Memorial was performed by <a href="#">Direct Dimensions</a> for the explicit purpose of conservation, restoration/reproduction and documentation at the behest of the National Katy&#324; Memorial Foundation. Special consideration of scanned materials was needed to calculate surface areas of bronze and gold leaf individually in order to provide accurate details for preservation cost estimation. Details of the monument are restoration/replication grade, meaning that the data can be used to restore the monument to its scanned condition if further wear should occur.</p>
+            </div>
+
+            <!-- Collapsible: The Subject (first) -->
+            <div class="collapsible open" id="subject-section">
+                <div class="collapsible-header" onclick="this.parentElement.classList.toggle('open')">
+                    <span class="collapsible-title">The Subject</span>
+                    <span class="collapsible-chevron">&#9654;</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="subject-grid">
+                        <div class="subject-detail">
+                            <span class="subject-label">Creator</span>
+                            <span class="subject-value">Andrzej Pity&#324;ski</span>
+                        </div>
+                        <div class="subject-detail">
+                            <span class="subject-label">Date</span>
+                            <span class="subject-value">2000</span>
+                        </div>
+                        <div class="subject-detail">
+                            <span class="subject-label">Period</span>
+                            <span class="subject-value">Modern</span>
+                        </div>
+                        <div class="subject-detail">
+                            <span class="subject-label">Culture</span>
+                            <span class="subject-value">Polish</span>
+                        </div>
+                        <div class="subject-detail">
+                            <span class="subject-label">Medium</span>
+                            <span class="subject-value">Bronze &amp; Gold Leaf</span>
+                        </div>
+                        <div class="subject-detail">
+                            <span class="subject-label">Dimensions</span>
+                            <span class="subject-value">44 Ft. &times; 56 Ft.</span>
+                        </div>
+                        <div class="subject-detail">
+                            <span class="subject-label">Condition</span>
+                            <span class="subject-value">Minor wear, documented</span>
+                        </div>
+                        <div class="subject-detail">
+                            <span class="subject-label">Location</span>
+                            <span class="subject-value">Katy&#324; Circle, Baltimore</span>
+                        </div>
+                    </div>
+
+                    <div class="map-placeholder">
+                        <span class="map-pin">&#128205;</span>
+                        <span class="map-coords">39.28317&deg;N, 76.601612&deg;W</span>
+                    </div>
+
+                    <div class="prose-labeled">
+                        <div class="prose-sub-label">Historical Context</div>
+                        <div class="prose-block">
+                            <p>The <a href="#">Katy&#324; massacre</a> was a series of mass executions of Poles carried out by the Soviet Union between April and May 1940. Nearly 22,000 Polish military and police officers, border guards, and intelligentsia prisoners of war were executed by the NKVD on Joseph Stalin's orders.</p>
+                            <p>The massacre is qualified as a crime against humanity, a war crime and, according to a 2009 resolution of the Polish parliament, bears the hallmarks of a genocide.</p>
+                        </div>
+                    </div>
+
+                    <div class="prose-labeled">
+                        <div class="prose-sub-label">Provenance</div>
+                        <div class="prose-block">
+                            <p>Funding for the monument was provided by the <a href="#">National Katy&#324; Memorial Foundation</a> and a grant provided by the state of Maryland.</p>
+                            <p>Production took place over three years at the <a href="#">GZUT foundry</a> in Gliwice, Poland, overseen by lead artist Andrzej Pity&#324;ski. The unveiling occurred on November 19, 2000 at Katy&#324; Circle, after a Mass at Holy Rosary Church.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quality & Capture -->
+            <div class="collapsible open" id="quality-section">
+                <div class="collapsible-header" onclick="this.parentElement.classList.toggle('open')">
+                    <span class="collapsible-title">Quality &amp; Capture</span>
+                    <span class="collapsible-chevron">&#9654;</span>
+                </div>
+                <div class="collapsible-content">
+                <div class="credit-line" style="margin-bottom: 12px;"><span class="org">Direct Dimensions</span> &mdash; Pete Kennedy, Harry Abramson</div>
+                <div class="quality-grid">
+                    <div class="quality-detail">
+                        <span class="quality-label">Tier</span>
+                        <span class="quality-value">Tier 2 &mdash; Reference</span>
+                    </div>
+                    <div class="quality-detail">
+                        <span class="quality-label">Accuracy</span>
+                        <span class="quality-value">Grade A</span>
+                    </div>
+                    <div class="quality-detail">
+                        <span class="quality-label">Resolution</span>
+                        <span class="quality-value">3.175mm GSD</span>
+                    </div>
+                    <div class="quality-detail">
+                        <span class="quality-label">Alignment</span>
+                        <span class="quality-value">4.76mm RMSE</span>
+                    </div>
+                    <div class="quality-detail">
+                        <span class="quality-label">Scale Check</span>
+                        <span class="quality-value">Ref. object height</span>
+                    </div>
+                    <div class="quality-detail">
+                        <span class="quality-label">Device</span>
+                        <span class="quality-value">DJI Mavic 3 Ent.</span>
+                    </div>
+                    <div class="quality-detail">
+                        <span class="quality-label">Serial</span>
+                        <span class="quality-value" style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.01em;">EX-AMPL-E-SER-IAL</span>
+                    </div>
+                </div>
+                <div class="quality-secondary">
+                    <div class="quality-detail">
+                        <span class="quality-label">Coverage</span>
+                        <span class="quality-value">No gaps present</span>
+                    </div>
+                    <div class="quality-detail">
+                        <span class="quality-label">Reconstruction</span>
+                        <span class="quality-value">None present</span>
+                    </div>
+                    <div class="quality-detail">
+                        <span class="quality-label">Color Cal.</span>
+                        <span class="quality-value">Field swatch verified</span>
+                    </div>
+                </div>
+                </div>
+            </div>
+
+            <!-- Processing -->
+            <div class="collapsible open" id="processing-section">
+                <div class="collapsible-header" onclick="this.parentElement.classList.toggle('open')">
+                    <span class="collapsible-title">Processing</span>
+                    <span class="collapsible-chevron">&#9654;</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="software-line">
+                        <strong>Software</strong> Reality Capture &middot; Supersplat &middot; Leica Cyclone &middot; Brush
+                    </div>
+                    <div class="prose-block">
+                        <p>Photogrammetric capture from 483 photographs taken in circumferential passes at four different elevations around the statue as it is displayed onsite, outdoors in Baltimore, MD. Ambient mid-day daylight gave full even coverage. Lidar data also gathered at same time.</p>
+                        <p>Bronze and gold leaf material surface area calculation was done by manually separating the main memorial model into two separate models based on material. Area was then calculated independently, resulting in an accurate surface area calculation for each material.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Collapsible: Data Assets -->
+            <div class="collapsible" id="assets-section">
+                <div class="collapsible-header" onclick="this.parentElement.classList.toggle('open')">
+                    <span class="collapsible-title">Data Assets</span>
+                    <span class="collapsible-chevron">&#9654;</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="asset-item">
+                        <div class="asset-header">
+                            <span class="asset-role">Derived</span>
+                            <span class="asset-filename">scene_0.sog</span>
+                        </div>
+                        <div class="asset-creator">Supersplat</div>
+                        <div class="asset-meta">
+                            <span class="asset-meta-chip">67 MB</span>
+                            <span class="asset-meta-chip">1,048,576 splats</span>
+                        </div>
+                        <div class="asset-notes">Gaussian splat trained in Brush to 50,000 iterations, cleaned and compressed to .sog using Supersplat. Training by Jake Marino using the original photogrammetric dataset.</div>
+                    </div>
+                    <div class="asset-item">
+                        <div class="asset-header">
+                            <span class="asset-role">Derived</span>
+                            <span class="asset-filename">mesh_0.glb</span>
+                        </div>
+                        <div class="asset-creator">MetaShape</div>
+                        <div class="asset-meta">
+                            <span class="asset-meta-chip">259 MB</span>
+                            <span class="asset-meta-chip">2,000,000 polygons</span>
+                            <span class="asset-meta-chip">2,000,000 vertices</span>
+                        </div>
+                        <div class="asset-notes">Initial model created in Metashape, cleaned in zBrush. No reconstructed areas. Decimated to 2M, exported to glTF. Model by Pete Kennedy, surface calculation by Jessie Weintraub, color and mastering by Elliot Spence.</div>
+                    </div>
+                    <div class="asset-item">
+                        <div class="asset-header">
+                            <span class="asset-role">Textures</span>
+                            <span class="asset-filename">mesh_0.glb</span>
+                        </div>
+                        <div class="asset-meta">
+                            <span class="asset-meta-chip">baseColor 8192&times;8192</span>
+                            <span class="asset-meta-chip">normal 8192&times;8192</span>
+                            <span class="asset-meta-chip">metallicRoughness 8192&times;8192</span>
+                            <span class="asset-meta-chip">occlusion 8192&times;8192</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Collapsible: Technical Details -->
+            <div class="collapsible" id="tech-section">
+                <div class="collapsible-header" onclick="this.parentElement.classList.toggle('open')">
+                    <span class="collapsible-title">Technical Details</span>
+                    <span class="collapsible-chevron">&#9654;</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="tech-grid">
+                        <div class="tech-detail">
+                            <span class="tech-label">Standard</span>
+                            <span class="tech-value">Smithsonian EDAN / Dublin Core</span>
+                        </div>
+                        <div class="tech-detail">
+                            <span class="tech-label">Copyright</span>
+                            <span class="tech-value">Public Domain</span>
+                        </div>
+                        <div class="tech-detail">
+                            <span class="tech-label">Material</span>
+                            <span class="tech-value">Metal/Roughness</span>
+                        </div>
+                        <div class="tech-detail">
+                            <span class="tech-label">Color Space</span>
+                            <span class="tech-value">sRGB</span>
+                        </div>
+                        <div class="tech-detail">
+                            <span class="tech-label">Normal</span>
+                            <span class="tech-value">OpenGL</span>
+                        </div>
+                        <div class="tech-detail">
+                            <span class="tech-label">Rendering</span>
+                            <span class="tech-value">WebGL 2.0</span>
+                        </div>
+                    </div>
+
+                    <div class="tech-sub-header">Significant Properties</div>
+                    <div class="sig-props">
+                        <span class="sig-prop">geometry</span>
+                        <span class="sig-prop">vertex color</span>
+                        <span class="sig-prop">UV mapping</span>
+                        <span class="sig-prop">normal maps</span>
+                        <span class="sig-prop">PBR materials</span>
+                        <span class="sig-prop">real-world scale</span>
+                        <span class="sig-prop">Gaussian splat</span>
+                    </div>
+
+                    <div class="tech-sub-header">Integrity &mdash; SHA-256</div>
+                    <ul class="hash-list">
+                        <li><span>scene_0.sog</span> 57b2f893...4089907b</li>
+                        <li><span>mesh_0.glb</span> 0a656f3f...59fd0811</li>
+                        <li><span>preview.jpg</span> 0fa65570...5870c8f</li>
+                    </ul>
+
+                    <div class="dates-row">
+                        <div class="tech-detail">
+                            <span class="tech-label">Created</span>
+                            <span class="tech-value">2025-09-23</span>
+                        </div>
+                        <div class="tech-detail">
+                            <span class="tech-label">Last Modified</span>
+                            <span class="tech-value">2025-10-15</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Collapsible: Tags -->
+            <div class="collapsible open" id="tags-section">
+                <div class="collapsible-header" onclick="this.parentElement.classList.toggle('open')">
+                    <span class="collapsible-title">Tags</span>
+                    <span class="collapsible-chevron">&#9654;</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="tags">
+                        <span class="tag">heritage</span>
+                        <span class="tag">statue</span>
+                        <span class="tag">memorial</span>
+                        <span class="tag">Poland</span>
+                        <span class="tag">Soviet</span>
+                        <span class="tag">1940</span>
+                        <span class="tag">Baltimore</span>
+                        <span class="tag">Pity&#324;ski</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+                <span class="license">All Rights Reserved</span>
+            </div>
+
+        </div><!-- /panel-content -->
+    </div><!-- /panel -->
+
+</div><!-- /viewport -->
+
+<!-- Bottom Ribbon -->
+<div class="ribbon">
+    <div class="ribbon-links">
+        <button class="ribbon-link active">Both</button>
+        <button class="ribbon-link">Model</button>
+        <button class="ribbon-link">Splat</button>
+        <span class="ribbon-sep">|</span>
+        <button class="ribbon-link">SD</button>
+        <button class="ribbon-link active">HD</button>
+        <span class="ribbon-sep">|</span>
+        <button class="ribbon-link details-active">Details</button>
+    </div>
+
+    <div class="ribbon-anno">
+        <span class="ribbon-anno-num">01</span>
+        <span class="ribbon-anno-dash"></span>
+        <span class="ribbon-anno-num">02</span>
+        <span class="ribbon-anno-dash"></span>
+        <span class="ribbon-anno-num">03</span>
+        <span class="ribbon-anno-dash"></span>
+        <span class="ribbon-anno-num">04</span>
+    </div>
+
+    <span class="ribbon-brand">Direct Dimensions</span>
+</div>
+
+</body>
+</html>

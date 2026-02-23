@@ -423,6 +423,23 @@ export async function init(): Promise<void> {
     // Handle window resize
     window.addEventListener('resize', onWindowResize);
 
+    // Observe viewer canvas for size changes (editorial panel open/close resizes via CSS)
+    const resizeCanvas = document.getElementById('viewer-canvas');
+    const resizeContainer = document.getElementById('viewer-container');
+    if (resizeCanvas && resizeContainer && typeof ResizeObserver !== 'undefined') {
+        let resizeRafId: number | null = null;
+        const canvasObserver = new ResizeObserver(() => {
+            if (resizeRafId) return;
+            resizeRafId = requestAnimationFrame(() => {
+                resizeRafId = null;
+                sceneManager.onWindowResize(state.displayMode as DisplayMode, resizeCanvas);
+                _markersDirty = true;
+                invalidatePopupLayoutCache();
+            });
+        });
+        canvasObserver.observe(resizeCanvas);
+    }
+
     // Setup mobile bottom sheet drag (always — layout modules use sidebar as mobile fallback)
     setupBottomSheetDrag();
     if (isMobileKiosk()) setSheetSnap('peek');
@@ -3674,7 +3691,9 @@ function repositionAnnotationToggle(): void {
 function onWindowResize(): void {
     const container = document.getElementById('viewer-container');
     if (!container) return;
-    sceneManager.onWindowResize(state.displayMode, container);
+    // Use canvas element for sizing — it may be narrower than container when editorial panel is open
+    const canvas = document.getElementById('viewer-canvas');
+    sceneManager.onWindowResize(state.displayMode, canvas || container);
     _markersDirty = true; // Viewport changed — marker screen positions are stale
     invalidatePopupLayoutCache(); // Viewer rect changed
 
