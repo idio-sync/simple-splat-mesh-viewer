@@ -171,13 +171,14 @@ export const MESH_LOD = {
 // =============================================================================
 
 export const SHADOWS = {
-    MAP_SIZE: 2048,                   // Shadow map resolution (px)
-    CAMERA_SIZE: 15,                  // Shadow camera frustum half-width
+    MAP_SIZE: 4096,                   // Shadow map resolution (px)
+    CAMERA_SIZE: 10,                  // Shadow camera frustum half-width
     CAMERA_NEAR: 0.5,
     CAMERA_FAR: 50,
-    BIAS: -0.0001,
-    NORMAL_BIAS: 0.02,
-    GROUND_PLANE_SIZE: 30,            // Shadow catcher plane size
+    BIAS: 0.0001,                     // VSM needs slight positive bias
+    NORMAL_BIAS: 0.01,
+    RADIUS: 4,                        // VSM blur radius — smooth penumbra
+    GROUND_PLANE_SIZE: 20,            // Shadow catcher plane size
     GROUND_PLANE_Y: -0.02             // Slightly below grid to avoid z-fighting
 } as const;
 

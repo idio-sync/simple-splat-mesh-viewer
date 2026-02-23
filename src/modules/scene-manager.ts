@@ -237,7 +237,7 @@ export class SceneManager {
         // Only configure shadow map on WebGL — WebGPU has texture init bugs with shadow maps
         if (type === 'webgl') {
             newRenderer.shadowMap.enabled = false;
-            newRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            newRenderer.shadowMap.type = THREE.VSMShadowMap;
         }
         return newRenderer;
     }
@@ -696,6 +696,7 @@ export class SceneManager {
         this.directionalLight1.shadow.camera.bottom = -SHADOWS.CAMERA_SIZE;
         this.directionalLight1.shadow.bias = SHADOWS.BIAS;
         this.directionalLight1.shadow.normalBias = SHADOWS.NORMAL_BIAS;
+        this.directionalLight1.shadow.radius = SHADOWS.RADIUS;
         this.scene!.add(this.directionalLight1);
 
         // Directional light 2

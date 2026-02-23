@@ -1537,8 +1537,9 @@ body.kiosk-mode.kiosk-editorial #kiosk-gate-play svg {
 
 body.kiosk-mode.kiosk-editorial .editorial-gate-info {
     position: absolute;
-    bottom: 40px;
-    left: 24px;
+    top: 0;
+    left: 0;
+    padding: 28px 48px 20px 24px;
     z-index: 2;
     max-width: 50%;
 }
@@ -1547,20 +1548,27 @@ body.kiosk-mode.kiosk-editorial #kiosk-gate-title {
     font-family: var(--kiosk-font-body);
     font-size: 1.5rem;
     font-weight: 700;
-    color: rgb(var(--kiosk-text-heading-rgb));
+    color: var(--kiosk-text-primary);
     text-transform: uppercase;
     letter-spacing: 0.02em;
     line-height: 1.15;
-    margin: 0;
+    margin: 0 0 8px 0;
+    text-shadow:
+        0 1px 2px rgba(0,0,0,0.9),
+        0 0 12px rgba(0,0,0,0.6),
+        0 0 40px rgba(0,0,0,0.3);
 }
 
 body.kiosk-mode.kiosk-editorial #kiosk-gate-types {
     font-family: var(--kiosk-font-body);
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--kiosk-accent);
-    letter-spacing: 0.06em;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--kiosk-text-secondary);
+    letter-spacing: 0.04em;
     text-transform: uppercase;
+    text-shadow:
+        0 1px 2px rgba(0,0,0,0.9),
+        0 0 10px rgba(0,0,0,0.5);
 }
 
 /* --- Hide toast notifications in editorial theme --- */
