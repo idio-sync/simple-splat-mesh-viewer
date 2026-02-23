@@ -186,6 +186,7 @@ let _markersContainerEl: HTMLElement | null = null; // Cached for animate loop
 const _prevCamPos = new THREE.Vector3();
 const _prevCamQuat = new THREE.Quaternion();
 let _markersDirty = true;
+let _sidebarTransitioning = false;
 
 /** Get the resolved layout module, if any. */
 function getLayoutModule(): LayoutModule | null {
@@ -425,17 +426,17 @@ export async function init(): Promise<void> {
 
     // Observe viewer canvas for size changes (editorial panel open/close resizes via CSS)
     const resizeCanvas = document.getElementById('viewer-canvas');
-    const resizeContainer = document.getElementById('viewer-container');
-    if (resizeCanvas && resizeContainer && typeof ResizeObserver !== 'undefined') {
-        let resizeRafId: number | null = null;
+    if (resizeCanvas && typeof ResizeObserver !== 'undefined') {
+        let resizeTimerId: ReturnType<typeof setTimeout> | null = null;
         const canvasObserver = new ResizeObserver(() => {
-            if (resizeRafId) return;
-            resizeRafId = requestAnimationFrame(() => {
-                resizeRafId = null;
+            if (_sidebarTransitioning) return;
+            if (resizeTimerId) clearTimeout(resizeTimerId);
+            resizeTimerId = setTimeout(() => {
+                resizeTimerId = null;
                 sceneManager.onWindowResize(state.displayMode as DisplayMode, resizeCanvas);
                 _markersDirty = true;
                 invalidatePopupLayoutCache();
-            });
+            }, 80);
         });
         canvasObserver.observe(resizeCanvas);
     }
@@ -451,6 +452,97 @@ export async function init(): Promise<void> {
     setupFilePicker();
 
     log.info('Kiosk viewer ready');
+}
+
+// =============================================================================
+// =============================================================================
+// SIDEBAR TRANSITION — screenshot freeze + slide during editorial panel toggle
+// =============================================================================
+
+let _sidebarObserverInstalled = false;
+
+/** Set up after layoutModule.setup() so .editorial-info-overlay exists in the DOM. */
+function setupSidebarTransitionObserver(): void {
+    if (_sidebarObserverInstalled || !sceneManager) return;
+    const viewerContainer = document.getElementById('viewer-container');
+    const overlay = viewerContainer?.querySelector('.editorial-info-overlay');
+    const resizeCanvas = document.getElementById('viewer-canvas');
+    if (!overlay || !viewerContainer || !resizeCanvas) return;
+    _sidebarObserverInstalled = true;
+
+    const SIDEBAR_TRANSITION = 'transform 0.35s cubic-bezier(0.33, 1, 0.68, 1)';
+    const canvasEl = sceneManager.renderer.domElement as HTMLCanvasElement;
+    let freezeCanvas: HTMLCanvasElement | null = null;
+
+    const cleanupFreeze = () => {
+        if (freezeCanvas) {
+            freezeCanvas.remove();
+            freezeCanvas = null;
+        }
+    };
+
+    const classObserver = new MutationObserver(() => {
+        const isOpening = overlay.classList.contains('open');
+
+        // If already transitioning (rapid toggle), clean up previous
+        if (_sidebarTransitioning) cleanupFreeze();
+        _sidebarTransitioning = true;
+
+        const containerW = viewerContainer.clientWidth;
+        const sidebarW = Math.min(containerW * 0.54, 720);
+        const shift = Math.round(sidebarW / 2);
+
+        if (!isOpening) {
+            // Closing: pre-size renderer to full viewport so screenshot covers everything
+            sceneManager!.onWindowResize(state.displayMode as DisplayMode, viewerContainer);
+        }
+
+        // Render a fresh frame and copy synchronously to a second canvas
+        sceneManager!.render(
+            state.displayMode as any, splatMesh, modelGroup, pointcloudGroup, null
+        );
+        const snap = document.createElement('canvas');
+        snap.width = canvasEl.width;
+        snap.height = canvasEl.height;
+        const ctx = snap.getContext('2d');
+        if (!ctx) { _sidebarTransitioning = false; return; }
+        ctx.drawImage(canvasEl, 0, 0);
+
+        // Place in viewer-container (flex parent — constant full dimensions)
+        // z-index 5: above #viewer-canvas (1), below sidebar (90) and ribbon (100)
+        snap.style.cssText =
+            'position:absolute;top:0;left:0;pointer-events:none;z-index:5;' +
+            `width:${containerW}px;height:${viewerContainer.clientHeight}px;`;
+        freezeCanvas = snap;
+        viewerContainer.appendChild(snap);
+
+        // Animate: slide from current center to new center
+        snap.getBoundingClientRect(); // force reflow — establish "before" state
+        if (isOpening) {
+            snap.style.transition = SIDEBAR_TRANSITION;
+            snap.style.transform = `translateX(-${shift}px)`;
+        } else {
+            snap.style.transform = `translateX(-${shift}px)`;
+            snap.getBoundingClientRect(); // force second reflow for transform change
+            snap.style.transition = SIDEBAR_TRANSITION;
+            snap.style.transform = 'translateX(0)';
+        }
+    });
+    classObserver.observe(overlay, { attributes: true, attributeFilter: ['class'] });
+
+    overlay.addEventListener('transitionend', (e: Event) => {
+        if ((e as TransitionEvent).propertyName !== 'width' || !_sidebarTransitioning) return;
+        _sidebarTransitioning = false;
+
+        // Resize renderer to final dimensions and render
+        sceneManager!.onWindowResize(state.displayMode as DisplayMode, resizeCanvas);
+        sceneManager!.render(
+            state.displayMode as any, splatMesh, modelGroup, pointcloudGroup, null
+        );
+        cleanupFreeze();
+        _markersDirty = true;
+        invalidatePopupLayoutCache();
+    });
 }
 
 // =============================================================================
@@ -769,6 +861,7 @@ function onDirectFileLoaded(fileName: string | null): void {
     if (layoutModule) {
         // Delegate to layout module — it creates its own ribbon/toolbar
         layoutModule.setup(null, createLayoutDeps());
+        setupSidebarTransitionObserver();
         // View switcher as mobile fallback (hidden on desktop by layout CSS)
         createViewSwitcher();
     } else {
@@ -1150,6 +1243,7 @@ async function handleArchiveFile(file: File): Promise<void> {
         if (layoutModule) {
             // Delegate to layout module — it creates its own UI
             layoutModule.setup(manifest, createLayoutDeps());
+            setupSidebarTransitionObserver();
 
             // Also populate the sidebar content as a mobile fallback
             // (layout CSS hides it on desktop, media query shows it on mobile)

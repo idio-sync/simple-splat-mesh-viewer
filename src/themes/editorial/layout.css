@@ -560,6 +560,7 @@ body.kiosk-mode.kiosk-editorial #viewer-canvas {
     flex: 1;
     min-width: 0;
     width: auto !important;
+    overflow: hidden;
 }
 
 body.kiosk-mode.kiosk-editorial .editorial-info-overlay {
