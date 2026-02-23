@@ -531,7 +531,7 @@ function setupSidebarTransitionObserver(): void {
     classObserver.observe(overlay, { attributes: true, attributeFilter: ['class'] });
 
     overlay.addEventListener('transitionend', (e: Event) => {
-        if ((e as TransitionEvent).propertyName !== 'width' || !_sidebarTransitioning) return;
+        if ((e as TransitionEvent).propertyName !== 'margin-right' || !_sidebarTransitioning) return;
         _sidebarTransitioning = false;
 
         // Resize renderer to final dimensions and render

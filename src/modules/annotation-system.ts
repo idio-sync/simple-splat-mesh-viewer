@@ -450,17 +450,16 @@ export class AnnotationSystem {
             const x = (screenPos.x * 0.5 + 0.5) * rect.width + rect.left;
             const y = (-screenPos.y * 0.5 + 0.5) * rect.height + rect.top;
 
-            // Check if behind camera
-            if (screenPos.z > 1) {
-                marker.element.style.display = 'none';
-            } else {
-                marker.element.style.display = 'flex';
-                marker.element.style.left = x + 'px';
-                marker.element.style.top = y + 'px';
+            // Always update position so markers don't jump on reappear
+            marker.element.style.left = x + 'px';
+            marker.element.style.top = y + 'px';
 
-                // Surface-normal occlusion using stored annotation camera position.
-                // The direction from annotation point toward the camera that placed it
-                // approximates the surface normal at that point.
+            // Compute visibility factor (0 = hidden, 1 = fully visible).
+            // Behind camera: hard 0. Otherwise use dot-product fade zone.
+            let visibility = 1;
+            if (screenPos.z > 1) {
+                visibility = 0;
+            } else {
                 const anno = marker.annotation;
                 if (anno.camera_position) {
                     this._surfaceNormal.set(
@@ -475,11 +474,16 @@ export class AnnotationSystem {
                         this.camera.position.z - anno.position.z
                     ).normalize();
 
-                    // Dot < 0 means camera is on the opposite side of the surface
+                    // Fade zone: dot 0.0 → fully hidden, dot 0.3 → fully visible
                     const dot = this._surfaceNormal.dot(this._viewDir);
-                    marker.element.classList.toggle('occluded', dot < 0.05);
+                    visibility = Math.max(0, Math.min(1, dot / 0.3));
                 }
             }
+
+            // Drive visibility via CSS custom property so hover/selected opacity
+            // rules still work — CSS multiplies: opacity: calc(var(--marker-vis) * <base>)
+            marker.element.style.setProperty('--marker-vis', String(visibility));
+            marker.element.style.pointerEvents = visibility < 0.05 ? 'none' : '';
         });
     }
 

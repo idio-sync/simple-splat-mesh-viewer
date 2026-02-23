@@ -1665,6 +1665,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 .annotation-marker {
+    --marker-vis: 1;
     position: absolute;
     width: 26px;
     height: 26px;
@@ -1681,6 +1682,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
     color: var(--bg-deep);
     cursor: pointer;
     pointer-events: auto;
+    opacity: var(--marker-vis);
     transition: transform 0.15s, box-shadow 0.15s;
 }
 

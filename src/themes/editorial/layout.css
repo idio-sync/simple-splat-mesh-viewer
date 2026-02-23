@@ -565,8 +565,9 @@ body.kiosk-mode.kiosk-editorial #viewer-canvas {
 
 body.kiosk-mode.kiosk-editorial .editorial-info-overlay {
     --editorial-strip-width: 280px;
-    width: 0;
-    overflow: hidden;
+    --editorial-panel-width: min(54%, 720px);
+    width: var(--editorial-panel-width);
+    margin-right: calc(-1 * var(--editorial-panel-width));
     flex-shrink: 0;
     height: 100%;
     background: rgba(var(--kiosk-surface-rgb), 0.94);
@@ -575,14 +576,14 @@ body.kiosk-mode.kiosk-editorial .editorial-info-overlay {
     border-left: 1px solid transparent;
     box-shadow: none;
     z-index: 90;
-    transition: width 0.35s cubic-bezier(0.33, 1, 0.68, 1),
+    transition: margin-right 0.35s cubic-bezier(0.33, 1, 0.68, 1),
                 box-shadow 0.35s ease,
                 border-color 0.35s ease;
     pointer-events: none;
 }
 
 body.kiosk-mode.kiosk-editorial .editorial-info-overlay.open {
-    width: min(54%, 720px);
+    margin-right: 0;
     border-left-color: var(--kiosk-border-subtle);
     box-shadow: -8px 0 32px rgba(0,0,0,0.35), -2px 0 8px rgba(0,0,0,0.2);
     pointer-events: auto;
@@ -1250,10 +1251,10 @@ body.kiosk-mode.kiosk-editorial .annotation-marker {
     background: rgba(var(--kiosk-accent-rgb), 0.45);
     border: 2px solid rgba(255, 255, 255, 0.15);
     color: rgba(26, 26, 46, 0.55);
-    opacity: 1;
+    opacity: var(--marker-vis);
     z-index: 50;
     box-shadow: 0 2px 8px rgba(var(--kiosk-accent-rgb),0.2);
-    transition: transform 0.15s, box-shadow 0.2s, background 0.2s, border-color 0.2s, opacity 0.3s ease;
+    transition: transform 0.15s, box-shadow 0.2s, background 0.2s, border-color 0.2s;
 }
 
 body.kiosk-mode.kiosk-editorial .annotation-marker:hover {

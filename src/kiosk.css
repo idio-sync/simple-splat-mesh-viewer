@@ -975,28 +975,23 @@ body.kiosk-mode #annotation-info-popup {
 /* --- Annotation Markers: Semi-transparent with glow --- */
 
 body.kiosk-mode .annotation-marker {
-    opacity: 0.6;
+    opacity: calc(var(--marker-vis) * 0.6);
     border: 2px solid rgba(255, 255, 255, 0.6);
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4),
                 0 0 20px rgba(var(--kiosk-accent-rgb), 0.15);
     color: #fff;
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
-    transition: transform 0.15s, box-shadow 0.15s, opacity 0.3s ease;
+    transition: transform 0.15s, box-shadow 0.15s;
 }
 
 body.kiosk-mode .annotation-marker:hover {
-    opacity: 0.85;
+    opacity: calc(var(--marker-vis) * 0.85);
     box-shadow: 0 4px 20px rgba(var(--kiosk-accent-rgb), 0.4),
                 0 0 30px rgba(var(--kiosk-accent-rgb), 0.2);
 }
 
 body.kiosk-mode .annotation-marker.selected {
-    opacity: 0.8;
-}
-
-body.kiosk-mode .annotation-marker.occluded {
-    opacity: 0 !important;
-    pointer-events: none;
+    opacity: calc(var(--marker-vis) * 0.8);
 }
 
 /* Intro glow animation — applied on load, removed after ~6s */
@@ -1433,15 +1428,15 @@ body.kiosk-mode #metadata-sidebar ::-webkit-scrollbar-thumb:hover {
     body.kiosk-mode .annotation-marker {
         min-width: 36px;
         min-height: 36px;
-        opacity: 0.6;
+        opacity: calc(var(--marker-vis) * 0.6);
     }
 
     body.kiosk-mode .annotation-marker:hover {
-        opacity: 0.9;
+        opacity: calc(var(--marker-vis) * 0.9);
     }
 
     body.kiosk-mode .annotation-marker.selected {
-        opacity: 0.85;
+        opacity: calc(var(--marker-vis) * 0.85);
     }
 
     /* --- Annotation Popup: Hidden on Mobile (content in sheet instead) --- */
