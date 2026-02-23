@@ -1167,22 +1167,20 @@ function initFilePicker(container, deps) {
         <div class="editorial-loading-logo">
             <img src="${logoSrc}" alt="" draggable="false" />
         </div>
-        <div class="editorial-picker-center">
-            <div class="editorial-picker-eyebrow">Open File</div>
+        <div class="editorial-loading-center kiosk-picker-box" id="kiosk-drop-zone">
+            <div class="editorial-loading-eyebrow">Open File</div>
             <h1 class="editorial-picker-title">Vitrine3D</h1>
             <div class="editorial-loading-title-bar"></div>
-            <p class="editorial-picker-desc">Open a 3D file or archive to view its content.</p>
-            <div class="kiosk-picker-box" id="kiosk-drop-zone">
-                <p>Select a <strong>3D file</strong> or <strong>archive</strong></p>
-                <button id="kiosk-picker-btn" type="button">Select File</button>
-                <p class="kiosk-picker-hint">or drag and drop it here</p>
-                <p class="kiosk-picker-formats">
-                    Archives (.a3d, .a3z) &middot; Models (.glb, .gltf, .obj, .stl)<br>
-                    Splats (.ply, .splat, .ksplat, .spz, .sog) &middot; Point Clouds (.e57)
-                </p>
-            </div>
-            <input type="file" id="kiosk-picker-input" accept=".a3z,.a3d,.glb,.gltf,.obj,.stl,.ply,.splat,.ksplat,.spz,.sog,.e57" multiple style="display:none">
+            <p class="kiosk-picker-formats">
+                Scans, models, point clouds, and archives
+            </p>
+            <button id="kiosk-picker-btn" type="button">Browse Files</button>
+            <p class="kiosk-picker-prompt">or drag and drop here</p>
         </div>
+        <div class="editorial-loading-bottom">
+            <div class="editorial-picker-progress-shell"></div>
+        </div>
+        <input type="file" id="kiosk-picker-input" accept=".a3z,.a3d,.glb,.gltf,.obj,.stl,.ply,.splat,.ksplat,.spz,.sog,.e57" multiple style="display:none">
     `;
 }
 
