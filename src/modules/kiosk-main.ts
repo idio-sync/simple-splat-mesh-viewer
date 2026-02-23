@@ -473,6 +473,9 @@ function setupSidebarTransitionObserver(): void {
     const SIDEBAR_TRANSITION = 'transform 0.35s cubic-bezier(0.33, 1, 0.68, 1)';
     const canvasEl = sceneManager.renderer.domElement as HTMLCanvasElement;
     let freezeCanvas: HTMLCanvasElement | null = null;
+    const markerContainer = document.getElementById('annotation-markers');
+    const popupEl = document.getElementById('annotation-info-popup');
+    const lineOverlay = document.getElementById('annotation-line-overlay');
 
     const cleanupFreeze = () => {
         if (freezeCanvas) {
@@ -481,11 +484,27 @@ function setupSidebarTransitionObserver(): void {
         }
     };
 
+    const overlayElements = [markerContainer, popupEl, lineOverlay].filter(Boolean) as HTMLElement[];
+
+    const setOverlayTransform = (transformValue: string, animate: boolean) => {
+        for (const el of overlayElements) {
+            el.style.transition = animate ? SIDEBAR_TRANSITION : 'none';
+            el.style.transform = transformValue;
+        }
+    };
+
+    const resetOverlays = () => {
+        for (const el of overlayElements) {
+            el.style.transition = '';
+            el.style.transform = '';
+        }
+    };
+
     const classObserver = new MutationObserver(() => {
         const isOpening = overlay.classList.contains('open');
 
         // If already transitioning (rapid toggle), clean up previous
-        if (_sidebarTransitioning) cleanupFreeze();
+        if (_sidebarTransitioning) { cleanupFreeze(); resetOverlays(); }
         _sidebarTransitioning = true;
 
         const containerW = viewerContainer.clientWidth;
@@ -516,16 +535,20 @@ function setupSidebarTransitionObserver(): void {
         freezeCanvas = snap;
         viewerContainer.appendChild(snap);
 
-        // Animate: slide from current center to new center
+        // Animate: slide freeze canvas + marker overlays in sync
         snap.getBoundingClientRect(); // force reflow — establish "before" state
         if (isOpening) {
             snap.style.transition = SIDEBAR_TRANSITION;
             snap.style.transform = `translateX(-${shift}px)`;
+            setOverlayTransform(`translateX(-${shift}px)`, true);
         } else {
+            // Closing: freeze canvas starts shifted left to match current narrow view
             snap.style.transform = `translateX(-${shift}px)`;
-            snap.getBoundingClientRect(); // force second reflow for transform change
+            snap.getBoundingClientRect(); // force reflow — establish shifted starting state
+            // Animate freeze canvas right to center; markers right from current positions
             snap.style.transition = SIDEBAR_TRANSITION;
             snap.style.transform = 'translateX(0)';
+            setOverlayTransform(`translateX(${shift}px)`, true);
         }
     });
     classObserver.observe(overlay, { attributes: true, attributeFilter: ['class'] });
@@ -540,6 +563,7 @@ function setupSidebarTransitionObserver(): void {
             state.displayMode as any, splatMesh, modelGroup, pointcloudGroup, null
         );
         cleanupFreeze();
+        resetOverlays();
         _markersDirty = true;
         invalidatePopupLayoutCache();
     });
@@ -1363,9 +1387,12 @@ async function handleArchiveFile(file: File): Promise<void> {
                 }
                 // Re-apply global alignment to ensure late-loaded assets get
                 // correct transforms (alignment may have been skipped earlier
-                // when the asset didn't exist yet)
+                // when the asset didn't exist yet).
+                // Skip camera — it was already set from viewer_settings or
+                // fitCameraToScene during initial load; overwriting it here
+                // would cause an abrupt jump after the background load.
                 if (globalAlignment) {
-                    applyGlobalAlignment(globalAlignment);
+                    applyGlobalAlignment(globalAlignment, { skipCamera: true });
                 }
                 // Keep archive data available for export downloads
                 log.info('All archive assets loaded, raw data retained for export');
@@ -2563,7 +2590,7 @@ function fitCameraToScene(): void {
     controls.update();
 }
 
-function applyGlobalAlignment(alignment: any): void {
+function applyGlobalAlignment(alignment: any, opts?: { skipCamera?: boolean }): void {
     if (!alignment) return;
 
     // Apply object transforms (position, rotation, scale)
@@ -2583,14 +2610,18 @@ function applyGlobalAlignment(alignment: any): void {
         pointcloudGroup.scale.setScalar(alignment.pointcloud.scale);
     }
 
-    // Apply orbit controls target and camera position
-    if (alignment.target) {
-        controls.target.set(alignment.target[0], alignment.target[1], alignment.target[2]);
+    // Apply orbit controls target and camera position.
+    // Skip during background re-apply — the camera was already set
+    // correctly from viewer_settings during initial load.
+    if (!opts?.skipCamera) {
+        if (alignment.target) {
+            controls.target.set(alignment.target[0], alignment.target[1], alignment.target[2]);
+        }
+        if (alignment.camera) {
+            camera.position.set(alignment.camera[0], alignment.camera[1], alignment.camera[2]);
+        }
+        controls.update();
     }
-    if (alignment.camera) {
-        camera.position.set(alignment.camera[0], alignment.camera[1], alignment.camera[2]);
-    }
-    controls.update();
 }
 
 /**
@@ -4046,20 +4077,24 @@ function animate(): void {
             _prevCamQuat.copy(camera.quaternion);
             _markersDirty = false;
 
-            // Update annotation marker screen positions (skip when globally hidden)
-            if (annotationSystem.hasAnnotations()) {
-                if (!_markersContainerEl) _markersContainerEl = document.getElementById('annotation-markers');
-                const markersShown = !_markersContainerEl || _markersContainerEl.style.display !== 'none';
-                if (markersShown) {
-                    annotationSystem.updateMarkerPositions();
+            // Freeze marker positions during sidebar transition — the container
+            // transform handles the visual slide; per-marker updates would fight it
+            if (!_sidebarTransitioning) {
+                // Update annotation marker screen positions (skip when globally hidden)
+                if (annotationSystem.hasAnnotations()) {
+                    if (!_markersContainerEl) _markersContainerEl = document.getElementById('annotation-markers');
+                    const markersShown = !_markersContainerEl || _markersContainerEl.style.display !== 'none';
+                    if (markersShown) {
+                        annotationSystem.updateMarkerPositions();
+                    }
+                    updateAnnotationPopupPosition(currentPopupAnnotationId);
+                    updateAnnotationLine(currentPopupAnnotationId);
                 }
-                updateAnnotationPopupPosition(currentPopupAnnotationId);
-                updateAnnotationLine(currentPopupAnnotationId);
-            }
 
-            // Update measurement marker screen positions
-            if (measurementSystem) {
-                measurementSystem.updateMarkerPositions();
+                // Update measurement marker screen positions
+                if (measurementSystem) {
+                    measurementSystem.updateMarkerPositions();
+                }
             }
         }
 
