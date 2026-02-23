@@ -564,8 +564,8 @@ body.kiosk-mode.kiosk-editorial #viewer-canvas {
 }
 
 body.kiosk-mode.kiosk-editorial .editorial-info-overlay {
-    --editorial-strip-width: 280px;
-    --editorial-panel-width: min(54%, 720px);
+    --editorial-strip-ratio: 38.2%;
+    --editorial-panel-width: min(38.2%, 720px);
     width: var(--editorial-panel-width);
     margin-right: calc(-1 * var(--editorial-panel-width));
     flex-shrink: 0;
@@ -595,14 +595,14 @@ body.kiosk-mode.kiosk-editorial .editorial-panel-inner {
     display: flex;
     flex-direction: row;
     height: 100%;
-    min-width: 520px;
+    min-width: 440px;
     position: relative;
 }
 
 /* Image strip — vertical bleed along panel left edge */
 
 body.kiosk-mode.kiosk-editorial .editorial-image-strip {
-    width: var(--editorial-strip-width);
+    width: var(--editorial-strip-ratio);
     flex-shrink: 0;
     position: relative;
     overflow: hidden;

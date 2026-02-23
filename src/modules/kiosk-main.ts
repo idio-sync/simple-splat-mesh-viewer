@@ -508,7 +508,7 @@ function setupSidebarTransitionObserver(): void {
         _sidebarTransitioning = true;
 
         const containerW = viewerContainer.clientWidth;
-        const sidebarW = Math.min(containerW * 0.54, 720);
+        const sidebarW = Math.min(containerW * 0.382, 720);
         const shift = Math.round(sidebarW / 2);
 
         if (!isOpening) {
