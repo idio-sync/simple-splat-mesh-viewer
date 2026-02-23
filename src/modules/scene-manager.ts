@@ -30,6 +30,14 @@ import {
     PlaneGeometry,
     ToneMapping,
     Vector2,
+    Line,
+    BufferGeometry,
+    LineBasicMaterial,
+    MeshBasicMaterial,
+    CircleGeometry,
+    DoubleSide,
+    Float32BufferAttribute,
+    Vector3,
 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 
@@ -84,6 +92,12 @@ export class SceneManager {
 
     // Grid
     gridHelper: GridHelper | null;
+
+    // Orbit center line (visual cue for transform centering)
+    orbitCenterLine: Line | null;
+    orbitCenterDisc: Mesh | null;
+    originCenterLine: Line | null;
+    originCenterDisc: Mesh | null;
 
     // Environment
     pmremGenerator: PMREMGenerator | null;
@@ -142,6 +156,12 @@ export class SceneManager {
 
         // Grid
         this.gridHelper = null;
+
+        // Orbit center line
+        this.orbitCenterLine = null;
+        this.orbitCenterDisc = null;
+        this.originCenterLine = null;
+        this.originCenterDisc = null;
 
         // Environment
         this.pmremGenerator = null;
@@ -714,6 +734,127 @@ export class SceneManager {
     }
 
     /**
+     * Show vertical center lines: red at the orbit pivot, white at world origin.
+     * Each line has a flat disc at y=0 so the position is visible from above/below.
+     */
+    showOrbitCenterLine(target: Vector3): void {
+        if (this.orbitCenterLine) return; // Already visible
+
+        const DISC_RADIUS = 0.08;
+        const DISC_SEGMENTS = 16;
+
+        // Red line — orbit pivot (moves with pan)
+        const pivotGeo = new BufferGeometry();
+        pivotGeo.setAttribute('position', new Float32BufferAttribute([
+            0, -50, 0,
+            0,  50, 0,
+        ], 3));
+        const pivotMat = new LineBasicMaterial({
+            color: 0xff3333,
+            transparent: true,
+            opacity: 0.6,
+            depthTest: false,
+        });
+        this.orbitCenterLine = new Line(pivotGeo, pivotMat);
+        this.orbitCenterLine.renderOrder = 999;
+        this.orbitCenterLine.frustumCulled = false;
+        this.orbitCenterLine.position.set(target.x, 0, target.z);
+        this.scene!.add(this.orbitCenterLine);
+
+        // Red disc at orbit pivot
+        const pivotDiscGeo = new CircleGeometry(DISC_RADIUS, DISC_SEGMENTS);
+        const pivotDiscMat = new MeshBasicMaterial({
+            color: 0xff3333,
+            transparent: true,
+            opacity: 0.6,
+            depthTest: false,
+            side: DoubleSide,
+        });
+        this.orbitCenterDisc = new Mesh(pivotDiscGeo, pivotDiscMat);
+        this.orbitCenterDisc.rotation.x = -Math.PI / 2; // Lay flat on XZ plane
+        this.orbitCenterDisc.renderOrder = 999;
+        this.orbitCenterDisc.frustumCulled = false;
+        this.orbitCenterDisc.position.set(target.x, 0, target.z);
+        this.orbitCenterDisc.raycast = () => {}; // Exclude from raycasting
+        this.scene!.add(this.orbitCenterDisc);
+
+        // White line — world origin (fixed at 0,0,0)
+        const originGeo = new BufferGeometry();
+        originGeo.setAttribute('position', new Float32BufferAttribute([
+            0, -50, 0,
+            0,  50, 0,
+        ], 3));
+        const originMat = new LineBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.35,
+            depthTest: false,
+        });
+        this.originCenterLine = new Line(originGeo, originMat);
+        this.originCenterLine.renderOrder = 998;
+        this.originCenterLine.frustumCulled = false;
+        this.scene!.add(this.originCenterLine);
+
+        // White disc at world origin
+        const originDiscGeo = new CircleGeometry(DISC_RADIUS, DISC_SEGMENTS);
+        const originDiscMat = new MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.35,
+            depthTest: false,
+            side: DoubleSide,
+        });
+        this.originCenterDisc = new Mesh(originDiscGeo, originDiscMat);
+        this.originCenterDisc.rotation.x = -Math.PI / 2;
+        this.originCenterDisc.renderOrder = 998;
+        this.originCenterDisc.frustumCulled = false;
+        this.originCenterDisc.raycast = () => {};
+        this.scene!.add(this.originCenterDisc);
+    }
+
+    /**
+     * Hide and dispose both center lines and their discs.
+     */
+    hideOrbitCenterLine(): void {
+        if (this.orbitCenterLine) {
+            this.scene!.remove(this.orbitCenterLine);
+            this.orbitCenterLine.geometry.dispose();
+            (this.orbitCenterLine.material as LineBasicMaterial).dispose();
+            this.orbitCenterLine = null;
+        }
+        if (this.orbitCenterDisc) {
+            this.scene!.remove(this.orbitCenterDisc);
+            this.orbitCenterDisc.geometry.dispose();
+            (this.orbitCenterDisc.material as MeshBasicMaterial).dispose();
+            this.orbitCenterDisc = null;
+        }
+        if (this.originCenterLine) {
+            this.scene!.remove(this.originCenterLine);
+            this.originCenterLine.geometry.dispose();
+            (this.originCenterLine.material as LineBasicMaterial).dispose();
+            this.originCenterLine = null;
+        }
+        if (this.originCenterDisc) {
+            this.scene!.remove(this.originCenterDisc);
+            this.originCenterDisc.geometry.dispose();
+            (this.originCenterDisc.material as MeshBasicMaterial).dispose();
+            this.originCenterDisc = null;
+        }
+    }
+
+    /**
+     * Update the orbit center line and disc position to track the orbit target.
+     */
+    updateOrbitCenterLine(target: Vector3): void {
+        if (this.orbitCenterLine) {
+            this.orbitCenterLine.position.set(target.x, 0, target.z);
+        }
+        if (this.orbitCenterDisc) {
+            this.orbitCenterDisc.position.set(target.x, 0, target.z);
+        }
+    }
+
+    /**
      * Set scene background color
      */
     setBackgroundColor(hexColor: string): void {
@@ -1206,6 +1347,8 @@ export class SceneManager {
             this.gridHelper.dispose();
             this.gridHelper = null;
         }
+
+        this.hideOrbitCenterLine();
 
         if (this.transformControls) {
             this.scene!.remove(this.transformControls.getHelper());

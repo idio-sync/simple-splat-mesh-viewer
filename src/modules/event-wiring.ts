@@ -49,12 +49,17 @@ export function setupUIEvents(deps: EventWiringDeps): void {
             // Fullscreen is action-only — handled by setupFullscreen()
             if (tool === 'fullscreen') return;
             activateTool(tool);
-            // Show/hide transform gizmo based on active tool
+            // Show/hide transform gizmo and orbit center line based on active tool
             if (sceneRefs.transformControls) {
                 try {
                     sceneRefs.transformControls.getHelper().visible = (tool === 'transform');
                     sceneRefs.transformControls.enabled = (tool === 'transform');
                 } catch { /* ignore */ }
+            }
+            if (tool === 'transform') {
+                sceneManager.showOrbitCenterLine(sceneRefs.controls.target);
+            } else {
+                sceneManager.hideOrbitCenterLine();
             }
             // Auto-select first loaded object when opening transform pane with no selection
             if (tool === 'transform' && state.selectedObject === 'none') {
@@ -238,6 +243,7 @@ export function setupUIEvents(deps: EventWiringDeps): void {
 
 
     // ─── Alignment ───────────────────────────────────────────
+    addListener('btn-center-at-origin', 'click', deps.alignment.centerAtOrigin);
     addListener('btn-reset-alignment', 'click', deps.alignment.resetAlignment);
 
     // ─── Share ───────────────────────────────────────────────
@@ -288,9 +294,39 @@ export function setupUIEvents(deps: EventWiringDeps): void {
     addListener('btn-select-splat', 'click', () => deps.transform.setSelectedObject('splat' as any));
     addListener('btn-select-model', 'click', () => deps.transform.setSelectedObject('model' as any));
     addListener('btn-select-both', 'click', () => deps.transform.setSelectedObject('both' as any));
-    addListener('btn-translate', 'click', () => deps.transform.setTransformMode('translate' as any));
-    addListener('btn-rotate', 'click', () => deps.transform.setTransformMode('rotate' as any));
-    addListener('btn-scale', 'click', () => deps.transform.setTransformMode('scale' as any));
+    const pivotSection = document.getElementById('rotation-pivot-section');
+    const scaleLockSection = document.getElementById('scale-lock-section');
+    const showModeSection = (mode: string) => {
+        if (pivotSection) pivotSection.style.display = mode === 'rotate' ? '' : 'none';
+        if (scaleLockSection) scaleLockSection.style.display = mode === 'scale' ? '' : 'none';
+    };
+    addListener('btn-translate', 'click', () => { deps.transform.setTransformMode('translate' as any); showModeSection('translate'); });
+    addListener('btn-rotate', 'click', () => { deps.transform.setTransformMode('rotate' as any); showModeSection('rotate'); });
+    addListener('btn-scale', 'click', () => { deps.transform.setTransformMode('scale' as any); showModeSection('scale'); });
+
+    // ─── Rotation pivot toggle ───────────────────────────────
+    addListener('btn-pivot-object', 'click', () => {
+        state.rotationPivot = 'object';
+        document.getElementById('btn-pivot-object')?.classList.add('active');
+        document.getElementById('btn-pivot-origin')?.classList.remove('active');
+    });
+    addListener('btn-pivot-origin', 'click', () => {
+        state.rotationPivot = 'origin';
+        document.getElementById('btn-pivot-origin')?.classList.add('active');
+        document.getElementById('btn-pivot-object')?.classList.remove('active');
+    });
+
+    // ─── Scale lock proportions toggle ───────────────────────
+    addListener('btn-scale-locked', 'click', () => {
+        state.scaleLockProportions = true;
+        document.getElementById('btn-scale-locked')?.classList.add('active');
+        document.getElementById('btn-scale-free')?.classList.remove('active');
+    });
+    addListener('btn-scale-free', 'click', () => {
+        state.scaleLockProportions = false;
+        document.getElementById('btn-scale-free')?.classList.add('active');
+        document.getElementById('btn-scale-locked')?.classList.remove('active');
+    });
 
     // ─── Transform pane inputs ────────────────────────────────
     (['x', 'y', 'z'] as const).forEach(axis => {
@@ -640,12 +676,19 @@ export function setupUIEvents(deps: EventWiringDeps): void {
             case 'f': deps.camera.toggleFlyMode(); break;
             default: break;
         }
-        // Show/hide transform gizmo based on active tool
+        // Show/hide transform gizmo and orbit center line based on active tool
         if (activatedTool && sceneRefs.transformControls) {
             try {
                 sceneRefs.transformControls.getHelper().visible = (activatedTool === 'transform');
                 sceneRefs.transformControls.enabled = (activatedTool === 'transform');
             } catch { /* ignore */ }
+        }
+        if (activatedTool) {
+            if (activatedTool === 'transform') {
+                sceneManager.showOrbitCenterLine(sceneRefs.controls.target);
+            } else {
+                sceneManager.hideOrbitCenterLine();
+            }
         }
         // Stop cross-section when switching away via keyboard
         if (activatedTool && activatedTool !== 'crosssection' && deps.crossSection.active) {

@@ -3,6 +3,7 @@
 export type DisplayMode = 'splat' | 'model' | 'pointcloud' | 'both' | 'split' | 'stl';
 export type SelectedObject = 'splat' | 'model' | 'both' | 'none';
 export type TransformMode = 'translate' | 'rotate' | 'scale';
+export type RotationPivot = 'object' | 'origin';
 export type QualityTier = 'sd' | 'hd';
 export type AssetStateValue = 'unloaded' | 'loading' | 'loaded' | 'error';
 
@@ -12,6 +13,8 @@ export interface AppState {
     displayMode: DisplayMode;
     selectedObject: SelectedObject;
     transformMode: TransformMode;
+    rotationPivot: RotationPivot;
+    scaleLockProportions: boolean;
     splatLoaded: boolean;
     modelLoaded: boolean;
     pointcloudLoaded: boolean;
@@ -209,6 +212,7 @@ export interface EventWiringDeps {
     alignment: {
         resetAlignment: () => void;
         toggleAlignment: () => void;
+        centerAtOrigin: () => void;
     };
     annotations: {
         toggleAnnotationMode: () => void;

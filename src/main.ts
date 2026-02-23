@@ -100,7 +100,10 @@ import {
     syncBothObjects as syncBothObjectsHandler,
     storeLastPositions as storeLastPositionsHandler,
     setTransformMode as setTransformModeHandler,
-    resetTransform as resetTransformHandler
+    resetTransform as resetTransformHandler,
+    applyPivotRotation as applyPivotRotationHandler,
+    applyUniformScale as applyUniformScaleHandler,
+    centerAtOrigin as centerAtOriginHandler
 } from './modules/transform-controller.js';
 import {
     handleSourceFilesInput,
@@ -224,6 +227,8 @@ const state: AppState = {
     displayMode: config.initialViewMode || 'model', // 'splat', 'model', 'pointcloud', 'both', 'split'
     selectedObject: 'none', // 'splat', 'model', 'both', 'none'
     transformMode: 'translate', // 'translate', 'rotate', 'scale'
+    rotationPivot: 'object', // 'object' | 'origin'
+    scaleLockProportions: true, // lock proportions when scaling
     splatLoaded: false,
     modelLoaded: false,
     pointcloudLoaded: false,
@@ -586,7 +591,7 @@ function createEventWiringDeps(): EventWiringDeps {
             toggleGridlines, setBackgroundColor
         },
         camera: { resetCamera, fitToView, toggleFlyMode },
-        alignment: { resetAlignment, toggleAlignment },
+        alignment: { resetAlignment, toggleAlignment, centerAtOrigin },
         annotations: {
             toggleAnnotationMode, saveAnnotation, cancelAnnotation,
             updateSelectedAnnotationCamera, deleteSelectedAnnotation,
@@ -714,6 +719,10 @@ async function init() {
         if (state.selectedObject === 'both') {
             syncBothObjects();
         }
+        // If rotating around world origin, adjust position to orbit around (0,0,0)
+        applyPivotRotation();
+        // If scale lock is on, enforce uniform scaling
+        applyUniformScale();
     };
 
     // Initialize annotation system
@@ -927,12 +936,25 @@ function syncBothObjects() {
     syncBothObjectsHandler({ transformControls, splatMesh, modelGroup, pointcloudGroup });
 }
 
+function applyPivotRotation() {
+    applyPivotRotationHandler({ transformControls, splatMesh, modelGroup, pointcloudGroup, state });
+}
+
+function applyUniformScale() {
+    applyUniformScaleHandler({ transformControls, splatMesh, modelGroup, state });
+}
+
 function storeLastPositions() {
     storeLastPositionsHandler({ splatMesh, modelGroup, pointcloudGroup });
 }
 
 function setTransformMode(mode: TransformMode) {
     setTransformModeHandler(mode, { transformControls, state, splatMesh, modelGroup, pointcloudGroup });
+}
+
+function centerAtOrigin() {
+    centerAtOriginHandler({ splatMesh, modelGroup, pointcloudGroup, camera, controls, state });
+    updateTransformInputs();
 }
 
 function resetTransform() {
@@ -1576,6 +1598,9 @@ function animate() {
                 controlsRight.update();
             }
         }
+
+        // Track orbit center line to current pivot point
+        sceneManager.updateOrbitCenterLine(controls.target);
 
         // Render using scene manager (handles split view)
         sceneManager.render(state.displayMode, splatMesh, modelGroup, pointcloudGroup, stlGroup);

@@ -611,6 +611,35 @@
                     </div>
                 </div>
 
+                <!-- Rotation Pivot (shown only in Rotate mode) -->
+                <div class="prop-section open" id="rotation-pivot-section" style="display:none;">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Rotation Pivot</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <p class="prop-hint mb4">Choose rotation center point.</p>
+                        <div class="seg-ctrl">
+                            <button class="seg-btn active" id="btn-pivot-object">Object</button>
+                            <button class="seg-btn" id="btn-pivot-origin">World Origin</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scale Lock (shown only in Scale mode) -->
+                <div class="prop-section open" id="scale-lock-section" style="display:none;">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Scale Proportions</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <div class="seg-ctrl">
+                            <button class="seg-btn active" id="btn-scale-locked">Locked</button>
+                            <button class="seg-btn" id="btn-scale-free">Free</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Position & Rotation (NEW) -->
                 <div class="prop-section open">
                     <div class="prop-section-hd">
@@ -668,6 +697,7 @@
                             Place matching point pairs on each object (minimum 3 pairs). Preview shows alignment quality.
                         </p>
                         <button class="prop-btn accent" id="btn-align">Align Objects</button>
+                        <button class="prop-btn mt4" id="btn-center-at-origin">Center at Origin</button>
                         <button class="prop-btn mt4" id="btn-reset-alignment">Reset All Transforms</button>
                     </div>
                 </div>
