@@ -1387,14 +1387,15 @@ body.kiosk-mode.kiosk-editorial #annotation-info-popup {
     border: 1px solid var(--kiosk-border-subtle);
     border-radius: 6px;
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
-    padding: 14px 16px 14px 16px;
+    padding: 10px 14px;
+    max-width: 260px;
     max-height: calc(100vh - 150px);
     overflow: visible;
 }
 
 body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-header {
-    padding-bottom: 10px;
-    margin-bottom: 10px;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
     position: relative;
 }
 
@@ -1420,8 +1421,9 @@ body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-body {
     font-family: var(--kiosk-font-body);
     font-weight: 400;
     color: var(--kiosk-text-secondary);
-    line-height: 1.7;
-    max-height: 240px;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    max-height: 200px;
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: rgba(var(--kiosk-accent-rgb),0.3) transparent;
@@ -1490,13 +1492,18 @@ body.kiosk-mode.kiosk-editorial .editorial-info-description a:hover {
 /* --- Hero image zone — editorial overrides --- */
 
 body.kiosk-mode.kiosk-editorial #annotation-info-popup.has-image {
-    max-width: 400px;
+    max-width: 300px;
     padding: 0;
 }
 
+body.kiosk-mode.kiosk-editorial #annotation-info-popup.has-image .annotation-info-hero {
+    border-bottom: 1px solid rgba(var(--kiosk-text-dim-rgb), 0.15);
+    margin-bottom: 6px;
+}
+
 body.kiosk-mode.kiosk-editorial #annotation-info-popup.has-image .annotation-info-header {
-    padding: 14px 16px 10px;
-    margin-bottom: 0;
+    padding: 10px 14px 8px;
+    margin-bottom: 6px;
 }
 
 body.kiosk-mode.kiosk-editorial #annotation-info-popup.has-image .annotation-info-header::after {
@@ -1504,7 +1511,7 @@ body.kiosk-mode.kiosk-editorial #annotation-info-popup.has-image .annotation-inf
 }
 
 body.kiosk-mode.kiosk-editorial #annotation-info-popup.has-image .annotation-info-body {
-    padding: 0 16px 14px;
+    padding: 0 14px 10px;
 }
 
 body.kiosk-mode.kiosk-editorial .annotation-hero-zoom {
@@ -2161,4 +2168,65 @@ body.kiosk-mode.kiosk-editorial .editorial-loading-title-bar {
     body.kiosk-mode.kiosk-editorial .editorial-collapsible-inner {
         transition: none !important;
     }
+}
+
+/* ============================================================
+   Walkthrough — Editorial Theme
+   ============================================================ */
+
+/* Walkthrough stop sequence (mirrors annotation sequence) */
+body.kiosk-mode.kiosk-editorial .editorial-wt-sequence {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    position: absolute;
+    left: 0;
+    right: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    pointer-events: none;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-wt-sequence > * {
+    pointer-events: auto;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-wt-sequence::-webkit-scrollbar {
+    display: none;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-wt-seq-dot {
+    font-family: var(--kiosk-font-body);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--kiosk-text-muted);
+    padding: 2px 4px;
+    transition: color 0.3s, opacity 0.3s;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    opacity: 0.5;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-wt-seq-dot.visited {
+    color: var(--kiosk-text-secondary);
+    opacity: 0.7;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-wt-seq-dot.active {
+    color: var(--kiosk-accent);
+    font-weight: 500;
+    opacity: 1;
+}
+
+/* Stop title overlay in title block */
+body.kiosk-mode.kiosk-editorial .editorial-wt-stop-title {
+    display: block;
+    font-family: var(--kiosk-font-body);
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--kiosk-text-secondary);
+    letter-spacing: 0.04em;
+    margin-top: 6px;
+    transition: opacity 0.4s ease;
 }

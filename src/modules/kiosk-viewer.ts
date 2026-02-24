@@ -75,6 +75,7 @@ const LOCAL_MODULES: LocalModule[] = [
     { specifier: './metadata-manager.js',  path: 'metadata-manager.js' },
     { specifier: './theme-loader.js',      path: 'theme-loader.js' },
     { specifier: './quality-tier.js',      path: 'quality-tier.js' },
+    { specifier: './walkthrough-engine.js', path: 'walkthrough-engine.js' },
     { specifier: './kiosk-main.js',        path: 'kiosk-main.js' },
 ];
 

@@ -111,6 +111,7 @@ interface ArchiveManifest {
     };
     alignment?: any;
     annotations?: any[];
+    walkthrough?: import('../types.js').Walkthrough;
     project?: Record<string, any>;
     [key: string]: any;
 }
@@ -798,6 +799,13 @@ export class ArchiveLoader {
     getAnnotations(): any[] {
         if (!this.manifest) return [];
         return this.manifest.annotations || [];
+    }
+
+    /**
+     * Get walkthrough from manifest
+     */
+    getWalkthrough(): import('../types.js').Walkthrough | null {
+        return this.manifest.walkthrough ?? null;
     }
 
     /**

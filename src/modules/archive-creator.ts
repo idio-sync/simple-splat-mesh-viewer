@@ -289,6 +289,7 @@ export interface Manifest {
     };
     data_entries: Record<string, DataEntry>;
     annotations: Annotation[];
+    walkthrough?: import('../types.js').Walkthrough;
     version_history: VersionHistoryEntry[];
     integrity?: IntegrityData;
     compliance?: ManifestCompliance;
@@ -365,6 +366,7 @@ export interface ViewerState {
     pointcloudTransform?: { position?: [number, number, number]; rotation?: [number, number, number]; scale?: number };
     pointcloudMetadata?: { createdBy?: string; version?: string; sourceNotes?: string };
     annotations?: Annotation[];
+    walkthrough?: import('../types.js').Walkthrough | null;
     qualityStats?: QualityStats;
 }
 
@@ -638,6 +640,7 @@ export class ArchiveCreator {
             },
             data_entries: {},
             annotations: [],
+            walkthrough: undefined,
             version_history: [],
             _meta: {}
         };
@@ -1462,6 +1465,18 @@ export class ArchiveCreator {
         this.manifest.annotations = this.annotations;
     }
 
+    setWalkthrough(walkthrough: import('../types.js').Walkthrough | null): void {
+        if (walkthrough && walkthrough.stops.length > 0) {
+            this.manifest.walkthrough = walkthrough;
+        } else {
+            this.manifest.walkthrough = undefined;
+        }
+    }
+
+    getWalkthrough(): import('../types.js').Walkthrough | null {
+        return this.manifest.walkthrough ?? null;
+    }
+
     setVersionHistory(entries: VersionHistoryEntry[]): void {
         this.manifest.version_history = Array.isArray(entries) ? [...entries] : [];
     }
@@ -1518,6 +1533,10 @@ export class ArchiveCreator {
 
         if (annotations && annotations.length > 0) {
             this.setAnnotations(annotations);
+        }
+
+        if (viewerState.walkthrough && viewerState.walkthrough.stops?.length > 0) {
+            this.setWalkthrough(viewerState.walkthrough);
         }
 
         if (qualityStats) {

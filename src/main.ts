@@ -13,6 +13,16 @@ import { Logger, notify } from './modules/utilities.js';
 import { FlyControls } from './modules/fly-controls.js';
 import { getStore } from './modules/asset-store.js';
 import { validateUserUrl as validateUserUrlCore } from './modules/url-validation.js';
+import {
+    initWalkthroughController,
+    addStop as wtAddStop,
+    addStopFromAnnotation as wtAddStopFromAnnotation,
+    deleteStop as wtDeleteStop,
+    updateStopCamera as wtUpdateStopCamera,
+    playPreview as wtPlayPreview,
+    stopPreview as wtStopPreview,
+    isPreviewAnimating,
+} from './modules/walkthrough-controller.js';
 import { SceneManager } from './modules/scene-manager.js';
 import {
     LandmarkAlignment,
@@ -605,6 +615,14 @@ function createEventWiringDeps(): EventWiringDeps {
         share: { copyShareLink },
         transform: { setSelectedObject, setTransformMode, resetTransform },
         crossSection: crossSection!,
+        walkthrough: {
+            addStop: wtAddStop,
+            addStopFromAnnotation: wtAddStopFromAnnotation,
+            deleteStop: wtDeleteStop,
+            updateStopCamera: wtUpdateStopCamera,
+            playPreview: wtPlayPreview,
+            stopPreview: wtStopPreview,
+        },
         tauri: {
             wireNativeDialogsIfAvailable: () => {
                 if (window.__TAURI__ && tauriBridge) {
@@ -736,6 +754,15 @@ async function init() {
     annotationSystem.onAnnotationSelected = onAnnotationSelected;
     annotationSystem.onPlacementModeChanged = onPlacementModeChanged;
     log.info(' Annotation system initialized:', !!annotationSystem);
+
+    // Initialize walkthrough controller
+    initWalkthroughController({
+        camera,
+        controls,
+        annotationSystem,
+        getAnnotations: () => annotationSystem ? annotationSystem.toJSON() : [],
+    });
+    log.info(' Walkthrough controller initialized');
 
     // Initialize measurement system
     measurementSystem = new MeasurementSystem(scene, camera, renderer, controls);
@@ -1625,7 +1652,7 @@ function animate() {
         // Update active camera controls
         if (flyControls && flyControls.enabled) {
             flyControls.update();
-        } else if (!annotationSystem?.isAnimating) {
+        } else if (!annotationSystem?.isAnimating && !isPreviewAnimating()) {
             controls.update();
             // Only sync right controls when in split view (avoids unnecessary math per frame)
             if (state.displayMode === 'split') {

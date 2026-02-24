@@ -11,6 +11,7 @@ import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader } from './archive-loader.js';
 import { hasAnyProxy } from './quality-tier.js';
 import { ASSET_STATE } from './constants.js';
+import { loadWalkthroughFromArchive } from './walkthrough-controller.js';
 import { Logger, notify, computeMeshFaceCount, computeTextureInfo, disposeObject } from './utilities.js';
 import { getStore } from './asset-store.js';
 import {
@@ -524,6 +525,12 @@ export async function processArchive(archiveLoader: any, archiveName: string, de
         // Load annotations
         if (annotations && annotations.length > 0) {
             deps.annotations.loadAnnotationsFromArchive(annotations);
+        }
+
+        // Load walkthrough
+        const walkthroughData = archiveLoader.getWalkthrough();
+        if (walkthroughData) {
+            loadWalkthroughFromArchive(walkthroughData);
         }
 
         deps.ui.hideLoading();

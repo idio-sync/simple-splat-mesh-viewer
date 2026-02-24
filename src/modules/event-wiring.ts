@@ -436,6 +436,16 @@ export function setupUIEvents(deps: EventWiringDeps): void {
     addListener('btn-sidebar-update-anno-camera', 'click', deps.annotations.updateSelectedAnnotationCamera);
     addListener('btn-sidebar-delete-anno', 'click', deps.annotations.deleteSelectedAnnotation);
 
+    // ─── Walkthrough controls ──────────────────────────────────
+    if (deps.walkthrough) {
+        addListener('btn-wt-add-stop', 'click', deps.walkthrough.addStop);
+        addListener('btn-wt-add-from-annotation', 'click', deps.walkthrough.addStopFromAnnotation);
+        addListener('btn-wt-delete-stop', 'click', deps.walkthrough.deleteStop);
+        addListener('btn-wt-update-camera', 'click', deps.walkthrough.updateStopCamera);
+        addListener('btn-wt-preview', 'click', deps.walkthrough.playPreview);
+        addListener('btn-wt-stop-preview', 'click', deps.walkthrough.stopPreview);
+    }
+
     // ─── Fly camera mode toggle ──────────────────────────────
     addListener('btn-fly-mode', 'click', deps.camera.toggleFlyMode);
 
@@ -695,6 +705,7 @@ export function setupUIEvents(deps: EventWiringDeps): void {
                 }
                 break;
             case 'n': activateTool('annotate'); activatedTool = 'annotate'; break;
+            case 'w': activateTool('walkthrough'); activatedTool = 'walkthrough'; break;
             case 'x':
                 activateTool('crosssection'); activatedTool = 'crosssection';
                 if (!deps.crossSection.active) {

@@ -206,6 +206,7 @@ const TOOL_PANE_MAP: Record<string, { pane: string; title: string }> = {
     crosssection: { pane: 'pane-crosssection', title: 'Cross-Section' },
     measure:      { pane: 'pane-measure',      title: 'Measurements' },
     capture:      { pane: 'pane-capture',      title: 'Screenshots' },
+    walkthrough:  { pane: 'pane-walkthrough',  title: 'Walkthrough' },
     metadata:     { pane: 'pane-metadata',     title: 'Metadata' },
     export:       { pane: 'pane-export',       title: 'Export' },
     settings:     { pane: 'pane-settings',     title: 'Settings' },

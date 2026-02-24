@@ -114,6 +114,38 @@ export interface Annotation {
     camera_quaternion?: { x: number; y: number; z: number; w: number };
 }
 
+// ===== Walkthrough =====
+
+export type WalkthroughTransition = 'fly' | 'fade' | 'cut';
+
+/** A single stop in a guided walkthrough sequence. */
+export interface WalkthroughStop {
+    id: string;
+    title: string;
+    description?: string;
+    camera_position: { x: number; y: number; z: number };
+    camera_target: { x: number; y: number; z: number };
+    camera_quaternion?: { x: number; y: number; z: number; w: number };
+    /** Optional link to an existing annotation — shows marker + popup on arrival. */
+    annotation_id?: string;
+    /** How the camera arrives at this stop. First stop's transition is used when looping or jumping. */
+    transition: WalkthroughTransition;
+    /** Camera fly duration in ms (for 'fly' transitions). */
+    fly_duration?: number;
+    /** Fade duration per half in ms (for 'fade' transitions — total is 2x). */
+    fade_duration?: number;
+    /** Time in ms to dwell before auto-advancing. 0 = manual advance only. */
+    dwell_time: number;
+}
+
+/** A guided walkthrough — ordered sequence of camera stops with transitions. */
+export interface Walkthrough {
+    title: string;
+    stops: WalkthroughStop[];
+    auto_play?: boolean;
+    loop?: boolean;
+}
+
 // ===== Asset Store =====
 
 export interface AssetStore {
@@ -264,6 +296,14 @@ export interface EventWiringDeps {
         setAxis: (axis: 'x' | 'y' | 'z') => void;
         flip: () => void;
         reset: (center: import('three').Vector3) => void;
+    };
+    walkthrough: {
+        addStop: () => void;
+        addStopFromAnnotation: () => void;
+        deleteStop: () => void;
+        updateStopCamera: () => void;
+        playPreview: () => void;
+        stopPreview: () => void;
     };
     tauri: {
         wireNativeDialogsIfAvailable: () => void;

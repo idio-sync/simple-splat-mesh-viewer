@@ -121,6 +121,17 @@
                 </svg>
             </button>
 
+            <!-- Walkthrough — Guided camera tour -->
+            <button class="tool-btn" data-tool="walkthrough" data-tooltip="Walkthrough  W" title="Create guided walkthrough">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="5" cy="6" r="2"/>
+                    <circle cx="12" cy="18" r="2"/>
+                    <circle cx="19" cy="8" r="2"/>
+                    <path d="M7 6c2.5 0 3 6 5 12"/>
+                    <path d="M14 18c2-6 2.5-10 5-10"/>
+                </svg>
+            </button>
+
             <!-- Cross-Section — Clip with a movable plane -->
             <button class="tool-btn" data-tool="crosssection" data-tooltip="Cross-Section  X" title="Clip the scene with a movable plane">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -207,6 +218,8 @@
             <div id="fly-mode-hint" class="hidden">
                 WASD move &middot; Q/E down/up &middot; Right-click look &middot; Shift fast &middot; Scroll speed
             </div>
+            <div id="walkthrough-fade-overlay" class="walkthrough-fade-overlay"></div>
+
             <div id="annotation-mode-indicator" class="hidden">
                 Click on model to place annotation
             </div>
@@ -759,6 +772,106 @@
                 </div>
 
             </div>
+
+
+            <!-- ========================================================
+                 WALKTHROUGH PANE
+                 ======================================================== -->
+            <!-- KIOSK-STRIP-START -->
+            <div class="props-pane" id="pane-walkthrough">
+
+                <div class="prop-section open">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Settings</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <div class="metadata-field">
+                            <label for="walkthrough-title">Title</label>
+                            <input type="text" class="prop-input" id="walkthrough-title" placeholder="Walkthrough title" value="Building Tour">
+                        </div>
+                        <div class="cb-row mt4">
+                            <input type="checkbox" id="walkthrough-auto-play" checked>
+                            <label for="walkthrough-auto-play">Auto-play in viewer</label>
+                        </div>
+                        <div class="cb-row">
+                            <input type="checkbox" id="walkthrough-loop">
+                            <label for="walkthrough-loop">Loop</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="prop-section open">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Stops</span>
+                        <span id="wt-stop-count" style="font-size:10px; color:var(--text-muted); margin-left:auto; margin-right:6px;"></span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <div id="walkthrough-stop-list"></div>
+
+                        <div id="walkthrough-stop-editor" class="hidden">
+                            <div class="metadata-field">
+                                <label for="wt-stop-title">Title</label>
+                                <input type="text" class="prop-input" id="wt-stop-title" placeholder="Stop title">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="wt-stop-description">Description</label>
+                                <textarea class="prop-input" id="wt-stop-description" rows="2" placeholder="Optional description..."></textarea>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="wt-stop-transition">Transition</label>
+                                <select class="prop-select" id="wt-stop-transition">
+                                    <option value="fly">Fly</option>
+                                    <option value="fade">Fade</option>
+                                    <option value="cut">Cut</option>
+                                </select>
+                            </div>
+                            <div class="metadata-field" id="wt-fly-duration-row">
+                                <label for="wt-stop-fly-duration">Fly Duration (ms)</label>
+                                <input type="number" class="prop-input" id="wt-stop-fly-duration" min="200" max="10000" step="100" value="1500">
+                            </div>
+                            <div class="metadata-field hidden" id="wt-fade-duration-row">
+                                <label for="wt-stop-fade-duration">Fade Duration (ms)</label>
+                                <input type="number" class="prop-input" id="wt-stop-fade-duration" min="100" max="3000" step="50" value="400">
+                            </div>
+                            <div class="metadata-field">
+                                <label for="wt-stop-dwell">Dwell Time (ms)</label>
+                                <input type="number" class="prop-input" id="wt-stop-dwell" min="0" max="60000" step="500" value="5000">
+                                <span style="font-size:10px; color:var(--text-muted);">0 = manual advance only</span>
+                            </div>
+                            <div class="metadata-field">
+                                <label for="wt-stop-annotation">Linked Annotation</label>
+                                <select class="prop-select" id="wt-stop-annotation">
+                                    <option value="">None</option>
+                                </select>
+                            </div>
+                            <div style="display:flex; gap:6px; margin-top:8px;">
+                                <button class="prop-btn small" id="btn-wt-update-camera" title="Update to current camera view">Update Camera</button>
+                                <button class="prop-btn danger small" id="btn-wt-delete-stop" title="Delete this stop">Delete</button>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:8px; display:flex; gap:6px;">
+                            <button class="prop-btn accent" id="btn-wt-add-stop">+ Add Stop</button>
+                            <button class="prop-btn" id="btn-wt-add-from-annotation">+ From Annotation</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="prop-section open">
+                    <div class="prop-section-hd">
+                        <span class="prop-section-title">Preview</span>
+                        <span class="prop-section-chevron">&#9654;</span>
+                    </div>
+                    <div class="prop-section-body">
+                        <button class="prop-btn accent" id="btn-wt-preview">&#9654; Play Preview</button>
+                        <button class="prop-btn hidden" id="btn-wt-stop-preview">&#9632; Stop Preview</button>
+                    </div>
+                </div>
+
+            </div>
+            <!-- KIOSK-STRIP-END -->
 
 
             <!-- ========================================================

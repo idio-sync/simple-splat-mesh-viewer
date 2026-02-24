@@ -2364,23 +2364,18 @@ export function showAnnotationPopup(annotation: Annotation, imageAssets?: Map<st
 
     popup.classList.remove('hidden');
 
-    // Invalidate cached popup dimensions — content just changed
-    _popupDimCache = null;
-
     return annotation.id;
 }
 
 /**
- * Cached popup/viewer dimensions — invalidated on resize and popup content changes.
+ * Cached viewer dimensions — invalidated on resize.
  * Avoids per-frame getBoundingClientRect() calls that force synchronous reflow
  * when interleaved with marker style writes in the animate loop.
  */
-let _popupDimCache: { w: number; h: number } | null = null;
-let _viewerRectCache: { left: number; right: number; midX: number } | null = null;
+let _viewerRectCache: { left: number; right: number; top: number; bottom: number; midX: number } | null = null;
 
-/** Invalidate cached popup/viewer dimensions (call on resize or popup content change). */
+/** Invalidate cached viewer dimensions (call on resize or layout change). */
 export function invalidatePopupLayoutCache(): void {
-    _popupDimCache = null;
     _viewerRectCache = null;
 }
 
@@ -2413,48 +2408,75 @@ export function updateAnnotationPopupPosition(currentPopupAnnotationId: string |
     const markerX = parseFloat(marker.style.left) || 0;
     const markerY = parseFloat(marker.style.top) || 0;
 
-    // Cache popup dimensions (only change when popup content changes)
-    if (!_popupDimCache) {
-        _popupDimCache = {
-            w: popup.offsetWidth || 320,
-            h: popup.offsetHeight || 200
-        };
-    }
-    const popupWidth = _popupDimCache.w;
-    const popupHeight = _popupDimCache.h;
+    // Read popup dimensions live — hero images can load after initial render,
+    // changing the height. Reading offsetWidth/Height is cheap on a single element.
+    const popupWidth = popup.offsetWidth || 280;
+    const popupHeight = popup.offsetHeight || 180;
 
-    // Cache viewer rect (only changes on resize — invalidated by invalidatePopupLayoutCache)
+    // Cache 3D canvas rect — use #viewer-canvas (not #viewer-container) because in
+    // editorial kiosk the container holds the info panel as a flex sibling, but the
+    // canvas shrinks to the actual 3D area. Invalidated on resize via invalidatePopupLayoutCache.
     if (!_viewerRectCache) {
-        const viewer = document.getElementById('viewer-container');
-        if (viewer) {
-            const vr = viewer.getBoundingClientRect();
-            _viewerRectCache = { left: vr.left, right: vr.right, midX: (vr.left + vr.right) / 2 };
+        const canvas = document.getElementById('viewer-canvas') || document.getElementById('viewer-container');
+        if (canvas) {
+            const vr = canvas.getBoundingClientRect();
+            _viewerRectCache = { left: vr.left, right: vr.right, top: vr.top, bottom: vr.bottom, midX: (vr.left + vr.right) / 2 };
         } else {
-            _viewerRectCache = { left: 0, right: window.innerWidth, midX: window.innerWidth / 2 };
+            _viewerRectCache = { left: 0, right: window.innerWidth, top: 0, bottom: window.innerHeight, midX: window.innerWidth / 2 };
         }
     }
+
+    // Reduce effective right boundary when a sidebar overlays the viewport (kiosk mode).
+    // Check both the metadata sidebar (standard kiosk) and editorial info overlay.
+    let effectiveRight = _viewerRectCache.right;
+    const sidebar = document.getElementById('metadata-sidebar');
+    if (sidebar && !sidebar.classList.contains('hidden')) {
+        const sr = sidebar.getBoundingClientRect();
+        // Only subtract if sidebar is actually rendered (sr.width > 0 guards against
+        // editorial theme hiding it via CSS display:none while .hidden class is absent)
+        if (sr.width > 0 && sr.left < effectiveRight) {
+            effectiveRight = sr.left;
+        }
+    }
+    const editorialPanel = document.querySelector('.editorial-info-overlay.open') as HTMLElement | null;
+    if (editorialPanel) {
+        const ep = editorialPanel.getBoundingClientRect();
+        if (ep.width > 0 && ep.left < effectiveRight) {
+            effectiveRight = ep.left;
+        }
+    }
+    const effectiveLeft = _viewerRectCache.left;
+    const effectiveMidX = (effectiveLeft + effectiveRight) / 2;
 
     const edgeMargin = 40;
     const padding = 15;
 
-    // Snap popup toward the nearest horizontal edge of the viewer
+    // Snap popup to the opposite side from the marker so it never covers the model
     let left: number;
-    if (markerX < _viewerRectCache.midX) {
-        left = _viewerRectCache.left + edgeMargin;
+    if (markerX < effectiveMidX) {
+        left = effectiveRight - popupWidth - edgeMargin;
     } else {
-        left = _viewerRectCache.right - popupWidth - edgeMargin;
+        left = effectiveLeft + edgeMargin;
     }
 
-    // Vertical: align with marker center, clamped to viewport
-    // In editorial mode, avoid title zone (top) and bottom ribbon
+    // Final horizontal clamp — never exceed effective viewer bounds
+    if (left < effectiveLeft + padding) left = effectiveLeft + padding;
+    if (left + popupWidth > effectiveRight - padding) {
+        left = effectiveRight - popupWidth - padding;
+    }
+
+    // Vertical: align with marker center, clamped to viewer bounds
+    // In editorial mode, add extra offset for title zone (top) and bottom ribbon
     const isEditorial = document.body.classList.contains('kiosk-editorial');
-    const topZone = isEditorial ? 95 : padding;
-    const bottomZone = isEditorial ? 48 : padding;
+    const topExtra = isEditorial ? 95 : 0;
+    const bottomExtra = isEditorial ? 48 : 0;
+    const effectiveTop = _viewerRectCache.top + Math.max(topExtra, padding);
+    const effectiveBottom = _viewerRectCache.bottom - Math.max(bottomExtra, padding);
 
     let top = markerY - popupHeight / 2;
-    if (top < topZone) top = topZone;
-    if (top + popupHeight > window.innerHeight - bottomZone) {
-        top = window.innerHeight - popupHeight - bottomZone;
+    if (top < effectiveTop) top = effectiveTop;
+    if (top + popupHeight > effectiveBottom) {
+        top = effectiveBottom - popupHeight;
     }
 
     popup.style.left = left + 'px';

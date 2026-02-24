@@ -40,6 +40,13 @@ export interface LayoutModule {
     hasOwnInfoPanel?: boolean;
     /** If true, the layout creates its own SD/HD quality toggle. */
     hasOwnQualityToggle?: boolean;
+
+    /** Called when a walkthrough is about to start (player bar created, autoplay pending). */
+    onWalkthroughStart?(walkthrough: import('../types.js').Walkthrough): void;
+    /** Called when the active walkthrough stop changes. */
+    onWalkthroughStopChange?(stopIndex: number, stop: import('../types.js').WalkthroughStop): void;
+    /** Called when the walkthrough ends or is stopped. */
+    onWalkthroughEnd?(): void;
 }
 
 interface ThemeMeta {

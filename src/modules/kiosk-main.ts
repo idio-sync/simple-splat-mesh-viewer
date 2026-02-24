@@ -20,7 +20,10 @@ import { FlyControls } from './fly-controls.js';
 import { AnnotationSystem } from './annotation-system.js';
 import { MeasurementSystem } from './measurement-system.js';
 import { CrossSectionTool } from './cross-section.js';
-import { CAMERA, ASSET_STATE, QUALITY_TIER } from './constants.js';
+import { CAMERA, ASSET_STATE, QUALITY_TIER, WALKTHROUGH } from './constants.js';
+import { WalkthroughEngine } from './walkthrough-engine.js';
+import type { WalkthroughPlaybackState } from './walkthrough-engine.js';
+import type { Walkthrough, WalkthroughStop } from '../types.js';
 import { resolveQualityTier, hasAnyProxy, getLodBudget } from './quality-tier.js';
 import { Logger, notify, parseMarkdown, resolveAssetRefs, fetchWithProgress, downloadBlob } from './utilities.js';
 import {
@@ -174,6 +177,10 @@ let sceneManager: SceneManager | null = null;
 let scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: any, controls: any, modelGroup: THREE.Group, pointcloudGroup: THREE.Group;
 let flyControls: FlyControls | null = null;
 let annotationSystem: AnnotationSystem | null = null;
+let walkthroughEngine: WalkthroughEngine | null = null;
+let walkthroughAnimating = false;
+let walkthroughPlayerEl: HTMLElement | null = null;
+let walkthroughFadeEl: HTMLElement | null = null;
 let crossSection: CrossSectionTool | null = null;
 let measurementSystem: MeasurementSystem | null = null;
 let sparkRenderer: any = null; // SparkRenderer instance
@@ -1205,6 +1212,12 @@ async function handleArchiveFile(file: File, preloadedLoader?: ArchiveLoader): P
             annotationSystem.fromJSON(annotations);
             populateAnnotationList();
             log.info(`Loaded ${annotations.length} annotations`);
+        }
+
+        // Walkthrough
+        const walkthroughData = archiveLoader.getWalkthrough();
+        if (walkthroughData && walkthroughData.stops.length > 0) {
+            setupWalkthroughPlayer(walkthroughData);
         }
 
         // Extract embedded images in parallel (awaited — editorial layout needs them for image strip)
@@ -2772,6 +2785,245 @@ function reorderKioskSidebar(): void {
     }
 }
 
+// =============================================================================
+// WALKTHROUGH PLAYER
+// =============================================================================
+
+function setupWalkthroughPlayer(walkthrough: Walkthrough): void {
+    // Create fade overlay
+    walkthroughFadeEl = document.createElement('div');
+    walkthroughFadeEl.id = 'kiosk-walkthrough-fade';
+    walkthroughFadeEl.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#000;opacity:0;pointer-events:none;transition:opacity 0.4s ease;z-index:400;';
+    document.body.appendChild(walkthroughFadeEl);
+
+    // Create player bar
+    walkthroughPlayerEl = document.createElement('div');
+    walkthroughPlayerEl.id = 'kiosk-walkthrough-player';
+    walkthroughPlayerEl.className = 'kiosk-wt-player';
+    walkthroughPlayerEl.innerHTML = buildPlayerHTML(walkthrough);
+    document.body.appendChild(walkthroughPlayerEl);
+
+    // Resolve layout module reference
+    const layoutModule = getLayoutModule();
+
+    // Create engine with kiosk callbacks
+    walkthroughEngine = new WalkthroughEngine({
+        flyCamera(endPos, endTarget, duration, onComplete) {
+            walkthroughAnimating = true;
+            const startPos = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
+            const startTarget = { x: controls.target.x, y: controls.target.y, z: controls.target.z };
+            const startTime = performance.now();
+
+            function animateStep() {
+                const elapsed = performance.now() - startTime;
+                const t = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+
+                camera.position.set(
+                    startPos.x + (endPos.x - startPos.x) * eased,
+                    startPos.y + (endPos.y - startPos.y) * eased,
+                    startPos.z + (endPos.z - startPos.z) * eased
+                );
+                controls.target.set(
+                    startTarget.x + (endTarget.x - startTarget.x) * eased,
+                    startTarget.y + (endTarget.y - startTarget.y) * eased,
+                    startTarget.z + (endTarget.z - startTarget.z) * eased
+                );
+
+                if (t < 1) {
+                    requestAnimationFrame(animateStep);
+                } else {
+                    walkthroughAnimating = false;
+                    onComplete();
+                }
+            }
+            requestAnimationFrame(animateStep);
+        },
+
+        fadeOut(duration, onComplete) {
+            if (!walkthroughFadeEl) { onComplete(); return; }
+            walkthroughFadeEl.style.transition = `opacity ${duration}ms ease`;
+            walkthroughFadeEl.style.opacity = '1';
+            setTimeout(onComplete, duration);
+        },
+
+        fadeIn(duration, onComplete) {
+            if (!walkthroughFadeEl) { onComplete(); return; }
+            walkthroughFadeEl.style.transition = `opacity ${duration}ms ease`;
+            walkthroughFadeEl.style.opacity = '0';
+            setTimeout(onComplete, duration);
+        },
+
+        setCameraImmediate(pos, target) {
+            camera.position.set(pos.x, pos.y, pos.z);
+            controls.target.set(target.x, target.y, target.z);
+            controls.update();
+        },
+
+        showAnnotation(annotationId) {
+            if (annotationSystem) {
+                annotationSystem.goToAnnotation(annotationId);
+            }
+        },
+
+        hideAnnotation() {
+            if (annotationSystem) {
+                annotationSystem.selectedAnnotation = null;
+            }
+            hideAnnotationPopup();
+            const popup = document.getElementById('annotation-info-popup');
+            if (popup) popup.classList.add('hidden');
+        },
+
+        onStopChange(stopIndex, stop) {
+            updateWalkthroughPlayerUI(stopIndex, walkthrough.stops.length, stop);
+            if (layoutModule?.onWalkthroughStopChange) {
+                layoutModule.onWalkthroughStopChange(stopIndex, stop);
+            }
+        },
+
+        onStateChange(newState) {
+            updateWalkthroughPlayState(newState);
+        },
+
+        onComplete() {
+            removeWalkthroughPlayer();
+            if (layoutModule?.onWalkthroughEnd) {
+                layoutModule.onWalkthroughEnd();
+            }
+        },
+    });
+
+    walkthroughEngine.load(walkthrough);
+
+    // Wire player buttons
+    const playBtn = walkthroughPlayerEl.querySelector('.wt-play-btn');
+    const closeBtn = walkthroughPlayerEl.querySelector('.wt-close-btn');
+    const prevBtn = walkthroughPlayerEl.querySelector('.wt-prev-btn');
+    const nextBtn = walkthroughPlayerEl.querySelector('.wt-next-btn');
+
+    playBtn?.addEventListener('click', () => {
+        if (!walkthroughEngine) return;
+        if (walkthroughEngine.state === 'paused') {
+            walkthroughEngine.resume();
+        } else if (walkthroughEngine.state === 'idle') {
+            walkthroughEngine.play();
+        } else {
+            walkthroughEngine.pause();
+        }
+    });
+
+    closeBtn?.addEventListener('click', () => {
+        walkthroughEngine?.stop();
+    });
+
+    prevBtn?.addEventListener('click', () => {
+        walkthroughEngine?.prev();
+    });
+
+    nextBtn?.addEventListener('click', () => {
+        walkthroughEngine?.next();
+    });
+
+    // Wire dot clicks
+    walkthroughPlayerEl.querySelectorAll('.wt-dot').forEach((dot, i) => {
+        dot.addEventListener('click', () => walkthroughEngine?.goToStop(i));
+    });
+
+    // Keyboard shortcuts
+    const handleWalkthroughKeys = (e: KeyboardEvent) => {
+        if (!walkthroughEngine || walkthroughEngine.state === 'idle') return;
+        switch (e.key) {
+            case ' ':
+                e.preventDefault();
+                if (walkthroughEngine.state === 'paused') walkthroughEngine.resume();
+                else walkthroughEngine.pause();
+                break;
+            case 'Escape':
+                walkthroughEngine.stop();
+                break;
+            case 'ArrowRight':
+                walkthroughEngine.next();
+                break;
+            case 'ArrowLeft':
+                walkthroughEngine.prev();
+                break;
+        }
+    };
+    window.addEventListener('keydown', handleWalkthroughKeys);
+
+    // Notify layout module
+    if (layoutModule?.onWalkthroughStart) {
+        layoutModule.onWalkthroughStart(walkthrough);
+    }
+
+    // Auto-play after delay
+    if (walkthrough.auto_play !== false) {
+        setTimeout(() => {
+            walkthroughEngine?.play();
+        }, WALKTHROUGH.AUTOPLAY_START_DELAY);
+    }
+}
+
+function buildPlayerHTML(walkthrough: Walkthrough): string {
+    const dots = walkthrough.stops.map((s, i) =>
+        `<button class="wt-dot" data-index="${i}" title="${s.title || 'Stop ' + (i + 1)}"></button>`
+    ).join('');
+
+    return `
+        <div class="wt-player-inner">
+            <button class="wt-prev-btn" title="Previous stop">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <button class="wt-play-btn" title="Play/Pause">
+                <svg class="wt-icon-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21"/></svg>
+                <svg class="wt-icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            </button>
+            <button class="wt-next-btn" title="Next stop">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <div class="wt-dots">${dots}</div>
+            <span class="wt-stop-title"></span>
+            <span class="wt-stop-counter"></span>
+            <button class="wt-close-btn" title="Exit walkthrough">&times;</button>
+        </div>
+    `;
+}
+
+function updateWalkthroughPlayerUI(stopIndex: number, totalStops: number, stop: WalkthroughStop): void {
+    if (!walkthroughPlayerEl) return;
+
+    walkthroughPlayerEl.querySelectorAll('.wt-dot').forEach((dot, i) => {
+        dot.classList.toggle('active', i === stopIndex);
+        dot.classList.toggle('visited', i < stopIndex);
+    });
+
+    const titleEl = walkthroughPlayerEl.querySelector('.wt-stop-title');
+    const counterEl = walkthroughPlayerEl.querySelector('.wt-stop-counter');
+    if (titleEl) titleEl.textContent = stop.title || '';
+    if (counterEl) counterEl.textContent = `${stopIndex + 1} / ${totalStops}`;
+}
+
+function updateWalkthroughPlayState(state: WalkthroughPlaybackState): void {
+    if (!walkthroughPlayerEl) return;
+    const playIcon = walkthroughPlayerEl.querySelector('.wt-icon-play') as HTMLElement | null;
+    const pauseIcon = walkthroughPlayerEl.querySelector('.wt-icon-pause') as HTMLElement | null;
+    if (playIcon && pauseIcon) {
+        const isPlaying = state === 'transitioning' || state === 'dwelling';
+        playIcon.style.display = isPlaying ? 'none' : '';
+        pauseIcon.style.display = isPlaying ? '' : 'none';
+    }
+}
+
+function removeWalkthroughPlayer(): void {
+    walkthroughAnimating = false;
+    walkthroughPlayerEl?.remove();
+    walkthroughPlayerEl = null;
+    walkthroughFadeEl?.remove();
+    walkthroughFadeEl = null;
+    walkthroughEngine = null;
+}
+
 function populateAnnotationList(): void {
     const annotations = annotationSystem.getAnnotations();
     if (annotations.length === 0) return;
@@ -4160,7 +4412,7 @@ function animate(): void {
     try {
         if (state.flyModeActive) {
             flyControls.update();
-        } else if (!annotationSystem?.isAnimating) {
+        } else if (!annotationSystem?.isAnimating && !walkthroughAnimating) {
             controls.update();
         }
 

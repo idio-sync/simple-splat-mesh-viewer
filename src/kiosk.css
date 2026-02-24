@@ -1846,3 +1846,161 @@ body.kiosk-mode #metadata-sidebar.sheet-dragging {
     opacity: 0;
     animation: kiosk-gate-intro 0.6s ease-out forwards 0.6s;
 }
+
+/* =============================================================================
+   WALKTHROUGH PLAYER
+   ============================================================================= */
+
+.kiosk-wt-player {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 350;
+    pointer-events: auto;
+}
+
+.wt-player-inner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(20, 20, 30, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 28px;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.wt-play-btn,
+.wt-prev-btn,
+.wt-next-btn,
+.wt-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    transition: background 0.15s;
+    padding: 0;
+}
+
+.wt-play-btn:hover,
+.wt-prev-btn:hover,
+.wt-next-btn:hover,
+.wt-close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.wt-play-btn {
+    width: 36px;
+    height: 36px;
+    background: var(--accent, #5a9e97);
+}
+
+.wt-play-btn:hover {
+    background: var(--accent-hover, #4a8e87);
+}
+
+.wt-dots {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    padding: 0 8px;
+}
+
+.wt-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.2s;
+}
+
+.wt-dot.active {
+    border-color: var(--accent, #5a9e97);
+    background: var(--accent, #5a9e97);
+    transform: scale(1.2);
+}
+
+.wt-dot.visited {
+    border-color: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.wt-dot:hover {
+    border-color: rgba(255, 255, 255, 0.8);
+}
+
+.wt-stop-title {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+    padding: 0 4px;
+}
+
+.wt-stop-counter {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 11px;
+    padding: 0 4px;
+}
+
+.wt-close-btn {
+    font-size: 18px;
+    margin-left: 4px;
+}
+
+/* Editorial theme offset — above the ribbon */
+body.kiosk-mode .kiosk-wt-player {
+    bottom: 64px;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .kiosk-wt-player {
+        bottom: 12px;
+        left: 8px;
+        right: 8px;
+        transform: none;
+    }
+
+    .wt-player-inner {
+        padding: 6px 12px;
+        gap: 6px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .wt-stop-title {
+        max-width: 120px;
+        font-size: 11px;
+    }
+
+    .wt-dots {
+        padding: 0 4px;
+    }
+
+    .wt-dot {
+        width: 8px;
+        height: 8px;
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .wt-dot {
+        transition: none;
+    }
+}

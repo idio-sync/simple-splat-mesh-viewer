@@ -1212,6 +1212,14 @@ export function setup(manifest, deps) {
         detailsLink.classList.toggle('active', isOpen);
     });
 
+    // Invalidate popup layout cache after panel open/close transition so annotation
+    // popups respect the new canvas bounds
+    overlay.addEventListener('transitionend', (e) => {
+        if (e.propertyName === 'margin-right') {
+            window.dispatchEvent(new Event('resize'));
+        }
+    });
+
     // --- Image strip parallax on info panel scroll ---
     const panelContent = overlay.querySelector('.editorial-info-content');
     const stripImg = overlay.querySelector('.editorial-image-strip img');
@@ -1396,11 +1404,106 @@ function onKeyboardShortcut(key) {
     return false;
 }
 
+// ---- Walkthrough hooks ----
+
+let wtStopDots = null;
+let wtTitleEl = null;
+
+function onWalkthroughStart(walkthrough) {
+    // Create walkthrough progress dots in the ribbon
+    const ribbon = document.querySelector('.editorial-bottom-ribbon');
+    if (!ribbon) return;
+
+    // Hide annotation sequence during walkthrough
+    const annoSeq = ribbon.querySelector('.editorial-anno-sequence');
+    if (annoSeq) annoSeq.style.display = 'none';
+
+    // Create walkthrough stop dots
+    wtStopDots = document.createElement('div');
+    wtStopDots.className = 'editorial-wt-sequence';
+
+    walkthrough.stops.forEach((stop, i) => {
+        if (i > 0) {
+            const dash = document.createElement('span');
+            dash.className = 'editorial-anno-seq-dash';
+            wtStopDots.appendChild(dash);
+        }
+        const dot = document.createElement('span');
+        dot.className = 'editorial-wt-seq-dot';
+        dot.dataset.stopIndex = String(i);
+        dot.textContent = String(i + 1).padStart(2, '0');
+        wtStopDots.appendChild(dot);
+    });
+
+    // Insert before the first ribbon-rule after tools group, or append to tools group
+    const toolsGroup = ribbon.querySelector('.editorial-ribbon-tools');
+    if (toolsGroup) {
+        if (annoSeq) {
+            toolsGroup.insertBefore(wtStopDots, annoSeq);
+        } else {
+            toolsGroup.prepend(wtStopDots);
+        }
+    }
+
+    // Create stop title subtitle in the title block
+    const titleBlock = document.querySelector('.editorial-title-block');
+    if (titleBlock) {
+        wtTitleEl = document.createElement('span');
+        wtTitleEl.className = 'editorial-wt-stop-title';
+        titleBlock.appendChild(wtTitleEl);
+        titleBlock.style.opacity = '1';
+        titleBlock.style.pointerEvents = 'auto';
+    }
+}
+
+function onWalkthroughStopChange(stopIndex, stop) {
+    // Update progress dots
+    if (wtStopDots) {
+        wtStopDots.querySelectorAll('.editorial-wt-seq-dot').forEach(d => d.classList.remove('active'));
+        // Mark current and all previous as visited
+        wtStopDots.querySelectorAll('.editorial-wt-seq-dot').forEach(d => {
+            const idx = parseInt(d.dataset.stopIndex, 10);
+            if (idx < stopIndex) d.classList.add('visited');
+            if (idx === stopIndex) d.classList.add('active');
+        });
+    }
+
+    // Update stop title
+    if (wtTitleEl) {
+        wtTitleEl.textContent = stop.title || '';
+    }
+}
+
+function onWalkthroughEnd() {
+    // Remove walkthrough UI
+    if (wtStopDots) {
+        wtStopDots.remove();
+        wtStopDots = null;
+    }
+
+    if (wtTitleEl) {
+        wtTitleEl.remove();
+        wtTitleEl = null;
+    }
+
+    // Re-show annotation sequence
+    const annoSeq = document.querySelector('.editorial-anno-sequence');
+    if (annoSeq) annoSeq.style.display = '';
+
+    // Let title block resume auto-fade
+    const titleBlock = document.querySelector('.editorial-title-block');
+    if (titleBlock) {
+        titleBlock.style.opacity = '';
+        titleBlock.style.pointerEvents = '';
+    }
+}
+
 // ---- Self-register for offline kiosk discovery ----
 if (!window.__KIOSK_LAYOUTS__) window.__KIOSK_LAYOUTS__ = {};
 window.__KIOSK_LAYOUTS__['editorial'] = {
     setup, initLoadingScreen, initClickGate, initFilePicker,
     onAnnotationSelect, onAnnotationDeselect, onViewModeChange, onKeyboardShortcut,
+    onWalkthroughStart, onWalkthroughStopChange, onWalkthroughEnd,
     hasOwnInfoPanel: true,
     hasOwnQualityToggle: true
 };

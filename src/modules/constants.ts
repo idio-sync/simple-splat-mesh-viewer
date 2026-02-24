@@ -186,6 +186,25 @@ export const SHADOWS = {
 // ENVIRONMENT MAP PRESETS
 // =============================================================================
 
+// =============================================================================
+// WALKTHROUGH (guided tour playback)
+// =============================================================================
+
+export const WALKTHROUGH = {
+    DEFAULT_FLY_DURATION: 1500,      // ms for fly transition between stops
+    DEFAULT_FADE_DURATION: 400,      // ms per half of fade (total visible fade = 2x)
+    DEFAULT_DWELL_TIME: 5000,        // ms to pause at each stop before auto-advancing
+    DEFAULT_TRANSITION: 'fly' as const,
+    MIN_FLY_DURATION: 200,
+    MAX_FLY_DURATION: 10000,
+    MAX_DWELL_TIME: 60000,
+    AUTOPLAY_START_DELAY: 1500,      // ms delay before autoplay begins after load
+} as const;
+
+// =============================================================================
+// ENVIRONMENT MAP PRESETS
+// =============================================================================
+
 export const ENVIRONMENT = {
     PRESETS: [
         { name: 'None', url: '' },

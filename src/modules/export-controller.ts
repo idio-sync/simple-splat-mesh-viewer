@@ -11,6 +11,7 @@ import { formatFileSize, getActiveProfile, VALIDATION_RULES } from './metadata-m
 import { validateSIP, toManifestCompliance } from './sip-validator.js';
 import type { SIPValidationResult } from './sip-validator.js';
 import { getStore } from './asset-store.js';
+import { captureWalkthroughForArchive } from './walkthrough-controller.js';
 import type { ExportDeps } from '@/types.js';
 
 const log = Logger.getLogger('export-controller');
@@ -354,6 +355,13 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
     if (includeAnnotations && annotationSystem && annotationSystem.hasAnnotations()) {
         log.info(' Adding annotations');
         archiveCreator.setAnnotations(annotationSystem.toJSON());
+    }
+
+    // Add walkthrough if present
+    const walkthroughData = captureWalkthroughForArchive();
+    if (walkthroughData) {
+        log.info(' Adding walkthrough');
+        archiveCreator.setWalkthrough(walkthroughData);
     }
 
     // Add embedded images
