@@ -95,11 +95,10 @@ body.kiosk-mode.kiosk-editorial .editorial-title-meta {
 /* --- Ribbon logo — quiet signature at far right --- */
 
 body.kiosk-mode.kiosk-editorial .editorial-ribbon-logo {
-    height: 14px;
+    height: 18px;
     width: auto;
     opacity: 0.9;
     flex-shrink: 0;
-    margin-left: auto;
     filter: brightness(1.5) drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5));
 }
 
@@ -138,7 +137,7 @@ body.kiosk-mode.kiosk-editorial .editorial-ribbon-tools {
     display: flex;
     align-items: center;
     flex-shrink: 0;
-    margin-left: 0;
+    margin-left: auto;
     gap: 0;
 }
 

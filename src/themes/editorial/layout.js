@@ -1182,6 +1182,11 @@ export function setup(manifest, deps) {
 
     ribbon.appendChild(toolsGroup);
 
+    // Separator between tools and logo
+    const toolsLogoRule = document.createElement('div');
+    toolsLogoRule.className = 'editorial-ribbon-rule';
+    ribbon.appendChild(toolsLogoRule);
+
     // Right group — logo + fullscreen, pushed far right
     const ribbonLogo = document.createElement('img');
     ribbonLogo.className = 'editorial-ribbon-logo';
