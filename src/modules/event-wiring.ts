@@ -259,6 +259,7 @@ export function setupUIEvents(deps: EventWiringDeps): void {
     // ─── Camera buttons ──────────────────────────────────────
     addListener('btn-reset-camera', 'click', deps.camera.resetCamera);
     addListener('btn-fit-view', 'click', deps.camera.fitToView);
+    addListener('btn-reset-orbit', 'click', deps.camera.resetOrbitCenter);
 
     // ─── Lighting controls ───────────────────────────────────
     addListener('ambient-intensity', 'input', (e: Event) => {

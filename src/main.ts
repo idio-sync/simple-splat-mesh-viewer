@@ -7,7 +7,8 @@ import { AnnotationSystem } from './modules/annotation-system.js';
 import { CrossSectionTool } from './modules/cross-section.js';
 import { MeasurementSystem } from './modules/measurement-system.js';
 import { ArchiveCreator, CRYPTO_AVAILABLE } from './modules/archive-creator.js';
-import { CAMERA, TIMING, ASSET_STATE, MESH_LOD } from './modules/constants.js';
+import { CAMERA, TIMING, ASSET_STATE, MESH_LOD, QUALITY_TIER } from './modules/constants.js';
+import { getLodBudget } from './modules/quality-tier.js';
 import { Logger, notify } from './modules/utilities.js';
 import { FlyControls } from './modules/fly-controls.js';
 import { getStore } from './modules/asset-store.js';
@@ -591,7 +592,7 @@ function createEventWiringDeps(): EventWiringDeps {
             updateModelMetalnessView, updateModelSpecularF0View,
             toggleGridlines, setBackgroundColor
         },
-        camera: { resetCamera, fitToView, toggleFlyMode },
+        camera: { resetCamera, fitToView, resetOrbitCenter, toggleFlyMode },
         alignment: { resetAlignment, toggleAlignment, centerAtOrigin },
         annotations: {
             toggleAnnotationMode, saveAnnotation, cancelAnnotation,
@@ -669,11 +670,11 @@ async function init() {
             autoUpdate: true,
             minAlpha: 3 / 255,     // Cull near-invisible splats
             // LOD (Spark 2.0) — budget-based rendering caps splats per frame
-            lodSplatCount: 1_500_000,   // HD budget; main app assumes capable device
+            lodSplatCount: getLodBudget(QUALITY_TIER.HD),
             behindFoveate: 0.1,         // Aggressive behind-camera culling
         });
         scene.add(sparkRenderer);
-        log.info('SparkRenderer created with clipXY=2.0, minAlpha=3/255, lodSplatCount=1.5M');
+        log.info(`SparkRenderer created with clipXY=2.0, minAlpha=3/255, lodSplatCount=${getLodBudget(QUALITY_TIER.HD)}`);
     } else {
         log.info('SparkRenderer deferred — will be created after WebGL switch');
     }
@@ -705,11 +706,11 @@ async function init() {
                 clipXY: 2.0,
                 autoUpdate: true,
                 minAlpha: 3 / 255,
-                lodSplatCount: 1_500_000,
+                lodSplatCount: getLodBudget(QUALITY_TIER.HD),
                 behindFoveate: 0.1,
             });
             scene.add(sparkRenderer);
-            log.info('Renderer changed, SparkRenderer recreated for WebGL');
+            log.info(`Renderer changed, SparkRenderer recreated for WebGL (lodSplatCount=${getLodBudget(QUALITY_TIER.HD)})`);
         } else {
             log.info('Renderer changed to WebGPU, SparkRenderer removed');
         }
@@ -1392,6 +1393,27 @@ function fitToView() {
         controlsRight.target.copy(controls.target);
         controlsRight.update();
     }
+}
+
+function resetOrbitCenter() {
+    const box = new THREE.Box3();
+    let hasContent = false;
+
+    if (splatMesh && splatMesh.visible) {
+        if (typeof splatMesh.getBoundingBox === 'function') {
+            const splatBox = splatMesh.getBoundingBox(false);
+            if (splatBox && !splatBox.isEmpty()) { box.union(splatBox); hasContent = true; }
+        } else {
+            box.expandByObject(splatMesh); hasContent = true;
+        }
+    }
+    if (modelGroup && modelGroup.children.length > 0) { box.expandByObject(modelGroup); hasContent = true; }
+    if (pointcloudGroup && pointcloudGroup.children.length > 0) { box.expandByObject(pointcloudGroup); hasContent = true; }
+
+    const center = hasContent ? box.getCenter(new THREE.Vector3()) : new THREE.Vector3(0, 0, 0);
+    controls.target.copy(center);
+    controls.update();
+    if (controlsRight) { controlsRight.target.copy(center); controlsRight.update(); }
 }
 
 // Controls panel visibility (delegated to ui-controller.js)

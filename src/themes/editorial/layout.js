@@ -702,7 +702,8 @@ export function setup(manifest, deps) {
         sceneManager, state, annotationSystem, modelGroup,
         setDisplayMode, createDisplayModeDeps, triggerLazyLoad,
         showAnnotationPopup, hideAnnotationPopup, hideAnnotationLine,
-        getCurrentPopupId, setCurrentPopupId
+        getCurrentPopupId, setCurrentPopupId,
+        resetOrbitCenter
     } = deps;
 
     const log = Logger.getLogger('editorial-layout');
@@ -982,11 +983,25 @@ export function setup(manifest, deps) {
                 sequence.querySelectorAll('.editorial-anno-seq-num.active').forEach(n => n.classList.remove('active'));
             }
         });
+        // Reset orbit center
+        const orbitResetBtn = document.createElement('button');
+        orbitResetBtn.className = 'editorial-marker-toggle';
+        orbitResetBtn.title = 'Reset rotation center';
+        orbitResetBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>';
+        orbitResetBtn.addEventListener('click', () => { if (resetOrbitCenter) resetOrbitCenter(); });
+        toolsGroup.appendChild(orbitResetBtn);
+
         toolsGroup.appendChild(markerToggle);
         if (measureWrapper) toolsGroup.appendChild(measureWrapper);
-    } else if (measureWrapper) {
-        // Measure without annotations
-        toolsGroup.appendChild(measureWrapper);
+    } else {
+        // No annotations — still show orbit reset and measure
+        const orbitResetBtn = document.createElement('button');
+        orbitResetBtn.className = 'editorial-marker-toggle';
+        orbitResetBtn.title = 'Reset rotation center';
+        orbitResetBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>';
+        orbitResetBtn.addEventListener('click', () => { if (resetOrbitCenter) resetOrbitCenter(); });
+        toolsGroup.appendChild(orbitResetBtn);
+        if (measureWrapper) toolsGroup.appendChild(measureWrapper);
     }
 
     // Rule separator between annotation and visualization groups

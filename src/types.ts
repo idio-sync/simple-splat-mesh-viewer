@@ -216,6 +216,7 @@ export interface EventWiringDeps {
     camera: {
         resetCamera: () => void;
         fitToView: () => void;
+        resetOrbitCenter: () => void;
         toggleFlyMode: () => void;
     };
     alignment: {
