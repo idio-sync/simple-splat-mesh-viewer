@@ -102,8 +102,8 @@ export function hasAnyProxy(contentInfo: { hasMeshProxy?: boolean; hasSceneProxy
  * Can be overridden via Docker env vars LOD_BUDGET_SD / LOD_BUDGET_HD.
  */
 const DEFAULT_LOD_BUDGETS: Record<string, number> = {
-    [QUALITY_TIER.SD]: 500_000,
-    [QUALITY_TIER.HD]: 3_000_000,
+    [QUALITY_TIER.SD]: 1_000_000,
+    [QUALITY_TIER.HD]: 5_000_000,
 };
 
 /** Resolve LOD budgets: APP_CONFIG overrides take priority over defaults. */
