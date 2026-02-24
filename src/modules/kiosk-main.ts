@@ -2620,7 +2620,12 @@ function resetOrbitCenter(): void {
     const box = new THREE.Box3();
     let hasContent = false;
 
-    if (splatMesh && splatMesh.visible) {
+    // Prefer mesh/pointcloud bounds — splat bounding boxes can be noisy
+    if (modelGroup && modelGroup.children.length > 0) { box.expandByObject(modelGroup); hasContent = true; }
+    if (pointcloudGroup && pointcloudGroup.children.length > 0) { box.expandByObject(pointcloudGroup); hasContent = true; }
+
+    // Only use splat bounds as fallback when no mesh/pointcloud is loaded
+    if (!hasContent && splatMesh && splatMesh.visible) {
         if (typeof splatMesh.getBoundingBox === 'function') {
             const splatBox = splatMesh.getBoundingBox(false);
             if (splatBox && !splatBox.isEmpty()) { box.union(splatBox); hasContent = true; }
@@ -2628,8 +2633,6 @@ function resetOrbitCenter(): void {
             box.expandByObject(splatMesh); hasContent = true;
         }
     }
-    if (modelGroup && modelGroup.children.length > 0) { box.expandByObject(modelGroup); hasContent = true; }
-    if (pointcloudGroup && pointcloudGroup.children.length > 0) { box.expandByObject(pointcloudGroup); hasContent = true; }
 
     const center = hasContent ? box.getCenter(new THREE.Vector3()) : new THREE.Vector3(0, 0, 0);
     controls.target.copy(center);
