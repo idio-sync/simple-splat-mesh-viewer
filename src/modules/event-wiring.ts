@@ -361,31 +361,37 @@ export function setupUIEvents(deps: EventWiringDeps): void {
             const val = parseFloat((e.target as HTMLInputElement).value);
             if (isNaN(val) || val <= 0) return;
             const sel = state.selectedObject;
-            // Uniform scale only — manifest stores a single scalar
+            const uniform = state.scaleLockProportions;
+            const apply = (obj: any) => {
+                if (uniform) obj.scale.setScalar(val);
+                else obj.scale[axis] = val;
+            };
             if (sel === 'splat' && sceneRefs.splatMesh) {
-                sceneRefs.splatMesh.scale.setScalar(val);
+                apply(sceneRefs.splatMesh);
             } else if (sel === 'model' && sceneRefs.modelGroup) {
-                sceneRefs.modelGroup.scale.setScalar(val);
+                apply(sceneRefs.modelGroup);
             } else if (sel === 'both') {
-                if (sceneRefs.splatMesh) sceneRefs.splatMesh.scale.setScalar(val);
-                if (sceneRefs.modelGroup) sceneRefs.modelGroup.scale.setScalar(val);
-                if (sceneRefs.pointcloudGroup) sceneRefs.pointcloudGroup.scale.setScalar(val);
+                if (sceneRefs.splatMesh) apply(sceneRefs.splatMesh);
+                if (sceneRefs.modelGroup) apply(sceneRefs.modelGroup);
+                if (sceneRefs.pointcloudGroup) apply(sceneRefs.pointcloudGroup);
             }
-            // Sync the other two axis inputs
-            const formatted = val.toFixed(2);
-            for (const a of ['x', 'y', 'z'] as const) {
-                if (a !== axis) {
-                    const el = document.getElementById(`transform-scale-${a}`) as HTMLInputElement | null;
-                    if (el) el.value = formatted;
+            if (uniform) {
+                // Sync the other two axis inputs
+                const formatted = val.toFixed(2);
+                for (const a of ['x', 'y', 'z'] as const) {
+                    if (a !== axis) {
+                        const el = document.getElementById(`transform-scale-${a}`) as HTMLInputElement | null;
+                        if (el) el.value = formatted;
+                    }
                 }
-            }
-            // Sync sidebar scale slider
-            const sliderId = sel === 'splat' ? 'splat-scale' : sel === 'model' ? 'model-scale' : null;
-            if (sliderId) {
-                const slider = document.getElementById(sliderId) as HTMLInputElement | null;
-                if (slider) slider.value = String(val);
-                const label = document.getElementById(`${sliderId}-value`);
-                if (label) label.textContent = val.toFixed(1);
+                // Sync sidebar scale slider
+                const sliderId = sel === 'splat' ? 'splat-scale' : sel === 'model' ? 'model-scale' : null;
+                if (sliderId) {
+                    const slider = document.getElementById(sliderId) as HTMLInputElement | null;
+                    if (slider) slider.value = String(val);
+                    const label = document.getElementById(`${sliderId}-value`);
+                    if (label) label.textContent = val.toFixed(1);
+                }
             }
         });
     });

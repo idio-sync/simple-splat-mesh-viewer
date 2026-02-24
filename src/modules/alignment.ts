@@ -9,6 +9,7 @@
  */
 
 import * as THREE from 'three';
+import { normalizeScale } from '@/types.js';
 import type {
     Scene,
     PerspectiveCamera,
@@ -49,17 +50,17 @@ export interface AlignmentData {
     splat?: {
         position: [number, number, number];
         rotation: [number, number, number];
-        scale: number;
+        scale: number | [number, number, number];
     } | null;
     model?: {
         position: [number, number, number];
         rotation: [number, number, number];
-        scale: number;
+        scale: number | [number, number, number];
     } | null;
     pointcloud?: {
         position: [number, number, number];
         rotation: [number, number, number];
-        scale: number;
+        scale: number | [number, number, number];
     } | null;
 }
 
@@ -1329,19 +1330,19 @@ export function applyAlignmentData(data: AlignmentData, deps: AlignmentDataDeps)
     if (data.splat && splatMesh) {
         splatMesh.position.fromArray(data.splat.position);
         splatMesh.rotation.set(...data.splat.rotation);
-        splatMesh.scale.setScalar(data.splat.scale);
+        splatMesh.scale.set(...normalizeScale(data.splat.scale));
     }
 
     if (data.model && modelGroup) {
         modelGroup.position.fromArray(data.model.position);
         modelGroup.rotation.set(...data.model.rotation);
-        modelGroup.scale.setScalar(data.model.scale);
+        modelGroup.scale.set(...normalizeScale(data.model.scale));
     }
 
     if (data.pointcloud && pointcloudGroup) {
         pointcloudGroup.position.fromArray(data.pointcloud.position);
         pointcloudGroup.rotation.set(...data.pointcloud.rotation);
-        pointcloudGroup.scale.setScalar(data.pointcloud.scale);
+        pointcloudGroup.scale.set(...normalizeScale(data.pointcloud.scale));
     }
 
     updateTransformInputs();
@@ -1403,17 +1404,17 @@ export async function saveAlignment(deps: SaveAlignmentDeps): Promise<void> {
         splat: splatMesh ? {
             position: splatMesh.position.toArray() as [number, number, number],
             rotation: [splatMesh.rotation.x, splatMesh.rotation.y, splatMesh.rotation.z],
-            scale: splatMesh.scale.x
+            scale: [splatMesh.scale.x, splatMesh.scale.y, splatMesh.scale.z] as [number, number, number]
         } : null,
         model: modelGroup ? {
             position: modelGroup.position.toArray() as [number, number, number],
             rotation: [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z],
-            scale: modelGroup.scale.x
+            scale: [modelGroup.scale.x, modelGroup.scale.y, modelGroup.scale.z] as [number, number, number]
         } : null,
         pointcloud: pointcloudGroup ? {
             position: pointcloudGroup.position.toArray() as [number, number, number],
             rotation: [pointcloudGroup.rotation.x, pointcloudGroup.rotation.y, pointcloudGroup.rotation.z],
-            scale: pointcloudGroup.scale.x
+            scale: [pointcloudGroup.scale.x, pointcloudGroup.scale.y, pointcloudGroup.scale.z] as [number, number, number]
         } : null
     };
 

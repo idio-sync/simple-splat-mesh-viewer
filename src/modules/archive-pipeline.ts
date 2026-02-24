@@ -24,6 +24,7 @@ import {
 import { centerModelOnGrid } from './alignment.js';
 import { updatePronomRegistry } from './metadata-manager.js';
 import type { ArchivePipelineDeps } from '@/types.js';
+import { normalizeScale } from '@/types.js';
 
 const log = Logger.getLogger('archive-pipeline');
 
@@ -303,10 +304,11 @@ export async function ensureAssetLoaded(assetType: string, deps: ArchivePipeline
             // Apply transform
             const transform = archiveLoader.getEntryTransform(sceneEntry);
             const currentSplat = sceneRefs.splatMesh;
-            if (currentSplat && (transform.position.some((v: number) => v !== 0) || transform.rotation.some((v: number) => v !== 0) || transform.scale !== 1)) {
+            const s = normalizeScale(transform.scale);
+            if (currentSplat && (transform.position.some((v: number) => v !== 0) || transform.rotation.some((v: number) => v !== 0) || s.some(v => v !== 1))) {
                 currentSplat.position.fromArray(transform.position);
                 currentSplat.rotation.set(...transform.rotation);
-                currentSplat.scale.setScalar(transform.scale);
+                currentSplat.scale.set(...s);
             }
             assets.splatBlob = splatData.blob;
             // Detect splat format from archive filename
@@ -333,10 +335,11 @@ export async function ensureAssetLoaded(assetType: string, deps: ArchivePipeline
             // Apply transform from primary mesh entry
             const transform = archiveLoader.getEntryTransform(meshEntry);
             const modelGroup = sceneRefs.modelGroup;
-            if (modelGroup && (transform.position.some((v: number) => v !== 0) || transform.rotation.some((v: number) => v !== 0) || transform.scale !== 1)) {
+            const ms = normalizeScale(transform.scale);
+            if (modelGroup && (transform.position.some((v: number) => v !== 0) || transform.rotation.some((v: number) => v !== 0) || ms.some(v => v !== 1))) {
                 modelGroup.position.fromArray(transform.position);
                 modelGroup.rotation.set(...transform.rotation);
-                modelGroup.scale.setScalar(transform.scale);
+                modelGroup.scale.set(...ms);
             }
             if (useProxy) {
                 // Store the proxy blob for re-export, extract full-res blob in background
@@ -375,10 +378,11 @@ export async function ensureAssetLoaded(assetType: string, deps: ArchivePipeline
             // Apply transform
             const transform = archiveLoader.getEntryTransform(pointcloudEntry);
             const pointcloudGroup = sceneRefs.pointcloudGroup;
-            if (pointcloudGroup && (transform.position.some((v: number) => v !== 0) || transform.rotation.some((v: number) => v !== 0) || transform.scale !== 1)) {
+            const ps = normalizeScale(transform.scale);
+            if (pointcloudGroup && (transform.position.some((v: number) => v !== 0) || transform.rotation.some((v: number) => v !== 0) || ps.some(v => v !== 1))) {
                 pointcloudGroup.position.fromArray(transform.position);
                 pointcloudGroup.rotation.set(...transform.rotation);
-                pointcloudGroup.scale.setScalar(transform.scale);
+                pointcloudGroup.scale.set(...ps);
             }
             document.getElementById('pointcloud-filename')!.textContent = pointcloudEntry.file_name.split('/').pop()!;
             document.getElementById('pointcloud-points')!.textContent = result.pointCount.toLocaleString();

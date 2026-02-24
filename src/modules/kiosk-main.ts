@@ -10,6 +10,7 @@
 
 import * as THREE from 'three';
 import type { Annotation, DisplayMode } from '@/types.js';
+import { normalizeScale } from '@/types.js';
 import { SceneManager } from './scene-manager.js';
 import { SparkRenderer } from '@sparkjsdev/spark';
 
@@ -824,19 +825,19 @@ async function loadDirectFilesFromUrls(config: AppConfig): Promise<void> {
             if (alignment.splat && splatMesh) {
                 if (alignment.splat.position) splatMesh.position.fromArray(alignment.splat.position);
                 if (alignment.splat.rotation) splatMesh.rotation.set(...alignment.splat.rotation as [number, number, number]);
-                if (alignment.splat.scale != null) splatMesh.scale.setScalar(alignment.splat.scale);
+                if (alignment.splat.scale != null) splatMesh.scale.set(...normalizeScale(alignment.splat.scale));
                 // Force matrix world update after transforms
                 splatMesh.updateMatrixWorld(true);
             }
             if (alignment.model && modelGroup) {
                 if (alignment.model.position) modelGroup.position.fromArray(alignment.model.position);
                 if (alignment.model.rotation) modelGroup.rotation.set(...alignment.model.rotation as [number, number, number]);
-                if (alignment.model.scale != null) modelGroup.scale.setScalar(alignment.model.scale);
+                if (alignment.model.scale != null) modelGroup.scale.set(...normalizeScale(alignment.model.scale));
             }
             if (alignment.pointcloud && pointcloudGroup) {
                 if (alignment.pointcloud.position) pointcloudGroup.position.fromArray(alignment.pointcloud.position);
                 if (alignment.pointcloud.rotation) pointcloudGroup.rotation.set(...alignment.pointcloud.rotation as [number, number, number]);
-                if (alignment.pointcloud.scale != null) pointcloudGroup.scale.setScalar(alignment.pointcloud.scale);
+                if (alignment.pointcloud.scale != null) pointcloudGroup.scale.set(...normalizeScale(alignment.pointcloud.scale));
             }
         }
 
@@ -1533,7 +1534,7 @@ function createArchiveDeps(): any {
                 // will set the final position from the saved alignment data.
                 const hasRealTransform = transform.position?.some((v: number) => v !== 0) ||
                     transform.rotation?.some((v: number) => v !== 0) ||
-                    (transform.scale != null && transform.scale !== 1);
+                    (transform.scale != null && normalizeScale(transform.scale).some(v => v !== 1));
                 if (!hasRealTransform) return;
                 if (transform.position) {
                     splatMesh.position.set(transform.position[0], transform.position[1], transform.position[2]);
@@ -1542,7 +1543,7 @@ function createArchiveDeps(): any {
                     splatMesh.rotation.set(transform.rotation[0], transform.rotation[1], transform.rotation[2]);
                 }
                 if (transform.scale != null) {
-                    splatMesh.scale.setScalar(transform.scale);
+                    splatMesh.scale.set(...normalizeScale(transform.scale));
                 }
                 splatMesh.updateMatrixWorld(true);
             },
@@ -1551,7 +1552,7 @@ function createArchiveDeps(): any {
 
                 const hasRealTransform = transform.position?.some((v: number) => v !== 0) ||
                     transform.rotation?.some((v: number) => v !== 0) ||
-                    (transform.scale != null && transform.scale !== 1);
+                    (transform.scale != null && normalizeScale(transform.scale).some(v => v !== 1));
 
                 // Center model on grid only when no splat and no saved transform.
                 // Only adjust group position — never mutate children positions,
@@ -1579,7 +1580,7 @@ function createArchiveDeps(): any {
                         modelGroup.rotation.set(transform.rotation[0], transform.rotation[1], transform.rotation[2]);
                     }
                     if (transform.scale != null) {
-                        modelGroup.scale.setScalar(transform.scale);
+                        modelGroup.scale.set(...normalizeScale(transform.scale));
                     }
                 }
             }
@@ -2618,17 +2619,17 @@ function applyGlobalAlignment(alignment: any, opts?: { skipCamera?: boolean }): 
     if (alignment.splat && splatMesh) {
         splatMesh.position.fromArray(alignment.splat.position);
         splatMesh.rotation.set(...alignment.splat.rotation as [number, number, number]);
-        splatMesh.scale.setScalar(alignment.splat.scale);
+        splatMesh.scale.set(...normalizeScale(alignment.splat.scale));
     }
     if (alignment.model && modelGroup) {
         modelGroup.position.fromArray(alignment.model.position);
         modelGroup.rotation.set(...alignment.model.rotation as [number, number, number]);
-        modelGroup.scale.setScalar(alignment.model.scale);
+        modelGroup.scale.set(...normalizeScale(alignment.model.scale));
     }
     if (alignment.pointcloud && pointcloudGroup) {
         pointcloudGroup.position.fromArray(alignment.pointcloud.position);
         pointcloudGroup.rotation.set(...alignment.pointcloud.rotation as [number, number, number]);
-        pointcloudGroup.scale.setScalar(alignment.pointcloud.scale);
+        pointcloudGroup.scale.set(...normalizeScale(alignment.pointcloud.scale));
     }
 
     // Apply orbit controls target and camera position.
@@ -4088,7 +4089,7 @@ function animate(): void {
     try {
         if (state.flyModeActive) {
             flyControls.update();
-        } else {
+        } else if (!annotationSystem?.isAnimating) {
             controls.update();
         }
 

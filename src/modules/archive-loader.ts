@@ -56,7 +56,7 @@ interface SanitizationResult {
 interface EntryTransform {
     position: number[];
     rotation: number[];
-    scale: number;
+    scale: number | [number, number, number];
 }
 
 interface ContentInfo {

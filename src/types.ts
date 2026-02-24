@@ -92,7 +92,14 @@ export interface UICallbacks {
 export interface Transform {
     position: { x: number; y: number; z: number };
     rotation: { x: number; y: number; z: number };
-    scale: number;
+    scale: number | [number, number, number];
+}
+
+/** Normalize a scale value from manifest (scalar or 3-tuple) into [x, y, z]. */
+export function normalizeScale(s: number | [number, number, number] | undefined): [number, number, number] {
+    if (s === undefined || s === null) return [1, 1, 1];
+    if (Array.isArray(s)) return s;
+    return [s, s, s];
 }
 
 /** A 3D annotation placed on a surface via raycasting. */
@@ -103,6 +110,8 @@ export interface Annotation {
     position: { x: number; y: number; z: number };
     camera_target: { x: number; y: number; z: number };
     camera_position: { x: number; y: number; z: number };
+    /** Camera orientation quaternion — captures exact view direction. Optional for backward compat with older archives. */
+    camera_quaternion?: { x: number; y: number; z: number; w: number };
 }
 
 // ===== Asset Store =====

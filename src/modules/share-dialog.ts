@@ -15,6 +15,7 @@
 
 import { Logger } from './utilities.js';
 import type { AppState, Transform } from '@/types.js';
+import { normalizeScale } from '@/types.js';
 
 const log = Logger.getLogger('ShareDialog');
 
@@ -325,8 +326,9 @@ function addAlignmentParams(params: URLSearchParams): void {
         if (rot[0] !== 0 || rot[1] !== 0 || rot[2] !== 0) {
             params.set('sr', formatVec3(rot));
         }
-        if (t.scale !== undefined && t.scale !== 1) {
-            params.set('ss', parseFloat(t.scale.toFixed(4)).toString());
+        {
+            const s = normalizeScale(t.scale);
+            if (s.some(v => v !== 1)) params.set('ss', formatVec3(s));
         }
     }
 
@@ -341,8 +343,9 @@ function addAlignmentParams(params: URLSearchParams): void {
         if (rot[0] !== 0 || rot[1] !== 0 || rot[2] !== 0) {
             params.set('mr', formatVec3(rot));
         }
-        if (t.scale !== undefined && t.scale !== 1) {
-            params.set('ms', parseFloat(t.scale.toFixed(4)).toString());
+        {
+            const s = normalizeScale(t.scale);
+            if (s.some(v => v !== 1)) params.set('ms', formatVec3(s));
         }
     }
 
@@ -357,8 +360,9 @@ function addAlignmentParams(params: URLSearchParams): void {
         if (rot[0] !== 0 || rot[1] !== 0 || rot[2] !== 0) {
             params.set('pr', formatVec3(rot));
         }
-        if (t.scale !== undefined && t.scale !== 1) {
-            params.set('ps', parseFloat(t.scale.toFixed(4)).toString());
+        {
+            const s = normalizeScale(t.scale);
+            if (s.some(v => v !== 1)) params.set('ps', formatVec3(s));
         }
     }
 }

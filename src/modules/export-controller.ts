@@ -245,7 +245,7 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
         const fileName = document.getElementById('splat-filename')?.textContent || 'scene.ply';
         const position = splatMesh ? [splatMesh.position.x, splatMesh.position.y, splatMesh.position.z] : [0, 0, 0];
         const rotation = splatMesh ? [splatMesh.rotation.x, splatMesh.rotation.y, splatMesh.rotation.z] : [0, 0, 0];
-        const scale = splatMesh ? splatMesh.scale.x : 1;
+        const scale: [number, number, number] = splatMesh ? [splatMesh.scale.x, splatMesh.scale.y, splatMesh.scale.z] : [1, 1, 1];
 
         log.info(' Adding scene:', { fileName, position, rotation, scale });
         archiveCreator.addScene(assets.splatBlob, fileName, {
@@ -271,7 +271,7 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
         const fileName = document.getElementById('model-filename')?.textContent || 'mesh.glb';
         const position = modelGroup ? [modelGroup.position.x, modelGroup.position.y, modelGroup.position.z] : [0, 0, 0];
         const rotation = modelGroup ? [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z] : [0, 0, 0];
-        const scale = modelGroup ? modelGroup.scale.x : 1;
+        const scale: [number, number, number] = modelGroup ? [modelGroup.scale.x, modelGroup.scale.y, modelGroup.scale.z] : [1, 1, 1];
 
         log.info(' Adding mesh:', { fileName, position, rotation, scale });
         archiveCreator.addMesh(assets.meshBlob, fileName, {
@@ -288,7 +288,7 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
         const proxyFileName = document.getElementById('proxy-mesh-filename')?.textContent || 'mesh_proxy.glb';
         const position = modelGroup ? [modelGroup.position.x, modelGroup.position.y, modelGroup.position.z] : [0, 0, 0];
         const rotation = modelGroup ? [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z] : [0, 0, 0];
-        const scale = modelGroup ? modelGroup.scale.x : 1;
+        const scale: [number, number, number] = modelGroup ? [modelGroup.scale.x, modelGroup.scale.y, modelGroup.scale.z] : [1, 1, 1];
 
         log.info(' Adding mesh proxy:', { proxyFileName });
         archiveCreator.addMeshProxy(assets.proxyMeshBlob, proxyFileName, {
@@ -302,7 +302,7 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
         const proxySplatFileName = document.getElementById('proxy-splat-filename')?.textContent || 'scene_proxy.spz';
         const splatPosition = splatMesh ? [splatMesh.position.x, splatMesh.position.y, splatMesh.position.z] : [0, 0, 0];
         const splatRotation = splatMesh ? [splatMesh.rotation.x, splatMesh.rotation.y, splatMesh.rotation.z] : [0, 0, 0];
-        const splatScale = splatMesh ? splatMesh.scale.x : 1;
+        const splatScale: [number, number, number] = splatMesh ? [splatMesh.scale.x, splatMesh.scale.y, splatMesh.scale.z] : [1, 1, 1];
 
         log.info(' Adding splat proxy:', { proxySplatFileName });
         archiveCreator.addSceneProxy(assets.proxySplatBlob, proxySplatFileName, {
@@ -317,7 +317,7 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
         const fileName = document.getElementById('pointcloud-filename')?.textContent || 'pointcloud.e57';
         const position = pointcloudGroup ? [pointcloudGroup.position.x, pointcloudGroup.position.y, pointcloudGroup.position.z] : [0, 0, 0];
         const rotation = pointcloudGroup ? [pointcloudGroup.rotation.x, pointcloudGroup.rotation.y, pointcloudGroup.rotation.z] : [0, 0, 0];
-        const scale = pointcloudGroup ? pointcloudGroup.scale.x : 1;
+        const scale: [number, number, number] = pointcloudGroup ? [pointcloudGroup.scale.x, pointcloudGroup.scale.y, pointcloudGroup.scale.z] : [1, 1, 1];
 
         log.info(' Adding pointcloud:', { fileName, position, rotation, scale });
         archiveCreator.addPointcloud(assets.pointcloudBlob, fileName, {
@@ -334,17 +334,17 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
         splat: splatMesh ? {
             position: [splatMesh.position.x, splatMesh.position.y, splatMesh.position.z],
             rotation: [splatMesh.rotation.x, splatMesh.rotation.y, splatMesh.rotation.z],
-            scale: splatMesh.scale.x
+            scale: [splatMesh.scale.x, splatMesh.scale.y, splatMesh.scale.z]
         } : null,
         model: modelGroup ? {
             position: [modelGroup.position.x, modelGroup.position.y, modelGroup.position.z],
             rotation: [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z],
-            scale: modelGroup.scale.x
+            scale: [modelGroup.scale.x, modelGroup.scale.y, modelGroup.scale.z]
         } : null,
         pointcloud: pointcloudGroup ? {
             position: [pointcloudGroup.position.x, pointcloudGroup.position.y, pointcloudGroup.position.z],
             rotation: [pointcloudGroup.rotation.x, pointcloudGroup.rotation.y, pointcloudGroup.rotation.z],
-            scale: pointcloudGroup.scale.x
+            scale: [pointcloudGroup.scale.x, pointcloudGroup.scale.y, pointcloudGroup.scale.z]
         } : null,
         camera: [camera.position.x, camera.position.y, camera.position.z],
         target: controls ? [controls.target.x, controls.target.y, controls.target.z] : [0, 0, 0]

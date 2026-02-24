@@ -143,7 +143,7 @@ export interface Preservation {
 export interface DataEntryParameters {
     position: [number, number, number];
     rotation: [number, number, number];
-    scale: number;
+    scale: number | [number, number, number];
     [key: string]: any;
 }
 
@@ -275,9 +275,9 @@ export interface Manifest {
         annotations_visible: boolean;
     };
     alignment?: {
-        splat?: { position: number[]; rotation: number[]; scale: number } | null;
-        model?: { position: number[]; rotation: number[]; scale: number } | null;
-        pointcloud?: { position: number[]; rotation: number[]; scale: number } | null;
+        splat?: { position: number[]; rotation: number[]; scale: number | [number, number, number] } | null;
+        model?: { position: number[]; rotation: number[]; scale: number | [number, number, number] } | null;
+        pointcloud?: { position: number[]; rotation: number[]; scale: number | [number, number, number] } | null;
         camera?: number[];
         target?: number[];
     } | null;
@@ -1096,9 +1096,9 @@ export class ArchiveCreator {
     }
 
     setAlignment(data: {
-        splat?: { position: number[]; rotation: number[]; scale: number } | null;
-        model?: { position: number[]; rotation: number[]; scale: number } | null;
-        pointcloud?: { position: number[]; rotation: number[]; scale: number } | null;
+        splat?: { position: number[]; rotation: number[]; scale: number | [number, number, number] } | null;
+        model?: { position: number[]; rotation: number[]; scale: number | [number, number, number] } | null;
+        pointcloud?: { position: number[]; rotation: number[]; scale: number | [number, number, number] } | null;
         camera?: number[];
         target?: number[];
     }): void {
