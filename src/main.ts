@@ -1570,6 +1570,9 @@ function autoCenterAlign() {
 let _antialiasUpdatePending = false;
 function updateAntialias() {
     if (_antialiasUpdatePending || !sceneManager) return;
+    // Don't toggle AA until content is loaded — avoids a wasteful renderer
+    // recreation at startup when the default (AA on) already matches what we want.
+    if (!state.splatLoaded && !state.modelLoaded && !state.pointcloudLoaded) return;
     const needsAA = state.modelLoaded;
     _antialiasUpdatePending = true;
     sceneManager.setAntialias(needsAA).finally(() => { _antialiasUpdatePending = false; });
@@ -1593,7 +1596,7 @@ function animate() {
         // Update active camera controls
         if (flyControls && flyControls.enabled) {
             flyControls.update();
-        } else {
+        } else if (!annotationSystem?.isAnimating) {
             controls.update();
             // Only sync right controls when in split view (avoids unnecessary math per frame)
             if (state.displayMode === 'split') {

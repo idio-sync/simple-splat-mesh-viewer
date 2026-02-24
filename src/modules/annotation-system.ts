@@ -29,6 +29,7 @@ interface DragState {
 interface CameraState {
     camera_target: { x: number; y: number; z: number };
     camera_position: { x: number; y: number; z: number };
+    camera_quaternion?: { x: number; y: number; z: number; w: number };
 }
 
 /**
@@ -50,6 +51,7 @@ export class AnnotationSystem {
     pendingPosition: { x: number; y: number; z: number } | null;
     selectedAnnotation: Annotation | null;
     annotationCount: number;
+    isAnimating: boolean;
 
     // Raycaster for click detection
     raycaster: Raycaster;
@@ -95,6 +97,7 @@ export class AnnotationSystem {
         this.pendingPosition = null;
         this.selectedAnnotation = null;
         this.annotationCount = 0;
+        this.isAnimating = false;
 
         // Raycaster for click detection
         this.raycaster = new THREE.Raycaster();
@@ -231,6 +234,7 @@ export class AnnotationSystem {
      * Get current camera position and target
      */
     _getCurrentCameraState(): CameraState {
+        const q = this.camera.quaternion;
         return {
             camera_target: {
                 x: parseFloat(this.controls.target.x.toFixed(4)),
@@ -241,6 +245,12 @@ export class AnnotationSystem {
                 x: parseFloat(this.camera.position.x.toFixed(4)),
                 y: parseFloat(this.camera.position.y.toFixed(4)),
                 z: parseFloat(this.camera.position.z.toFixed(4))
+            },
+            camera_quaternion: {
+                x: parseFloat(q.x.toFixed(6)),
+                y: parseFloat(q.y.toFixed(6)),
+                z: parseFloat(q.z.toFixed(6)),
+                w: parseFloat(q.w.toFixed(6))
             }
         };
     }
@@ -283,7 +293,8 @@ export class AnnotationSystem {
             body: body || '',
             position: { ...this.pendingPosition },
             camera_target: cameraState.camera_target,
-            camera_position: cameraState.camera_position
+            camera_position: cameraState.camera_position,
+            camera_quaternion: cameraState.camera_quaternion
         };
 
         this.annotations.push(annotation);
@@ -424,11 +435,8 @@ export class AnnotationSystem {
         // Update camera reference for surface-normal occlusion
         const cameraState = this._getCurrentCameraState();
         marker.annotation.camera_position = cameraState.camera_position;
-        marker.annotation.camera_target = {
-            x: marker.annotation.position.x,
-            y: marker.annotation.position.y,
-            z: marker.annotation.position.z
-        };
+        marker.annotation.camera_target = cameraState.camera_target;
+        marker.annotation.camera_quaternion = cameraState.camera_quaternion;
 
         // Notify that annotation was updated
         if (this.onAnnotationUpdated) {
@@ -515,41 +523,49 @@ export class AnnotationSystem {
 
         this.selectAnnotation(id);
 
-        const startPos = this.camera.position.clone();
-        const startTarget = this.controls.target.clone();
+        // Disable auto-rotate — it fights the camera positioning
+        if (this.controls.autoRotate) {
+            this.controls.autoRotate = false;
+            const btn = document.getElementById('btn-auto-rotate');
+            if (btn) btn.classList.remove('active');
+        }
 
-        const endPos = new THREE.Vector3(
+        // Block controls.update() in main animate loop
+        this.isAnimating = true;
+
+        // Step 1: Drain ALL accumulated OrbitControls deltas
+        // (sphericalDelta, panOffset, scale from prior user interactions).
+        // Must happen BEFORE setting position/target, because update()
+        // applies panOffset to controls.target and sphericalDelta to camera.
+        const wasDamping = this.controls.enableDamping;
+        this.controls.enableDamping = false;
+        this.controls.update();
+        this.controls.enableDamping = wasDamping;
+
+        // Step 2: Restore the exact camera position and orbit pivot
+        // that were saved when the annotation was created/updated.
+        this.camera.position.set(
             annotation.camera_position.x,
             annotation.camera_position.y,
             annotation.camera_position.z
         );
-        const endTarget = new THREE.Vector3(
+        this.controls.target.set(
             annotation.camera_target.x,
             annotation.camera_target.y,
             annotation.camera_target.z
         );
 
-        const startTime = performance.now();
+        // Step 3: Sync OrbitControls to our restored state.
+        // With all deltas drained to zero, this update() just converts
+        // position-target to spherical and back (no-op), then calls
+        // camera.lookAt(target) — reproducing the same orientation that
+        // OrbitControls originally computed when the annotation was saved.
+        this.controls.enableDamping = false;
+        this.controls.update();
+        this.controls.enableDamping = wasDamping;
 
-        const animate = (): void => {
-            const elapsed = performance.now() - startTime;
-            const t = Math.min(elapsed / duration, 1);
-
-            // Ease in-out
-            const eased = t < 0.5
-                ? 2 * t * t
-                : 1 - Math.pow(-2 * t + 2, 2) / 2;
-
-            this.camera.position.lerpVectors(startPos, endPos, eased);
-            this.controls.target.lerpVectors(startTarget, endTarget, eased);
-            this.controls.update();
-
-            if (t < 1) {
-                requestAnimationFrame(animate);
-            }
-        };
-
-        animate();
+        // Step 4: Release — internal state is fully synced, no residual deltas
+        this.isAnimating = false;
     }
 
     /**
@@ -580,6 +596,8 @@ export class AnnotationSystem {
      * Update annotation camera from current view
      */
     updateAnnotationCamera(id: string): Annotation | null {
+        const annotation = this.annotations.find(a => a.id === id);
+        if (!annotation) return null;
         const cameraState = this._getCurrentCameraState();
         return this.updateAnnotation(id, cameraState);
     }
@@ -648,14 +666,20 @@ export class AnnotationSystem {
      * Export annotations to JSON
      */
     toJSON(): Annotation[] {
-        return this.annotations.map(a => ({
-            id: a.id,
-            title: a.title,
-            body: a.body,
-            position: { ...a.position },
-            camera_target: { ...a.camera_target },
-            camera_position: { ...a.camera_position }
-        }));
+        return this.annotations.map(a => {
+            const obj: Annotation = {
+                id: a.id,
+                title: a.title,
+                body: a.body,
+                position: { ...a.position },
+                camera_target: { ...a.camera_target },
+                camera_position: { ...a.camera_position }
+            };
+            if (a.camera_quaternion) {
+                obj.camera_quaternion = { ...a.camera_quaternion };
+            }
+            return obj;
+        });
     }
 
     /**
