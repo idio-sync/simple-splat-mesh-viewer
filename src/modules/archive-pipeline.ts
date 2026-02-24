@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader } from './archive-loader.js';
 import { hasAnyProxy } from './quality-tier.js';
-import { TIMING, ASSET_STATE } from './constants.js';
+import { ASSET_STATE } from './constants.js';
 import { Logger, notify, computeMeshFaceCount, computeTextureInfo, disposeObject } from './utilities.js';
 import { getStore } from './asset-store.js';
 import {
@@ -233,9 +233,12 @@ export async function handleArchiveFile(event: Event, deps: ArchivePipelineDeps)
 
 /**
  * Load archive from URL.
+ * Tries Range-based streaming first (downloads only ~64KB central directory,
+ * then extracts files on demand via HTTP Range requests). Falls back to a
+ * full download when the server doesn't support Range requests.
  */
 export async function loadArchiveFromUrl(url: string, deps: ArchivePipelineDeps): Promise<void> {
-    deps.ui.showLoading('Downloading archive...', true);
+    deps.ui.showLoading('Loading archive...');
 
     try {
         // Clean up previous archive if any
@@ -244,11 +247,23 @@ export async function loadArchiveFromUrl(url: string, deps: ArchivePipelineDeps)
         }
 
         const archiveLoader = new ArchiveLoader();
-        await archiveLoader.loadFromUrl(url, (progress: number) => {
-            deps.ui.updateProgress(Math.round(progress * 100), 'Downloading archive...');
-        });
-
         const fileName = url.split('/').pop() || 'archive.a3d';
+
+        // Try Range-based streaming first — only downloads the ZIP central
+        // directory (~64KB). Each subsequent extractFile() call fetches just
+        // the bytes for that file via an HTTP Range request.
+        try {
+            const fileSize = await archiveLoader.loadRemoteIndex(url);
+            log.info(`Range-based loading: indexed ${fileSize} bytes from ${fileName}`);
+        } catch (rangeError: any) {
+            // Server doesn't support Range requests or HEAD failed — fall back
+            log.info('Range-based loading unavailable, falling back to full download:', rangeError.message);
+            deps.ui.showLoading('Downloading archive...', true);
+            await archiveLoader.loadFromUrl(url, (progress: number) => {
+                deps.ui.updateProgress(Math.round(progress * 100), 'Downloading archive...');
+            });
+        }
+
         document.getElementById('archive-filename')!.textContent = fileName;
 
         deps.state.currentArchiveUrl = url;
@@ -455,23 +470,6 @@ export async function processArchive(archiveLoader: any, archiveName: string, de
         // Load annotations from archive
         const annotations = archiveLoader.getAnnotations();
 
-        // Extract embedded images for markdown rendering
-        state.imageAssets.clear();
-        const imageEntries = archiveLoader.getImageEntries();
-        for (const entry of imageEntries) {
-            try {
-                const data = await archiveLoader.extractFile(entry.file_name);
-                if (data) {
-                    state.imageAssets.set(entry.file_name, { blob: data.blob, url: data.url, name: entry.file_name });
-                }
-            } catch (e: any) {
-                log.warn('Failed to extract image:', entry.file_name, e.message);
-            }
-        }
-        if (imageEntries.length > 0) {
-            log.info(` Extracted ${state.imageAssets.size} embedded images`);
-        }
-
         // Populate source files list from archive manifest (metadata only).
         // Blobs are re-extracted on demand at export time via archiveLoader.extractFile().
         // releaseRawData() is skipped when source files exist so extraction stays possible.
@@ -491,6 +489,7 @@ export async function processArchive(archiveLoader: any, archiveName: string, de
         }
 
         // === Phase 2: Load primary asset for current display mode ===
+        // Moved BEFORE image extraction — get 3D content on screen first.
         const primaryType = getPrimaryAssetType(state.displayMode, contentInfo);
         deps.ui.showLoading(`Loading ${primaryType} from archive...`);
         const primaryLoaded = await ensureAssetLoaded(primaryType, deps);
@@ -540,26 +539,45 @@ export async function processArchive(archiveLoader: any, archiveName: string, de
             document.getElementById('quality-toggle-container')?.classList.remove('hidden');
         }
 
-        // === Phase 3: Background-load remaining assets ===
+        // Extract embedded images for markdown rendering (deferred — not needed for initial render).
+        // Runs in parallel with Phase 3 background loading below.
+        const imageEntries = archiveLoader.getImageEntries();
+        if (imageEntries.length > 0) {
+            state.imageAssets.clear();
+            Promise.all(imageEntries.map(async (entry: any) => {
+                try {
+                    const data = await archiveLoader.extractFile(entry.file_name);
+                    if (data) {
+                        state.imageAssets.set(entry.file_name, { blob: data.blob, url: data.url, name: entry.file_name });
+                    }
+                } catch (e: any) {
+                    log.warn('Failed to extract image:', entry.file_name, e.message);
+                }
+            })).then(() => {
+                log.info(`Extracted ${state.imageAssets.size} embedded images`);
+            });
+        }
+
+        // === Phase 3: Background-load remaining assets (in parallel) ===
         const remainingTypes = ['splat', 'mesh', 'pointcloud'].filter(
             t => t !== primaryType && state.assetStates[t] === ASSET_STATE.UNLOADED
         );
         if (remainingTypes.length > 0) {
             setTimeout(async () => {
-                for (const type of remainingTypes) {
-                    const typeContentCheck = (type === 'splat' && contentInfo.hasSplat) ||
-                                             (type === 'mesh' && contentInfo.hasMesh) ||
-                                             (type === 'pointcloud' && contentInfo.hasPointcloud);
-                    if (typeContentCheck) {
-                        log.info(`Background loading: ${type}`);
-                        await ensureAssetLoaded(type, deps);
-                        deps.ui.updateTransformInputs();
-                        // Re-apply viewer settings to newly loaded meshes
-                        if (type === 'mesh' && manifest.viewer_settings) {
-                            applyViewerSettings(manifest.viewer_settings, deps);
-                        }
+                const typesToLoad = remainingTypes.filter(type =>
+                    (type === 'splat' && contentInfo.hasSplat) ||
+                    (type === 'mesh' && contentInfo.hasMesh) ||
+                    (type === 'pointcloud' && contentInfo.hasPointcloud)
+                );
+                await Promise.all(typesToLoad.map(async (type) => {
+                    log.info(`Background loading: ${type}`);
+                    await ensureAssetLoaded(type, deps);
+                    deps.ui.updateTransformInputs();
+                    // Re-apply viewer settings to newly loaded meshes
+                    if (type === 'mesh' && manifest.viewer_settings) {
+                        applyViewerSettings(manifest.viewer_settings, deps);
                     }
-                }
+                }));
                 // Release raw ZIP data after all assets are extracted,
                 // but keep it if archive has source files (needed for re-export)
                 // or proxies (needed for on-demand quality switching).

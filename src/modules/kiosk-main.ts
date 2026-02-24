@@ -1003,6 +1003,23 @@ async function showClickGate(archiveUrl: string): Promise<void> {
 }
 
 async function loadArchiveFromUrl(url: string): Promise<void> {
+    const fileName = url.split('/').pop()?.split('?')[0] || 'archive.a3d';
+
+    // Try Range-based loading first — only downloads ~64KB central directory,
+    // then extracts files on demand via targeted HTTP Range requests.
+    try {
+        showLoading('Connecting...', true);
+        const archiveLoader = new ArchiveLoader();
+        const fileSize = await archiveLoader.loadRemoteIndex(url);
+        log.info(`Range-based loading: indexed ${fileSize} bytes from ${fileName}`);
+        state.archiveSourceUrl = url;
+        handleArchiveFile(new File([], fileName), archiveLoader);
+        return;
+    } catch (rangeError: any) {
+        log.info('Range-based loading unavailable, falling back to full download:', rangeError.message);
+    }
+
+    // Fallback: full download (server doesn't support Range requests)
     showLoading('Downloading archive...', true);
     try {
         const blob = await fetchWithProgress(url, (received, total) => {
@@ -1016,7 +1033,6 @@ async function loadArchiveFromUrl(url: string): Promise<void> {
                 updateProgress(0, `Downloading... ${mb} MB`);
             }
         });
-        const fileName = url.split('/').pop().split('?')[0] || 'archive.a3d';
         const file = new File([blob], fileName, { type: blob.type });
         state.archiveSourceUrl = url;
         handleArchiveFile(file);
@@ -1109,14 +1125,14 @@ function triggerLazyLoad(mode: string): void {
     }
 }
 
-async function handleArchiveFile(file: File): Promise<void> {
+async function handleArchiveFile(file: File, preloadedLoader?: ArchiveLoader): Promise<void> {
     log.info('Loading archive:', file.name);
     showLoading('Loading archive...', true);
 
     try {
         // === Phase 1: Read file + index ZIP directory (no decompression) ===
         updateProgress(5, 'Reading archive...');
-        const archiveLoader = await loadArchiveFromFile(file, { state: state as any });
+        const archiveLoader = preloadedLoader || await loadArchiveFromFile(file, { state: state as any });
 
         // Reset asset states for new archive
         state.assetStates = { splat: ASSET_STATE.UNLOADED, mesh: ASSET_STATE.UNLOADED, pointcloud: ASSET_STATE.UNLOADED };
@@ -1191,20 +1207,20 @@ async function handleArchiveFile(file: File): Promise<void> {
             log.info(`Loaded ${annotations.length} annotations`);
         }
 
-        // Extract embedded images for markdown rendering
-        state.imageAssets.clear();
+        // Extract embedded images in parallel (awaited — editorial layout needs them for image strip)
         const imageEntries = archiveLoader.getImageEntries();
-        for (const entry of imageEntries) {
-            try {
-                const data = await archiveLoader.extractFile(entry.file_name);
-                if (data) {
-                    state.imageAssets.set(entry.file_name, { blob: data.blob, url: data.url, name: entry.file_name });
-                }
-            } catch (e) {
-                log.warn('Failed to extract image:', entry.file_name, e.message);
-            }
-        }
         if (imageEntries.length > 0) {
+            state.imageAssets.clear();
+            await Promise.all(imageEntries.map(async (entry: any) => {
+                try {
+                    const data = await archiveLoader.extractFile(entry.file_name);
+                    if (data) {
+                        state.imageAssets.set(entry.file_name, { blob: data.blob, url: data.url, name: entry.file_name });
+                    }
+                } catch (e: any) {
+                    log.warn('Failed to extract image:', entry.file_name, e.message);
+                }
+            }));
             log.info(`Extracted ${state.imageAssets.size} embedded images`);
         }
 
