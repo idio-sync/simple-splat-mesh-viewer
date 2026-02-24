@@ -14,6 +14,8 @@
 //                            URL params (?controls, ?sidebar, ?toolbar, ?kiosk, ?splat, etc.)
 //   ARCHIVE_PATH_PREFIX    - When set with KIOSK_LOCK, only archives under this path are allowed
 //                            (e.g., "/archives/"). Prevents path traversal to other server files.
+//   LOD_BUDGET_SD          - Splat LOD budget for SD quality tier (default: 500000)
+//   LOD_BUDGET_HD          - Splat LOD budget for HD quality tier (default: 3000000)
 //   EMBED_REFERERS         - Space-separated list of allowed referer domains for nginx
 //                            (e.g., "client-site.com *.client-site.com")
 //
@@ -178,6 +180,8 @@
     const envPointcloud = "${DEFAULT_POINTCLOUD_URL}";
     const envAlignment = "${DEFAULT_ALIGNMENT_URL}";
     const envShowControls = ${SHOW_CONTROLS}; // This becomes true/false
+    const envLodBudgetSd = "${LOD_BUDGET_SD}";
+    const envLodBudgetHd = "${LOD_BUDGET_HD}";
 
     // Get and validate URL parameters (URL params override env defaults)
     // When KIOSK_LOCK is active: archive URL param still works (needed for per-embed URLs)
@@ -271,7 +275,11 @@
         kioskLock: KIOSK_LOCK,
 
         // Allowed external domains (shared with main.js URL validation)
-        allowedDomains: ALLOWED_EXTERNAL_DOMAINS
+        allowedDomains: ALLOWED_EXTERNAL_DOMAINS,
+
+        // LOD splat budgets (overrides quality-tier.ts defaults)
+        lodBudgetSd: envLodBudgetSd ? parseInt(envLodBudgetSd, 10) || 0 : 0,
+        lodBudgetHd: envLodBudgetHd ? parseInt(envLodBudgetHd, 10) || 0 : 0
     };
 
     console.log('[config.js] Generated Config:', window.APP_CONFIG);

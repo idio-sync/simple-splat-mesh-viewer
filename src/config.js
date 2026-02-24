@@ -203,6 +203,10 @@
         autoload: autoload, // false = show click-to-load gate before downloading
 
         // Allowed external domains (shared with main.js URL validation)
-        allowedDomains: ALLOWED_EXTERNAL_DOMAINS
+        allowedDomains: ALLOWED_EXTERNAL_DOMAINS,
+
+        // LOD splat budgets (0 = use quality-tier.ts defaults)
+        lodBudgetSd: 0,
+        lodBudgetHd: 0
     };
 })();

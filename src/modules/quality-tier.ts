@@ -97,14 +97,23 @@ export function hasAnyProxy(contentInfo: { hasMeshProxy?: boolean; hasSceneProxy
 }
 
 /**
- * LOD splat budgets by quality tier.
+ * Default LOD splat budgets by quality tier.
  * Controls SparkRenderer.lodSplatCount — the hard cap on splats rendered per frame.
- * Spark.js 2.0 defaults: 500K mobile, 1.5M desktop. These match those defaults.
+ * Can be overridden via Docker env vars LOD_BUDGET_SD / LOD_BUDGET_HD.
  */
-const LOD_BUDGETS: Record<string, number> = {
+const DEFAULT_LOD_BUDGETS: Record<string, number> = {
     [QUALITY_TIER.SD]: 500_000,
-    [QUALITY_TIER.HD]: 1_500_000,
+    [QUALITY_TIER.HD]: 3_000_000,
 };
+
+/** Resolve LOD budgets: APP_CONFIG overrides take priority over defaults. */
+function resolveLodBudgets(): Record<string, number> {
+    const cfg = (window as any).APP_CONFIG;
+    return {
+        [QUALITY_TIER.SD]: (cfg?.lodBudgetSd > 0) ? cfg.lodBudgetSd : DEFAULT_LOD_BUDGETS[QUALITY_TIER.SD],
+        [QUALITY_TIER.HD]: (cfg?.lodBudgetHd > 0) ? cfg.lodBudgetHd : DEFAULT_LOD_BUDGETS[QUALITY_TIER.HD],
+    };
+}
 
 /**
  * Get the LOD splat budget for a given quality tier.
@@ -112,5 +121,6 @@ const LOD_BUDGETS: Record<string, number> = {
  * @returns Splat count budget for SparkRenderer
  */
 export function getLodBudget(tier: string): number {
-    return LOD_BUDGETS[tier] ?? LOD_BUDGETS[QUALITY_TIER.HD];
+    const budgets = resolveLodBudgets();
+    return budgets[tier] ?? budgets[QUALITY_TIER.HD];
 }

@@ -55,6 +55,8 @@ docker compose up -d
 | `DEFAULT_POINTCLOUD_URL` | _(empty)_ | Point cloud URL to auto-load |
 | `DEFAULT_ALIGNMENT_URL` | _(empty)_ | Alignment JSON URL to auto-load |
 | `SHOW_CONTROLS` | `true` | Show/hide the controls panel |
+| `LOD_BUDGET_SD` | `500000` | Splat LOD budget (max splats per frame) for SD quality tier |
+| `LOD_BUDGET_HD` | `3000000` | Splat LOD budget (max splats per frame) for HD quality tier |
 
 ### 3. Docker Compose
 
