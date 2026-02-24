@@ -4118,11 +4118,14 @@ function animate(): void {
                         annotationSystem.updateMarkerPositions();
                     }
                     updateAnnotationPopupPosition(currentPopupAnnotationId);
-                    // Hide connecting line during camera animation to avoid it
-                    // whipping across the screen as the marker moves
+                    // Fade out popup and hide line during camera animation
                     if (annotationSystem.isAnimating) {
+                        const popupEl = document.getElementById('annotation-info-popup');
+                        if (popupEl) popupEl.classList.add('animating-away');
                         hideAnnotationLine();
                     } else {
+                        const popupEl = document.getElementById('annotation-info-popup');
+                        if (popupEl) popupEl.classList.remove('animating-away');
                         updateAnnotationLine(currentPopupAnnotationId);
                     }
                 }

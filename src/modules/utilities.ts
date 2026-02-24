@@ -690,7 +690,17 @@ function parseMarkdown(text: string): string {
         result.push(`</${listType}>`);
     }
 
-    return result.join('\n');
+    let html = result.join('\n');
+
+    // Convert standalone YouTube links to responsive embeds.
+    // Matches <p> containing only a YouTube <a> tag (auto-linked or explicit).
+    html = html.replace(
+        /<p class="md-p"><a href="(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})[^"]*)"[^>]*>[^<]*<\/a><\/p>/g,
+        (_match, _url, videoId) =>
+            `<div class="md-video"><iframe src="https://www.youtube-nocookie.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`
+    );
+
+    return html;
 }
 
 /**

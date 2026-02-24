@@ -970,6 +970,12 @@ body.kiosk-mode #annotation-info-popup {
     border: 1px solid rgba(var(--kiosk-accent-rgb), 0.15);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     border-radius: 8px;
+    transition: opacity 0.3s ease;
+}
+
+body.kiosk-mode #annotation-info-popup.animating-away {
+    opacity: 0;
+    transition: none;
 }
 
 /* --- Annotation Markers: Semi-transparent with glow --- */
