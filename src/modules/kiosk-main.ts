@@ -4118,7 +4118,13 @@ function animate(): void {
                         annotationSystem.updateMarkerPositions();
                     }
                     updateAnnotationPopupPosition(currentPopupAnnotationId);
-                    updateAnnotationLine(currentPopupAnnotationId);
+                    // Hide connecting line during camera animation to avoid it
+                    // whipping across the screen as the marker moves
+                    if (annotationSystem.isAnimating) {
+                        hideAnnotationLine();
+                    } else {
+                        updateAnnotationLine(currentPopupAnnotationId);
+                    }
                 }
 
                 // Update measurement marker screen positions
