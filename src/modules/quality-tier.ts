@@ -95,3 +95,22 @@ export function resolveQualityTier(tier: string, gl?: WebGLRenderingContext | We
 export function hasAnyProxy(contentInfo: { hasMeshProxy?: boolean; hasSceneProxy?: boolean }): boolean {
     return !!(contentInfo.hasMeshProxy || contentInfo.hasSceneProxy);
 }
+
+/**
+ * LOD splat budgets by quality tier.
+ * Controls SparkRenderer.lodSplatCount — the hard cap on splats rendered per frame.
+ * Spark.js 2.0 defaults: 500K mobile, 1.5M desktop. These match those defaults.
+ */
+const LOD_BUDGETS: Record<string, number> = {
+    [QUALITY_TIER.SD]: 500_000,
+    [QUALITY_TIER.HD]: 1_500_000,
+};
+
+/**
+ * Get the LOD splat budget for a given quality tier.
+ * @param tier - Resolved quality tier (SD or HD)
+ * @returns Splat count budget for SparkRenderer
+ */
+export function getLodBudget(tier: string): number {
+    return LOD_BUDGETS[tier] ?? LOD_BUDGETS[QUALITY_TIER.HD];
+}

@@ -93,6 +93,9 @@ export default defineConfig({
             'three/addons/': 'three/examples/jsm/',
             // Path alias: @/ maps to src/ for cleaner cross-directory imports
             '@': resolve(__dirname, 'src'),
+            // Spark.js 2.0.0-preview vendored from CDN (no npm release yet).
+            // CDN source: https://sparkjs.dev/releases/spark/preview/2.0.0/spark.module.js
+            '@sparkjsdev/spark': resolve(__dirname, 'src/vendor/spark-2.0.0-preview.module.js'),
         },
     },
 

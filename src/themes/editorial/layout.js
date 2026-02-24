@@ -782,8 +782,8 @@ export function setup(manifest, deps) {
         viewModes.appendChild(link);
     });
 
-    // Quality toggle (SD/HD) — inline with view modes if archive has proxies
-    if (deps.hasAnyProxy) {
+    // Quality toggle (SD/HD) — inline with view modes if archive has proxies or splat (Spark 2.0 LOD budget)
+    if (deps.hasAnyProxy || deps.hasSplat) {
         const qualitySep = document.createElement('span');
         qualitySep.className = 'editorial-view-mode-sep';
         qualitySep.textContent = '|';

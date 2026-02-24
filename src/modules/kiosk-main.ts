@@ -20,7 +20,7 @@ import { AnnotationSystem } from './annotation-system.js';
 import { MeasurementSystem } from './measurement-system.js';
 import { CrossSectionTool } from './cross-section.js';
 import { CAMERA, ASSET_STATE, QUALITY_TIER } from './constants.js';
-import { resolveQualityTier, hasAnyProxy } from './quality-tier.js';
+import { resolveQualityTier, hasAnyProxy, getLodBudget } from './quality-tier.js';
 import { Logger, notify, parseMarkdown, resolveAssetRefs, fetchWithProgress, downloadBlob } from './utilities.js';
 import {
     showLoading, hideLoading, updateProgress,
@@ -268,15 +268,18 @@ export async function init(): Promise<void> {
     // WebGL context (uses .flush()). If starting with WebGPU, SparkRenderer
     // will be created in onRendererChanged when switching to WebGL for splat loading.
     if (sceneManager.rendererType === 'webgl') {
+        const lodBudget = getLodBudget(state.qualityResolved || QUALITY_TIER.HD);
         sparkRenderer = new SparkRenderer({
             renderer: renderer,
             clipXY: 2.0,           // Prevent edge popping without excessive overdraw (default: 1.4)
             autoUpdate: true,
-            minAlpha: 3 / 255,     // Cull near-invisible splats (default: ~0.002)
-            view: { sortDistance: 0.01 }  // Re-sort after 1cm movement (Spark.js default)
+            minAlpha: 3 / 255,     // Cull near-invisible splats
+            // LOD (Spark 2.0) — device-tier-aware splat budget
+            lodSplatCount: lodBudget,
+            behindFoveate: 0.1,    // Aggressive behind-camera culling
         });
         scene.add(sparkRenderer);
-        log.info('SparkRenderer created with clipXY=2.0, minAlpha=3/255, sortDistance=0.01');
+        log.info(`SparkRenderer created with clipXY=2.0, minAlpha=3/255, lodSplatCount=${lodBudget}`);
     } else {
         log.info('SparkRenderer deferred — will be created after WebGL switch');
     }
@@ -305,15 +308,17 @@ export async function init(): Promise<void> {
             scene.remove(sparkRenderer);
             if (sparkRenderer.dispose) sparkRenderer.dispose();
         }
+        const lodBudget = getLodBudget(state.qualityResolved || QUALITY_TIER.HD);
         sparkRenderer = new SparkRenderer({
             renderer: newRenderer,
             clipXY: 2.0,
             autoUpdate: true,
             minAlpha: 3 / 255,
-            view: { sortDistance: 0.01 }
+            lodSplatCount: lodBudget,
+            behindFoveate: 0.1,
         });
         scene.add(sparkRenderer);
-        log.info('Renderer changed to', sceneManager!.rendererType, '- SparkRenderer recreated');
+        log.info('Renderer changed to', sceneManager!.rendererType, `- SparkRenderer recreated (lodSplatCount=${lodBudget})`);
     };
 
     // Create annotation system
@@ -1347,8 +1352,10 @@ async function handleArchiveFile(file: File): Promise<void> {
             hideMetadataSidebar();
         }
 
-        // Show quality toggle if archive has proxies (layout modules with own toggle handle this)
-        if (hasAnyProxy(contentInfo) && !layoutModule?.hasOwnQualityToggle) {
+        // Show quality toggle if archive has proxies OR splat is loaded (Spark 2.0 LOD budget).
+        // Layout modules with their own toggle handle this independently.
+        const hasSplat = contentInfo.hasSplat || contentInfo.hasSceneProxy;
+        if ((hasAnyProxy(contentInfo) || hasSplat) && !layoutModule?.hasOwnQualityToggle) {
             showQualityToggle();
         }
 
@@ -1457,8 +1464,21 @@ async function switchQualityTier(newTier: string): Promise<void> {
         btn.classList.add('loading');
     });
 
+    // Update SparkRenderer LOD budget (works even without proxy assets)
+    if (sparkRenderer) {
+        sparkRenderer.lodSplatCount = getLodBudget(newTier);
+        log.info(`SparkRenderer lodSplatCount updated to ${getLodBudget(newTier)}`);
+    }
+
     const archiveLoader = state.archiveLoader;
-    if (!archiveLoader) return;
+    if (!archiveLoader) {
+        // No archive — just LOD budget change, remove loading state
+        document.querySelectorAll('.quality-toggle-btn').forEach(btn => {
+            btn.classList.remove('loading');
+        });
+        log.info(`Quality tier switched to ${newTier} (LOD only)`);
+        return;
+    }
 
     const contentInfo = archiveLoader.getContentInfo();
     const deps = createArchiveDeps();
@@ -1736,6 +1756,7 @@ function createLayoutDeps(): any {
         themeBaseUrl: (window.APP_CONFIG?.theme) ? `themes/${window.APP_CONFIG.theme}/` : '',
         themeAssets: window.__KIOSK_THEME_ASSETS__ || {},
         hasAnyProxy: hasAnyProxy(state.archiveLoader ? state.archiveLoader.getContentInfo() : {}),
+        hasSplat: !!(state.archiveLoader?.getContentInfo()?.hasSplat || state.splatLoaded),
         qualityResolved: state.qualityResolved,
         switchQualityTier,
         metadataProfile: state.archiveManifest?.metadata_profile || 'archival',

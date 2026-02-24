@@ -666,11 +666,13 @@ async function init() {
             renderer: renderer,
             clipXY: 2.0,           // Prevent edge popping without excessive overdraw (default: 1.4)
             autoUpdate: true,
-            minAlpha: 3 / 255,     // Cull near-invisible splats (default: ~0.002)
-            view: { sortDistance: 0.01 }  // Re-sort after 1cm movement (Spark.js default)
+            minAlpha: 3 / 255,     // Cull near-invisible splats
+            // LOD (Spark 2.0) — budget-based rendering caps splats per frame
+            lodSplatCount: 1_500_000,   // HD budget; main app assumes capable device
+            behindFoveate: 0.1,         // Aggressive behind-camera culling
         });
         scene.add(sparkRenderer);
-        log.info('SparkRenderer created with clipXY=2.0, minAlpha=3/255, sortDistance=0.01');
+        log.info('SparkRenderer created with clipXY=2.0, minAlpha=3/255, lodSplatCount=1.5M');
     } else {
         log.info('SparkRenderer deferred — will be created after WebGL switch');
     }
@@ -702,7 +704,8 @@ async function init() {
                 clipXY: 2.0,
                 autoUpdate: true,
                 minAlpha: 3 / 255,
-                view: { sortDistance: 0.01 }
+                lodSplatCount: 1_500_000,
+                behindFoveate: 0.1,
             });
             scene.add(sparkRenderer);
             log.info('Renderer changed, SparkRenderer recreated for WebGL');

@@ -46,7 +46,7 @@ const CDN_DEPS: Record<string, string> = {
     'three/addons/loaders/STLLoader.js':
         'https://esm.sh/three@0.170.0/examples/jsm/loaders/STLLoader.js?external=three',
     '@sparkjsdev/spark':
-        'https://sparkjs.dev/releases/spark/0.1.10/spark.module.js',
+        'https://sparkjs.dev/releases/spark/preview/2.0.0/spark.module.js',
     'fflate':
         'https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js',
 };

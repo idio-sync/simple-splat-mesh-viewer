@@ -3,6 +3,10 @@ import tseslint from 'typescript-eslint';
 import prettierConfig from 'eslint-config-prettier';
 
 export default [
+    // Ignore vendored files
+    {
+        ignores: ['src/vendor/**'],
+    },
     // Apply to all JS/TS files in src/
     {
         files: ['src/**/*.{js,ts}'],

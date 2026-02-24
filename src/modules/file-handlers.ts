@@ -23,6 +23,21 @@ import type { AppState, QualityTier } from '@/types.js';
 // E57Loader is loaded lazily via dynamic import to allow graceful degradation
 // when the three-e57-loader CDN module is unavailable (e.g., offline kiosk viewer).
 
+/**
+ * Map file extension to Spark 2.0 SplatFileType enum value.
+ * Needed when loading from blob URLs where Spark can't infer format from the path.
+ */
+const SPLAT_FILE_TYPE_MAP: Record<string, string> = {
+    ply: 'ply', spz: 'spz', splat: 'splat', ksplat: 'ksplat', rad: 'rad',
+    // Note: .sog (SOGS) format is not supported in Spark 2.0 preview.
+    // Convert .sog files to .spz using splat-transform or SuperSplat.
+};
+
+function getSplatFileType(fileNameOrUrl: string): string | undefined {
+    const ext = fileNameOrUrl.split(/[?#]/)[0].split('.').pop()?.toLowerCase();
+    return ext ? SPLAT_FILE_TYPE_MAP[ext] : undefined;
+}
+
 // Lazy-loaded E57 support
 let _E57Loader: any = null;
 let _e57Checked = false;
@@ -204,8 +219,11 @@ export async function loadSplatFromFile(file: File, deps: LoadSplatDeps): Promis
     // Ensure WASM is ready (required for compressed formats like .sog, .spz)
     await SplatMesh.staticInitialized;
 
+    // Pass fileType for blob URLs where Spark 2.0 can't detect format from path
+    const fileType = getSplatFileType(file.name);
+
     // Create SplatMesh using Spark
-    const splatMesh = new SplatMesh({ url: fileUrl });
+    const splatMesh = new SplatMesh({ url: fileUrl, ...(fileType && { fileType }) });
 
     // Apply default rotation to correct upside-down orientation
     splatMesh.rotation.x = Math.PI;
@@ -290,8 +308,11 @@ export async function loadSplatFromUrl(url: string, deps: LoadSplatDeps, onProgr
     // Ensure WASM is ready (required for compressed formats like .sog, .spz)
     await SplatMesh.staticInitialized;
 
+    // Pass fileType for blob URLs where Spark 2.0 can't detect format from path
+    const fileType = getSplatFileType(url);
+
     // Create SplatMesh using Spark
-    const splatMesh = new SplatMesh({ url: blobUrl });
+    const splatMesh = new SplatMesh({ url: blobUrl, ...(fileType && { fileType }) });
 
     // Apply default rotation
     splatMesh.rotation.x = Math.PI;
@@ -347,8 +368,11 @@ export async function loadSplatFromBlobUrl(blobUrl: string, fileName: string, de
     // Ensure WASM is ready (required for compressed formats like .sog, .spz)
     await SplatMesh.staticInitialized;
 
+    // Pass fileType for blob URLs where Spark 2.0 can't detect format from path
+    const fileType = getSplatFileType(fileName);
+
     // Create SplatMesh using Spark
-    const splatMesh = new SplatMesh({ url: blobUrl });
+    const splatMesh = new SplatMesh({ url: blobUrl, ...(fileType && { fileType }) });
 
     // Apply default rotation
     splatMesh.rotation.x = Math.PI;
