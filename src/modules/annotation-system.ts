@@ -52,6 +52,7 @@ export class AnnotationSystem {
     selectedAnnotation: Annotation | null;
     annotationCount: number;
     isAnimating: boolean;
+    _animationFrameId: number;
 
     // Raycaster for click detection
     raycaster: Raycaster;
@@ -98,6 +99,7 @@ export class AnnotationSystem {
         this.selectedAnnotation = null;
         this.annotationCount = 0;
         this.isAnimating = false;
+        this._animationFrameId = 0;
 
         // Raycaster for click detection
         this.raycaster = new THREE.Raycaster();
@@ -326,11 +328,11 @@ export class AnnotationSystem {
         markerEl.setAttribute('role', 'button');
         markerEl.setAttribute('tabindex', '0');
         markerEl.setAttribute('aria-label', `Annotation ${number}: ${annotation.title || 'untitled'}`);
-        markerEl.addEventListener('click', () => this.selectAnnotation(annotation.id));
+        markerEl.addEventListener('click', () => this.goToAnnotation(annotation.id));
         markerEl.addEventListener('keydown', (e: KeyboardEvent) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                this.selectAnnotation(annotation.id);
+                this.goToAnnotation(annotation.id);
             }
         });
 
@@ -515,7 +517,7 @@ export class AnnotationSystem {
     }
 
     /**
-     * Navigate camera to annotation viewpoint
+     * Navigate camera to annotation viewpoint with smooth animation.
      */
     goToAnnotation(id: string, duration: number = 1000): void {
         const annotation = this.annotations.find(a => a.id === id);
@@ -530,41 +532,82 @@ export class AnnotationSystem {
             if (btn) btn.classList.remove('active');
         }
 
-        // Block controls.update() in main animate loop
-        this.isAnimating = true;
+        // Cancel any in-flight animation
+        if (this._animationFrameId) {
+            cancelAnimationFrame(this._animationFrameId);
+            this._animationFrameId = 0;
+        }
 
-        // Step 1: Drain ALL accumulated OrbitControls deltas
-        // (sphericalDelta, panOffset, scale from prior user interactions).
-        // Must happen BEFORE setting position/target, because update()
-        // applies panOffset to controls.target and sphericalDelta to camera.
+        // Drain accumulated OrbitControls deltas before reading current state
         const wasDamping = this.controls.enableDamping;
         this.controls.enableDamping = false;
         this.controls.update();
         this.controls.enableDamping = wasDamping;
 
-        // Step 2: Restore the exact camera position and orbit pivot
-        // that were saved when the annotation was created/updated.
-        this.camera.position.set(
+        const endPos = new THREE.Vector3(
             annotation.camera_position.x,
             annotation.camera_position.y,
             annotation.camera_position.z
         );
-        this.controls.target.set(
+        const endTarget = new THREE.Vector3(
             annotation.camera_target.x,
             annotation.camera_target.y,
             annotation.camera_target.z
         );
 
-        // Step 3: Sync OrbitControls to our restored state.
-        // With all deltas drained to zero, this update() just converts
-        // position-target to spherical and back (no-op), then calls
-        // camera.lookAt(target) — reproducing the same orientation that
-        // OrbitControls originally computed when the annotation was saved.
+        // Skip animation if camera is already at the target
+        const EPS = 0.01;
+        if (this.camera.position.distanceTo(endPos) < EPS &&
+            this.controls.target.distanceTo(endTarget) < EPS) {
+            return;
+        }
+
+        // Respect prefers-reduced-motion
+        const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        if (reducedMotion || duration <= 0) {
+            this._applyCameraState(endPos, endTarget);
+            return;
+        }
+
+        // Smooth animation via lerp + easeOutCubic
+        const startPos = this.camera.position.clone();
+        const startTarget = this.controls.target.clone();
+        const startTime = performance.now();
+
+        this.isAnimating = true;
+
+        const animate = () => {
+            const elapsed = performance.now() - startTime;
+            const t = Math.min(elapsed / duration, 1);
+            const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+
+            this.camera.position.lerpVectors(startPos, endPos, eased);
+            this.controls.target.lerpVectors(startTarget, endTarget, eased);
+
+            this.controls.enableDamping = false;
+            this.controls.update();
+            this.controls.enableDamping = wasDamping;
+
+            if (t < 1) {
+                this._animationFrameId = requestAnimationFrame(animate);
+            } else {
+                // Set exact final values (no lerp drift)
+                this._applyCameraState(endPos, endTarget);
+                this._animationFrameId = 0;
+            }
+        };
+
+        this._animationFrameId = requestAnimationFrame(animate);
+    }
+
+    /** Instantly apply camera position + target and sync OrbitControls. */
+    private _applyCameraState(position: THREE.Vector3, target: THREE.Vector3): void {
+        const wasDamping = this.controls.enableDamping;
+        this.camera.position.copy(position);
+        this.controls.target.copy(target);
         this.controls.enableDamping = false;
         this.controls.update();
         this.controls.enableDamping = wasDamping;
-
-        // Step 4: Release — internal state is fully synced, no residual deltas
         this.isAnimating = false;
     }
 
