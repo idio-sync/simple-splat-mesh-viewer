@@ -873,6 +873,11 @@ function onDirectFileLoaded(fileName: string | null): void {
     // Show only relevant settings sections
     showRelevantSettings(state.splatLoaded, state.modelLoaded, state.pointcloudLoaded);
 
+    // Resolve quality tier for direct file loads (archive flow resolves earlier)
+    const glCtx = renderer ? renderer.getContext() : null;
+    state.qualityResolved = resolveQualityTier(state.qualityTier, glCtx);
+    if (sparkRenderer) sparkRenderer.lodSplatCount = getLodBudget(state.qualityResolved);
+
     // Fit camera to loaded content
     fitCameraToScene();
 
@@ -900,6 +905,9 @@ function onDirectFileLoaded(fileName: string | null): void {
         // Standard kiosk UI
         createViewSwitcher();
     }
+
+    // Sync quality toggle button active states after layout renders
+    syncQualityButtons();
 
     // Set filename as display title if available
     if (fileName) {
@@ -1290,6 +1298,9 @@ async function handleArchiveFile(file: File): Promise<void> {
             if (archiveSection) archiveSection.style.display = '';
         }
 
+        // Sync quality toggle button active states after layout renders
+        syncQualityButtons();
+
         // Apply viewer settings from manifest (after theme, so these override theme defaults)
         if (manifest.viewer_settings) {
             if (manifest.viewer_settings.single_sided !== undefined) {
@@ -1424,6 +1435,15 @@ async function handleArchiveFile(file: File): Promise<void> {
 // =============================================================================
 // QUALITY TIER TOGGLE
 // =============================================================================
+
+/**
+ * Sync all quality toggle button active states to match current resolved tier.
+ */
+function syncQualityButtons(): void {
+    document.querySelectorAll('.quality-toggle-btn').forEach(btn => {
+        btn.classList.toggle('active', (btn as HTMLElement).dataset.tier === state.qualityResolved);
+    });
+}
 
 /**
  * Show the SD/HD quality toggle. Uses existing HTML element if present,

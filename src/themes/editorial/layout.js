@@ -776,7 +776,7 @@ export function setup(manifest, deps) {
             state.displayMode = mode;
             setDisplayMode(mode, createDisplayModeDeps());
             triggerLazyLoad(mode);
-            viewModes.querySelectorAll('.editorial-view-mode-link').forEach(l => {
+            viewModes.querySelectorAll('.editorial-view-mode-link:not(.quality-toggle-btn)').forEach(l => {
                 l.classList.toggle('active', l.dataset.mode === mode);
             });
         });
@@ -971,7 +971,7 @@ export function setup(manifest, deps) {
         markerToggle = document.createElement('button');
         markerToggle.className = 'editorial-marker-toggle';
         markerToggle.title = 'Toggle annotation markers';
-        markerToggle.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+        markerToggle.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
         markerToggle.addEventListener('click', () => {
             setMarkersVisible(!markersVisible);
             if (!markersVisible && getCurrentPopupId()) {
