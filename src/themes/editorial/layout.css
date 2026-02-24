@@ -95,7 +95,7 @@ body.kiosk-mode.kiosk-editorial .editorial-title-meta {
 /* --- Ribbon logo — quiet signature at far right --- */
 
 body.kiosk-mode.kiosk-editorial .editorial-ribbon-logo {
-    height: 18px;
+    height: 16px;
     width: auto;
     opacity: 0.9;
     flex-shrink: 0;
@@ -341,9 +341,9 @@ body.kiosk-mode.kiosk-editorial .editorial-fullscreen-btn svg {
     display: block;
 }
 
-/* Tighter separator before fullscreen */
+/* Tighter separator before fullscreen (but keep 20px on logo side) */
 body.kiosk-mode.kiosk-editorial .editorial-ribbon-logo + .editorial-ribbon-rule {
-    margin: 0 10px;
+    margin: 0 10px 0 20px;
     height: 10px;
 }
 
