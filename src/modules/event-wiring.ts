@@ -357,6 +357,37 @@ export function setupUIEvents(deps: EventWiringDeps): void {
                 if (sceneRefs.pointcloudGroup) (sceneRefs.pointcloudGroup as any).rotation[axis] = rad;
             }
         });
+        addListener(`transform-scale-${axis}`, 'change', (e: Event) => {
+            const val = parseFloat((e.target as HTMLInputElement).value);
+            if (isNaN(val) || val <= 0) return;
+            const sel = state.selectedObject;
+            // Uniform scale only — manifest stores a single scalar
+            if (sel === 'splat' && sceneRefs.splatMesh) {
+                sceneRefs.splatMesh.scale.setScalar(val);
+            } else if (sel === 'model' && sceneRefs.modelGroup) {
+                sceneRefs.modelGroup.scale.setScalar(val);
+            } else if (sel === 'both') {
+                if (sceneRefs.splatMesh) sceneRefs.splatMesh.scale.setScalar(val);
+                if (sceneRefs.modelGroup) sceneRefs.modelGroup.scale.setScalar(val);
+                if (sceneRefs.pointcloudGroup) sceneRefs.pointcloudGroup.scale.setScalar(val);
+            }
+            // Sync the other two axis inputs
+            const formatted = val.toFixed(2);
+            for (const a of ['x', 'y', 'z'] as const) {
+                if (a !== axis) {
+                    const el = document.getElementById(`transform-scale-${a}`) as HTMLInputElement | null;
+                    if (el) el.value = formatted;
+                }
+            }
+            // Sync sidebar scale slider
+            const sliderId = sel === 'splat' ? 'splat-scale' : sel === 'model' ? 'model-scale' : null;
+            if (sliderId) {
+                const slider = document.getElementById(sliderId) as HTMLInputElement | null;
+                if (slider) slider.value = String(val);
+                const label = document.getElementById(`${sliderId}-value`);
+                if (label) label.textContent = val.toFixed(1);
+            }
+        });
     });
 
     // ─── Reset transform button ──────────────────────────────

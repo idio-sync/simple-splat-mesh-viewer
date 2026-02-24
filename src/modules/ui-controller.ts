@@ -404,6 +404,9 @@ export function updateTransformInputs(
             setInputValue('transform-rot-x', THREE.MathUtils.radToDeg(src.rotation.x).toFixed(1));
             setInputValue('transform-rot-y', THREE.MathUtils.radToDeg(src.rotation.y).toFixed(1));
             setInputValue('transform-rot-z', THREE.MathUtils.radToDeg(src.rotation.z).toFixed(1));
+            setInputValue('transform-scale-x', src.scale.x.toFixed(2));
+            setInputValue('transform-scale-y', src.scale.y.toFixed(2));
+            setInputValue('transform-scale-z', src.scale.z.toFixed(2));
         }
     }
 }
