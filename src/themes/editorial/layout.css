@@ -1763,13 +1763,11 @@ body.kiosk-mode.kiosk-editorial .editorial-gate-info .editorial-loading-title-ba
 }
 
 body.kiosk-mode.kiosk-editorial #kiosk-gate-types {
-    opacity: 0;
-    animation: editorialUIFadeIn 0.4s ease-out 0.55s forwards;
+    animation: editorialUIFadeIn 0.4s ease-out 0.55s both;
 }
 
 body.kiosk-mode.kiosk-editorial .editorial-gate-content {
-    opacity: 0;
-    animation: editorialUIFadeIn 0.5s ease-out 0.65s forwards;
+    animation: editorialUIFadeIn 0.5s ease-out 0.65s both;
 }
 
 body.kiosk-mode.kiosk-editorial #kiosk-gate-title {
