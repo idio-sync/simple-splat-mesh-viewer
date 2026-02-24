@@ -1151,9 +1151,9 @@ body.kiosk-mode #loading-overlay {
 
 #annotation-line-overlay line {
     stroke: var(--kiosk-accent);
-    stroke-opacity: 0.3;
-    stroke-width: 1;
-    stroke-dasharray: 4 4;
+    stroke-opacity: 0.7;
+    stroke-width: 2.5;
+    stroke-dasharray: 5 5;
 }
 
 /* --- Sidebar Scrollbar --- */

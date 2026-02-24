@@ -1480,8 +1480,8 @@ body.kiosk-mode.kiosk-editorial .editorial-info-description a:hover {
 
 body.kiosk-mode.kiosk-editorial #annotation-line-overlay line {
     stroke: var(--kiosk-accent);
-    stroke-opacity: 0.35;
-    stroke-width: 1;
+    stroke-opacity: 0.75;
+    stroke-width: 2.5;
     stroke-dasharray: 6 6;
     animation: editorialLineFadeIn 0.4s ease-out;
 }
