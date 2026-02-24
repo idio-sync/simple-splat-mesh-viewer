@@ -1482,6 +1482,30 @@ body.kiosk-mode.kiosk-editorial .editorial-info-description a:hover {
     text-decoration-color: var(--kiosk-accent);
 }
 
+/* --- Hero image zone — editorial overrides --- */
+
+body.kiosk-mode.kiosk-editorial #annotation-info-popup.has-image {
+    max-width: 400px;
+    padding: 0;
+}
+
+body.kiosk-mode.kiosk-editorial #annotation-info-popup.has-image .annotation-info-header {
+    padding: 14px 16px 10px;
+    margin-bottom: 0;
+}
+
+body.kiosk-mode.kiosk-editorial #annotation-info-popup.has-image .annotation-info-header::after {
+    left: 16px;
+}
+
+body.kiosk-mode.kiosk-editorial #annotation-info-popup.has-image .annotation-info-body {
+    padding: 0 16px 14px;
+}
+
+body.kiosk-mode.kiosk-editorial .annotation-hero-zoom {
+    background: rgba(var(--kiosk-surface-rgb), 0.65);
+}
+
 /* Connecting line — yellow, dashed, wider gap from endpoints */
 
 body.kiosk-mode.kiosk-editorial #annotation-line-overlay line {

@@ -978,6 +978,25 @@ body.kiosk-mode #annotation-info-popup.animating-away {
     transition: none;
 }
 
+body.kiosk-mode #annotation-info-popup.has-image {
+    max-width: 400px;
+    padding: 0;
+    overflow: hidden;
+}
+
+body.kiosk-mode #annotation-info-popup.has-image .annotation-info-header {
+    padding: 14px 18px 10px;
+    margin-bottom: 0;
+}
+
+body.kiosk-mode #annotation-info-popup.has-image .annotation-info-body {
+    padding: 0 18px 14px;
+}
+
+body.kiosk-mode .annotation-hero-zoom {
+    background: rgba(var(--kiosk-surface-rgb), 0.6);
+}
+
 /* --- Annotation Markers: Semi-transparent with glow --- */
 
 body.kiosk-mode .annotation-marker {

@@ -47,7 +47,8 @@ import {
     setupMetadataSidebar, prefillMetadataFromArchive,
     populateMetadataDisplay, updateArchiveMetadataUI,
     showAnnotationPopup, hideAnnotationPopup, updateAnnotationPopupPosition,
-    invalidatePopupLayoutCache
+    invalidatePopupLayoutCache,
+    initImageLightbox, openImageLightbox
 } from './metadata-manager.js';
 import { loadTheme } from './theme-loader.js';
 import type { LayoutModule } from './theme-loader.js';
@@ -413,6 +414,7 @@ export async function init(): Promise<void> {
 
     // Wire up UI
     setupViewerUI();
+    initImageLightbox();
     // Always set up sidebar (layout modules hide it via CSS but need it as mobile fallback)
     setupMetadataSidebar({ state: state as any, annotationSystem, imageAssets: state.imageAssets });
     setupCollapsibles();
@@ -3769,6 +3771,14 @@ function showMobileAnnotationDetail(annotation: Annotation): void {
     if (nextBtn) {
         nextBtn.addEventListener('click', () => navigateAnnotation(1));
     }
+
+    // Wire inline images to open lightbox on click
+    detail.querySelectorAll('.md-image').forEach((img: Element) => {
+        (img as HTMLElement).style.cursor = 'pointer';
+        img.addEventListener('click', () => {
+            openImageLightbox((img as HTMLImageElement).src, (img as HTMLImageElement).alt);
+        });
+    });
 
     // Expand sheet to see content
     if (currentSheetSnap === 'peek') {

@@ -2287,6 +2287,20 @@ export function clearArchiveMetadata(): void {
 // =============================================================================
 
 /**
+ * Extract the first markdown image from text, returning the image info and remaining text.
+ * Matches ![alt](url) patterns.
+ */
+function extractHeroImage(body: string): { src: string; alt: string; remainingBody: string } | null {
+    const match = body.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+    if (!match) return null;
+    return {
+        alt: match[1],
+        src: match[2],
+        remainingBody: body.replace(match[0], '').trim()
+    };
+}
+
+/**
  * Show annotation popup near the selected marker
  */
 export function showAnnotationPopup(annotation: Annotation, imageAssets?: Map<string, any>): string | null {
@@ -2302,11 +2316,51 @@ export function showAnnotationPopup(annotation: Annotation, imageAssets?: Map<st
     // Populate popup
     const numberEl = popup.querySelector('.annotation-info-number');
     const titleEl = popup.querySelector('.annotation-info-title');
+    const heroEl = popup.querySelector('.annotation-info-hero') as HTMLElement | null;
     const bodyEl = popup.querySelector('.annotation-info-body');
 
     if (numberEl) numberEl.textContent = number;
     if (titleEl) titleEl.textContent = annotation.title || 'Untitled';
-    if (bodyEl) bodyEl.innerHTML = parseMarkdown(resolveAssetRefs(annotation.body || '', imageAssets));
+
+    // Resolve asset refs in body text
+    const resolvedBody = resolveAssetRefs(annotation.body || '', imageAssets);
+
+    // Extract hero image (first image in markdown) for prominent display
+    const hero = extractHeroImage(resolvedBody);
+
+    if (heroEl) {
+        if (hero) {
+            heroEl.innerHTML = `<img src="${hero.src}" alt="${hero.alt}" class="annotation-hero-img" loading="lazy"><span class="annotation-hero-zoom" aria-label="Expand image"></span>`;
+            heroEl.style.display = '';
+            popup.classList.add('has-image');
+
+            // Wire click-to-expand on the hero zone
+            const heroImg = heroEl.querySelector('.annotation-hero-img') as HTMLImageElement;
+            if (heroImg) {
+                heroImg.onclick = () => openImageLightbox(hero.src, hero.alt);
+            }
+            const heroZoom = heroEl.querySelector('.annotation-hero-zoom');
+            if (heroZoom) {
+                (heroZoom as HTMLElement).onclick = () => openImageLightbox(hero.src, hero.alt);
+            }
+        } else {
+            heroEl.innerHTML = '';
+            heroEl.style.display = 'none';
+            popup.classList.remove('has-image');
+        }
+    }
+
+    // Render remaining body text (without hero image)
+    const bodyMarkdown = hero ? hero.remainingBody : resolvedBody;
+    if (bodyEl) {
+        bodyEl.innerHTML = parseMarkdown(bodyMarkdown);
+        // Wire any remaining inline images to open lightbox on click
+        bodyEl.querySelectorAll('.md-image').forEach((img: Element) => {
+            img.addEventListener('click', () => {
+                openImageLightbox((img as HTMLImageElement).src, (img as HTMLImageElement).alt);
+            });
+        });
+    }
 
     popup.classList.remove('hidden');
 
@@ -2413,4 +2467,70 @@ export function updateAnnotationPopupPosition(currentPopupAnnotationId: string |
 export function hideAnnotationPopup(): void {
     const popup = document.getElementById('annotation-info-popup');
     if (popup) popup.classList.add('hidden');
+}
+
+// =============================================================================
+// IMAGE LIGHTBOX
+// =============================================================================
+
+/**
+ * Open the fullscreen image lightbox overlay.
+ */
+export function openImageLightbox(src: string, alt: string): void {
+    const lightbox = document.getElementById('image-lightbox');
+    if (!lightbox) return;
+
+    const img = lightbox.querySelector('.lightbox-img') as HTMLImageElement;
+    if (img) {
+        img.src = src;
+        img.alt = alt || '';
+    }
+
+    lightbox.classList.remove('hidden');
+    // Trigger reflow for transition
+    void lightbox.offsetWidth;
+    lightbox.classList.add('visible');
+}
+
+/**
+ * Close the fullscreen image lightbox overlay.
+ */
+export function closeImageLightbox(): void {
+    const lightbox = document.getElementById('image-lightbox');
+    if (!lightbox) return;
+
+    lightbox.classList.remove('visible');
+    // Wait for fade-out transition, then hide
+    lightbox.addEventListener('transitionend', function onEnd() {
+        lightbox.removeEventListener('transitionend', onEnd);
+        lightbox.classList.add('hidden');
+        const img = lightbox.querySelector('.lightbox-img') as HTMLImageElement;
+        if (img) img.src = '';
+    }, { once: true });
+}
+
+/**
+ * Wire lightbox dismiss handlers (call once at init).
+ */
+export function initImageLightbox(): void {
+    const lightbox = document.getElementById('image-lightbox');
+    if (!lightbox) return;
+
+    // Close on backdrop click
+    lightbox.addEventListener('click', (e) => {
+        if (e.target === lightbox) closeImageLightbox();
+    });
+
+    // Close on X button
+    const closeBtn = lightbox.querySelector('.lightbox-close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => closeImageLightbox());
+    }
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !lightbox.classList.contains('hidden')) {
+            closeImageLightbox();
+        }
+    });
 }

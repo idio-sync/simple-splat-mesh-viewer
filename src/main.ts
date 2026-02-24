@@ -57,7 +57,8 @@ import {
     setupMetadataSidebar as setupMetadataSidebarHandler,
     prefillMetadataFromArchive as prefillMetadataFromArchiveHandler,
     updatePronomRegistry,
-    invalidatePopupLayoutCache
+    invalidatePopupLayoutCache,
+    initImageLightbox
 } from './modules/metadata-manager.js';
 import {
     loadSplatFromFile as loadSplatFromFileHandler,
@@ -784,6 +785,9 @@ async function init() {
 
     // Setup UI events (delegated to event-wiring.ts)
     setupUIEventsCtrl(createEventWiringDeps());
+
+    // Wire image lightbox dismiss handlers
+    initImageLightbox();
 
     // Apply initial controls visibility and mode
     applyControlsVisibility();
