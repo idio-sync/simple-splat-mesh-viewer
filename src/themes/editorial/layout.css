@@ -6,6 +6,12 @@
 
 /* --- Base Typography — inherited by all editorial elements --- */
 
+/* Bump root font-size so all rem values scale up 25% for readability.
+   16px default → 20px effective base. */
+html:has(body.kiosk-mode.kiosk-editorial) {
+    font-size: 125%;
+}
+
 body.kiosk-mode.kiosk-editorial {
     font-family: var(--kiosk-font-body);
     font-feature-settings: "liga", "kern";
