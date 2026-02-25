@@ -30,6 +30,8 @@ interface LocalAssetStore {
     proxyMeshBlob: Blob | null;
     proxySplatBlob: Blob | null;
     pointcloudBlob: Blob | null;
+    cadBlob: Blob | null;
+    cadFileName: string | null;
     sourceFiles: SourceFileEntry[];
 }
 
@@ -39,6 +41,8 @@ const store: LocalAssetStore = {
     proxyMeshBlob: null,
     proxySplatBlob: null,
     pointcloudBlob: null,
+    cadBlob: null,
+    cadFileName: null,
     sourceFiles: []   // Array of { file: File|null, name: string, size: number, category: string, fromArchive: boolean }
 };
 
@@ -60,6 +64,8 @@ export function resetBlobs(): void {
     store.proxyMeshBlob = null;
     store.proxySplatBlob = null;
     store.pointcloudBlob = null;
+    store.cadBlob = null;
+    store.cadFileName = null;
     store.sourceFiles = [];
     log.info('Asset store reset');
 }

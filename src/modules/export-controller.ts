@@ -137,7 +137,7 @@ function showComplianceDialog(result: SIPValidationResult): Promise<boolean> {
  */
 export async function downloadArchive(deps: ExportDeps): Promise<void> {
     const { sceneRefs, state, ui, metadata: metadataFns } = deps;
-    const { archiveCreator, renderer, scene, camera, controls, splatMesh, modelGroup, pointcloudGroup, annotationSystem } = sceneRefs;
+    const { archiveCreator, renderer, scene, camera, controls, splatMesh, modelGroup, pointcloudGroup, cadGroup, annotationSystem } = sceneRefs;
     const assets = getStore();
 
     log.info(' downloadArchive called');
@@ -328,6 +328,17 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
             source_notes: metadata.pointcloudMetadata?.sourceNotes || '',
             role: metadata.pointcloudMetadata?.role || ''
         });
+    }
+
+    // Add CAD if loaded
+    if (assets.cadBlob && state.cadLoaded) {
+        const cadFileName = getStore().cadFileName || document.getElementById('cad-filename')?.textContent || 'model.step';
+        const position = cadGroup ? [cadGroup.position.x, cadGroup.position.y, cadGroup.position.z] : [0, 0, 0];
+        const rotation = cadGroup ? [cadGroup.rotation.x, cadGroup.rotation.y, cadGroup.rotation.z] : [0, 0, 0];
+        const scale: [number, number, number] = cadGroup ? [cadGroup.scale.x, cadGroup.scale.y, cadGroup.scale.z] : [1, 1, 1];
+
+        log.info(' Adding CAD:', { cadFileName, position, rotation, scale });
+        archiveCreator.addCAD(assets.cadBlob, cadFileName, { position, rotation, scale });
     }
 
     // Save global alignment — definitive scene state for re-import

@@ -19,8 +19,10 @@ export interface AppState {
     modelLoaded: boolean;
     pointcloudLoaded: boolean;
     stlLoaded: boolean;
+    cadLoaded: boolean;
     drawingLoaded: boolean;
     currentDrawingUrl: string | null;
+    currentCadUrl: string | null;
     modelOpacity: number;
     modelWireframe: boolean;
     modelMatcap: boolean;
@@ -70,6 +72,7 @@ export interface SceneRefs {
     readonly modelGroup: any;         // THREE.Group
     readonly pointcloudGroup: any;    // THREE.Group
     readonly stlGroup: any;           // THREE.Group
+    readonly cadGroup: any;           // THREE.Group
     readonly drawingGroup: any;       // THREE.Group
     readonly flyControls: any;        // FlyControls | null
     readonly annotationSystem: any;   // AnnotationSystem | null
@@ -157,13 +160,15 @@ export interface AssetStore {
     proxyMeshBlob: Blob | null;
     proxySplatBlob: Blob | null;
     pointcloudBlob: Blob | null;
+    cadBlob: Blob | null;
+    cadFileName: string | null;
     sourceFiles: Array<{ name: string; blob: Blob }>;
 }
 
 // ===== Module Dependencies =====
 
 export interface ExportDeps {
-    sceneRefs: Pick<SceneRefs, 'renderer' | 'scene' | 'camera' | 'controls' | 'splatMesh' | 'modelGroup' | 'pointcloudGroup' | 'annotationSystem' | 'archiveCreator'>;
+    sceneRefs: Pick<SceneRefs, 'renderer' | 'scene' | 'camera' | 'controls' | 'splatMesh' | 'modelGroup' | 'pointcloudGroup' | 'cadGroup' | 'annotationSystem' | 'archiveCreator'>;
     state: AppState;
     tauriBridge: any | null;
     ui: {
@@ -183,7 +188,7 @@ export interface ExportDeps {
 }
 
 export interface ArchivePipelineDeps {
-    sceneRefs: Pick<SceneRefs, 'scene' | 'camera' | 'controls' | 'renderer' | 'splatMesh' | 'modelGroup' | 'pointcloudGroup' | 'drawingGroup'>;
+    sceneRefs: Pick<SceneRefs, 'scene' | 'camera' | 'controls' | 'renderer' | 'splatMesh' | 'modelGroup' | 'pointcloudGroup' | 'cadGroup' | 'drawingGroup'>;
     state: AppState;
     sceneManager: any;
     setSplatMesh: (mesh: any) => void;
@@ -227,6 +232,7 @@ export interface EventWiringDeps {
         handleProxyMeshFile: (e: Event) => void;
         handleProxySplatFile: (e: Event) => void;
         handleSTLFile: (e: Event) => void;
+        handleCADFile: (e: Event) => void;
         handleDrawingFile: (e: Event) => void;
         handleSourceFilesInput: (e: Event) => void;
         handleLoadSplatFromUrlPrompt: () => void;
@@ -234,6 +240,7 @@ export interface EventWiringDeps {
         handleLoadPointcloudFromUrlPrompt: () => void;
         handleLoadArchiveFromUrlPrompt: () => void;
         handleLoadSTLFromUrlPrompt: () => void;
+        handleLoadCADFromUrlPrompt: () => void;
         handleLoadDrawingFromUrlPrompt: () => void;
         handleLoadFullResMesh: () => void;
         switchQualityTier: (tier: string) => void;

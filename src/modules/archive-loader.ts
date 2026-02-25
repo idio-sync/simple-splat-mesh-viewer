@@ -21,10 +21,11 @@ const SUPPORTED_FORMATS: Record<string, string[]> = {
     mesh: ['.glb', '.gltf', '.obj', '.stl', '.drc'],
     drawing: ['.dxf'],
     pointcloud: ['.e57'],
+    cad: ['.step', '.stp', '.iges', '.igs'],
     thumbnail: ['.png', '.jpg', '.jpeg', '.webp']
 };
 
-type FormatType = 'splat' | 'mesh' | 'drawing' | 'pointcloud' | 'thumbnail';
+type FormatType = 'splat' | 'mesh' | 'drawing' | 'pointcloud' | 'cad' | 'thumbnail';
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -67,6 +68,7 @@ interface ContentInfo {
     hasSceneProxy: boolean;
     hasPointcloud: boolean;
     hasDrawing: boolean;
+    hasCAD: boolean;
     hasThumbnail: boolean;
     hasSourceFiles: boolean;
     sourceFileCount: number;
@@ -865,6 +867,11 @@ export class ArchiveLoader {
     /**
      * Check if the archive contains viewable content
      */
+    getCADEntry(): ManifestDataEntry | null {
+        const cads = this.findEntriesByPrefix('cad_');
+        return cads.length > 0 ? cads[0].entry : null;
+    }
+
     getContentInfo(): ContentInfo {
         const scene = this.getSceneEntry();
         const mesh = this.getMeshEntry();
@@ -872,6 +879,7 @@ export class ArchiveLoader {
         const sceneProxy = this.getSceneProxyEntry();
         const pointcloud = this.getPointcloudEntry();
         const drawing = this.getDrawingEntry();
+        const cad = this.getCADEntry();
         const thumbnail = this.getThumbnailEntry();
 
         const sourceFiles = this.getSourceFileEntries();
@@ -883,6 +891,7 @@ export class ArchiveLoader {
             hasSceneProxy: sceneProxy !== null && isFormatSupported(sceneProxy.file_name, 'splat'),
             hasPointcloud: pointcloud !== null && isFormatSupported(pointcloud.file_name, 'pointcloud'),
             hasDrawing: drawing !== null && isFormatSupported(drawing.file_name, 'drawing'),
+            hasCAD: cad !== null && isFormatSupported(cad.file_name, 'cad'),
             hasThumbnail: thumbnail !== null && isFormatSupported(thumbnail.file_name, 'thumbnail'),
             hasSourceFiles: sourceFiles.length > 0,
             sourceFileCount: sourceFiles.length

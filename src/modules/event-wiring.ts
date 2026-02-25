@@ -104,6 +104,8 @@ export function setupUIEvents(deps: EventWiringDeps): void {
     addListener('proxy-splat-input', 'change', deps.files.handleProxySplatFile);
     addListener('stl-input', 'change', deps.files.handleSTLFile);
     addListener('btn-load-stl-url', 'click', deps.files.handleLoadSTLFromUrlPrompt);
+    addListener('cad-input', 'change', deps.files.handleCADFile);
+    addListener('btn-load-cad-url', 'click', deps.files.handleLoadCADFromUrlPrompt);
     addListener('drawing-input', 'change', deps.files.handleDrawingFile);
     addListener('btn-load-drawing-url', 'click', deps.files.handleLoadDrawingFromUrlPrompt);
     addListener('source-files-input', 'change', deps.files.handleSourceFilesInput);

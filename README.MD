@@ -10,6 +10,7 @@ Powered by [Three.js](https://github.com/mrdoob/three.js/) and [Spark](https://s
 - Load and display **3D models** (.glb, .gltf, .obj)
 - Load and display **Gaussian splat** files (.ply, .splat, .ksplat, .spz, .sog)
 - Load and display **E57 point clouds** (.e57) via [three-e57-loader](https://www.npmjs.com/package/three-e57-loader)
+- Load and display **parametric CAD files** (.step, .stp, .iges, .igs) via [occt-import-js](https://github.com/kovacsv/occt-import-js) (OpenCASCADE WASM) — tessellated and rendered as a shaded mesh
 - **Scene settings** — tone mapping (6 modes + exposure), HDR environment maps (3 presets + file/URL loading), environment-as-background skybox, shadow casting with shadow catcher ground plane, background image loading
 - **Auto-rotate** — turntable toggle in toolbar for both main app and kiosk viewer
 - **Screenshot capture** — capture viewport screenshots with a viewfinder-based archive preview override, thumbnail gallery with delete, and automatic export to `/screenshots/` in archives
@@ -85,6 +86,10 @@ docker run -p 8080:80 \
 ### Point Clouds
 - `.e57` — ASTM E57 format (via [three-e57-loader](https://www.npmjs.com/package/three-e57-loader), which uses the [web-e57](https://www.npmjs.com/package/web-e57) WASM parser)
 
+### Parametric CAD
+- `.step` / `.stp` — ISO 10303 STEP (via [occt-import-js](https://github.com/kovacsv/occt-import-js) OpenCASCADE WASM)
+- `.iges` / `.igs` — Initial Graphics Exchange Specification (via [occt-import-js](https://github.com/kovacsv/occt-import-js) OpenCASCADE WASM)
+
 ## Documentation
 
 | Guide | Description |
@@ -105,6 +110,7 @@ docker run -p 8080:80 \
 - [Three.js](https://threejs.org/) — 3D rendering, model loading, and scene management
 - [three-e57-loader](https://www.npmjs.com/package/three-e57-loader) — E57 point cloud loading (WASM-based via web-e57)
 - [three-dxf-loader](https://www.npmjs.com/package/three-dxf-loader) — DXF drawing file loading
+- [occt-import-js](https://github.com/kovacsv/occt-import-js) — STEP/IGES parametric CAD loading (OpenCASCADE WASM)
 - [fflate](https://github.com/101arrowz/fflate) — Fast ZIP compression/decompression
 - [nginx](https://nginx.org/) — Web server for Docker deployment
 - [Vite](https://vitejs.dev/) — Dev server, bundler, and build toolchain
@@ -121,7 +127,7 @@ Requires a modern browser with WebGL 2.0 support:
 - Safari 15+
 - Edge 79+
 
-E57 loading additionally requires WebAssembly support (available in all the above browsers).
+E57 and STEP/IGES loading additionally require WebAssembly support (available in all the above browsers).
 
 ## Related Projects
 

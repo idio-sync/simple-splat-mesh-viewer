@@ -91,10 +91,12 @@ import {
     handleLoadPointcloudFromUrlPrompt as handleLoadPointcloudFromUrlPromptCtrl,
     handleLoadArchiveFromUrlPrompt as handleLoadArchiveFromUrlPromptCtrl,
     handleLoadSTLFromUrlPrompt as handleLoadSTLFromUrlPromptCtrl,
+    handleLoadCADFromUrlPrompt as handleLoadCADFromUrlPromptCtrl,
     handleLoadDrawingFromUrlPrompt as handleLoadDrawingFromUrlPromptCtrl,
     handleSplatFile as handleSplatFileCtrl,
     handleModelFile as handleModelFileCtrl,
     handleSTLFile as handleSTLFileCtrl,
+    handleCADFile as handleCADFileCtrl,
     handleDrawingFile as handleDrawingFileCtrl,
     handlePointcloudFile as handlePointcloudFileCtrl,
     handleProxyMeshFile as handleProxyMeshFileCtrl,
@@ -247,6 +249,8 @@ const state: AppState = {
     modelLoaded: false,
     pointcloudLoaded: false,
     stlLoaded: false,
+    cadLoaded: false,
+    currentCadUrl: null,
     drawingLoaded: false,
     currentDrawingUrl: null,
     modelOpacity: 1,
@@ -302,6 +306,7 @@ let splatMesh: any = null; // SplatMesh from Spark
 let modelGroup: THREE.Group;
 let pointcloudGroup: THREE.Group;
 let stlGroup: THREE.Group;
+let cadGroup: THREE.Group;
 let drawingGroup: THREE.Group;
 let ambientLight: THREE.AmbientLight;
 let hemisphereLight: THREE.HemisphereLight;
@@ -331,6 +336,7 @@ const sceneRefs: SceneRefs = {
     get modelGroup() { return modelGroup; },
     get pointcloudGroup() { return pointcloudGroup; },
     get stlGroup() { return stlGroup; },
+    get cadGroup() { return cadGroup; },
     get drawingGroup() { return drawingGroup; },
     get flyControls() { return flyControls; },
     get annotationSystem() { return annotationSystem; },
@@ -587,10 +593,20 @@ function createArchivePipelineDeps(): ArchivePipelineDeps {
 }
 
 // Helper function to create dependencies object for file-input-handlers.ts
+function createCADDeps(): any {
+    return {
+        cadGroup,
+        state,
+        showLoading,
+        hideLoading,
+    };
+}
+
 function createFileInputDeps(): any {
     return {
         validateUserUrl, state, sceneManager, tauriBridge, assets,
         createFileHandlerDeps, createPointcloudDeps, createArchivePipelineDeps,
+        createCADDeps,
         loadArchiveFromUrl, processArchive,
         showLoading, hideLoading, updateProgress, formatFileSize, updateSourceFilesUI
     };
@@ -605,10 +621,10 @@ function createEventWiringDeps(): EventWiringDeps {
         files: {
             handleSplatFile, handleModelFile, handleArchiveFile,
             handlePointcloudFile, handleProxyMeshFile, handleProxySplatFile,
-            handleSTLFile, handleDrawingFile, handleSourceFilesInput,
+            handleSTLFile, handleCADFile, handleDrawingFile, handleSourceFilesInput,
             handleLoadSplatFromUrlPrompt, handleLoadModelFromUrlPrompt,
             handleLoadPointcloudFromUrlPrompt, handleLoadArchiveFromUrlPrompt,
-            handleLoadSTLFromUrlPrompt, handleLoadDrawingFromUrlPrompt,
+            handleLoadSTLFromUrlPrompt, handleLoadCADFromUrlPrompt, handleLoadDrawingFromUrlPrompt,
             handleLoadFullResMesh, switchQualityTier
         },
         display: {
@@ -689,6 +705,7 @@ async function init() {
     modelGroup = sceneManager.modelGroup;
     pointcloudGroup = sceneManager.pointcloudGroup;
     stlGroup = sceneManager.stlGroup;
+    cadGroup = sceneManager.cadGroup;
     drawingGroup = sceneManager.drawingGroup;
 
     // Initialize fly camera controls (disabled by default, orbit mode is default)
@@ -1329,6 +1346,14 @@ async function handleDrawingFile(event: Event) {
 
 function handleLoadDrawingFromUrlPrompt() {
     handleLoadDrawingFromUrlPromptCtrl(createFileInputDeps());
+}
+
+async function handleCADFile(event: Event) {
+    return handleCADFileCtrl(event, createFileInputDeps());
+}
+
+function handleLoadCADFromUrlPrompt() {
+    handleLoadCADFromUrlPromptCtrl(createFileInputDeps());
 }
 
 async function handleProxyMeshFile(event: Event) {

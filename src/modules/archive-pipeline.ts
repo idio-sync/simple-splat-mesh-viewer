@@ -23,6 +23,7 @@ import {
     loadArchiveProxyMesh, loadArchiveProxySplat,
     getPrimaryAssetType
 } from './file-handlers.js';
+import { loadCADFromBlobUrl } from './cad-loader.js';
 import { centerModelOnGrid } from './alignment.js';
 import { updatePronomRegistry } from './metadata-manager.js';
 import type { ArchivePipelineDeps } from '@/types.js';
@@ -433,6 +434,34 @@ export async function ensureAssetLoaded(assetType: string, deps: ArchivePipeline
             document.getElementById('drawing-filename')!.textContent = drawingEntry.file_name.split('/').pop()!;
             state.assetStates[assetType] = ASSET_STATE.LOADED;
             return true;
+
+        } else if (assetType === 'cad') {
+            const contentInfo = archiveLoader.getContentInfo();
+            if (!contentInfo.hasCAD) {
+                state.assetStates[assetType] = ASSET_STATE.UNLOADED;
+                return false;
+            }
+            const cadEntry = archiveLoader.getCADEntry();
+            if (!cadEntry) { state.assetStates[assetType] = ASSET_STATE.UNLOADED; return false; }
+            const cadData = await archiveLoader.extractFile(cadEntry.file_name);
+            if (!cadData) { state.assetStates[assetType] = ASSET_STATE.ERROR; return false; }
+            await loadCADFromBlobUrl(cadData.url, cadEntry.file_name, { cadGroup: sceneRefs.cadGroup, state });
+            state.cadLoaded = true;
+            // Apply transform
+            const cadTransform = archiveLoader.getEntryTransform(cadEntry);
+            const cadGroup = sceneRefs.cadGroup;
+            const cs = normalizeScale(cadTransform.scale);
+            if (cadGroup && (cadTransform.position.some((v: number) => v !== 0) || cadTransform.rotation.some((v: number) => v !== 0) || cs.some(v => v !== 1))) {
+                cadGroup.position.fromArray(cadTransform.position);
+                cadGroup.rotation.set(...cadTransform.rotation);
+                cadGroup.scale.set(...cs);
+            }
+            document.getElementById('cad-filename')!.textContent = cadEntry.file_name.split('/').pop()!;
+            const cadStore = getStore();
+            cadStore.cadFileName = cadEntry.original_name || cadEntry.file_name.split('/').pop() || cadEntry.file_name;
+            cadStore.cadBlob = cadData.blob;
+            state.assetStates[assetType] = ASSET_STATE.LOADED;
+            return true;
         }
 
         return false;
@@ -464,7 +493,7 @@ export async function processArchive(archiveLoader: any, archiveName: string, de
         state.archiveFileName = archiveName;
         state.archiveLoaded = true;
         // Reset asset states for new archive
-        state.assetStates = { splat: ASSET_STATE.UNLOADED, mesh: ASSET_STATE.UNLOADED, pointcloud: ASSET_STATE.UNLOADED };
+        state.assetStates = { splat: ASSET_STATE.UNLOADED, mesh: ASSET_STATE.UNLOADED, pointcloud: ASSET_STATE.UNLOADED, cad: ASSET_STATE.UNLOADED };
 
         // Prefill metadata panel from loaded archive
         deps.metadata.prefillMetadataFromArchive(manifest);
@@ -522,7 +551,7 @@ export async function processArchive(archiveLoader: any, archiveName: string, de
 
         if (!primaryLoaded) {
             // Try loading any available asset
-            const fallbackTypes = ['splat', 'mesh', 'pointcloud', 'drawing'].filter(t => t !== primaryType);
+            const fallbackTypes = ['splat', 'mesh', 'pointcloud', 'drawing', 'cad'].filter(t => t !== primaryType);
             let anyLoaded = false;
             for (const type of fallbackTypes) {
                 deps.ui.showLoading(`Loading ${type} from archive...`);
@@ -591,7 +620,7 @@ export async function processArchive(archiveLoader: any, archiveName: string, de
         }
 
         // === Phase 3: Background-load remaining assets (in parallel) ===
-        const remainingTypes = ['splat', 'mesh', 'pointcloud', 'drawing'].filter(
+        const remainingTypes = ['splat', 'mesh', 'pointcloud', 'drawing', 'cad'].filter(
             t => t !== primaryType && state.assetStates[t] === ASSET_STATE.UNLOADED
         );
         if (remainingTypes.length > 0) {
@@ -600,7 +629,8 @@ export async function processArchive(archiveLoader: any, archiveName: string, de
                     (type === 'splat' && contentInfo.hasSplat) ||
                     (type === 'mesh' && contentInfo.hasMesh) ||
                     (type === 'pointcloud' && contentInfo.hasPointcloud) ||
-                    (type === 'drawing' && contentInfo.hasDrawing)
+                    (type === 'drawing' && contentInfo.hasDrawing) ||
+                    (type === 'cad' && contentInfo.hasCAD)
                 );
                 await Promise.all(typesToLoad.map(async (type) => {
                     log.info(`Background loading: ${type}`);

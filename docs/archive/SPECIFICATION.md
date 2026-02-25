@@ -417,6 +417,7 @@ Entry keys MUST follow the pattern `<type>_<index>` where:
 | `mesh_` | Polygon mesh (GLB, glTF, OBJ, STL) |
 | `pointcloud_` | Point cloud (E57) |
 | `drawing_` | 2D/3D line drawing (DXF) |
+| `cad_` | Parametric CAD model (STEP, IGES) |
 | `thumbnail_` | Preview image |
 | `screenshot_` | User-captured viewport screenshot |
 | `image_` | Embedded image attachment (referenced by annotations or descriptions via the `asset:` protocol) |
@@ -502,7 +503,7 @@ Per-axis scale example:
 
 #### 5.9.4 Minimum Asset Requirement
 
-A valid archive MUST contain at least one data entry with a type prefix of `scene_`, `mesh_`, or `pointcloud_`. Archives containing only `thumbnail_`, `screenshot_`, `image_`, or `source_` entries are not valid.
+A valid archive MUST contain at least one data entry with a type prefix of `scene_`, `mesh_`, `pointcloud_`, or `cad_`. Archives containing only `thumbnail_`, `screenshot_`, `image_`, or `source_` entries are not valid.
 
 ### 5.10 annotations
 
@@ -749,7 +750,20 @@ Drawing assets SHOULD be assigned the `role` value `"derived"` and SHOULD use th
 
 Drawing assets are loaded via the `three-dxf-loader` library in the reference implementation.
 
-### 6.5 Thumbnail Formats
+### 6.5 CAD Formats
+
+| Extension | Format | Specification |
+|-----------|--------|--------------|
+| `.step` / `.stp` | ISO 10303 STEP | [ISO 10303](https://www.iso.org/standard/63141.html) |
+| `.iges` / `.igs` | Initial Graphics Exchange Specification | [IGES 5.3](https://www.uspro.org/iges_spec.html) |
+
+STEP and IGES files contain parametric CAD geometry (B-Rep solid models, surfaces, curves). They are typically produced by CAD authoring tools (SolidWorks, CATIA, FreeCAD, AutoCAD) for engineering and manufacturing workflows.
+
+CAD assets SHOULD use the `cad_` entry key prefix (e.g., `cad_0`). Readers SHOULD tessellate and render CAD geometry in a dedicated CAD layer, distinct from mesh, splat, and drawing layers, to allow independent visibility control.
+
+CAD assets are tessellated via the OpenCASCADE Technology WASM library (`occt-import-js`) in the reference implementation.
+
+### 6.6 Thumbnail Formats
 
 | Extension | Format |
 |-----------|--------|

@@ -440,6 +440,11 @@
                         <button class="prop-btn" id="btn-load-stl-url" style="font-size:10px; color:var(--text-muted);">STL from URL...</button>
                         <span id="stl-filename" class="prop-hint">No file loaded</span>
 
+                        <label for="cad-input" class="prop-btn mt4" style="cursor:pointer;"><span style="color:#4a9e6b;">+</span> CAD Model (.step, .iges)</label>
+                        <input type="file" id="cad-input" accept=".step,.stp,.iges,.igs" style="display:none" />
+                        <button class="prop-btn" id="btn-load-cad-url" style="font-size:10px; color:var(--text-muted);">CAD from URL...</button>
+                        <span id="cad-filename" class="prop-hint">No file loaded</span>
+
                         <label for="drawing-input" class="prop-btn mt4" style="cursor:pointer;"><span style="color:#7bce9a;">+</span> CAD Drawing (.dxf)</label>
                         <input type="file" id="drawing-input" accept=".dxf" style="display:none" />
                         <button class="prop-btn" id="btn-load-drawing-url" style="font-size:10px; color:var(--text-muted);">DXF from URL...</button>

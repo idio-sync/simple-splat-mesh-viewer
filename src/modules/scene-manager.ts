@@ -121,6 +121,9 @@ export class SceneManager {
     // STL group
     stlGroup: Group | null;
 
+    // CAD group (STEP/IGES)
+    cadGroup: Group | null;
+
     // Drawing group (DXF)
     drawingGroup: Group | null;
 
@@ -187,6 +190,9 @@ export class SceneManager {
 
         // STL group
         this.stlGroup = null;
+
+        // CAD group (STEP/IGES)
+        this.cadGroup = null;
 
         // Drawing group (DXF)
         this.drawingGroup = null;
@@ -424,6 +430,10 @@ export class SceneManager {
         this.drawingGroup = new Group();
         this.drawingGroup.name = 'drawingGroup';
         this.scene.add(this.drawingGroup);
+
+        this.cadGroup = new Group();
+        this.cadGroup.name = 'cadGroup';
+        this.scene.add(this.cadGroup);
 
         log.info('Scene initialization complete');
         return true;

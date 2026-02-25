@@ -17,6 +17,7 @@ scene.a3d/
     scene_0.ply              # Gaussian splat data
     mesh_0.glb               # 3D mesh
     pointcloud_0.e57         # Point cloud (optional)
+    cad_0.step               # Parametric CAD model (optional)
     mesh_0_proxy.glb         # LOD proxy mesh (optional)
   images/                    # Image attachments referenced by annotations/descriptions
     photo1.jpg

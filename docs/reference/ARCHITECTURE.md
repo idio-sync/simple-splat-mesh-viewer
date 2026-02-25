@@ -94,9 +94,10 @@ utilities.ts  (imports constants, logger, THREE)
      +---> scene-manager.ts       (THREE, OrbitControls, TransformControls, constants, utilities)
      +---> file-handlers.ts       (THREE, GLTFLoader, OBJLoader, MTLLoader, SplatMesh, E57Loader,
      |                             fflate via archive-loader, constants, utilities)
+     +---> cad-loader.ts          (THREE, occt-import-js WASM, utilities, asset-store)
      +---> archive-loader.ts      (fflate, utilities)
      +---> archive-creator.ts     (fflate, utilities)
-     +---> archive-pipeline.ts    (file-handlers, archive-loader, quality-tier, utilities)
+     +---> archive-pipeline.ts    (file-handlers, cad-loader, archive-loader, quality-tier, utilities)
      +---> alignment.ts           (THREE, utilities)
      +---> annotation-system.ts   (THREE — no utility imports)
      +---> metadata-manager.ts    (utilities)
@@ -131,6 +132,7 @@ Dependencies installed via npm (pinned versions in `package.json`):
 - Spark.js 0.1.10
 - fflate 0.8.2
 - three-e57-loader 1.2.0 / web-e57 1.2.0
+- occt-import-js 0.0.23 (OpenCASCADE WASM — STEP/IGES tessellation; 7.3 MB WASM served at `/occt-import-js.wasm`)
 - Leaflet (interactive map picker for GPS coordinate selection in metadata)
 
 Vite resolves bare specifiers (`'three'`, `'fflate'`, etc.) from `node_modules/` at build time.
@@ -145,6 +147,7 @@ User picks file / provides URL
   → Splat bytes → Spark.js SplatMesh.load() → added to scene
   → Mesh bytes  → GLTFLoader / OBJLoader → wrapped in modelGroup → added to scene
   → E57 bytes   → E57Loader (WASM) → THREE.Points → added to pointcloudGroup
+  → STEP/IGES bytes → occt-import-js (WASM) → tessellated THREE.Mesh(es) → added to cadGroup
   → main.ts callbacks update UI state, trigger auto-alignment if needed
 ```
 
@@ -225,6 +228,13 @@ Encapsulates Three.js setup in a `SceneManager` class:
 - `render()` method handles visibility toggling per display mode and renders to one or two canvases.
 - `onWindowResize()` recalculates aspect ratios for single or split layout.
 - FPS counter logic (frame counting + periodic update).
+
+### `src/modules/cad-loader.ts`
+Parametric CAD loading:
+- Lazy WASM singleton — `occt-import-js` is initialized on first use, then reused.
+- `loadCADFromFile()` / `loadCADFromUrl()` / `loadCADFromBlobUrl()` — accept File, URL, or blob URL + filename.
+- `loadCADFromBuffer()` — core function: calls `occt.ReadStepFile()` or `occt.ReadIgesFile()` (synchronous after WASM init), then builds one `THREE.Mesh` per returned geometry using `THREE.MeshPhongMaterial`.
+- The WASM binary is fetched from `/occt-import-js.wasm` (absolute server-root path) via `locateFile` override. In dev, `serveOcctWasm()` Vite plugin serves it from `node_modules/`; at build time it is copied to `dist/`.
 
 ### `src/modules/file-handlers.ts`
 All asset-loading logic:

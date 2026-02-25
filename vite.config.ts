@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import { copyFileSync, cpSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'fs';
+import { copyFileSync, cpSync, mkdirSync, existsSync, readFileSync, writeFileSync, createReadStream } from 'fs';
 import { transformSync } from 'esbuild';
 
 // Kiosk viewer fetches these as raw text at runtime to inline into offline HTML.
@@ -12,6 +12,30 @@ const KIOSK_MODULES = [
     'annotation-system.ts', 'measurement-system.ts', 'file-handlers.ts', 'metadata-manager.ts',
     'theme-loader.ts', 'quality-tier.ts', 'metadata-profile.ts', 'walkthrough-engine.ts', 'kiosk-main.ts'
 ];
+
+/**
+ * Vite plugin that serves occt-import-js WASM in dev and copies it to dist/ at build time.
+ * occt-import-js uses a locateFile override to fetch from '/occt-import-js.wasm' (server root).
+ */
+function serveOcctWasm() {
+    return {
+        name: 'serve-occt-wasm',
+        configureServer(server: any) {
+            const wasmPath = resolve(__dirname, 'node_modules/occt-import-js/dist/occt-import-js.wasm');
+            server.middlewares.use('/occt-import-js.wasm', (_req: any, res: any) => {
+                res.setHeader('Content-Type', 'application/wasm');
+                createReadStream(wasmPath).pipe(res);
+            });
+        },
+        writeBundle() {
+            const wasmSrc = resolve(__dirname, 'node_modules/occt-import-js/dist/occt-import-js.wasm');
+            const wasmDest = resolve(__dirname, 'dist/occt-import-js.wasm');
+            if (existsSync(wasmSrc)) {
+                copyFileSync(wasmSrc, wasmDest);
+            }
+        }
+    };
+}
 
 /**
  * Vite plugin that copies files needed at runtime but not imported at build time.
@@ -100,11 +124,13 @@ export default defineConfig({
     },
 
     optimizeDeps: {
-        // Spark.js uses eval() for WASM — excluding prevents esbuild from breaking it
-        exclude: ['@sparkjsdev/spark'],
+        // Spark.js uses eval() for WASM — excluding prevents esbuild from breaking it.
+        // occt-import-js uses dynamic import + locateFile for WASM — exclude to prevent esbuild inlining.
+        exclude: ['@sparkjsdev/spark', 'occt-import-js'],
     },
 
     plugins: [
         copyRuntimeAssets(),
+        serveOcctWasm(),
     ],
 });

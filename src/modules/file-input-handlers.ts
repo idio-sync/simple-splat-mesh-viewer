@@ -12,6 +12,7 @@ import {
     loadDrawingFromFile as loadDrawingFromFileHandler,
     loadDrawingFromUrl as loadDrawingFromUrlHandler
 } from './file-handlers.js';
+import { loadCADFromFile as loadCADFromFileHandler, loadCADFromUrl as loadCADFromUrlHandler } from './cad-loader.js';
 
 const log = Logger.getLogger('file-input-handlers');
 
@@ -26,6 +27,7 @@ export interface FileInputDeps {
     createFileHandlerDeps: () => any;
     createPointcloudDeps: () => any;
     createArchivePipelineDeps: () => any;
+    createCADDeps: () => any;
     loadArchiveFromUrl: (url: string) => Promise<void>;
     processArchive: (archiveLoader: any, name: string) => Promise<void>;
     showLoading: (msg: string, progress?: boolean) => void;
@@ -116,6 +118,20 @@ async function loadDrawingFromUrlInternal(url: string, deps: FileInputDeps) {
         log.error('Error loading DXF from URL:', error);
         deps.hideLoading();
         notify.error('Error loading DXF drawing: ' + error.message);
+    }
+}
+
+async function loadCADFromUrlInternal(url: string, deps: FileInputDeps) {
+    deps.showLoading('Loading CAD Model...');
+    try {
+        await loadCADFromUrlHandler(url, deps.createCADDeps());
+        const filename = url.split('/').pop() || 'URL';
+        document.getElementById('cad-filename').textContent = filename;
+        deps.hideLoading();
+    } catch (error) {
+        log.error('Error loading CAD from URL:', error);
+        deps.hideLoading();
+        notify.error('Error loading CAD model: ' + error.message);
     }
 }
 
@@ -211,6 +227,21 @@ export function handleLoadDrawingFromUrlPrompt(deps: FileInputDeps) {
     loadDrawingFromUrlInternal(validation.url, deps);
 }
 
+export function handleLoadCADFromUrlPrompt(deps: FileInputDeps) {
+    log.info(' handleLoadCADFromUrlPrompt called');
+    const url = prompt('Enter STEP or IGES URL (.step, .stp, .iges, .igs):');
+    log.info(' User entered:', url);
+    if (!url) return;
+
+    const validation = deps.validateUserUrl(url, 'cad');
+    if (!validation.valid) {
+        notify.error('Cannot load CAD model: ' + validation.error);
+        return;
+    }
+
+    loadCADFromUrlInternal(validation.url, deps);
+}
+
 // ===== File Input Handlers =====
 
 export async function handleSplatFile(event: Event, deps: FileInputDeps) {
@@ -298,6 +329,23 @@ export async function handlePointcloudFile(event: Event, deps: FileInputDeps) {
         log.error('Error loading point cloud:', error);
         deps.hideLoading();
         notify.error('Error loading point cloud: ' + error.message);
+    }
+}
+
+export async function handleCADFile(event: Event, deps: FileInputDeps) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+
+    document.getElementById('cad-filename').textContent = file.name;
+    deps.showLoading('Loading CAD Model...');
+
+    try {
+        await loadCADFromFileHandler(file, deps.createCADDeps());
+        deps.hideLoading();
+    } catch (error) {
+        log.error('Error loading CAD model:', error);
+        deps.hideLoading();
+        notify.error('Error loading CAD model: ' + error.message);
     }
 }
 

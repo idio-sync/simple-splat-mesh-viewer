@@ -41,6 +41,7 @@ Prioritized list of future work, drawn from the [code review](reference/CODE_REV
 
 ### Asset Types
 - [x] **Done** — DXF drawing files as an independent asset type (loaded via `three-dxf-loader`, displayed in a dedicated drawing layer)
+- [x] **Done** — STEP/IGES parametric CAD files as an independent asset type (loaded via `occt-import-js` OpenCASCADE WASM, tessellated and rendered in a dedicated CAD layer; stored as `cad_` entries in archives)
 
 ### Annotation Enhancements
 - [x] **Done** — Image attachments in annotations via `asset:` protocol
