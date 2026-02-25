@@ -233,6 +233,12 @@ These appear in older Three.js extension packages or are very specialized.
 | 1 | **UTF8Loader** | UTF-8 encoded mesh | Google's experimental compressed mesh format. Abandoned in favor of Draco. |
 | 1 | **XLoader** | `.x` (DirectX) | Legacy DirectX model format. Extremely rare in modern workflows. |
 
+### 3.13 Game Engine Formats
+
+| DDI | Package | Format(s) | Description |
+|-----|---------|-----------|-------------|
+| 3 | **source-engine-model-loader** (gkjohnson) | `.mdl`, `.vtx`, `.vvd`, `.ani`, `.vtf`, `.vmt` | Loads Valve Source Engine models from Half-Life 2, Portal, TF2, CS:GO, and related titles. Parses the full asset trio: `.mdl` (bone hierarchy, LODs, hitboxes), `.vtx` (optimized render geometry), `.vvd` (vertices and blend weights), with optional `.ani` animation clips. Materials resolved via `.vmt`/`.vtf`. Useful if DDI documents game studios, interactive heritage recreations, or needs to reference game-engine versions of real-world locations. |
+
 ---
 
 ## 4. Summary: DDI Top 15 Formats
