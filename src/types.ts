@@ -19,6 +19,8 @@ export interface AppState {
     modelLoaded: boolean;
     pointcloudLoaded: boolean;
     stlLoaded: boolean;
+    drawingLoaded: boolean;
+    currentDrawingUrl: string | null;
     modelOpacity: number;
     modelWireframe: boolean;
     modelMatcap: boolean;
@@ -68,6 +70,7 @@ export interface SceneRefs {
     readonly modelGroup: any;         // THREE.Group
     readonly pointcloudGroup: any;    // THREE.Group
     readonly stlGroup: any;           // THREE.Group
+    readonly drawingGroup: any;       // THREE.Group
     readonly flyControls: any;        // FlyControls | null
     readonly annotationSystem: any;   // AnnotationSystem | null
     readonly archiveCreator: any;     // ArchiveCreator | null
@@ -180,7 +183,7 @@ export interface ExportDeps {
 }
 
 export interface ArchivePipelineDeps {
-    sceneRefs: Pick<SceneRefs, 'scene' | 'camera' | 'controls' | 'renderer' | 'splatMesh' | 'modelGroup' | 'pointcloudGroup'>;
+    sceneRefs: Pick<SceneRefs, 'scene' | 'camera' | 'controls' | 'renderer' | 'splatMesh' | 'modelGroup' | 'pointcloudGroup' | 'drawingGroup'>;
     state: AppState;
     sceneManager: any;
     setSplatMesh: (mesh: any) => void;
@@ -213,7 +216,7 @@ export interface ArchivePipelineDeps {
 }
 
 export interface EventWiringDeps {
-    sceneRefs: Pick<SceneRefs, 'scene' | 'camera' | 'controls' | 'transformControls' | 'splatMesh' | 'modelGroup' | 'pointcloudGroup' | 'stlGroup' | 'flyControls' | 'ambientLight' | 'hemisphereLight' | 'directionalLight1' | 'directionalLight2'>;
+    sceneRefs: Pick<SceneRefs, 'scene' | 'camera' | 'controls' | 'transformControls' | 'splatMesh' | 'modelGroup' | 'pointcloudGroup' | 'stlGroup' | 'drawingGroup' | 'flyControls' | 'ambientLight' | 'hemisphereLight' | 'directionalLight1' | 'directionalLight2'>;
     state: AppState;
     sceneManager: any;
     files: {
@@ -224,12 +227,14 @@ export interface EventWiringDeps {
         handleProxyMeshFile: (e: Event) => void;
         handleProxySplatFile: (e: Event) => void;
         handleSTLFile: (e: Event) => void;
+        handleDrawingFile: (e: Event) => void;
         handleSourceFilesInput: (e: Event) => void;
         handleLoadSplatFromUrlPrompt: () => void;
         handleLoadModelFromUrlPrompt: () => void;
         handleLoadPointcloudFromUrlPrompt: () => void;
         handleLoadArchiveFromUrlPrompt: () => void;
         handleLoadSTLFromUrlPrompt: () => void;
+        handleLoadDrawingFromUrlPrompt: () => void;
         handleLoadFullResMesh: () => void;
         switchQualityTier: (tier: string) => void;
     };

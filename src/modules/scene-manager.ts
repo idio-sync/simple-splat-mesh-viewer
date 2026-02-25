@@ -121,6 +121,9 @@ export class SceneManager {
     // STL group
     stlGroup: Group | null;
 
+    // Drawing group (DXF)
+    drawingGroup: Group | null;
+
     // FPS tracking
     frameCount: number;
     lastFpsTime: number;
@@ -184,6 +187,9 @@ export class SceneManager {
 
         // STL group
         this.stlGroup = null;
+
+        // Drawing group (DXF)
+        this.drawingGroup = null;
 
         // FPS tracking
         this.frameCount = 0;
@@ -414,6 +420,10 @@ export class SceneManager {
         this.stlGroup = new Group();
         this.stlGroup.name = 'stlGroup';
         this.scene.add(this.stlGroup);
+
+        this.drawingGroup = new Group();
+        this.drawingGroup.name = 'drawingGroup';
+        this.scene.add(this.drawingGroup);
 
         log.info('Scene initialization complete');
         return true;

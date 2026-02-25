@@ -104,6 +104,8 @@ export function setupUIEvents(deps: EventWiringDeps): void {
     addListener('proxy-splat-input', 'change', deps.files.handleProxySplatFile);
     addListener('stl-input', 'change', deps.files.handleSTLFile);
     addListener('btn-load-stl-url', 'click', deps.files.handleLoadSTLFromUrlPrompt);
+    addListener('drawing-input', 'change', deps.files.handleDrawingFile);
+    addListener('btn-load-drawing-url', 'click', deps.files.handleLoadDrawingFromUrlPrompt);
     addListener('source-files-input', 'change', deps.files.handleSourceFilesInput);
     addListener('btn-load-pointcloud-url', 'click', deps.files.handleLoadPointcloudFromUrlPrompt);
     addListener('btn-load-archive-url', 'click', deps.files.handleLoadArchiveFromUrlPrompt);

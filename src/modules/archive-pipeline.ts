@@ -18,6 +18,7 @@ import {
     loadGLTF,
     loadOBJFromUrl as loadOBJFromUrlFn,
     loadPointcloudFromBlobUrl as loadPointcloudFromBlobUrlHandler,
+    loadDrawingFromBlobUrl as loadDrawingFromBlobUrlHandler,
     loadArchiveFullResMesh, loadArchiveFullResSplat,
     loadArchiveProxyMesh, loadArchiveProxySplat,
     getPrimaryAssetType
@@ -408,6 +409,30 @@ export async function ensureAssetLoaded(assetType: string, deps: ArchivePipeline
             state.assetStates[assetType] = ASSET_STATE.LOADED;
             updatePronomRegistry(state);
             return true;
+
+        } else if (assetType === 'drawing') {
+            const contentInfo = archiveLoader.getContentInfo();
+            if (!contentInfo.hasDrawing) {
+                state.assetStates[assetType] = ASSET_STATE.UNLOADED;
+                return false;
+            }
+            const drawingEntry = archiveLoader.getDrawingEntry();
+            if (!drawingEntry) { state.assetStates[assetType] = ASSET_STATE.UNLOADED; return false; }
+            const drawingData = await archiveLoader.extractFile(drawingEntry.file_name);
+            if (!drawingData) { state.assetStates[assetType] = ASSET_STATE.ERROR; return false; }
+            await loadDrawingFromBlobUrlHandler(drawingData.url, drawingEntry.file_name, { drawingGroup: sceneRefs.drawingGroup, state });
+            // Apply transform
+            const transform = archiveLoader.getEntryTransform(drawingEntry);
+            const drawingGroup = sceneRefs.drawingGroup;
+            const ds = normalizeScale(transform.scale);
+            if (drawingGroup && (transform.position.some((v: number) => v !== 0) || transform.rotation.some((v: number) => v !== 0) || ds.some(v => v !== 1))) {
+                drawingGroup.position.fromArray(transform.position);
+                drawingGroup.rotation.set(...transform.rotation);
+                drawingGroup.scale.set(...ds);
+            }
+            document.getElementById('drawing-filename')!.textContent = drawingEntry.file_name.split('/').pop()!;
+            state.assetStates[assetType] = ASSET_STATE.LOADED;
+            return true;
         }
 
         return false;
@@ -497,7 +522,7 @@ export async function processArchive(archiveLoader: any, archiveName: string, de
 
         if (!primaryLoaded) {
             // Try loading any available asset
-            const fallbackTypes = ['splat', 'mesh', 'pointcloud'].filter(t => t !== primaryType);
+            const fallbackTypes = ['splat', 'mesh', 'pointcloud', 'drawing'].filter(t => t !== primaryType);
             let anyLoaded = false;
             for (const type of fallbackTypes) {
                 deps.ui.showLoading(`Loading ${type} from archive...`);
@@ -566,7 +591,7 @@ export async function processArchive(archiveLoader: any, archiveName: string, de
         }
 
         // === Phase 3: Background-load remaining assets (in parallel) ===
-        const remainingTypes = ['splat', 'mesh', 'pointcloud'].filter(
+        const remainingTypes = ['splat', 'mesh', 'pointcloud', 'drawing'].filter(
             t => t !== primaryType && state.assetStates[t] === ASSET_STATE.UNLOADED
         );
         if (remainingTypes.length > 0) {
@@ -574,7 +599,8 @@ export async function processArchive(archiveLoader: any, archiveName: string, de
                 const typesToLoad = remainingTypes.filter(type =>
                     (type === 'splat' && contentInfo.hasSplat) ||
                     (type === 'mesh' && contentInfo.hasMesh) ||
-                    (type === 'pointcloud' && contentInfo.hasPointcloud)
+                    (type === 'pointcloud' && contentInfo.hasPointcloud) ||
+                    (type === 'drawing' && contentInfo.hasDrawing)
                 );
                 await Promise.all(typesToLoad.map(async (type) => {
                     log.info(`Background loading: ${type}`);

@@ -8,7 +8,9 @@ import {
     loadModelFromUrl as loadModelFromUrlHandler,
     loadSTLFromUrlWithDeps as loadSTLFromUrlWithDepsHandler,
     loadPointcloudFromFile as loadPointcloudFromFileHandler,
-    loadPointcloudFromUrl as loadPointcloudFromUrlHandler
+    loadPointcloudFromUrl as loadPointcloudFromUrlHandler,
+    loadDrawingFromFile as loadDrawingFromFileHandler,
+    loadDrawingFromUrl as loadDrawingFromUrlHandler
 } from './file-handlers.js';
 
 const log = Logger.getLogger('file-input-handlers');
@@ -101,6 +103,22 @@ async function loadSTLFromUrlInternal(url: string, deps: FileInputDeps) {
     }
 }
 
+async function loadDrawingFromUrlInternal(url: string, deps: FileInputDeps) {
+    deps.showLoading('Downloading DXF Drawing...', true);
+
+    try {
+        await loadDrawingFromUrlHandler(url, deps.createFileHandlerDeps(), (received: number, total: number) => {
+            const percent = Math.round((received / total) * 90);
+            deps.updateProgress(percent, `Downloading DXF Drawing... ${deps.formatFileSize(received)} / ${deps.formatFileSize(total)}`);
+        });
+        deps.hideLoading();
+    } catch (error) {
+        log.error('Error loading DXF from URL:', error);
+        deps.hideLoading();
+        notify.error('Error loading DXF drawing: ' + error.message);
+    }
+}
+
 // ===== URL Prompt Handlers =====
 
 export function handleLoadSplatFromUrlPrompt(deps: FileInputDeps) {
@@ -178,6 +196,21 @@ export function handleLoadSTLFromUrlPrompt(deps: FileInputDeps) {
     loadSTLFromUrlInternal(validation.url, deps);
 }
 
+export function handleLoadDrawingFromUrlPrompt(deps: FileInputDeps) {
+    log.info(' handleLoadDrawingFromUrlPrompt called');
+    const url = prompt('Enter DXF Drawing URL (.dxf):');
+    log.info(' User entered:', url);
+    if (!url) return;
+
+    const validation = deps.validateUserUrl(url, 'drawing');
+    if (!validation.valid) {
+        notify.error('Cannot load DXF: ' + validation.error);
+        return;
+    }
+
+    loadDrawingFromUrlInternal(validation.url, deps);
+}
+
 // ===== File Input Handlers =====
 
 export async function handleSplatFile(event: Event, deps: FileInputDeps) {
@@ -233,6 +266,24 @@ export async function handleSTLFile(event: Event, deps: FileInputDeps) {
     }
 }
 
+export async function handleDrawingFile(event: Event, deps: FileInputDeps) {
+    const files = (event.target as HTMLInputElement).files;
+    if (!files.length) return;
+
+    const mainFile = files[0];
+    document.getElementById('drawing-filename').textContent = mainFile.name;
+    deps.showLoading('Loading DXF Drawing...');
+
+    try {
+        await loadDrawingFromFileHandler(files, deps.createFileHandlerDeps());
+        deps.hideLoading();
+    } catch (error) {
+        log.error('Error loading DXF:', error);
+        deps.hideLoading();
+        notify.error('Error loading DXF drawing: ' + error.message);
+    }
+}
+
 export async function handlePointcloudFile(event: Event, deps: FileInputDeps) {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
@@ -284,6 +335,10 @@ export async function loadPointcloudFromUrl(url: string, deps: FileInputDeps) {
 
 export async function loadSTLFromUrl(url: string, deps: FileInputDeps) {
     return loadSTLFromUrlInternal(url, deps);
+}
+
+export async function loadDrawingFromUrl(url: string, deps: FileInputDeps) {
+    return loadDrawingFromUrlInternal(url, deps);
 }
 
 // ===== Tauri Native Dialog Wiring =====

@@ -91,9 +91,11 @@ import {
     handleLoadPointcloudFromUrlPrompt as handleLoadPointcloudFromUrlPromptCtrl,
     handleLoadArchiveFromUrlPrompt as handleLoadArchiveFromUrlPromptCtrl,
     handleLoadSTLFromUrlPrompt as handleLoadSTLFromUrlPromptCtrl,
+    handleLoadDrawingFromUrlPrompt as handleLoadDrawingFromUrlPromptCtrl,
     handleSplatFile as handleSplatFileCtrl,
     handleModelFile as handleModelFileCtrl,
     handleSTLFile as handleSTLFileCtrl,
+    handleDrawingFile as handleDrawingFileCtrl,
     handlePointcloudFile as handlePointcloudFileCtrl,
     handleProxyMeshFile as handleProxyMeshFileCtrl,
     handleProxySplatFile as handleProxySplatFileCtrl,
@@ -245,6 +247,8 @@ const state: AppState = {
     modelLoaded: false,
     pointcloudLoaded: false,
     stlLoaded: false,
+    drawingLoaded: false,
+    currentDrawingUrl: null,
     modelOpacity: 1,
     modelWireframe: false,
     modelMatcap: false,
@@ -298,6 +302,7 @@ let splatMesh: any = null; // SplatMesh from Spark
 let modelGroup: THREE.Group;
 let pointcloudGroup: THREE.Group;
 let stlGroup: THREE.Group;
+let drawingGroup: THREE.Group;
 let ambientLight: THREE.AmbientLight;
 let hemisphereLight: THREE.HemisphereLight;
 let directionalLight1: THREE.DirectionalLight;
@@ -326,6 +331,7 @@ const sceneRefs: SceneRefs = {
     get modelGroup() { return modelGroup; },
     get pointcloudGroup() { return pointcloudGroup; },
     get stlGroup() { return stlGroup; },
+    get drawingGroup() { return drawingGroup; },
     get flyControls() { return flyControls; },
     get annotationSystem() { return annotationSystem; },
     get archiveCreator() { return archiveCreator; },
@@ -358,6 +364,7 @@ function createFileHandlerDeps(): any {
         scene,
         modelGroup,
         stlGroup,
+        drawingGroup,
         getSplatMesh: () => splatMesh,
         setSplatMesh: (mesh: any) => { splatMesh = mesh; },
         getModelGroup: () => modelGroup,
@@ -447,6 +454,13 @@ function createFileHandlerDeps(): any {
                 // Center STL on grid
                 setTimeout(() => centerModelOnGrid(stlGroup), TIMING.AUTO_ALIGN_DELAY);
                 updatePronomRegistry(state);
+            },
+            onDrawingLoaded: (object: any, file: any) => {
+                updateVisibility();
+                const filenameEl = document.getElementById('drawing-filename');
+                if (filenameEl) filenameEl.textContent = file.name || 'DXF loaded';
+                // Center drawing on grid
+                setTimeout(() => centerModelOnGrid(drawingGroup), TIMING.AUTO_ALIGN_DELAY);
             }
         }
     };
@@ -591,10 +605,11 @@ function createEventWiringDeps(): EventWiringDeps {
         files: {
             handleSplatFile, handleModelFile, handleArchiveFile,
             handlePointcloudFile, handleProxyMeshFile, handleProxySplatFile,
-            handleSTLFile, handleSourceFilesInput,
+            handleSTLFile, handleDrawingFile, handleSourceFilesInput,
             handleLoadSplatFromUrlPrompt, handleLoadModelFromUrlPrompt,
             handleLoadPointcloudFromUrlPrompt, handleLoadArchiveFromUrlPrompt,
-            handleLoadSTLFromUrlPrompt, handleLoadFullResMesh, switchQualityTier
+            handleLoadSTLFromUrlPrompt, handleLoadDrawingFromUrlPrompt,
+            handleLoadFullResMesh, switchQualityTier
         },
         display: {
             setDisplayMode, updateModelOpacity, updateModelWireframe,
@@ -674,6 +689,7 @@ async function init() {
     modelGroup = sceneManager.modelGroup;
     pointcloudGroup = sceneManager.pointcloudGroup;
     stlGroup = sceneManager.stlGroup;
+    drawingGroup = sceneManager.drawingGroup;
 
     // Initialize fly camera controls (disabled by default, orbit mode is default)
     flyControls = new FlyControls(camera, renderer.domElement);
@@ -1305,6 +1321,14 @@ async function handleSTLFile(event: Event) {
 
 function handleLoadSTLFromUrlPrompt() {
     handleLoadSTLFromUrlPromptCtrl(createFileInputDeps());
+}
+
+async function handleDrawingFile(event: Event) {
+    return handleDrawingFileCtrl(event, createFileInputDeps());
+}
+
+function handleLoadDrawingFromUrlPrompt() {
+    handleLoadDrawingFromUrlPromptCtrl(createFileInputDeps());
 }
 
 async function handleProxyMeshFile(event: Event) {
