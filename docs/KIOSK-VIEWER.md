@@ -18,6 +18,9 @@ Kiosk view mode is a read-only mode used for presentation of 3D data. It can be 
 - Mobile-responsive layout with bottom sheet navigation and swipe-based annotation browsing
 - Lazy asset loading — the manifest loads first, then individual assets load on demand with inline progress indicators
 - Click-to-load gate for deferred archive download (`?autoload=false`)
+- Guided walkthrough playback — auto-plays a sequence of named camera stops with fly/fade/cut transitions, dwell times, and optional annotation links; play/pause button; loop and auto-play configurable in the archive
+- Annotation popups constrained to the 3D viewport — popups reposition automatically to stay within the visible canvas area rather than overflowing outside it
+- Cross-section clipping plane — if included in the archive, the clipping plane state is available in the kiosk viewer
 
 ## Keyboard Shortcuts
 
@@ -29,7 +32,9 @@ Kiosk view mode is a read-only mode used for presentation of 3D data. It can be 
 | `F` | Toggle fly mode (first-person WASD camera) |
 | `M` | Toggle info overlay (metadata details panel) |
 | `G` | Toggle gridlines |
-| `Escape` | Close info overlay / hide annotation popup |
+| `Escape` | Close info overlay / hide annotation popup / exit walkthrough |
+| `Space` | Play / pause walkthrough (while walkthrough is active) |
+| `→` / `←` | Next / previous walkthrough stop (while walkthrough is active) |
 
 ## Click-to-Load Gate
 

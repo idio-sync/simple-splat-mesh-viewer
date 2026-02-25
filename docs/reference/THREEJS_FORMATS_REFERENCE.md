@@ -99,7 +99,7 @@ These carry geometry, materials, textures, animations, lights, and cameras in a 
 
 | DDI | Loader | Format(s) | Description |
 |-----|--------|-----------|-------------|
-| **9** | **DRACOLoader** | `.drc` (Draco compressed geometry) | Google's mesh compression. Typically used as a plugin for GLTFLoader to dramatically reduce file sizes. Essential for web delivery of large scan meshes. |
+| **9** ✅ | **DRACOLoader** | `.drc` (Draco compressed geometry) | Google's mesh compression. Typically used as a plugin for GLTFLoader to dramatically reduce file sizes. Essential for web delivery of large scan meshes. |
 | 5 | **FontLoader** | Three.js JSON font | Loads fonts for 3D text geometry. Useful for labels, annotations, and measurement displays in scan viewers. |
 | 3 | **LottieLoader** | Lottie `.json` animations | Renders Lottie animations as textures. Could be used for animated UI elements, loading indicators, or branded overlays in viewers. |
 | 1 | **PDBLoader** | `.pdb` | Protein Data Bank — molecular structure visualization. No DDI use unless scanning molecular models for science museums. |
@@ -173,7 +173,7 @@ For large-scale, geospatially-referenced datasets — buildings, cityscapes, ter
 | DDI | Package | Format(s) | Description |
 |-----|---------|-----------|-------------|
 | **8** | **opencascade.js** | `.step`, `.stp`, `.iges`, `.igs`, `.brep` | WASM port of the OpenCascade CAD kernel. Tessellates B-Rep solid models into Three.js-compatible meshes. Handles the parametric CAD formats that DDI's engineering clients (Lockheed Martin) commonly use. Heavy WASM bundle but powerful. |
-| 6 | **three-dxf-loader** | `.dxf` | AutoCAD DXF 2D/3D drawing exchange format. Loads entities like lines, arcs, circles, polylines, 3D faces. Relevant for architectural documentation and as-built drawings. |
+| 6 ✅ | **three-dxf-loader** | `.dxf` | AutoCAD DXF 2D/3D drawing exchange format. Loads entities like lines, arcs, circles, polylines, 3D faces. Relevant for architectural documentation and as-built drawings. |
 | 5 | **CAD Exchanger SDK** (commercial) | `.step`, `.jt`, `.iges`, `.catia`, `.solidworks`, many more | Commercial conversion service. Converts virtually any CAD format to glTF/OBJ for Three.js. Most comprehensive CAD support available but requires licensing. |
 
 ### 3.6 BIM / Architecture
@@ -243,7 +243,7 @@ Ranked by combined relevance across DDI's scanning, archival, client delivery, a
 | 1 | **10** ✅ | **glTF/GLB** (GLTFLoader) | Universal web delivery, archival, client handoff |
 | 2 | **10** ✅ | **Gaussian Splats** (Spark) | Photorealistic scan visualization on web |
 | 3 | **9** | **PLY** (PLYLoader) | Direct scanner output, point clouds, colored meshes |
-| 4 | **9** | **Draco** (DRACOLoader) | Compression for web delivery of large meshes |
+| 4 | **9** ✅ | **Draco** (DRACOLoader) | Compression for web delivery of large meshes |
 | 5 | **9** | **Potree** (@pnext/three-loader) | Massive point cloud streaming (LiDAR, FARO) |
 | 6 | **9** | **Gaussian Splats** (GaussianSplats3D) | Alternative splat renderer, .ksplat compression |
 | 7 | **9** ✅ | **Standard Textures** (TextureLoader) | Scan textures, orthophotos, UV maps |

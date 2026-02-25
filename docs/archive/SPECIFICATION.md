@@ -36,6 +36,7 @@ The format uses ZIP as its physical container and JSON as its metadata language.
    - 5.12 [_meta](#512-_meta)
    - 5.13 [version_history](#513-version_history)
    - 5.14 [compliance](#514-compliance)
+   - 5.15 [walkthrough](#515-walkthrough)
 6. [Supported Asset Formats](#6-supported-asset-formats)
 7. [Integrity Verification](#7-integrity-verification)
 8. [Compatibility and Extensibility](#8-compatibility-and-extensibility)
@@ -191,6 +192,7 @@ The notation `string | ""` indicates a string field that MAY be an empty string 
 | `version_history` | array | OPTIONAL | Ordered list of version entries. See [5.13](#513-version_history). |
 | `_meta` | object | OPTIONAL | Implementation-specific metadata. See [5.12](#512-_meta). |
 | `compliance` | object | OPTIONAL | SIP compliance validation results. See [5.14](#514-compliance). |
+| `walkthrough` | object | OPTIONAL | Guided camera tour through the scene. See [5.15](#515-walkthrough). |
 
 ### 5.2 project
 
@@ -414,6 +416,7 @@ Entry keys MUST follow the pattern `<type>_<index>` where:
 | `scene_` | Gaussian splat representation |
 | `mesh_` | Polygon mesh (GLB, glTF, OBJ, STL) |
 | `pointcloud_` | Point cloud (E57) |
+| `drawing_` | 2D/3D line drawing (DXF) |
 | `thumbnail_` | Preview image |
 | `screenshot_` | User-captured viewport screenshot |
 | `image_` | Embedded image attachment (referenced by annotations or descriptions via the `asset:` protocol) |
@@ -463,7 +466,9 @@ Defines the spatial placement of an asset in a common coordinate space, allowing
 |-------|------|---------|-------------|
 | `position` | array of 3 numbers | `[0, 0, 0]` | Translation offset `[x, y, z]` in scene units. |
 | `rotation` | array of 3 numbers | `[0, 0, 0]` | Euler rotation `[x, y, z]` in radians. Rotation order: YXZ. |
-| `scale` | number | `1` | Uniform scale factor. |
+| `scale` | number \| array of 3 numbers | `1` | Scale factor. A single number applies uniform scale on all axes. An array `[x, y, z]` applies independent scale per axis. Readers MUST support both forms. When the value is a number, readers SHOULD treat it as equivalent to `[n, n, n]`. |
+
+The scalar form (`1`) SHOULD be used when all axes are scaled equally. The array form (`[x, y, z]`) MUST be used when per-axis non-uniform scale is required.
 
 ```json
 "scene_0": {
@@ -476,6 +481,21 @@ Defines the spatial placement of an asset in a common coordinate space, allowing
         "position": [0, 0, 0],
         "rotation": [3.14159, 0, 0],
         "scale": 1
+    }
+}
+```
+
+Per-axis scale example:
+
+```json
+"mesh_0": {
+    "file_name": "assets/mesh_0.glb",
+    "created_by": "Reality Capture",
+    "role": "derived",
+    "_parameters": {
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
+        "scale": [1.0, 0.5, 1.0]
     }
 }
 ```
@@ -612,6 +632,76 @@ OPTIONAL. Records the result of SIP (Submission Information Package) compliance 
 }
 ```
 
+### 5.15 walkthrough
+
+OPTIONAL. A guided walkthrough defines an ordered sequence of camera stops that a viewer can play back as a scripted tour of the scene. When present, the field MUST be an object. When absent or when `stops` is empty, readers SHOULD treat the archive as having no walkthrough.
+
+| Field | Type | Status | Description |
+|-------|------|--------|-------------|
+| `title` | string | REQUIRED | Human-readable name for the walkthrough tour. |
+| `stops` | array of objects | REQUIRED | Ordered list of camera stops. MUST contain at least one entry. |
+| `auto_play` | boolean | OPTIONAL | Whether the walkthrough starts playing automatically when the archive is opened. Default: `false`. |
+| `loop` | boolean | OPTIONAL | Whether playback loops back to the first stop after the last. Default: `false`. |
+
+#### 5.15.1 Stop Object
+
+Each entry in `stops` is an object with the following fields:
+
+| Field | Type | Status | Description |
+|-------|------|--------|-------------|
+| `id` | string | REQUIRED | Unique identifier for this stop within the walkthrough. Convention: `"stop_<n>"` with a 0-based index. |
+| `title` | string | REQUIRED | Short label displayed when this stop is active. |
+| `description` | string | OPTIONAL | Extended description of this stop. MAY contain Markdown. |
+| `camera_position` | object | REQUIRED | Camera world-space position. Fields: `x`, `y`, `z` (numbers). |
+| `camera_target` | object | REQUIRED | Camera look-at point in world space. Fields: `x`, `y`, `z` (numbers). |
+| `camera_quaternion` | object | OPTIONAL | Exact camera orientation as a quaternion. Fields: `x`, `y`, `z`, `w` (numbers). When present, readers SHOULD prefer this over deriving orientation from `camera_position` and `camera_target`. Included for backward compatibility with archives that captured quaternion state. |
+| `transition` | string | REQUIRED | How the camera arrives at this stop. Values: `"fly"` (animated camera move), `"fade"` (cross-fade through black), `"cut"` (instant). |
+| `fly_duration` | number | OPTIONAL | Duration of the fly animation in milliseconds. Applies when `transition` is `"fly"`. Readers SHOULD use a sensible default (e.g., 2000 ms) when absent. |
+| `fade_duration` | number | OPTIONAL | Duration of each fade half in milliseconds. Total fade is 2× this value. Applies when `transition` is `"fade"`. Readers SHOULD use a sensible default (e.g., 500 ms) when absent. |
+| `dwell_time` | number | REQUIRED | Time in milliseconds to remain at this stop before auto-advancing. `0` means manual advance only (the player waits for user input). |
+| `annotation_id` | string | OPTIONAL | ID of an annotation defined in the `annotations` array. When present, the reader SHOULD display the linked annotation marker and popup on arrival at this stop. |
+
+The `transition` field on the first stop describes how the camera moves when playback loops back from the last stop. Readers MAY ignore the first stop's `transition` when `loop` is `false`.
+
+```json
+"walkthrough": {
+    "title": "Condition Survey Tour",
+    "auto_play": false,
+    "loop": false,
+    "stops": [
+        {
+            "id": "stop_0",
+            "title": "Overview",
+            "description": "Full view of the east facade from ground level.",
+            "camera_position": { "x": 0.0, "y": 2.0, "z": 8.0 },
+            "camera_target": { "x": 0.0, "y": 2.0, "z": 0.0 },
+            "transition": "cut",
+            "dwell_time": 4000
+        },
+        {
+            "id": "stop_1",
+            "title": "Crack in Tracery",
+            "description": "Hairline crack running along the upper tracery.",
+            "camera_position": { "x": 1.5, "y": 4.2, "z": 2.5 },
+            "camera_target": { "x": 1.2, "y": 3.4, "z": -0.1 },
+            "transition": "fly",
+            "fly_duration": 2500,
+            "dwell_time": 6000,
+            "annotation_id": "anno_1"
+        },
+        {
+            "id": "stop_2",
+            "title": "Base Detail",
+            "camera_position": { "x": -0.5, "y": 0.5, "z": 3.0 },
+            "camera_target": { "x": 0.0, "y": 0.3, "z": 0.0 },
+            "transition": "fade",
+            "fade_duration": 400,
+            "dwell_time": 0
+        }
+    ]
+}
+```
+
 ---
 
 ## 6. Supported Asset Formats
@@ -647,7 +737,19 @@ GLB is RECOMMENDED for meshes due to its single-file nature, binary efficiency, 
 |-----------|--------|--------------|
 | `.e57` | ASTM E57 | [ASTM E2807](https://www.astm.org/e2807-11r19.html) |
 
-### 6.4 Thumbnail Formats
+### 6.4 Drawing Formats
+
+| Extension | Format | Specification |
+|-----------|--------|--------------|
+| `.dxf` | AutoCAD Drawing Exchange Format | [Autodesk DXF Reference](https://help.autodesk.com/view/OARX/2024/ENU/?guid=GUID-235B22E0-A567-4CF6-92D3-38A2306D73F3) |
+
+DXF files contain 2D and 3D line-based geometry: lines, arcs, polylines, splines, and 3D faces. They are typically used for as-built architectural drawings, floor plans, and engineering overlays that spatially accompany a photogrammetric capture.
+
+Drawing assets SHOULD be assigned the `role` value `"derived"` and SHOULD use the `drawing_` entry key prefix (e.g., `drawing_0`). Readers SHOULD render drawing geometry in a dedicated drawing layer, distinct from mesh and splat layers, to allow independent visibility control.
+
+Drawing assets are loaded via the `three-dxf-loader` library in the reference implementation.
+
+### 6.5 Thumbnail Formats
 
 | Extension | Format |
 |-----------|--------|

@@ -19,13 +19,14 @@ src/
   types.ts                - Shared TypeScript interfaces (AppState, SceneRefs, deps interfaces)
   styles.css              - All styling (~4,390 lines)
   modules/
-    alignment.ts          - KD-tree, ICP algorithm, auto-align, fit-to-view
+    alignment.ts          - KD-tree, ICP algorithm, auto-align, fit-to-view, LandmarkAlignment
     annotation-system.ts  - 3D annotation markers and raycasting
     archive-creator.ts    - Archive creation with SHA-256 hashing
     archive-loader.ts     - ZIP extraction and manifest parsing
     archive-pipeline.ts   - Archive loading/processing pipeline (extracted from main.ts)
     asset-store.ts        - ES module singleton for blob references
     constants.ts          - Shared numeric/string constants
+    cross-section.ts      - Movable/rotatable clipping plane tool using material-level clipping
     event-wiring.ts       - Central UI event binding — setupUIEvents()
     export-controller.ts  - Archive export, kiosk viewer download, metadata manifests
     file-handlers.ts      - Asset loading (splat, mesh, point cloud, archive)
@@ -34,11 +35,15 @@ src/
     kiosk-main.ts         - Kiosk viewer entry point (viewer-only mode)
     kiosk-viewer.ts       - Offline viewer generator (fetches CDN deps)
     logger.ts             - Standalone Logger class (extracted from utilities)
+    map-picker.ts         - Leaflet + OSM interactive map modal for GPS coordinate selection
+    measurement-system.ts - Point-to-point distance measurement using raycasting (session-only)
     metadata-manager.ts   - Metadata sidebar (view/edit), Dublin Core schema
+    metadata-profile.ts   - Basic/Standard/Archival completeness tiers controlling field visibility
     quality-tier.ts       - Device capability detection for SD/HD asset selection
     scene-manager.ts      - Three.js scene, camera, renderers, animation
     screenshot-manager.ts - Screenshot capture, viewfinder, screenshot list management
     share-dialog.ts       - Share-link builder with URL parameters
+    sip-validator.ts      - SIP compliance validation at export time with scoring and audit trail
     source-files-manager.ts- Source file list UI management for archive exports
     tauri-bridge.ts       - Tauri v2 native OS integration with browser fallback
     theme-loader.ts       - Kiosk theme CSS/layout loading and metadata parsing
@@ -46,7 +51,10 @@ src/
     ui-controller.ts      - Display-mode switching, progress overlay, keyboard shortcuts
     url-validation.ts     - URL validation for user-entered URLs (extracted, testable)
     utilities.ts          - Logger, notifications, mesh helpers
-    __tests__/            - Vitest test suites (206 tests across 8 suites)
+    walkthrough-controller.ts - Thin orchestration layer bridging walkthrough editor and engine
+    walkthrough-editor.ts - Walkthrough props pane: stop list, inline editor, drag-to-reorder
+    walkthrough-engine.ts - Pure playback state machine (no DOM/Three.js deps)
+    __tests__/            - Vitest test suites (10 suites; alignment.test.ts added)
   themes/
     _template/            - Copy to create a new theme
     editorial/            - Gold/navy editorial layout theme
@@ -107,6 +115,9 @@ utilities.ts  (imports constants, logger, THREE)
      +---> screenshot-manager.ts  (utilities)
      +---> source-files-manager.ts(utilities)
      +---> transform-controller.ts(THREE, utilities)
+     +---> walkthrough-engine.ts   (constants only — pure state machine, no DOM/THREE deps)
+     +---> walkthrough-editor.ts   (constants, logger, types)
+     +---> walkthrough-controller.ts (walkthrough-engine, walkthrough-editor, logger, constants)
 
 main.ts  (imports everything above and orchestrates it all)
 
@@ -120,6 +131,7 @@ Dependencies installed via npm (pinned versions in `package.json`):
 - Spark.js 0.1.10
 - fflate 0.8.2
 - three-e57-loader 1.2.0 / web-e57 1.2.0
+- Leaflet (interactive map picker for GPS coordinate selection in metadata)
 
 Vite resolves bare specifiers (`'three'`, `'fflate'`, etc.) from `node_modules/` at build time.
 
@@ -188,8 +200,9 @@ The application glue layer. At ~1,445 lines (down from ~3,900 via Phase 1-4 refa
 ### `src/types.ts`
 Shared TypeScript interfaces:
 - `AppState` — global mutable state shape
-- `SceneRefs` — Three.js scene/camera/renderer/controls references
+- `SceneRefs` — Three.js scene/camera/renderer/controls references; includes `drawingGroup` and `landmarkAlignment`
 - `ExportDeps`, `ArchivePipelineDeps`, `EventWiringDeps`, `FileInputDeps` — deps pattern interfaces
+- `Walkthrough`, `WalkthroughStop`, `WalkthroughTransition` — guided walkthrough data shapes
 
 ### `src/modules/constants.ts`
 Pure data — exported objects for camera FOV, orbit control limits, lighting colors/intensities, grid settings, timing delays, material defaults, and supported file extensions. No logic.
@@ -216,7 +229,7 @@ Encapsulates Three.js setup in a `SceneManager` class:
 ### `src/modules/file-handlers.ts`
 All asset-loading logic:
 - `loadSplatFromFile()` / `loadSplatFromUrl()` — uses Spark.js `SplatMesh` to load PLY/SPZ/SPLAT Gaussian splat data.
-- `loadModelFromFile()` / `loadModelFromUrl()` — uses `GLTFLoader` or `OBJLoader` depending on extension. Handles blob URL creation for archives.
+- `loadModelFromFile()` / `loadModelFromUrl()` — uses `GLTFLoader` or `OBJLoader` depending on extension. Handles blob URL creation for archives. Draco-compressed GLB files are supported via `DRACOLoader` with the WASM decoder served from `public/draco/`.
 - `loadPointcloudFromFile()` / `loadPointcloudFromUrl()` / `loadPointcloudFromBlobUrl()` — uses `E57Loader` (WASM-based) for .e57 files. Creates `THREE.Points` with custom point size/opacity.
 - `updatePointcloudPointSize()` / `updatePointcloudOpacity()` — mutate point cloud material properties.
 
@@ -247,6 +260,7 @@ Spatial alignment tools:
 - **`fitToView()`** — positions camera to frame all loaded objects.
 - **`resetAlignment()`** / **`resetCamera()`** — restore transforms and camera to defaults.
 - **`centerModelOnGrid()`** — centers a standalone model at the grid origin.
+- **`LandmarkAlignment`** — interactive N-point landmark alignment class. Users place matching point pairs on two objects; the class computes an optimal rigid transform, shows a live preview, reports an RMSE quality metric, supports undo of individual point pairs, and applies the final transform on confirm.
 
 ### `src/modules/annotation-system.ts`
 `AnnotationSystem` class:
@@ -309,11 +323,35 @@ Screenshot capture, viewfinder, screenshot list management extracted from main.t
 ### `src/modules/source-files-manager.ts`
 Source file list UI management for archive exports. `handleSourceFilesInput()`, `updateSourceFilesUI()`. Self-contained, no deps factory needed.
 
+### `src/modules/cross-section.ts`
+`CrossSectionTool` class — a movable, rotatable clipping plane applied at the material level via `material.clippingPlanes`. An invisible pivot `Object3D` drives a shared `THREE.Plane` instance each frame; a semi-transparent quad visualises the cut. A dedicated `TransformControls` gizmo (independent of the asset gizmo) lets the user reposition and rotate the plane interactively. The Gaussian splat mesh is intentionally excluded — Spark.js uses a custom shader that is incompatible with Three.js clipping planes.
+
+### `src/modules/map-picker.ts`
+Lazy-loaded Leaflet + OpenStreetMap modal for selecting GPS coordinates in the metadata editor. Opens a full-screen map centred on existing coordinates (or a world default), lets the user click or drag a marker to any location, and calls an `onConfirm` callback with the final latitude, longitude, and a human-readable location name from Nominatim reverse geocoding. A search box calls the Nominatim search API with debouncing. Leaflet's default marker icons are patched to work under Vite's asset pipeline.
+
+### `src/modules/measurement-system.ts`
+`MeasurementSystem` class — click-to-place point-to-point distance measurement. Follows the same hybrid 2D/3D pattern as `AnnotationSystem`: a `THREE.Line` renders the connecting segment in correct perspective, while DOM elements (projected each frame via `Vector3.project`) show endpoint labels and a formatted distance readout. A configurable scale factor and unit string convert raw Three.js scene units to real-world distances. Measurements are session-only and are not saved to archives.
+
+### `src/modules/metadata-profile.ts`
+Defines three completeness tiers — `basic`, `standard`, `archival` — and the data structures that map each metadata tab, kiosk section, editorial section, and individual field ID to its minimum tier. `isTierVisible()` is the single gating function used everywhere. `getFieldsForProfile()` returns the set of field IDs relevant to a given profile for completeness scoring. Consumed by `metadata-manager.ts`, `kiosk-main.ts`, theme layout scripts, and `sip-validator.ts`.
+
+### `src/modules/sip-validator.ts`
+Pure logic module — no DOM access, fully testable. Validates collected metadata against SIP (Submission Information Package) compliance rules for a given `MetadataProfile`. Checks required-field presence (errors) and recommended-field presence (warnings), and validates ORCID, ISO date, and decimal-coordinate formats. Returns a structured `SIPValidationResult` with a compliance score (0–100), finding lists, and a `ComplianceStatus` (`pass` / `warnings` / `override`). Also produces a `ManifestCompliance` record written into `manifest.json` at export time to provide an audit trail.
+
 ### `src/modules/transform-controller.ts`
 Transform gizmo orchestration, object sync, delta tracking extracted from main.ts.
 
 ### `src/modules/kiosk-main.ts`
 Slim viewer entry point for kiosk/offline mode. Imports from real application modules so that visual and functional changes propagate automatically. Viewer-only — no archive creation, metadata editing, or alignment tools. Handles archive loading, display mode switching, annotations, and theme application in the generated offline HTML.
+
+### `src/modules/walkthrough-engine.ts`
+`WalkthroughEngine` class — the core playback state machine for guided walkthroughs. Pure logic with zero DOM or Three.js dependencies; all side effects (camera animation, fade transitions, annotation display, UI sync) are delegated to a `WalkthroughCallbacks` interface injected by the host (`main.ts` or `kiosk-main.ts`). Manages playback states (`idle`, `transitioning`, `dwelling`, `paused`), dwell timers, loop logic, and reduced-motion detection. Shared between editor preview and kiosk playback without duplication.
+
+### `src/modules/walkthrough-editor.ts`
+Props pane UI for the walkthrough authoring experience. Manages the stop list, inline stop editor (title, description, transition type, dwell time, annotation link), and drag-to-reorder. Exposes `getWalkthroughData()` / `setWalkthroughData()` for serialisation to/from the archive manifest. Imports `constants`, `logger`, and `types` only — no Three.js dependency.
+
+### `src/modules/walkthrough-controller.ts`
+Thin orchestration layer that bridges `walkthrough-editor.ts` and `walkthrough-engine.ts` with `main.ts` via the deps pattern (`WalkthroughControllerDeps`). Initialises both sub-modules, wires camera-capture buttons to the editor, and drives a `WalkthroughEngine` instance for preview playback inside the editor. Keeps editor and engine concerns separate while providing a single integration point for `main.ts`.
 
 ### `src/modules/quality-tier.ts`
 Device capability detection for SD/HD asset selection:
@@ -373,7 +411,7 @@ Several operations rely on `setTimeout` with constants from `TIMING` (e.g., `AUT
 
 ### 8. Test coverage improved but not comprehensive
 **Before**: No tests of any kind.
-**After**: 206 tests across 8 Vitest suites covering security-critical code:
+**After**: 10 Vitest suites covering security-critical code (206+ tests):
 - `url-validation.test.ts` (62 tests)
 - `theme-loader.test.ts` (26 tests)
 - `archive-loader.test.ts` (41 tests)
@@ -381,6 +419,7 @@ Several operations rely on `setTimeout` with constants from `TIMING` (e.g., `AUT
 - `quality-tier.test.ts` (21 tests)
 - `archive-creator.test.ts` (15 tests)
 - `share-dialog.test.ts` (11 tests)
+- `alignment.test.ts` (added)
 
 **Remaining gaps**: No E2E tests, no integration tests. Complex logic like KD-tree, ICP algorithm, metadata collection, and transform controller still have no automated verification.
 

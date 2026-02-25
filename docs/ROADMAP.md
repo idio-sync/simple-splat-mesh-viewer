@@ -30,7 +30,7 @@ Prioritized list of future work, drawn from the [code review](reference/CODE_REV
 - [x] **Done** — Point-to-point distance measurement (two-click flow, 3D line overlay, DOM markers, configurable units m/cm/mm/in/ft; works in main editor and kiosk viewer)
 - [ ] Coordinate readout on hover (XYZ in scene units)
 - [ ] Multi-point polyline measurement with cumulative distance
-- [ ] Cross-section tool (define a cutting plane, display intersection profile)
+- [x] **Done** — Cross-section tool (define a cutting plane, display intersection profile; arbitrary-orientation clipping plane)
 
 ### Metadata Improvements
 - [x] **Done** — Inline field validation (ORCID, coordinates, dates, PRONOM IDs)
@@ -39,6 +39,9 @@ Prioritized list of future work, drawn from the [code review](reference/CODE_REV
 - [x] **Done** — Auto-detect PRONOM format IDs from loaded assets; mesh face/vertex counts displayed as read-only statistics
 - [x] **Done** — SIP compliance validation at export time: required/recommended field checking, format validation (ORCID, dates, coordinates), compliance scoring, and manifest audit trail
 
+### Asset Types
+- [x] **Done** — DXF drawing files as an independent asset type (loaded via `three-dxf-loader`, displayed in a dedicated drawing layer)
+
 ### Annotation Enhancements
 - [x] **Done** — Image attachments in annotations via `asset:` protocol
 - [ ] Annotation types with type-specific fields (condition observation, measurement, general note)
@@ -46,6 +49,9 @@ Prioritized list of future work, drawn from the [code review](reference/CODE_REV
 - [ ] Area annotations — define a surface polygon for marking regions
 - [ ] Measurement annotations — store two endpoints and computed distance
 - [ ] Add `author`, `created_date`, `modified_date` fields to each annotation
+
+### Walkthrough Engine
+- [x] **Done** — Guided walkthrough engine — author camera-stop sequences with configurable transitions (fly/fade/cut), dwell times, annotation links, auto-play and loop; playback in both editor and kiosk viewer
 
 ### Standards Compliance
 - [ ] Add `format_variant` / `format_note` alongside PRONOM IDs to distinguish splat PLY from standard PLY
@@ -121,9 +127,10 @@ Prioritized list of future work, drawn from the [code review](reference/CODE_REV
 - [x] **Done** — Multi-resolution archives with LOD proxy variants in the manifest (`lod: "proxy"`, `derived_from`)
 - [ ] In-browser mesh decimation via meshoptimizer WASM (for meshes under 2M faces)
 - [ ] Octree-based point cloud renderer that loads visible nodes on demand
-- [ ] Draco/meshopt geometry compression for smaller archive transfer size
+- [x] **Done** — Draco/meshopt geometry compression for smaller archive transfer size (Draco-compressed GLB files now supported via DRACOLoader; WASM decoder served from `public/draco/`)
 
 ### Alignment
+- [x] **Done** — N-point landmark alignment with live preview, RMSE quality metric, and undo (`LandmarkAlignment` class)
 - [ ] Add convergence criteria and maximum correspondence distance to ICP
 - [ ] Implement point-to-plane ICP for better convergence on planar surfaces
 - [ ] RANSAC-based initial alignment for distant starting positions

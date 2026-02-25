@@ -55,8 +55,8 @@ docker compose up -d
 | `DEFAULT_POINTCLOUD_URL` | _(empty)_ | Point cloud URL to auto-load |
 | `DEFAULT_ALIGNMENT_URL` | _(empty)_ | Alignment JSON URL to auto-load |
 | `SHOW_CONTROLS` | `true` | Show/hide the controls panel |
-| `LOD_BUDGET_SD` | `500000` | Splat LOD budget (max splats per frame) for SD quality tier |
-| `LOD_BUDGET_HD` | `3000000` | Splat LOD budget (max splats per frame) for HD quality tier |
+| `LOD_BUDGET_SD` | `1000000` | Splat LOD budget (max splats per frame) for SD quality tier |
+| `LOD_BUDGET_HD` | `5000000` | Splat LOD budget (max splats per frame) for HD quality tier |
 
 ### 3. Docker Compose
 
@@ -166,12 +166,12 @@ FRAME_ANCESTORS='self' https://yourcompany.com https://*.yourcompany.com
 
 ## SSL / HTTPS
 
-### WebGPU Requires Secure Contexts
+### HTTPS Required for SHA-256 Integrity Hashing
 
-**Important:** The viewer uses WebGPU for high-performance rendering when available. WebGPU is a browser security feature that **requires a secure context** (HTTPS) to function:
+**Important:** The viewer uses WebGL exclusively for 3D rendering — WebGPU was evaluated but disabled due to stability issues. However, HTTPS is still required in production for a different reason: **SHA-256 integrity hashing uses the Web Crypto API (`SubtleCrypto`), which is only available in secure contexts.**
 
-| Access Method | Secure Context? | WebGPU Available? |
-|---------------|----------------|-------------------|
+| Access Method | Secure Context? | SubtleCrypto (SHA-256) Available? |
+|---------------|----------------|-----------------------------------|
 | `https://example.com` | ✅ Yes | ✅ Yes |
 | `http://localhost` | ✅ Yes (exception) | ✅ Yes |
 | `http://127.0.0.1` | ✅ Yes (exception) | ✅ Yes |
@@ -179,11 +179,11 @@ FRAME_ANCESTORS='self' https://yourcompany.com https://*.yourcompany.com
 | `http://192.168.x.x` | ❌ No | ❌ No |
 
 **What happens without HTTPS:**
-- On non-secure contexts, the viewer automatically falls back to WebGL rendering
-- You'll see a console warning: `WebGPU initialization failed, falling back to WebGL`
-- Performance is slightly reduced (WebGL vs WebGPU) but all features work
+- `SubtleCrypto` is unavailable, so archives are created without SHA-256 integrity data
+- The UI shows a warning banner in the Integrity tab and a toast notification on page load
+- All rendering and other features continue to work normally
 
-**Production recommendation:** Always deploy with HTTPS to enable WebGPU rendering for best performance.
+**Production recommendation:** Always deploy with HTTPS to ensure SHA-256 integrity hashing works when creating archives.
 
 ### Option A: Cloudflare (Recommended)
 
