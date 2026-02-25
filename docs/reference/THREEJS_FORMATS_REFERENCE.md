@@ -167,6 +167,7 @@ For large-scale, geospatially-referenced datasets — buildings, cityscapes, ter
 | 5 | **cityjson-threejs-loader** | CityJSON, CityJSONSeq | Loads 3D city model data. Supports raycasting for object identification. Relevant for urban heritage documentation and city-scale projects. |
 | 5 | **threebox / threebox-plugin** | GeoJSON + 3D models on Mapbox GL | Bridges Three.js and Mapbox GL JS. Place 3D scanned models on interactive maps with real sun lighting and terrain sync. |
 | 3 | **THREE.Terrain** | Heightmaps (PNG, procedural) | Procedural and heightmap-based terrain generation. Useful for creating context around scanned heritage sites. |
+| 5 | **three-globe** (vasturiano) | Tile imagery (Mapbox, Esri, etc.) | 3D interactive globe with satellite imagery tiles, arc animations, hex-bin layers, and label overlays. Excellent for presenting the geographic distribution of DDI capture projects or linking scanned heritage sites on a world map. |
 
 ### 3.5 CAD / Engineering Formats
 
@@ -182,6 +183,8 @@ For large-scale, geospatially-referenced datasets — buildings, cityscapes, ter
 | DDI | Package | Format(s) | Description |
 |-----|---------|-----------|-------------|
 | **8** | **web-ifc-three** (ThatOpen/IFC.js) | `.ifc` | Official IFC Loader for Three.js. Loads Building Information Models with full semantic data — walls, doors, windows, MEP systems. Directly relevant for DDI's building documentation work (e.g., Comsat Building). Enables querying building elements from scan data. |
+| 7 | **web-ifc** (ThatOpen) | `.ifc` | Lower-level IFC parser underlying `web-ifc-three`. Exposes the full IFC property graph — elements, relationships, type hierarchies — without the Three.js abstraction layer. Use when semantic querying matters more than rendering. |
+| 7 | **xeokit-sdk** (xeolabs) | XKT (`.xkt`), IFC, glTF, LAS | Full BIM viewer SDK using its own WebGL2/WebGPU engine. XKT is a highly compressed, web-optimized BIM format (10–20× smaller than IFC, nearly instant load). Strong alternative to web-ifc-three for large building models where performance is critical. |
 
 ### 3.7 VR Avatars / Characters
 
@@ -211,7 +214,7 @@ For large-scale, geospatially-referenced datasets — buildings, cityscapes, ter
 |-----|---------|-----------|-------------|
 | **8** | **meshoptimizer** (via GLTFLoader) | `EXT_meshopt_compression` | GPU-friendly mesh compression for glTF. Alternative to Draco with better decompression performance. Critical for optimizing scan mesh delivery. |
 | **8** | **basis_universal** (via KTX2Loader) | `.basis`, `.ktx2` | GPU texture supercompression. Single compressed file transcodes to any GPU format at runtime. Massive bandwidth savings for textured scans. |
-| 7 | **@loaders.gl** | Dozens of formats (3D Tiles, LAS, LAZ, PCD, PLY, glTF, etc.) | Universal, framework-agnostic loader library from Uber/vis.gl. Can pipe any supported format into Three.js. Swiss army knife for format support. |
+| **9** | **@loaders.gl** | LAS, LAZ, 3D Tiles, PCD, PLY, glTF, OBJ, E57 (via converter), and 40+ more | Universal, framework-agnostic loader library from Uber/vis.gl. The killer feature for DDI is **native LAS/LAZ support** — load raw LiDAR point clouds from FARO scanners directly, without running PotreeConverter first. Outputs columnar point data that feeds into Three.js `BufferGeometry`. Also covers Potree, i3s, and all common mesh formats. |
 
 ### 3.11 Apple AR / Mobile
 
@@ -238,6 +241,38 @@ These appear in older Three.js extension packages or are very specialized.
 | DDI | Package | Format(s) | Description |
 |-----|---------|-----------|-------------|
 | 3 | **source-engine-model-loader** (gkjohnson) | `.mdl`, `.vtx`, `.vvd`, `.ani`, `.vtf`, `.vmt` | Loads Valve Source Engine models from Half-Life 2, Portal, TF2, CS:GO, and related titles. Parses the full asset trio: `.mdl` (bone hierarchy, LODs, hitboxes), `.vtx` (optimized render geometry), `.vvd` (vertices and blend weights), with optional `.ani` animation clips. Materials resolved via `.vmt`/`.vtf`. Useful if DDI documents game studios, interactive heritage recreations, or needs to reference game-engine versions of real-world locations. |
+| 2 | **Quake BSP loaders** (various community) | `.bsp` (Quake 1/2/3), `.pak` | Several community implementations load id Software's BSP (Binary Space Partition) map format: geometry, lightmaps, entities, and textures from Quake 1/2/3 and related titles. Useful for digital preservation of early 3D game environments — a legitimate cultural heritage application. |
+
+### 3.14 Scene Utilities & Acceleration
+
+Not loaders per se, but close Three.js ecosystem tools that affect what you can do with loaded geometry.
+
+| DDI | Package | Description |
+|-----|---------|-------------|
+| **9** | **three-mesh-bvh** (gkjohnson) | BVH (Bounding Volume Hierarchy) acceleration structure for Three.js `BufferGeometry`. Reduces raycasting from O(n) triangle scans to O(log n). Directly relevant to Vitrine3D: annotation placement raycasts against high-poly meshes currently run on every click — adding BVH would make them near-instant. Also powers fast collision detection, distance queries, and closest-point queries. |
+| 6 | **three-bvh-csg** (gkjohnson) | CSG (Constructive Solid Geometry) boolean operations — union, subtract, intersect — using the BVH structure. Could power a "cookie cutter" cross-section that produces a real mesh intersection rather than a GPU clipping plane. Score improves if DDI needs to extract cross-section profiles from scan meshes. |
+| 7 | **three-gpu-pathtracer** (gkjohnson) | Unbiased path tracer running entirely in WebGL2 via fragment shaders. Produces photorealistic renders with soft shadows, indirect lighting, and reflections from any Three.js scene. Useful for generating high-quality static renders of scanned objects for publications, reports, and client presentations — no separate renderer required. |
+| 5 | **three-edge-projection** (gkjohnson) | Projects 3D mesh silhouettes and crease edges to 2D SVG-style outlines. Could generate technical drawing-style views of scanned objects (think architectural elevation drawings derived directly from a scan mesh). Score 5 for DDI but higher for architectural documentation workflows. |
+| 6 | **three-wboit** | Weighted Blended Order-Independent Transparency — resolves the z-sorting artifacts that occur when rendering semi-transparent objects (e.g., splat + mesh overlay with transparency, or transparent CAD geometry). GPU-side fix with no CPU sorting overhead. |
+
+### 3.15 Text Rendering
+
+| DDI | Package | Description |
+|-----|---------|-------------|
+| **8** | **troika-three-text** | SDF (Signed Distance Field) text rendering for Three.js. Crisp at any resolution and zoom level, supports multi-line, Unicode, RTL, custom fonts, and per-character styling. Far superior to Three.js's built-in `TextGeometry` (which bakes font outlines into polygons). Essential for annotation labels, measurement readouts, and any persistent 3D text overlays. |
+| 5 | **three-spritetext** (vasturiano) | Simple billboard text sprites using canvas-rendered labels. Much faster to set up than troika but lower quality. Good for quick prototyping or when text count is very high (thousands of labels in a point cloud scene). |
+
+### 3.16 glTF Processing & Pipeline
+
+| DDI | Package | Description |
+|-----|---------|-------------|
+| **9** | **gltf-transform** (@gltf-transform/core + @gltf-transform/extensions) | Not a Three.js loader — a Node.js CLI and programmatic API for reading, transforming, and writing glTF/GLB files. Apply Draco or meshopt compression, resize textures, merge scenes, strip unused nodes, deduplicate accessors, compute normals, and more. Essentially ImageMagick for glTF. Critical for DDI's scan-to-web pipeline: run before archiving to minimize file sizes without quality loss. Pairs with `KHR_draco_mesh_compression` and `EXT_meshopt_compression`. |
+
+### 3.17 Volumetric
+
+| DDI | Package | Format(s) | Description |
+|-----|---------|-----------|-------------|
+| 4 | **NanoVDB / three-openvdb** | `.nvdb`, `.vdb` | OpenVDB volumetric data rendered as ray-marched volumes in Three.js. OpenVDB is the industry standard for volumetric effects (smoke, fire, fluid simulations) and CT scan data. NanoVDB is the lightweight GPU-ready subset. Relevant if DDI does micro-CT scanning of sealed artifacts for museum clients — volumes can be displayed without destructive physical opening. |
 
 ---
 
