@@ -1,7 +1,7 @@
 # Code Review: Gaussian Splat & Mesh Viewer
 
 **Reviewer:** Senior Developer Code Review
-**Date:** 2026-02-04
+**Date:** 2026-02-04 (last updated 2026-02-24)
 **Scope:** Full codebase review for project standards, coding standards, and security
 
 ---
@@ -52,7 +52,7 @@ function init(): void {
 }
 ```
 
-> **Status:** Resolved (2026-02-12). All 28 modules converted to TypeScript. Shared types in `src/types.ts`. `@types/three` installed. `tsconfig.json` with `strict: false` (incremental strictness planned).
+> **Status:** Resolved (2026-02-12). All 36 modules converted to TypeScript. Shared types in `src/types.ts`. `@types/three` installed. `tsconfig.json` with `strict: false` (incremental strictness planned).
 
 ### 1.2 No Testing Framework (HIGH Priority)
 
@@ -65,11 +65,11 @@ function init(): void {
 - Add Playwright or Cypress for E2E testing
 - Prioritize testing for archive parsing, alignment algorithms, and file handling
 
-> **Status:** Resolved (2026-02-13). Vitest configured with 206 tests across 8 suites covering URL validation, theme metadata parsing, archive filename sanitization, utilities, quality tier, archive creator, and share dialog. `@vitest-environment jsdom` for DOM tests.
+> **Status:** Resolved (2026-02-13). Vitest configured with 206+ tests across 8+ suites covering URL validation, theme metadata parsing, archive filename sanitization, utilities, quality tier, archive creator, and share dialog. Additional suites added with new modules (cross-section, measurement, walkthrough, SIP validation). `@vitest-environment jsdom` for DOM tests.
 
 ### ~~1.3 Monolithic Main Module (MEDIUM Priority)~~ ✅ FIXED
 
-> **Status:** Completed. `main.ts` reduced from ~3,900 to ~1,445 lines across 4 refactoring phases. Now a typed glue layer: init, state, deps factories, animate loop, and thin delegation wrappers. 28 modules in `src/modules/`, all TypeScript.
+> **Status:** Completed. `main.ts` reduced from ~3,900 to ~1,445 lines across 4 refactoring phases. Now a typed glue layer: init, state, deps factories, animate loop, and thin delegation wrappers. 36 modules in `src/modules/`, all TypeScript. New modules added since initial refactor: `walkthrough-engine.ts`, `walkthrough-controller.ts`, `walkthrough-editor.ts`, `cross-section.ts`, `measurement-system.ts`, `annotation-controller.ts`, `sip-validator.ts`, `map-picker.ts`, `metadata-profile.ts`.
 >
 > **Architecture:**
 > - Modules use dependency injection pattern (functions receive state/callbacks as parameters)
@@ -120,7 +120,7 @@ log.debug('[DIAG] === applyControlsVisibilityDirect ===');
 
 **Issue:** No graceful error handling for WebGL context loss or module loading failures.
 
-**Location:** `main.js`, `index.html`
+**Location:** `main.ts`, `index.html`
 
 **Recommendation:**
 - Add WebGL context loss handler
@@ -135,7 +135,7 @@ log.debug('[DIAG] === applyControlsVisibilityDirect ===');
 
 **Issue:** Extensive inline style manipulation instead of CSS classes.
 
-**Location:** `main.js:3165-3185`
+**Location:** `main.ts` (inline style manipulation pattern persists)
 
 ```javascript
 // Anti-pattern
@@ -215,7 +215,7 @@ notify.error('Error loading Gaussian Splat: ' + error.message);
 
 **Issue:** Using `setTimeout` with Promises as a hack for async initialization.
 
-**Location:** `main.js:1811, 3313, 3380`
+**Location:** `main.ts` (setTimeout-based sequencing pattern persists)
 
 ```javascript
 // main.js:1811
@@ -260,7 +260,7 @@ processMeshMaterials(gltf.scene);
 
 **Issue:** Event listeners added without cleanup tracking.
 
-**Location:** `main.js:512-515, annotation-system.js`
+**Location:** `main.ts`, `annotation-system.ts`
 
 ```javascript
 // No cleanup mechanism for these listeners
@@ -457,7 +457,7 @@ if (!CRYPTO_AVAILABLE) {
 
 4. **Graceful Degradation:** The app continues functioning even when `TransformControls` fails due to THREE.js instance mismatch
 
-5. **JSDoc in Modules:** `archive-loader.js` and `annotation-system.js` have good JSDoc documentation
+5. **JSDoc in Modules:** `archive-loader.ts` and `annotation-system.ts` have good JSDoc documentation
 
 6. **Progress Feedback:** Good UX with loading indicators and progress bars for long operations
 
@@ -563,14 +563,15 @@ The codebase shows solid foundational work with good 3D visualization capabiliti
 The application is now ready for production from both a security and code quality standpoint.
 
 **Modularization and TypeScript migration completed:**
-- ✅ 28 modules in `src/modules/`, all TypeScript (`.ts`)
+- ✅ 36 modules in `src/modules/`, all TypeScript (`.ts`)
 - ✅ `main.ts` reduced from ~3,900 to ~1,445 lines (typed glue layer)
 - ✅ Shared type interfaces in `src/types.ts` (`AppState`, `SceneRefs`, `ExportDeps`, `ArchivePipelineDeps`, `EventWiringDeps`, `FileInputDeps`)
-- ✅ 206 tests across 8 Vitest suites
+- ✅ 206+ tests across 8+ Vitest suites
 - ✅ ESLint (0 errors) + Prettier formatting
 - ✅ Modules use typed dependency injection for testability
+- ✅ New feature modules: `walkthrough-engine.ts`, `walkthrough-controller.ts`, `walkthrough-editor.ts`, `cross-section.ts`, `measurement-system.ts`, `annotation-controller.ts`, `sip-validator.ts`, `map-picker.ts`, `metadata-profile.ts`
 
-Remaining items are longer-term maintainability improvements: adding file size limits for uploads.
+Remaining items are longer-term maintainability improvements: adding file size limits for uploads, event listener cleanup, replacing `setTimeout`-based async sequencing with promise chains.
 
 **Bug fix: Toolbar visibility safeguard:**
 - ✅ Added `ensureToolbarVisibility()` function to prevent race conditions during file loading

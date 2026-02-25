@@ -19,12 +19,13 @@ Powered by [Three.js](https://github.com/mrdoob/three.js/) and [Spark](https://s
 - **Annotation system** for placing spatial notes on 3D surfaces, with image attachments and depth-aware markers
 - **Archive tags** — add comma-separated tags to archives, displayed as chips in all viewer modes; stored as `project.tags` in the manifest
 - **Metadata editor** with 8 tabs covering project info, provenance, archival records, quality metrics, preservation, and more — with inline field validation
+- **Cross-section tool** — arbitrary-orientation clipping plane with draggable 3D handle; works in main app and kiosk viewer
+- **Walkthrough engine** — author guided camera tours with fly/fade/cut transitions, dwell times, annotation links, auto-play and loop; playback in editor and kiosk viewer
 - **Kiosk themes** — customizable color palettes and layouts via self-contained theme packages
 - **Lazy archive loading** — only the manifest is decompressed on open; individual assets load on demand
+- **SIP compliance validation** — required/recommended field checking, compliance scoring, and manifest audit trail at export time
 - **Docker deployment** with environment-variable configuration and kiosk mode support
 - **Digital preservation metadata** aligned with Dublin Core, PRONOM, and Smithsonian EDAN standards
-
-```
 
 ## Quick Start
 
@@ -66,9 +67,10 @@ docker run -p 8080:80 \
 - `.a3z` — Archive 3D container with metadata (ZIP-based, compressed) - experimental
 
 ### 3D Models (via Three.js)
-- `.glb` — Binary glTF
+- `.glb` — Binary glTF (Draco-compressed GLBs supported via DRACOLoader)
 - `.gltf` — glTF with external resources
 - `.obj` — Wavefront OBJ
+- `.stl` — STL mesh
 
 ### Gaussian Splats (via Spark)
 - `.ply` — Standard PLY format with Gaussian splat data
@@ -76,6 +78,9 @@ docker run -p 8080:80 \
 - `.ksplat` — Compressed splat format
 - `.spz` — Spark compressed format
 - `.sog` — SOG format
+
+### Drawings
+- `.dxf` — AutoCAD DXF (via [three-dxf-loader](https://www.npmjs.com/package/three-dxf-loader), displayed as an independent drawing layer)
 
 ### Point Clouds
 - `.e57` — ASTM E57 format (via [three-e57-loader](https://www.npmjs.com/package/three-e57-loader), which uses the [web-e57](https://www.npmjs.com/package/web-e57) WASM parser)
@@ -99,6 +104,7 @@ docker run -p 8080:80 \
 - [Spark](https://sparkjs.dev/) — 3D Gaussian Splatting renderer for Three.js
 - [Three.js](https://threejs.org/) — 3D rendering, model loading, and scene management
 - [three-e57-loader](https://www.npmjs.com/package/three-e57-loader) — E57 point cloud loading (WASM-based via web-e57)
+- [three-dxf-loader](https://www.npmjs.com/package/three-dxf-loader) — DXF drawing file loading
 - [fflate](https://github.com/101arrowz/fflate) — Fast ZIP compression/decompression
 - [nginx](https://nginx.org/) — Web server for Docker deployment
 - [Vite](https://vitejs.dev/) — Dev server, bundler, and build toolchain

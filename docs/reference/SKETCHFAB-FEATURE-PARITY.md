@@ -1,6 +1,6 @@
 # Sketchfab Feature Parity Analysis
 
-**Date:** 2026-02-11 (last updated 2026-02-14)
+**Date:** 2026-02-11 (last updated 2026-02-24)
 **Purpose:** Ranked feature gap analysis between this viewer and Sketchfab, evaluated for Three.js 0.170.0 feasibility.
 
 ---
@@ -19,6 +19,12 @@
 | 2026-02-12 | Kiosk theming system. Pluggable theme architecture with `src/themes/` directory, theme-loader.js, template/minimal/editorial themes. Editorial theme has custom layout with bottom ribbon. | `theme-loader.js`, `kiosk-main.js`, `config.js`, `themes/` |
 | 2026-02-12 | SD/HD quality tier toggle. Device-aware auto-detection, proxy mesh and proxy splat support, one-click tier switching. Partially addresses LOD (Rank 40). | `quality-tier.js`, `main.js`, `kiosk-main.js`, `file-handlers.js`, `archive-loader.js`, `archive-creator.js` |
 | 2026-02-13 | Tauri native desktop app. Full desktop application via Tauri with native OS file dialogs, filesystem access, and GitHub Actions release workflow. | `tauri-bridge.js`, `main.js`, `archive-creator.js`, `src-tauri/` |
+| 2026-02-24 | Rank 13: Cross-section clipping plane tool. Arbitrary-orientation clipping plane with draggable 3D handle, normal flip, and depth snap. Works in main app and kiosk viewer. | `cross-section.ts`, `index.html`, `main.ts`, `kiosk-main.ts` |
+| 2026-02-24 | Rank 14: Distance measurement tool. Two-click flow, 3D line overlay, DOM distance markers, configurable units (m/cm/mm/in/ft). Works in main app and kiosk viewer. | `measurement-system.ts`, `index.html`, `main.ts`, `kiosk-main.ts` |
+| 2026-02-24 | Rank 15: Walkthrough engine (guided annotation tours). Author camera-stop sequences with fly/fade/cut transitions, configurable dwell times, annotation links, auto-play and loop. Playback in editor and kiosk viewer. | `walkthrough-engine.ts`, `walkthrough-controller.ts`, `walkthrough-editor.ts`, `index.html`, `main.ts`, `kiosk-main.ts` |
+| 2026-02-24 | Annotation enhancements. Smooth camera animation when navigating to annotations, hero image zone with lightbox in popups, YouTube embed support in annotation descriptions, weighted connecting lines from markers to popups. | `annotation-system.ts`, `annotation-controller.ts`, `index.html`, `styles.css` |
+| 2026-02-24 | DXF drawing files as independent asset type (bonus). Loaded via `three-dxf-loader`, displayed in a dedicated drawing layer, round-trips through archive. | `file-handlers.ts`, `index.html`, `main.ts`, `kiosk-main.ts` |
+| 2026-02-24 | Draco mesh compression (bonus). DRACOLoader with WASM decoder served from `public/draco/`. Draco-compressed GLB files load transparently alongside uncompressed models. | `file-handlers.ts`, `scene-manager.ts` |
 
 ---
 
@@ -41,14 +47,17 @@ These features exist in our viewer but **not in Sketchfab**:
 |---------|-------|
 | Gaussian splat rendering (.ply, .spz, .ksplat, .sog, .splat) | Sketchfab has zero splat support |
 | E57 point cloud native loading (WASM) | Sketchfab only supports PLY point clouds |
+| DXF drawing files as independent asset type | Floor plans / technical drawings alongside 3D data |
 | Custom archive format (.a3d/.a3z) with manifest | Bundled deliverables with metadata |
 | Fully offline kiosk HTML (~1MB self-contained) | No network dependency at all |
-| 3-point landmark alignment (Kabsch algorithm) | Spatial registration of multi-asset scenes |
+| N-point landmark alignment (Kabsch algorithm) with live preview & RMSE | Spatial registration of multi-asset scenes |
 | ICP auto-alignment | Iterative closest point alignment |
 | Dublin Core metadata system (50+ fields, 8 tabs) | Archival-grade metadata |
+| SIP compliance validation at export time | Required-field checking, compliance scoring, manifest audit trail |
 | Split-view dual-canvas rendering | Side-by-side comparison |
 | Kiosk theming system | Pluggable themes (editorial, minimal, template) with custom layouts |
 | SD/HD quality tier with proxy assets | Device-aware auto-detection, one-click switching |
+| Draco mesh compression support | Transparent loading of Draco-compressed GLBs |
 | Tauri native desktop application | Offline desktop app with OS file dialogs and filesystem access |
 
 ---
@@ -86,9 +95,9 @@ These are the features that make a 3D viewer feel "professional grade."
 |------|---------|--------------|---------|-------------|--------|-------|
 | 11 | **SSAO (ambient occlusion)** | Adjustable intensity & radius | No | MEDIUM | Very High | `SSAOPass` via EffectComposer. Dramatically improves depth perception. ~15-25% FPS cost. |
 | 12 | **Bloom** | HDR bloom with threshold & intensity | No | MEDIUM | High | `UnrealBloomPass`. Makes emissive surfaces glow, adds cinematic quality. |
-| 13 | **Clipping/section planes** | X/Y/Z axis with position sliders | No | MEDIUM | Very High | `renderer.clippingPlanes`. Critical for architectural/engineering clients to see interiors. Three.js has native support. |
-| 14 | **Distance measurement tool** | Click two points, show distance | No | MEDIUM | Very High | Raycasting (already have) + line geometry + label. Essential for architecture/engineering clients. |
-| 15 | **Guided annotation tours** | Sequential walkthrough with camera animation | No | MEDIUM | High | Extend existing annotation system. Add tween.js for camera interpolation. Auto-play with configurable duration per step. |
+| 13 | **Clipping/section planes** | X/Y/Z axis with position sliders | **DONE** | MEDIUM | Very High | Arbitrary-orientation clipping plane with draggable 3D handle, normal flip, and depth snap. `cross-section.ts`. Works in main app and kiosk. |
+| 14 | **Distance measurement tool** | Click two points, show distance | **DONE** | MEDIUM | Very High | Two-click flow, 3D line overlay, DOM distance markers, configurable units (m/cm/mm/in/ft). `measurement-system.ts`. Works in main app and kiosk. |
+| 15 | **Guided annotation tours** | Sequential walkthrough with camera animation | **DONE** | MEDIUM | High | Walkthrough engine with camera-stop sequences, fly/fade/cut transitions, configurable dwell times, annotation links, auto-play and loop. `walkthrough-engine.ts`, `walkthrough-controller.ts`, `walkthrough-editor.ts`. |
 | 16 | **Matcap rendering mode** | Clay/form-study visualization | **DONE** | LOW | Medium | `MeshMatcapMaterial` with 5 procedural presets (Clay/Chrome/Pearl/Jade/Copper). Checkbox + dropdown in Model Settings. Mutually exclusive with wireframe. |
 | 17 | **Model inspector panel** | Vertex/face/texture count, memory usage | No | LOW | Medium | Traverse scene graph, count geometry stats. Display in sidebar. |
 | 18 | **Angle measurement** | Three-point angle calculation | No | MEDIUM | High | Extension of distance measurement. Click 3 points, calculate and display angle. |
@@ -96,6 +105,7 @@ These are the features that make a 3D viewer feel "professional grade."
 | 20 | **Outline / selection highlight** | Glow effect on hovered/selected objects | No | LOW-MEDIUM | Medium | `OutlinePass` in EffectComposer. Better visual feedback for object interaction. |
 
 **Estimated total effort for Tier 2: ~40-60 hours**
+**Progress: 4 of 10 features implemented (ranks 13, 14, 15, 16).**
 **Expected result: ~85% functional parity with Sketchfab**
 
 ---
@@ -203,6 +213,9 @@ Features Sketchfab has that are less relevant for 3D scan deliverables.
 | Camera reset | Reset to default + fit-to-view | Full |
 | Multiple light controls | 4 lights with independent intensity sliders | Full |
 | FOV control | Slider (10°–120°) in Scene Settings, kiosk, and editorial ribbon | Full |
+| Clipping/section planes | Arbitrary-orientation clipping plane, draggable 3D handle, main app and kiosk | Full |
+| Distance measurement | Two-click flow, 3D line overlay, configurable units (m/cm/mm/in/ft) | Full |
+| Guided annotation tours | Walkthrough engine with fly/fade/cut transitions, dwell times, auto-play and loop | Full |
 
 ---
 
@@ -218,10 +231,12 @@ Phase 1 (Tier 1):  ~15-25 hrs  →  60% visual parity  [IN PROGRESS — 8/10 don
   🟡 Camera constraints (zoom limits only — needs angle limits + UI)
   ⬜ Orthographic view
 
-Phase 2 (Tier 2):  ~40-60 hrs  →  85% functional parity  [IN PROGRESS — 1/10 done]
+Phase 2 (Tier 2):  ~40-60 hrs  →  85% functional parity  [IN PROGRESS — 4/10 done]
   ✅ Matcap rendering mode (5 procedural presets, checkbox + dropdown)
-  ⬜ SSAO, bloom, clipping planes, measurement tools,
-    guided tours, inspector, saved viewpoints, outlines
+  ✅ Clipping/section planes (cross-section.ts, arbitrary orientation, draggable handle)
+  ✅ Distance measurement tool (two-click, 3D overlay, configurable units)
+  ✅ Guided annotation tours (walkthrough engine, fly/fade/cut transitions, auto-play)
+  ⬜ SSAO, bloom, inspector, angle measurement, saved viewpoints, outlines
 
 Phase 3 (Tier 3):  ~25-35 hrs  →  90% polish parity  [IN PROGRESS — 1/10 done]
   ✅ Normal map visualization (MeshNormalMaterial toggle)
@@ -241,6 +256,8 @@ Bonus (not in Sketchfab):
   ✅ Kiosk theming system (editorial/minimal/template themes)
   ✅ SD/HD quality tier toggle with device-aware auto-detection
   ✅ Tauri native desktop application
+  ✅ DXF drawing files as independent asset type (three-dxf-loader)
+  ✅ Draco mesh compression (DRACOLoader, transparent loading of compressed GLBs)
 ```
 
 **Total estimated effort to full parity: ~220-340 hours**
@@ -248,28 +265,40 @@ Bonus (not in Sketchfab):
 
 ---
 
-## CDN Dependencies Needed
+## Adding New Dependencies
 
-All new features use Three.js addons available via esm.sh. Add to `index.html` import map:
+The project uses **Vite + npm**. New Three.js addons and packages are added via `npm install` and imported normally — no import map changes required.
 
-```javascript
-// Phase 1 — HDR environment maps
-"three/addons/loaders/RGBELoader.js": "https://esm.sh/three@0.170.0/examples/jsm/loaders/RGBELoader.js",
-
-// Phase 2 — Post-processing
-"three/addons/postprocessing/EffectComposer.js": "https://esm.sh/three@0.170.0/examples/jsm/postprocessing/EffectComposer.js",
-"three/addons/postprocessing/RenderPass.js": "https://esm.sh/three@0.170.0/examples/jsm/postprocessing/RenderPass.js",
-"three/addons/postprocessing/UnrealBloomPass.js": "https://esm.sh/three@0.170.0/examples/jsm/postprocessing/UnrealBloomPass.js",
-"three/addons/postprocessing/SSAOPass.js": "https://esm.sh/three@0.170.0/examples/jsm/postprocessing/SSAOPass.js",
-"three/addons/postprocessing/OutputPass.js": "https://esm.sh/three@0.170.0/examples/jsm/postprocessing/OutputPass.js",
-"three/addons/postprocessing/OutlinePass.js": "https://esm.sh/three@0.170.0/examples/jsm/postprocessing/OutlinePass.js",
-"three/addons/postprocessing/BokehPass.js": "https://esm.sh/three@0.170.0/examples/jsm/postprocessing/BokehPass.js",
-
-// Phase 2 — Camera animation
-"@tweenjs/tween.js": "https://esm.sh/@tweenjs/tween.js@25.0.0"
+```bash
+npm install some-package
 ```
 
-Remember: any new CDN deps must also be added to `kiosk-viewer.js` `CDN_DEPS` for offline kiosk support.
+```typescript
+import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+```
+
+**Kiosk mode requires a separate step.** The kiosk generator fetches dependencies from CDN at generation time. Any package used in kiosk mode must also have a CDN URL added to the `CDN_DEPS` object in `kiosk-viewer.ts`:
+
+```typescript
+// Example: adding a new Three.js post-processing pass for kiosk use
+"three/addons/postprocessing/SSAOPass.js":
+  "https://esm.sh/three@0.170.0/examples/jsm/postprocessing/SSAOPass.js",
+```
+
+Remaining Phase 2 post-processing deps (not yet added):
+
+```typescript
+// Post-processing
+"three/addons/postprocessing/EffectComposer.js": "https://esm.sh/three@0.170.0/examples/jsm/postprocessing/EffectComposer.js",
+"three/addons/postprocessing/RenderPass.js":     "https://esm.sh/three@0.170.0/examples/jsm/postprocessing/RenderPass.js",
+"three/addons/postprocessing/UnrealBloomPass.js": "https://esm.sh/three@0.170.0/examples/jsm/postprocessing/UnrealBloomPass.js",
+"three/addons/postprocessing/SSAOPass.js":        "https://esm.sh/three@0.170.0/examples/jsm/postprocessing/SSAOPass.js",
+"three/addons/postprocessing/OutputPass.js":      "https://esm.sh/three@0.170.0/examples/jsm/postprocessing/OutputPass.js",
+"three/addons/postprocessing/OutlinePass.js":     "https://esm.sh/three@0.170.0/examples/jsm/postprocessing/OutlinePass.js",
+"three/addons/postprocessing/BokehPass.js":       "https://esm.sh/three@0.170.0/examples/jsm/postprocessing/BokehPass.js",
+// Camera animation (if not using built-in Three.js AnimationMixer)
+"@tweenjs/tween.js": "https://esm.sh/@tweenjs/tween.js@25.0.0"
+```
 
 ---
 
@@ -283,4 +312,4 @@ Remember: any new CDN deps must also be added to `kiosk-viewer.js` `CDN_DEPS` fo
 
 4. **Performance budget**: SSAO + bloom together cost ~30% FPS. Add quality presets (Low/Medium/High) that toggle expensive effects.
 
-5. **No build step**: All addons must work as ES modules from CDN. Verify each import resolves correctly before committing to a feature.
+5. **Build pipeline via Vite**: Three.js addons can be imported directly from npm (`three/addons/...`) — no CDN needed for the main app. The kiosk generator separately fetches dependencies from CDN at generation time; any new dependency used in kiosk mode must also be added to `kiosk-viewer.ts` `CDN_DEPS`.
