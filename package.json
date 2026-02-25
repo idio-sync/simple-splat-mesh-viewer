@@ -20,7 +20,8 @@
     "format": "prettier --write \"src/**/*.{js,ts,css,html}\"",
     "format:check": "prettier --check \"src/**/*.{js,ts,css,html}\"",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "postinstall": "node -e \"const {mkdirSync,copyFileSync}=require('fs'),s='node_modules/three/examples/jsm/libs/draco/gltf',d='public/draco';mkdirSync(d,{recursive:true});['draco_decoder.js','draco_decoder.wasm','draco_wasm_wrapper.js'].forEach(f=>copyFileSync(s+'/'+f,d+'/'+f));console.log('Draco decoder files copied to public/draco/');\""
   },
   "keywords": [
     "gaussian-splatting",
@@ -47,6 +48,7 @@
   "dependencies": {
     "@sparkjsdev/spark": "^0.1.10",
     "@types/leaflet": "^1.9.21",
+    "dxf-parser": "^1.1.2",
     "fflate": "^0.8.2",
     "leaflet": "^1.9.4",
     "three": "^0.182.0",

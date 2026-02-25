@@ -18,12 +18,13 @@ const ARCHIVE_EXTENSIONS = ['a3d', 'a3z'];
 // Supported file formats within archives
 const SUPPORTED_FORMATS: Record<string, string[]> = {
     splat: ['.ply', '.spz', '.ksplat', '.sog', '.splat'],
-    mesh: ['.glb', '.gltf', '.obj', '.stl'],
+    mesh: ['.glb', '.gltf', '.obj', '.stl', '.drc'],
+    drawing: ['.dxf'],
     pointcloud: ['.e57'],
     thumbnail: ['.png', '.jpg', '.jpeg', '.webp']
 };
 
-type FormatType = 'splat' | 'mesh' | 'pointcloud' | 'thumbnail';
+type FormatType = 'splat' | 'mesh' | 'drawing' | 'pointcloud' | 'thumbnail';
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -65,6 +66,7 @@ interface ContentInfo {
     hasMeshProxy: boolean;
     hasSceneProxy: boolean;
     hasPointcloud: boolean;
+    hasDrawing: boolean;
     hasThumbnail: boolean;
     hasSourceFiles: boolean;
     sourceFileCount: number;
@@ -692,6 +694,14 @@ export class ArchiveLoader {
     }
 
     /**
+     * Get the primary drawing entry (DXF)
+     */
+    getDrawingEntry(): ManifestDataEntry | null {
+        const drawings = this.findEntriesByPrefix('drawing_');
+        return drawings.length > 0 ? drawings[0].entry : null;
+    }
+
+    /**
      * Get the primary thumbnail entry
      */
     getThumbnailEntry(): ManifestDataEntry | null {
@@ -861,6 +871,7 @@ export class ArchiveLoader {
         const meshProxy = this.getMeshProxyEntry();
         const sceneProxy = this.getSceneProxyEntry();
         const pointcloud = this.getPointcloudEntry();
+        const drawing = this.getDrawingEntry();
         const thumbnail = this.getThumbnailEntry();
 
         const sourceFiles = this.getSourceFileEntries();
@@ -871,6 +882,7 @@ export class ArchiveLoader {
             hasMeshProxy: meshProxy !== null && isFormatSupported(meshProxy.file_name, 'mesh'),
             hasSceneProxy: sceneProxy !== null && isFormatSupported(sceneProxy.file_name, 'splat'),
             hasPointcloud: pointcloud !== null && isFormatSupported(pointcloud.file_name, 'pointcloud'),
+            hasDrawing: drawing !== null && isFormatSupported(drawing.file_name, 'drawing'),
             hasThumbnail: thumbnail !== null && isFormatSupported(thumbnail.file_name, 'thumbnail'),
             hasSourceFiles: sourceFiles.length > 0,
             sourceFileCount: sourceFiles.length

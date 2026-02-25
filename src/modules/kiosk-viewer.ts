@@ -45,6 +45,10 @@ const CDN_DEPS: Record<string, string> = {
         'https://esm.sh/three@0.170.0/examples/jsm/loaders/MTLLoader.js?external=three',
     'three/addons/loaders/STLLoader.js':
         'https://esm.sh/three@0.170.0/examples/jsm/loaders/STLLoader.js?external=three',
+    'three/addons/loaders/DRACOLoader.js':
+        'https://esm.sh/three@0.170.0/examples/jsm/loaders/DRACOLoader.js?external=three',
+    'dxf-parser':
+        'https://esm.sh/dxf-parser@1.1.2',
     '@sparkjsdev/spark':
         'https://sparkjs.dev/releases/spark/preview/2.0.0/spark.module.js',
     'fflate':
@@ -91,6 +95,7 @@ interface ModuleData {
 interface BundleData {
     cdn: Record<string, string>;
     modules: ModuleData[];
+    draco?: { decoderJs: string };
 }
 
 interface ThemeAssets {
@@ -179,7 +184,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
  */
 export async function fetchDependencies(onProgress?: ProgressCallback): Promise<FetchDependenciesResult> {
     const cdnEntries = Object.entries(CDN_DEPS);
-    const totalSteps = cdnEntries.length + LOCAL_MODULES.length + 3;
+    const totalSteps = cdnEntries.length + LOCAL_MODULES.length + 3 + 1; // +1 for Draco decoder
     let step = 0;
 
     function progress(msg: string): void {
@@ -196,6 +201,18 @@ export async function fetchDependencies(onProgress?: ProgressCallback): Promise<
         const src = await fetchResolved(url);
         cdn[specifier] = toBase64(src);
         log.info(`Fetched ${specifier}: ${(src.length / 1024).toFixed(1)} KB`);
+    }
+
+    // 1b. Fetch Draco JS decoder for offline use (pure-JS fallback, no WASM needed)
+    let draco: BundleData['draco'];
+    try {
+        progress('Fetching Draco decoder...');
+        const dracoUrl = 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/libs/draco/gltf/draco_decoder.js';
+        const dracoSrc = await fetchText(dracoUrl);
+        draco = { decoderJs: toBase64(dracoSrc) };
+        log.info(`Fetched Draco decoder: ${(dracoSrc.length / 1024).toFixed(0)} KB`);
+    } catch (err: any) {
+        log.warn(`Draco decoder fetch failed, Draco-compressed GLBs won't load offline: ${err.message}`);
     }
 
     // 2. Fetch local modules from same origin
@@ -279,7 +296,7 @@ export async function fetchDependencies(onProgress?: ProgressCallback): Promise<
         layoutJS,
         themeAssets,
         themeName,
-        bundleData: { cdn, modules }
+        bundleData: { cdn, modules, draco }
     };
 }
 
@@ -356,6 +373,12 @@ const KIOSK_BOOTSTRAP = `(async function() {
                 src = src.split('import("' + spec + '")').join('import("' + url + '")');
             }
             return src;
+        }
+
+        // Phase 0: Pre-load Draco JS decoder for offline use
+        if (DEPS.draco && DEPS.draco.decoderJs) {
+            window.__DRACO_DECODER_SRC__ = decode(DEPS.draco.decoderJs);
+            console.log('[Kiosk] Draco JS decoder pre-loaded (' + Math.round(DEPS.draco.decoderJs.length * 0.75 / 1024) + ' KB)');
         }
 
         // Phase 1: Create blob URLs for CDN dependencies
