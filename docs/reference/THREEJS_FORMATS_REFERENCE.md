@@ -172,7 +172,8 @@ For large-scale, geospatially-referenced datasets — buildings, cityscapes, ter
 
 | DDI | Package | Format(s) | Description |
 |-----|---------|-----------|-------------|
-| **8** | **opencascade.js** | `.step`, `.stp`, `.iges`, `.igs`, `.brep` | WASM port of the OpenCascade CAD kernel. Tessellates B-Rep solid models into Three.js-compatible meshes. Handles the parametric CAD formats that DDI's engineering clients (Lockheed Martin) commonly use. Heavy WASM bundle but powerful. |
+| **8** ✅ | **occt-import-js** | `.step`, `.stp`, `.iges`, `.igs` | Lightweight WASM subset of the OpenCASCADE kernel (~7.3 MB). Reads STEP and IGES files, tessellates B-Rep geometry, and returns Three.js-ready Float32Array/Uint32Array buffers directly. No manual tessellation required. Integrated in Vitrine3D as a dedicated CAD layer (`cadGroup`). |
+| **8** | **opencascade.js** | `.step`, `.stp`, `.iges`, `.igs`, `.brep` | Full WASM port of the OpenCASCADE CAD kernel (~49 MB). More complete B-Rep support including `.brep` and scripting, but significantly heavier. Use `occt-import-js` for import-only workflows. |
 | 6 ✅ | **three-dxf-loader** | `.dxf` | AutoCAD DXF 2D/3D drawing exchange format. Loads entities like lines, arcs, circles, polylines, 3D faces. Relevant for architectural documentation and as-built drawings. |
 | 5 | **CAD Exchanger SDK** (commercial) | `.step`, `.jt`, `.iges`, `.catia`, `.solidworks`, many more | Commercial conversion service. Converts virtually any CAD format to glTF/OBJ for Three.js. Most comprehensive CAD support available but requires licensing. |
 
@@ -250,13 +251,13 @@ Ranked by combined relevance across DDI's scanning, archival, client delivery, a
 | 8 | **8** ✅ | **OBJ/MTL** (OBJLoader) | Universal mesh exchange, legacy compatibility |
 | 9 | **8** ✅ | **STL** (STLLoader) | Engineering client deliverables, 3D printing |
 | 10 | **8** | **KTX2** (KTX2Loader) | GPU-compressed textures for mobile/web performance |
-| 11 | **8** | **STEP/IGES** (opencascade.js) | Engineering CAD from clients like Lockheed Martin |
+| 11 | **8** ✅ | **STEP/IGES** (occt-import-js) | Engineering CAD from clients like Lockheed Martin |
 | 12 | **8** | **IFC** (web-ifc-three) | Building documentation (Comsat Building, etc.) |
 | 13 | **8** | **3D Tiles** (3d-tiles-renderer) | Large-scale photogrammetry and LiDAR streaming |
 | 14 | **8** | **USDZ** (USDZExporter) | "View in AR" on iPhone for museum clients |
 | 15 | **8** | **Meshoptimizer / Basis** | Compression pipeline for optimized web delivery |
 
-> **Also supported but not listed above:** E57 point clouds via `three-e57-loader` (1.2.0) + `web-e57` WASM. HDR environment maps via `RGBELoader`. Custom `.a3d`/`.a3z` archive format (ZIP-based, proprietary).
+> **Also supported but not listed above:** E57 point clouds via `three-e57-loader` (1.2.0) + `web-e57` WASM. STEP/IGES CAD via `occt-import-js` (OpenCASCADE WASM). HDR environment maps via `RGBELoader`. Custom `.a3d`/`.a3z` archive format (ZIP-based, proprietary).
 
 ---
 
