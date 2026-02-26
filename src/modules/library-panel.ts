@@ -13,14 +13,24 @@ const log = Logger.getLogger('library-panel');
 
 // ── Types ──
 
+interface ArchiveAsset {
+    key: string;
+    type: string;       // splat, mesh, pointcloud, cad, drawing
+    format: string;     // file extension
+    size_bytes: number;
+}
+
 interface Archive {
     hash: string;
     filename: string;
+    path: string;
     title: string;
     size: number;
     modified: string;
     thumbnail: string | null;
     viewerUrl: string;
+    assets?: ArchiveAsset[];
+    metadataFields?: Record<string, boolean | number | string>;
 }
 
 interface ArchiveListResponse {
@@ -63,6 +73,10 @@ let detailTitle: HTMLElement | null = null;
 let detailFilename: HTMLElement | null = null;
 let detailSize: HTMLElement | null = null;
 let detailDate: HTMLElement | null = null;
+let detailAssets: HTMLElement | null = null;
+let detailAssetsSection: HTMLElement | null = null;
+let detailMetadata: HTMLElement | null = null;
+let detailMetadataSection: HTMLElement | null = null;
 
 // ── Helpers ──
 
@@ -272,11 +286,117 @@ function selectArchive(hash: string): void {
     if (detailFilename) detailFilename.textContent = archive.filename;
     if (detailSize) detailSize.textContent = formatBytes(archive.size);
     if (detailDate) detailDate.textContent = formatDate(archive.modified);
+
+    renderAssets(archive);
+    renderMetadata(archive);
 }
 
 function showDetailEmpty(): void {
     if (detailEmpty) detailEmpty.style.display = '';
     if (detailPanel) detailPanel.style.display = 'none';
+}
+
+// ── Asset & Metadata rendering ──
+
+const ASSET_TYPE_LABELS: Record<string, string> = {
+    splat: 'Gaussian Splat',
+    mesh: 'Mesh',
+    pointcloud: 'Point Cloud',
+    cad: 'CAD Model',
+    drawing: 'Drawing',
+};
+
+const ASSET_TYPE_ICONS: Record<string, string> = {
+    splat: '\u2B24',       // filled circle
+    mesh: '\u25B3',        // triangle
+    pointcloud: '\u2059',  // dot pattern
+    cad: '\u2B21',         // hexagon
+    drawing: '\u25A1',     // square
+};
+
+function renderAssets(archive: Archive): void {
+    if (!detailAssets || !detailAssetsSection) return;
+    const assets = archive.assets;
+    if (!assets || assets.length === 0) {
+        detailAssetsSection.style.display = 'none';
+        return;
+    }
+    detailAssetsSection.style.display = '';
+    let html = '';
+    for (const a of assets) {
+        const label = ASSET_TYPE_LABELS[a.type] || a.type;
+        const icon = ASSET_TYPE_ICONS[a.type] || '\u25CF';
+        const fmt = a.format ? a.format.toUpperCase() : '';
+        const size = a.size_bytes ? formatBytes(a.size_bytes) : '';
+        const detail = [fmt, size].filter(Boolean).join(' \u00B7 ');
+        html += '<div class="prop-row">' +
+            '<span class="prop-row-label"><span class="library-asset-icon">' + icon + '</span>' + escapeHtml(label) + '</span>' +
+            '<span class="font-mono library-detail-val" style="font-size:10px;">' + escapeHtml(detail) + '</span>' +
+            '</div>';
+    }
+    detailAssets.innerHTML = html;
+}
+
+const METADATA_FIELD_LABELS: Record<string, string> = {
+    'project.title': 'Title',
+    'project.description': 'Description',
+    'project.license': 'License',
+    'project.tags': 'Tags',
+    'project.id': 'Project ID',
+    'provenance.capture_date': 'Capture Date',
+    'provenance.capture_device': 'Capture Device',
+    'provenance.operator': 'Operator',
+    'provenance.location': 'Location',
+    'provenance.processing_software': 'Software',
+    'provenance.processing_notes': 'Processing Notes',
+    'quality.tier': 'Quality Tier',
+    'quality.accuracy_grade': 'Accuracy',
+    'quality.capture_resolution': 'Resolution',
+    'archival.title': 'Archival Title',
+    'archival.creator': 'Creator',
+    'archival.date_created': 'Date Created',
+    'archival.period': 'Period',
+    'archival.culture': 'Culture',
+    'archival.medium': 'Medium',
+    'archival.location': 'Archival Location',
+    'annotations': 'Annotations',
+    'viewer.display_mode': 'Display Mode',
+};
+
+const METADATA_GROUP_ORDER = ['project', 'provenance', 'quality', 'archival', 'annotations', 'viewer'];
+
+function renderMetadata(archive: Archive): void {
+    if (!detailMetadata || !detailMetadataSection) return;
+    const fields = archive.metadataFields;
+    if (!fields || Object.keys(fields).length === 0) {
+        detailMetadataSection.style.display = 'none';
+        return;
+    }
+    detailMetadataSection.style.display = '';
+
+    // Group fields by prefix
+    const groups: Record<string, string[]> = {};
+    for (const key of Object.keys(fields)) {
+        const prefix = key.split('.')[0];
+        if (!groups[prefix]) groups[prefix] = [];
+        groups[prefix].push(key);
+    }
+
+    let html = '';
+    for (const group of METADATA_GROUP_ORDER) {
+        const keys = groups[group];
+        if (!keys) continue;
+        for (const key of keys) {
+            const label = METADATA_FIELD_LABELS[key] || key;
+            const val = fields[key];
+            const display = typeof val === 'number' ? String(val) : '\u2713';
+            html += '<div class="prop-row">' +
+                '<span class="prop-row-label">' + escapeHtml(label) + '</span>' +
+                '<span class="font-mono library-detail-val library-meta-filled" style="font-size:10px;">' + escapeHtml(display) + '</span>' +
+                '</div>';
+        }
+    }
+    detailMetadata.innerHTML = html;
 }
 
 // ── Actions ──
@@ -517,13 +637,16 @@ function setupDetailActions(): void {
     document.getElementById('library-action-share')?.addEventListener('click', async () => {
         const a = getSelected();
         if (a) {
-            // Extract the archive URL from the viewerUrl query param
             try {
                 const params = new URLSearchParams(a.viewerUrl.split('?')[1] || '');
                 const archiveUrl = params.get('archive');
                 if (archiveUrl) {
                     const { showShareDialog } = await import('./share-dialog.js');
-                    showShareDialog({ archiveUrl });
+                    showShareDialog({
+                        archiveUrl,
+                        archiveHash: a.hash,
+                        archiveTitle: a.title || a.filename,
+                    });
                 } else {
                     notify.warning('Cannot share: no archive URL found');
                 }
@@ -604,6 +727,10 @@ export function initLibraryPanel(): void {
     detailFilename = document.getElementById('library-detail-filename');
     detailSize = document.getElementById('library-detail-size');
     detailDate = document.getElementById('library-detail-date');
+    detailAssets = document.getElementById('library-detail-assets');
+    detailAssetsSection = document.getElementById('library-assets-section');
+    detailMetadata = document.getElementById('library-detail-metadata');
+    detailMetadataSection = document.getElementById('library-metadata-section');
 
     // Show "Save to Library" button in export pane
     const saveBtn = document.getElementById('btn-save-to-library');

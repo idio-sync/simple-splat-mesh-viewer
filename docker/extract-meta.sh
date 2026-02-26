@@ -109,6 +109,102 @@ except: pass
         thumb_url="/thumbs/$hash.jpg"
     fi
 
+    # Extract assets list and metadata fields from manifest using python3
+    local assets_json="[]"
+    local metadata_json="{}"
+
+    if [ -n "$manifest" ]; then
+        assets_json=$(echo "$manifest" | python3 -c "
+import sys, json
+try:
+    m = json.load(sys.stdin)
+    entries = m.get('data_entries', {})
+    assets = []
+    type_map = {
+        'scene_': 'splat', 'mesh_': 'mesh', 'pointcloud_': 'pointcloud',
+        'cad_': 'cad', 'drawing_': 'drawing'
+    }
+    for key, entry in entries.items():
+        # Skip thumbnails, images, source files
+        asset_type = None
+        for prefix, atype in type_map.items():
+            if key.startswith(prefix):
+                asset_type = atype
+                break
+        if not asset_type:
+            continue
+        # Skip proxy entries
+        if entry.get('lod') == 'proxy' or '_proxy' in key:
+            continue
+        fname = entry.get('file_name', '')
+        ext = fname.rsplit('.', 1)[-1].lower() if '.' in fname else ''
+        assets.append({
+            'key': key,
+            'type': asset_type,
+            'format': ext,
+            'size_bytes': entry.get('size_bytes', 0) or 0
+        })
+    print(json.dumps(assets))
+except:
+    print('[]')
+" 2>/dev/null) || assets_json="[]"
+
+        metadata_json=$(echo "$manifest" | python3 -c "
+import sys, json
+try:
+    m = json.load(sys.stdin)
+    filled = {}
+    # Project fields
+    p = m.get('project', {})
+    for f in ['title','description','license','tags','id']:
+        v = p.get(f)
+        if v and (not isinstance(v, list) or len(v) > 0):
+            filled['project.' + f] = True
+    # Provenance fields
+    prov = m.get('provenance', {})
+    for f in ['capture_date','capture_device','operator','location','processing_notes']:
+        if prov.get(f):
+            filled['provenance.' + f] = True
+    sw = prov.get('processing_software', [])
+    if sw and len(sw) > 0 and sw[0].get('name'):
+        filled['provenance.processing_software'] = True
+    # Quality metrics
+    q = m.get('quality_metrics', {})
+    for f in ['tier','accuracy_grade']:
+        if q.get(f):
+            filled['quality.' + f] = True
+    cr = q.get('capture_resolution', {})
+    if cr.get('value') is not None and cr.get('value') != 0:
+        filled['quality.capture_resolution'] = True
+    # Archival record
+    ar = m.get('archival_record', {})
+    if ar.get('title'):
+        filled['archival.title'] = True
+    c = ar.get('creation', {})
+    for f in ['creator','date_created','period','culture']:
+        if c.get(f):
+            filled['archival.' + f] = True
+    pd = ar.get('physical_description', {})
+    if pd.get('medium'):
+        filled['archival.medium'] = True
+    cov = ar.get('coverage', {})
+    sp = cov.get('spatial', {})
+    if sp.get('location_name'):
+        filled['archival.location'] = True
+    # Annotations count
+    ann = m.get('annotations', [])
+    if ann and len(ann) > 0:
+        filled['annotations'] = len(ann)
+    # Viewer settings
+    vs = m.get('viewer_settings', {})
+    if vs.get('display_mode'):
+        filled['viewer.display_mode'] = vs['display_mode']
+    print(json.dumps(filled))
+except:
+    print('{}')
+" 2>/dev/null) || metadata_json="{}"
+    fi
+
     # Use python3 to write proper JSON (handles escaping)
     python3 -c "
 import json, sys
@@ -116,11 +212,13 @@ data = {
     'title': sys.argv[1],
     'description': sys.argv[2],
     'thumbnail': sys.argv[3],
-    'archive_url': sys.argv[4]
+    'archive_url': sys.argv[4],
+    'assets': json.loads(sys.argv[6]),
+    'metadata_fields': json.loads(sys.argv[7])
 }
 with open(sys.argv[5], 'w') as f:
     json.dump(data, f, indent=2)
-" "$title" "$description" "$thumb_url" "$rel_url" "$meta_file"
+" "$title" "$description" "$thumb_url" "$rel_url" "$meta_file" "$assets_json" "$metadata_json"
 
     echo "    title: $title"
     [ -n "$thumb_url" ] && echo "    thumb: $thumb_url" || echo "    thumb: (none)"

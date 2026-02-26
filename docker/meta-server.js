@@ -322,7 +322,9 @@ function listArchives() {
             thumbnail: thumbnailUrl(meta, archiveUrl),
             size: stat.size,
             modified: stat.mtime.toISOString(),
-            viewerUrl: '/?archive=' + encodeURIComponent(archiveUrl)
+            viewerUrl: '/?archive=' + encodeURIComponent(archiveUrl),
+            assets: (meta && meta.assets) || [],
+            metadataFields: (meta && meta.metadata_fields) || {}
         });
     }
 
@@ -400,7 +402,9 @@ function buildArchiveObject(filename) {
         thumbnail: thumbnailUrl(meta, archiveUrl),
         size: stat.size,
         modified: stat.mtime.toISOString(),
-        viewerUrl: '/?archive=' + encodeURIComponent(archiveUrl)
+        viewerUrl: '/?archive=' + encodeURIComponent(archiveUrl),
+        assets: (meta && meta.assets) || [],
+        metadataFields: (meta && meta.metadata_fields) || {}
     };
 }
 
