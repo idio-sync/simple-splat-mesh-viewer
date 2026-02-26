@@ -316,10 +316,15 @@ export async function ensureAssetLoaded(assetType: string, deps: ArchivePipeline
                 state.assetStates[assetType] = ASSET_STATE.UNLOADED;
                 return false;
             }
-            const splatData = await archiveLoader.extractFile(sceneEntry.file_name);
+            // Prefer proxy splat when quality tier is SD
+            const proxyEntry = archiveLoader.getSceneProxyEntry();
+            const useProxy = state.qualityResolved === 'sd' && contentInfo.hasSceneProxy && proxyEntry;
+            const entryToLoad = useProxy ? proxyEntry : sceneEntry;
+
+            const splatData = await archiveLoader.extractFile(entryToLoad.file_name);
             if (!splatData) { state.assetStates[assetType] = ASSET_STATE.ERROR; return false; }
-            await loadSplatFromBlobUrl(splatData.url, sceneEntry.file_name, deps);
-            // Apply transform
+            await loadSplatFromBlobUrl(splatData.url, entryToLoad.file_name, deps);
+            // Apply transform from primary scene entry
             const transform = archiveLoader.getEntryTransform(sceneEntry);
             const currentSplat = sceneRefs.splatMesh;
             const s = normalizeScale(transform.scale);
@@ -328,7 +333,21 @@ export async function ensureAssetLoaded(assetType: string, deps: ArchivePipeline
                 currentSplat.rotation.set(...transform.rotation);
                 currentSplat.scale.set(...s);
             }
-            assets.splatBlob = splatData.blob;
+            if (useProxy) {
+                // Store the proxy blob for re-export, extract full-res blob in background
+                assets.proxySplatBlob = splatData.blob;
+                archiveLoader.extractFile(sceneEntry.file_name).then((fullData: any) => {
+                    if (fullData) assets.splatBlob = fullData.blob;
+                }).catch(() => {});
+            } else {
+                assets.splatBlob = splatData.blob;
+                // Extract proxy blob in background so it survives re-export
+                if (contentInfo.hasSceneProxy && proxyEntry) {
+                    archiveLoader.extractFile(proxyEntry.file_name).then((proxyData: any) => {
+                        if (proxyData) assets.proxySplatBlob = proxyData.blob;
+                    }).catch(() => {});
+                }
+            }
             // Detect splat format from archive filename
             state.splatFormat = sceneEntry.file_name.split('.').pop()?.toLowerCase() || 'splat';
             state.assetStates[assetType] = ASSET_STATE.LOADED;
@@ -374,6 +393,12 @@ export async function ensureAssetLoaded(assetType: string, deps: ArchivePipeline
                 if (fullResBtn) (fullResBtn as HTMLElement).style.display = '';
             } else {
                 assets.meshBlob = meshData.blob;
+                // Extract proxy blob in background so it survives re-export
+                if (contentInfo.hasMeshProxy && proxyEntry) {
+                    archiveLoader.extractFile(proxyEntry.file_name).then((proxyData: any) => {
+                        if (proxyData) assets.proxyMeshBlob = proxyData.blob;
+                    }).catch(() => {});
+                }
             }
             // Detect mesh format from archive filename
             state.meshFormat = meshEntry.file_name.split('.').pop()?.toLowerCase() || 'glb';

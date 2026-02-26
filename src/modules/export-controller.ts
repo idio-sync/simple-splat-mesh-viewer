@@ -12,6 +12,7 @@ import { validateSIP, toManifestCompliance } from './sip-validator.js';
 import type { SIPValidationResult } from './sip-validator.js';
 import { getStore } from './asset-store.js';
 import { captureWalkthroughForArchive } from './walkthrough-controller.js';
+import { getAuthCredentials, refreshLibrary } from './library-panel.js';
 import type { ExportDeps } from '@/types.js';
 
 const log = Logger.getLogger('export-controller');
@@ -132,18 +133,25 @@ function showComplianceDialog(result: SIPValidationResult): Promise<boolean> {
     });
 }
 
+interface PreparedArchive {
+    filename: string;
+    format: string;
+    includeHashes: boolean;
+}
+
 /**
- * Create and download an archive (.a3d/.a3z) with all selected assets.
+ * Shared archive preparation — validates metadata, adds assets, returns options.
+ * Returns null if validation fails or user cancels.
  */
-export async function downloadArchive(deps: ExportDeps): Promise<void> {
+async function prepareArchive(deps: ExportDeps): Promise<PreparedArchive | null> {
     const { sceneRefs, state, ui, metadata: metadataFns } = deps;
     const { archiveCreator, renderer, scene, camera, controls, splatMesh, modelGroup, pointcloudGroup, cadGroup, annotationSystem } = sceneRefs;
     const assets = getStore();
 
-    log.info(' downloadArchive called');
+    log.info(' prepareArchive called');
     if (!archiveCreator) {
         log.error(' archiveCreator is null');
-        return;
+        return null;
     }
 
     // Reset creator
@@ -173,7 +181,7 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
         log.info(' No title set, showing metadata panel');
         notify.warning('Please enter a project title in the metadata panel before exporting.');
         ui.showMetadataPanel();
-        return;
+        return null;
     }
 
     // SIP compliance validation
@@ -184,7 +192,7 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
         const proceed = await showComplianceDialog(sipResult);
         if (!proceed) {
             ui.showMetadataPanel();
-            return;
+            return null;
         }
     }
     const overridden = sipResult.errors.length > 0;
@@ -284,6 +292,15 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
         });
     }
 
+    // Re-extract proxy mesh blob from archive if not already in the store
+    if (includeModel && !assets.proxyMeshBlob && state.archiveLoader) {
+        const proxyMeshEntry = state.archiveLoader.getMeshProxyEntry();
+        if (proxyMeshEntry) {
+            const proxyData = await state.archiveLoader.extractFile(proxyMeshEntry.file_name);
+            if (proxyData) assets.proxyMeshBlob = proxyData.blob;
+        }
+    }
+
     // Add display proxy mesh if available
     if (includeModel && assets.proxyMeshBlob) {
         const proxyFileName = document.getElementById('proxy-mesh-filename')?.textContent || 'mesh_proxy.glb';
@@ -296,6 +313,15 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
             position, rotation, scale,
             derived_from: 'mesh_0'
         });
+    }
+
+    // Re-extract proxy splat blob from archive if not already in the store
+    if (!assets.proxySplatBlob && state.archiveLoader) {
+        const proxySplatEntry = state.archiveLoader.getSceneProxyEntry();
+        if (proxySplatEntry) {
+            const proxyData = await state.archiveLoader.extractFile(proxySplatEntry.file_name);
+            if (proxyData) assets.proxySplatBlob = proxyData.blob;
+        }
     }
 
     // Add display proxy splat if available
@@ -473,31 +499,148 @@ export async function downloadArchive(deps: ExportDeps): Promise<void> {
     log.info(' Validation result:', validation);
     if (!validation.valid) {
         notify.error('Cannot create archive: ' + validation.errors.join('; '));
-        return;
+        return null;
     }
 
-    // Create and download with progress
+    return {
+        filename: metadata.project.id || 'archive',
+        format,
+        includeHashes
+    };
+}
+
+/**
+ * Create and download an archive (.a3d/.a3z) with all selected assets.
+ */
+export async function downloadArchive(deps: ExportDeps): Promise<void> {
+    const prepared = await prepareArchive(deps);
+    if (!prepared) return;
+
+    const { archiveCreator } = deps.sceneRefs;
+    if (!archiveCreator) return;
+
     log.info(' Starting archive creation');
-    ui.showLoading('Creating archive...', true);
+    deps.ui.showLoading('Creating archive...', true);
     try {
-        log.info(' Calling archiveCreator.downloadArchive');
         await archiveCreator.downloadArchive(
             {
-                filename: metadata.project.id || 'archive',
-                format: format,
-                includeHashes: includeHashes
+                filename: prepared.filename,
+                format: prepared.format,
+                includeHashes: prepared.includeHashes
             },
             (percent: number, stage: string) => {
-                ui.updateProgress(percent, stage);
+                deps.ui.updateProgress(percent, stage);
             }
         );
         log.info(' Archive download complete');
-        ui.hideLoading();
-        ui.hideExportPanel();
+        deps.ui.hideLoading();
+        deps.ui.hideExportPanel();
     } catch (e: any) {
-        ui.hideLoading();
+        deps.ui.hideLoading();
         log.error(' Error creating archive:', e);
         notify.error('Error creating archive: ' + e.message);
+    }
+}
+
+/**
+ * Create an archive and save it directly to the server library via /api/archives.
+ */
+export async function saveToLibrary(deps: ExportDeps): Promise<void> {
+    const prepared = await prepareArchive(deps);
+    if (!prepared) return;
+
+    const { archiveCreator } = deps.sceneRefs;
+    if (!archiveCreator) return;
+
+    const creds = getAuthCredentials();
+    if (!creds) {
+        notify.warning('Please authenticate in the Library panel first.');
+        return;
+    }
+
+    log.info(' Starting save to library');
+    deps.ui.showLoading('Creating archive...', true);
+
+    try {
+        // Create the archive blob (0-80% progress)
+        const blob = await archiveCreator.createArchive(
+            { format: prepared.format, includeHashes: prepared.includeHashes },
+            (percent: number, stage: string) => {
+                deps.ui.updateProgress(Math.round(percent * 0.8), stage);
+            }
+        );
+
+        const filename = `${prepared.filename}.${prepared.format}`;
+        deps.ui.updateProgress(82, 'Uploading to library...');
+
+        // Upload via XHR for progress tracking
+        await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            const form = new FormData();
+            form.append('file', blob, filename);
+
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const uploadPct = Math.round((e.loaded / e.total) * 100);
+                    deps.ui.updateProgress(82 + Math.round(uploadPct * 0.16), 'Uploading to library...');
+                }
+            });
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve();
+                } else if (xhr.status === 409) {
+                    // File exists — try overwrite (delete + re-upload)
+                    const retryXhr = new XMLHttpRequest();
+                    fetch('/api/archives/' + encodeURIComponent(filename), {
+                        method: 'DELETE',
+                        credentials: 'include',
+                        headers: { 'Authorization': 'Basic ' + creds }
+                    }).then(delRes => {
+                        if (!delRes.ok) {
+                            reject(new Error('Archive already exists and could not be overwritten'));
+                            return;
+                        }
+                        // Re-upload after delete
+                        const retryForm = new FormData();
+                        retryForm.append('file', blob, filename);
+                        retryXhr.addEventListener('load', () => {
+                            if (retryXhr.status >= 200 && retryXhr.status < 300) resolve();
+                            else reject(new Error('Re-upload failed: ' + retryXhr.statusText));
+                        });
+                        retryXhr.addEventListener('error', () => reject(new Error('Re-upload network error')));
+                        retryXhr.open('POST', '/api/archives');
+                        retryXhr.withCredentials = true;
+                        retryXhr.setRequestHeader('Authorization', 'Basic ' + creds);
+                        retryXhr.send(retryForm);
+                    }).catch(reject);
+                } else {
+                    let msg = xhr.statusText;
+                    try { msg = JSON.parse(xhr.responseText).error || msg; } catch { /* ignore */ }
+                    reject(new Error(msg));
+                }
+            });
+
+            xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
+
+            xhr.open('POST', '/api/archives');
+            xhr.withCredentials = true;
+            xhr.setRequestHeader('Authorization', 'Basic ' + creds);
+            xhr.send(form);
+        });
+
+        deps.ui.updateProgress(100, 'Saved');
+        deps.ui.hideLoading();
+        deps.ui.hideExportPanel();
+        notify.success(`Saved to library: ${filename}`);
+
+        // Refresh library panel if it has been opened
+        refreshLibrary().catch(() => { /* ignore if library not initialized */ });
+
+    } catch (e: any) {
+        deps.ui.hideLoading();
+        log.error(' Error saving to library:', e);
+        notify.error('Error saving to library: ' + e.message);
     }
 }
 
