@@ -5,6 +5,11 @@
  * clipping (material.clippingPlanes). The Gaussian splat mesh is intentionally
  * excluded — Spark.js uses a custom shader incompatible with Three.js clipping.
  *
+ * The cross-section cap (gold fill visible from the cut side) uses back-face
+ * rendering: for each clipped mesh, a ghost clone renders only BackSide faces
+ * with the same clipping plane and a gold material. From the cut side, these
+ * back faces form the cross-section surface — like an architectural section.
+ *
  * Usage:
  *   const cs = new CrossSectionTool(scene, camera, renderer, controls,
  *                                   modelGroup, pointcloudGroup, stlGroup);
@@ -37,6 +42,12 @@ export class CrossSectionTool {
     /** Materials that have had clippingPlanes set; tracked so we can clear them on stop(). */
     private _trackedMaterials: THREE.Material[] = [];
 
+    /** Back-face ghost meshes that render the gold cross-section cap. */
+    private _capMeshes: THREE.Mesh[] = [];
+
+    /** Group that holds cap meshes in the scene. */
+    private _capGroup: THREE.Group;
+
     constructor(
         private readonly _scene: THREE.Scene,
         private readonly _camera: any,
@@ -54,7 +65,9 @@ export class CrossSectionTool {
         this._scene.add(this._planeAnchor);
 
         // Semi-transparent visual plane mesh
+        // PlaneGeometry default normal is +Z; rotate to +Y to match the clipping plane convention
         const geo = new THREE.PlaneGeometry(20, 20);
+        geo.rotateX(-Math.PI / 2);
         const mat = new THREE.MeshBasicMaterial({
             color: 0x0088ff,
             side: THREE.DoubleSide,
@@ -66,6 +79,10 @@ export class CrossSectionTool {
         this._planeMesh.renderOrder = 1;
         this._planeMesh.visible = false;
         this._scene.add(this._planeMesh);
+
+        // Cap group — holds back-face gold meshes
+        this._capGroup = new THREE.Group();
+        this._scene.add(this._capGroup);
 
         // Dedicated TransformControls for the plane anchor
         this._transformControls = new TransformControls(this._camera, this._renderer.domElement);
@@ -102,6 +119,7 @@ export class CrossSectionTool {
         this._transformControls.getHelper().visible = true;
         this._planeMesh.visible = true;
         this._applyClipping();
+        this._createCapMeshes();
         this.updatePlane();
         log.info('Cross-section activated at', center);
     }
@@ -112,6 +130,7 @@ export class CrossSectionTool {
         this._transformControls.getHelper().visible = false;
         this._planeMesh.visible = false;
         this._removeClipping();
+        this._disposeCapMeshes();
         // Ensure orbit controls are re-enabled if a drag was interrupted
         if (this._orbitControls) this._orbitControls.enabled = true;
         log.info('Cross-section deactivated');
@@ -178,16 +197,67 @@ export class CrossSectionTool {
     }
 
     /**
+     * Move the plane along the given axis to a normalised position (0 = bbox min, 1 = bbox max).
+     * Returns the world-space value on that axis for display purposes.
+     */
+    setPositionAlongAxis(axis: 'x' | 'y' | 'z', t: number): number {
+        const box = this._computeBBox();
+        const min = box.min[axis];
+        const max = box.max[axis];
+        const value = min + t * (max - min);
+        this._planeAnchor.position[axis] = value;
+        this.updatePlane();
+        return value;
+    }
+
+    /** Get the bounding box of the tracked asset groups. */
+    getBBox(): THREE.Box3 {
+        return this._computeBBox();
+    }
+
+    /** Get the current normalised position (0–1) of the plane along the given axis. */
+    getPositionAlongAxis(axis: 'x' | 'y' | 'z'): number {
+        const box = this._computeBBox();
+        const min = box.min[axis];
+        const max = box.max[axis];
+        const range = max - min;
+        if (range < 1e-6) return 0.5;
+        return (this._planeAnchor.position[axis] - min) / range;
+    }
+
+    /** Hide the TransformControls gizmo (for slider-based UI). */
+    hideGizmo(): void {
+        this._transformControls.getHelper().visible = false;
+    }
+
+    /** Show the TransformControls gizmo. */
+    showGizmo(): void {
+        if (this._active) {
+            this._transformControls.getHelper().visible = true;
+        }
+    }
+
+    /**
      * Re-walk asset groups and update tracked materials.
      * Call after new assets are loaded while the tool is active.
      */
     reapplyClipping(): void {
         if (!this._active) return;
         this._removeClipping();
+        this._disposeCapMeshes();
         this._applyClipping();
+        this._createCapMeshes();
     }
 
     // ─── Private helpers ──────────────────────────────────────
+
+    private _computeBBox(): THREE.Box3 {
+        const box = new THREE.Box3();
+        if (this._modelGroup.children.length) box.expandByObject(this._modelGroup);
+        if (this._pointcloudGroup.children.length) box.expandByObject(this._pointcloudGroup);
+        if (this._stlGroup?.children.length) box.expandByObject(this._stlGroup);
+        return box;
+    }
 
     private _applyClipping(): void {
         this._trackedMaterials = [];
@@ -226,5 +296,55 @@ export class CrossSectionTool {
             m.needsUpdate = true;
         }
         this._trackedMaterials = [];
+    }
+
+    // ─── Back-face cap helpers ───────────────────────────────
+
+    /**
+     * Create back-face cap meshes for all clipped meshes.
+     * Each cap shares the original mesh's geometry but renders only BackSide
+     * faces with a gold material and the same clipping plane. From the cut
+     * side, these back faces are the cross-section surface.
+     */
+    private _createCapMeshes(): void {
+        const groups: Array<THREE.Object3D | null> = [
+            this._modelGroup,
+            this._pointcloudGroup,
+            this._stlGroup,
+        ];
+        for (const group of groups) {
+            if (group) this._walkForCaps(group);
+        }
+        log.debug('Created', this._capMeshes.length, 'cap meshes');
+    }
+
+    private _walkForCaps(obj: THREE.Object3D): void {
+        if ((obj as THREE.Mesh).isMesh && !(obj as any).isPoints) {
+            const mesh = obj as THREE.Mesh;
+            mesh.updateWorldMatrix(true, false);
+
+            const capMat = new THREE.MeshBasicMaterial({
+                color: 0xc9a87c,
+                side: THREE.BackSide,
+                clippingPlanes: [this._plane],
+            });
+
+            const capMesh = new THREE.Mesh(mesh.geometry, capMat);
+            capMesh.applyMatrix4(mesh.matrixWorld);
+            this._capGroup.add(capMesh);
+            this._capMeshes.push(capMesh);
+        }
+        for (const child of obj.children) {
+            this._walkForCaps(child);
+        }
+    }
+
+    /** Dispose all cap meshes and remove from scene. */
+    private _disposeCapMeshes(): void {
+        for (const cap of this._capMeshes) {
+            (cap.material as THREE.Material).dispose();
+            this._capGroup.remove(cap);
+        }
+        this._capMeshes = [];
     }
 }

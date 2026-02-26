@@ -905,6 +905,166 @@ export function setup(manifest, deps) {
         measureWrapper.appendChild(measureDropdown);
     }
 
+    // Slice / cross-section dropdown (slider-based, no gizmo)
+    let sliceWrapper = null;
+    const crossSection = deps.crossSection;
+    if (crossSection) {
+        sliceWrapper = document.createElement('div');
+        sliceWrapper.className = 'editorial-slice-wrapper';
+
+        const sliceBtn = document.createElement('button');
+        sliceBtn.className = 'editorial-marker-toggle editorial-slice-btn';
+        sliceBtn.title = 'Cross-section';
+        sliceBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12" stroke-dasharray="3 2"/><polyline points="12 8 12 3"/><polyline points="12 16 12 21"/></svg>';
+
+        const sliceDropdown = document.createElement('div');
+        sliceDropdown.className = 'editorial-slice-dropdown';
+
+        let sliceActive = false;
+        let currentAxis = 'y';
+
+        // Axis row
+        const axisRow = document.createElement('div');
+        axisRow.className = 'editorial-slice-axis-row';
+
+        const axisLabel = document.createElement('span');
+        axisLabel.className = 'editorial-slice-label';
+        axisLabel.textContent = 'Axis';
+        axisRow.appendChild(axisLabel);
+
+        const axisBtnGroup = document.createElement('div');
+        axisBtnGroup.className = 'editorial-slice-seg';
+
+        ['X', 'Y', 'Z'].forEach(a => {
+            const btn = document.createElement('button');
+            btn.className = 'editorial-slice-seg-btn';
+            btn.textContent = a;
+            btn.dataset.axis = a.toLowerCase();
+            if (a === 'Y') btn.classList.add('active');
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                currentAxis = a.toLowerCase();
+                crossSection.setAxis(currentAxis);
+                axisBtnGroup.querySelectorAll('.editorial-slice-seg-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                // Reset slider to current position
+                sliceSlider.value = String(crossSection.getPositionAlongAxis(currentAxis) * 100);
+            });
+            axisBtnGroup.appendChild(btn);
+        });
+        axisRow.appendChild(axisBtnGroup);
+        sliceDropdown.appendChild(axisRow);
+
+        // Position slider
+        const sliderRow = document.createElement('div');
+        sliderRow.className = 'editorial-slice-slider-row';
+
+        const sliceSlider = document.createElement('input');
+        sliceSlider.type = 'range';
+        sliceSlider.min = '0';
+        sliceSlider.max = '100';
+        sliceSlider.step = '0.5';
+        sliceSlider.value = '50';
+        sliceSlider.className = 'editorial-slice-slider';
+
+        sliceSlider.addEventListener('input', (e) => {
+            e.stopPropagation();
+            const t = parseFloat(sliceSlider.value) / 100;
+            crossSection.setPositionAlongAxis(currentAxis, t);
+        });
+
+        sliderRow.appendChild(sliceSlider);
+        sliceDropdown.appendChild(sliderRow);
+
+        // Actions row: Flip · Reset
+        const actionsRow = document.createElement('div');
+        actionsRow.className = 'editorial-slice-actions';
+
+        const flipBtn = document.createElement('button');
+        flipBtn.className = 'editorial-slice-action';
+        flipBtn.textContent = 'Flip';
+        flipBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            crossSection.flip();
+        });
+
+        const actionDot = document.createElement('span');
+        actionDot.className = 'editorial-slice-action-dot';
+        actionDot.textContent = '\u00b7';
+
+        const resetBtn = document.createElement('button');
+        resetBtn.className = 'editorial-slice-action editorial-slice-action-danger';
+        resetBtn.textContent = 'Reset';
+        resetBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const box = crossSection.getBBox();
+            const center = { x: 0, y: 0, z: 0 };
+            if (!box.isEmpty()) {
+                center.x = (box.min.x + box.max.x) / 2;
+                center.y = (box.min.y + box.max.y) / 2;
+                center.z = (box.min.z + box.max.z) / 2;
+            }
+            crossSection.reset({ x: center.x, y: center.y, z: center.z });
+            currentAxis = 'y';
+            axisBtnGroup.querySelectorAll('.editorial-slice-seg-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.axis === 'y');
+            });
+            sliceSlider.value = '50';
+        });
+
+        actionsRow.appendChild(flipBtn);
+        actionsRow.appendChild(actionDot);
+        actionsRow.appendChild(resetBtn);
+        sliceDropdown.appendChild(actionsRow);
+
+        // Toggle: click activates/deactivates slice + opens/closes dropdown
+        sliceBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            // If active but dropdown was closed by outside click, just re-open it
+            if (sliceActive && !sliceDropdown.classList.contains('open')) {
+                sliceDropdown.classList.add('open');
+                return;
+            }
+
+            sliceActive = !sliceActive;
+
+            if (sliceActive) {
+                const box = crossSection.getBBox();
+                const center = { x: 0, y: 0, z: 0 };
+                if (!box.isEmpty()) {
+                    center.x = (box.min.x + box.max.x) / 2;
+                    center.y = (box.min.y + box.max.y) / 2;
+                    center.z = (box.min.z + box.max.z) / 2;
+                }
+                if (deps.setLocalClippingEnabled) deps.setLocalClippingEnabled(true);
+                crossSection.start(center);
+                crossSection.hideGizmo();
+                sliceSlider.value = '50';
+                currentAxis = 'y';
+                axisBtnGroup.querySelectorAll('.editorial-slice-seg-btn').forEach(b => {
+                    b.classList.toggle('active', b.dataset.axis === 'y');
+                });
+            } else {
+                crossSection.stop();
+                if (deps.setLocalClippingEnabled) deps.setLocalClippingEnabled(false);
+            }
+
+            sliceBtn.classList.toggle('active', sliceActive);
+            sliceDropdown.classList.toggle('open', sliceActive);
+        });
+
+        // Close dropdown on outside click but keep slice active
+        document.addEventListener('click', () => {
+            sliceDropdown.classList.remove('open');
+        });
+        sliceDropdown.addEventListener('click', (e) => { e.stopPropagation(); });
+
+        // Re-open dropdown when clicking active slice button
+        sliceWrapper.appendChild(sliceBtn);
+        sliceWrapper.appendChild(sliceDropdown);
+    }
+
     ribbon.appendChild(viewModes);
 
     // Separator after Info / before tools
@@ -993,6 +1153,7 @@ export function setup(manifest, deps) {
 
         toolsGroup.appendChild(markerToggle);
         if (measureWrapper) toolsGroup.appendChild(measureWrapper);
+        if (sliceWrapper) toolsGroup.appendChild(sliceWrapper);
     } else {
         // No annotations — still show orbit reset and measure
         const orbitResetBtn = document.createElement('button');
@@ -1002,6 +1163,7 @@ export function setup(manifest, deps) {
         orbitResetBtn.addEventListener('click', () => { if (resetOrbitCenter) resetOrbitCenter(); });
         toolsGroup.appendChild(orbitResetBtn);
         if (measureWrapper) toolsGroup.appendChild(measureWrapper);
+        if (sliceWrapper) toolsGroup.appendChild(sliceWrapper);
     }
 
     // Rule separator between annotation and visualization groups

@@ -1815,6 +1815,9 @@ function createLayoutDeps(): any {
         isTierVisible,
         EDITORIAL_SECTION_TIERS,
         resetOrbitCenter,
+        crossSection,
+        pointcloudGroup,
+        setLocalClippingEnabled: (enabled: boolean) => sceneManager?.setLocalClippingEnabled(enabled),
     };
 }
 
