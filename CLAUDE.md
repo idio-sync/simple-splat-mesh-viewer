@@ -109,12 +109,11 @@ After creating `SceneManager`, `init()` copies all its properties into loose `le
 A single mutable `const state: AppState = { ... }` object in `main.ts`. No setters, no events, no validation. Any function can mutate it directly.
 
 ### URL validation
-The core validation logic is in `url-validation.ts` (extracted, testable). It is used by:
-- `main.ts` — thin wrapper that passes `window.location` context and `ALLOWED_EXTERNAL_DOMAINS`
-- `config.js` line 58 — validates URL params at boot (separate implementation)
-- `file-handlers.js` line 35 — validates programmatic URL loads (separate implementation)
+The core validation logic is in `url-validation.ts` (extracted, testable). Two implementations exist:
+- `url-validation.ts` — canonical ES module, used at runtime via `main.ts` wrapper (passes `window.location` context and `ALLOWED_EXTERNAL_DOMAINS`). `file-input-handlers.ts` receives this via the deps pattern.
+- `config.js` line 68 — duplicate implementation for URL params at boot (IIFE, must run before ES modules). Uses identical logic but can't import from the TS module.
 
-When adding allowed domains, all three locations must be updated or loads will be silently blocked.
+The `ALLOWED_EXTERNAL_DOMAINS` list is defined in `config.js` and shared via `APP_CONFIG.allowedDomains`. A parity test in `__tests__/url-validation.test.ts` asserts both implementations produce identical results — if you change validation logic in one, the drift test will fail until the other is updated.
 
 ### Timing-based sequencing
 Several post-load operations use `setTimeout` with delays from `constants.js` TIMING (e.g., `AUTO_ALIGN_DELAY: 500`). These are not promise-based — they assume assets finish loading within the delay window.
