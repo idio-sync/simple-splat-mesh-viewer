@@ -4,7 +4,7 @@ FROM nginx:alpine
 # Node.js for the OG/oEmbed meta-server,
 # python3 for metadata extraction JSON parsing,
 # and unzip for reading archive contents
-RUN apk add --no-cache gettext nodejs python3 unzip
+RUN apk add --no-cache gettext nodejs openssl python3 unzip
 
 # Copy nginx configuration template (processed by entrypoint)
 COPY docker/nginx.conf.template /etc/nginx/templates/nginx.conf.template

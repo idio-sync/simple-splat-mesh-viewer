@@ -557,6 +557,7 @@ function parseMultipartUpload(req) {
                 if (idx > 0) writeStream.write(buffer.slice(0, idx));
                 buffer = Buffer.alloc(0);
                 state = 'done';
+                writeStream.end(() => finish(null, { tmpPath, filename }));
                 return;
             }
 
@@ -768,8 +769,10 @@ function handleViewArchive(req, res, hash) {
     if (DEFAULT_KIOSK_THEME) inject.theme = DEFAULT_KIOSK_THEME;
     const injectTag = '<script>window.__VITRINE_CLEAN_URL=' + JSON.stringify(inject) + ';</script>\n';
 
-    // Insert before the first <script tag so it runs before config.js
-    const html = indexHtml.replace(/<script/i, injectTag + '<script');
+    // Insert <base href="/"> so relative asset paths resolve from root (Vite uses base: './')
+    // Insert config inject before the first <script> tag (not CSP's "script-src")
+    let html = indexHtml.replace(/<head>/i, '<head>\n<base href="/">');
+    html = html.replace(/<script[\s>]/i, (m) => injectTag + m);
 
     res.writeHead(200, {
         'Content-Type': 'text/html; charset=utf-8',

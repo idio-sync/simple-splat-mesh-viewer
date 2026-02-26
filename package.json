@@ -15,6 +15,7 @@
     "branded": "node scripts/build-branded.mjs",
     "docker:build": "vite build && docker build -f docker/Dockerfile -t vitrine3d .",
     "docker:run": "docker run -p 8080:80 vitrine3d",
+    "docker:admin": "docker run -p 8080:80 -v ./archives:/usr/share/nginx/html/archives -e ADMIN_ENABLED=true -e ADMIN_PASS=dev123 -e OG_ENABLED=true -e SITE_URL=http://localhost:8080 -e DEFAULT_KIOSK_THEME=editorial vitrine3d",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write \"src/**/*.{js,ts,css,html}\"",

@@ -4,6 +4,7 @@
 CLAUDE.md
 nul
 src/models/
+archives/
 
 # Tauri
 dist/

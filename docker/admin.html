@@ -1558,19 +1558,15 @@ const QR = (() => {
 // ── Share / Embed Dialog ──
 
 function buildViewerUrl(archive, opts) {
-    // Clean URL format: /view/{hash} (defaults to kiosk=true, autoload=true)
+    if (!opts.kiosk) {
+        // Editor mode: direct URL with archive param
+        return location.origin + '/?archive=' + encodeURIComponent(archive.path);
+    }
+    // Kiosk mode: clean URL /view/{hash} (defaults to kiosk=true, autoload=false, theme=editorial)
     const base = location.origin + '/view/' + archive.hash;
-
     const params = [];
-    if (opts.mode && opts.mode !== 'default') params.push('mode=' + opts.mode);
-    if (opts.controls === 'hidden') params.push('controls=0');
-    if (opts.toolbar === 'hidden') params.push('toolbar=0');
-    if (opts.sidebar === 'hidden') params.push('sidebar=0');
-    if (opts.theme && opts.theme !== 'default') params.push('theme=' + opts.theme);
-    // Clean URL defaults: kiosk=true, autoload=false (click gate) — only add when overriding
-    if (!opts.kiosk) params.push('kiosk=false');
+    if (opts.theme && opts.theme !== 'default' && opts.theme !== 'editorial') params.push('theme=' + opts.theme);
     if (opts.autoload) params.push('autoload=true');
-
     return base + (params.length ? '?' + params.join('&') : '');
 }
 
@@ -1587,20 +1583,16 @@ function buildEmbedCode(archive, opts, dims) {
 
 function getShareOpts(container) {
     return {
-        mode: container.querySelector('[data-opt="mode"]')?.value || 'default',
-        controls: container.querySelector('[data-opt="controls"]')?.value || 'visible',
-        toolbar: container.querySelector('[data-opt="toolbar"]')?.value || 'visible',
-        sidebar: container.querySelector('[data-opt="sidebar"]')?.value || 'visible',
         theme: container.querySelector('[data-opt="theme"]')?.value || 'default',
-        kiosk: container.querySelector('[data-opt="kiosk"]')?.checked || false,
+        kiosk: container.querySelector('[data-opt="kiosk"]')?.value === 'true',
         autoload: container.querySelector('[data-opt="autoload"]')?.checked || false,
     };
 }
 
 const SHARE_PRESETS = {
-    viewer: { mode: 'default', controls: 'visible', toolbar: 'visible', sidebar: 'visible', theme: 'default', kiosk: false, autoload: false },
-    kiosk: { mode: 'default', controls: 'visible', toolbar: 'hidden', sidebar: 'hidden', theme: 'default', kiosk: true, autoload: false },
-    minimal: { mode: 'default', controls: 'hidden', toolbar: 'hidden', sidebar: 'hidden', theme: 'default', kiosk: true, autoload: false },
+    editor: { theme: 'default', kiosk: false, autoload: false },
+    kiosk: { theme: 'editorial', kiosk: true, autoload: false },
+    minimal: { theme: 'editorial', kiosk: true, autoload: false },
 };
 
 function showShareDialog(archive) {
@@ -1618,17 +1610,11 @@ function showShareDialog(archive) {
             // ── Link Panel ──
             '<div class="share-panel active" data-panel="link">' +
                 '<div class="share-presets">' +
-                    '<button class="share-preset active" data-preset="viewer">Viewer</button>' +
-                    '<button class="share-preset" data-preset="kiosk">Kiosk</button>' +
+                    '<button class="share-preset" data-preset="editor">Editor</button>' +
+                    '<button class="share-preset active" data-preset="kiosk">Kiosk</button>' +
                     '<button class="share-preset" data-preset="minimal">Minimal</button>' +
                 '</div>' +
                 '<div class="share-grid">' +
-                    '<div class="share-field"><label>Mode</label>' +
-                        '<select class="share-select" data-opt="mode">' +
-                            '<option value="default">Default</option>' +
-                            '<option value="orbit">Orbit</option>' +
-                            '<option value="fly">Fly</option>' +
-                        '</select></div>' +
                     '<div class="share-field"><label>Theme</label>' +
                         '<select class="share-select" data-opt="theme">' +
                             '<option value="default">Default</option>' +
@@ -1636,24 +1622,9 @@ function showShareDialog(archive) {
                             '<option value="museum">Museum</option>' +
                             '<option value="technical">Technical</option>' +
                         '</select></div>' +
-                    '<div class="share-field"><label>Controls</label>' +
-                        '<select class="share-select" data-opt="controls">' +
-                            '<option value="visible">Visible</option>' +
-                            '<option value="hidden">Hidden</option>' +
-                        '</select></div>' +
-                    '<div class="share-field"><label>Toolbar</label>' +
-                        '<select class="share-select" data-opt="toolbar">' +
-                            '<option value="visible">Visible</option>' +
-                            '<option value="hidden">Hidden</option>' +
-                        '</select></div>' +
-                    '<div class="share-field"><label>Sidebar</label>' +
-                        '<select class="share-select" data-opt="sidebar">' +
-                            '<option value="visible">Visible</option>' +
-                            '<option value="hidden">Hidden</option>' +
-                        '</select></div>' +
                 '</div>' +
                 '<div class="share-checks">' +
-                    '<label class="share-check"><input type="checkbox" data-opt="kiosk"> Kiosk mode</label>' +
+                    '<input type="hidden" data-opt="kiosk">' +
                     '<label class="share-check"><input type="checkbox" data-opt="autoload"> Auto-load</label>' +
                 '</div>' +
                 '<div class="share-output-row">' +
@@ -1722,13 +1693,12 @@ function showShareDialog(archive) {
         const p = SHARE_PRESETS[name];
         if (!p) return;
         dialog.querySelectorAll('.share-preset').forEach(b => b.classList.toggle('active', b.dataset.preset === name));
-        dialog.querySelector('[data-opt="mode"]').value = p.mode;
-        dialog.querySelector('[data-opt="controls"]').value = p.controls;
-        dialog.querySelector('[data-opt="toolbar"]').value = p.toolbar;
-        dialog.querySelector('[data-opt="sidebar"]').value = p.sidebar;
         dialog.querySelector('[data-opt="theme"]').value = p.theme;
-        dialog.querySelector('[data-opt="kiosk"]').checked = p.kiosk;
+        dialog.querySelector('[data-opt="kiosk"]').value = p.kiosk ? 'true' : 'false';
         dialog.querySelector('[data-opt="autoload"]').checked = p.autoload;
+        // Hide theme picker for editor preset (no kiosk = no theme)
+        const themeField = dialog.querySelector('.share-grid');
+        if (themeField) themeField.style.display = p.kiosk ? '' : 'none';
         updateOutputs();
     }
 
@@ -1789,8 +1759,8 @@ function showShareDialog(archive) {
         if (e.key === 'Escape') close();
     });
 
-    // Initial render
-    updateOutputs();
+    // Initial render — apply kiosk preset as default
+    applyPreset('kiosk');
 }
 
 // ── Init ──

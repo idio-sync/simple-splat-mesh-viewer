@@ -164,7 +164,7 @@ async function loadLayoutFiles(baseUrl: string, meta: ThemeMeta): Promise<void> 
     // Use absolute URL because import() resolves relative to this module's
     // location (/modules/), not the document root where themes/ lives.
     try {
-        const layoutUrl = new URL(baseUrl + 'layout.js', window.location.href).href;
+        const layoutUrl = new URL(baseUrl + 'layout.js', document.baseURI).href;
         await import(/* @vite-ignore */ layoutUrl);
         meta.layoutModule = getLayoutModule(meta.layout);
         if (meta.layoutModule) {

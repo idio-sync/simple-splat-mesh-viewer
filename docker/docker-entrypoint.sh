@@ -185,7 +185,7 @@ fi
 if [ "${OG_ENABLED}" = "true" ] || [ "${ADMIN_ENABLED}" = "true" ]; then
     # Generate clean archive URL proxy: /view/{hash} → meta-server
     cat > /etc/nginx/conf.d/view-proxy.conf.inc <<'VIEWEOF'
-location ~ ^/view/[a-f0-9]{16}$ {
+location ~ "^/view/[a-f0-9]{16}$" {
     proxy_pass http://127.0.0.1:3001;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
