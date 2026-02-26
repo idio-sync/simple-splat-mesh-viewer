@@ -280,6 +280,7 @@ export interface EventWiringDeps {
         showExportPanel: () => void;
         downloadArchive: () => void;
         downloadGenericViewer: () => void;
+        saveToLibrary: () => void;
     };
     screenshots: {
         captureScreenshotToList: () => void;

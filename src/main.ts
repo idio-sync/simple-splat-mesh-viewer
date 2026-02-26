@@ -13,6 +13,7 @@ import { Logger, notify } from './modules/utilities.js';
 import { FlyControls } from './modules/fly-controls.js';
 import { getStore } from './modules/asset-store.js';
 import { validateUserUrl as validateUserUrlCore } from './modules/url-validation.js';
+import { initLibraryPanel } from './modules/library-panel.js';
 import {
     initWalkthroughController,
     addStop as wtAddStop,
@@ -649,7 +650,7 @@ function createEventWiringDeps(): EventWiringDeps {
             updateSelectedAnnotationCamera, deleteSelectedAnnotation,
             dismissPopup: () => dismissPopupHandler(createAnnotationControllerDeps())
         },
-        export: { showExportPanel, downloadArchive, downloadGenericViewer },
+        export: { showExportPanel, downloadArchive, downloadGenericViewer, saveToLibrary },
         screenshots: { captureScreenshotToList, showViewfinder, captureManualPreview, hideViewfinder },
         metadata: { hideMetadataPanel, toggleMetadataDisplay, setupMetadataSidebar },
         share: { copyShareLink },
@@ -858,6 +859,9 @@ async function init() {
 
     // Wire image lightbox dismiss handlers
     initImageLightbox();
+
+    // Initialize library panel (shows rail button if libraryEnabled)
+    initLibraryPanel();
 
     // Apply initial controls visibility and mode
     applyControlsVisibility();
@@ -1198,6 +1202,12 @@ function captureManualPreview() {
 // Download archive — delegated to export-controller.ts
 async function downloadArchive() {
     const { downloadArchive: ctrl } = await import('./modules/export-controller.js');
+    return ctrl(createExportDeps());
+}
+
+// Save archive to library — delegated to export-controller.ts
+async function saveToLibrary() {
+    const { saveToLibrary: ctrl } = await import('./modules/export-controller.js');
     return ctrl(createExportDeps());
 }
 

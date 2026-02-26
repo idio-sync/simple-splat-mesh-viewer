@@ -18,6 +18,7 @@ import {
     showLoading,
     hideLoading
 } from './ui-controller.js';
+import { onLibraryActivated } from './library-panel.js';
 import {
     addCustomField,
     setupMetadataTabs,
@@ -49,6 +50,8 @@ export function setupUIEvents(deps: EventWiringDeps): void {
             // Fullscreen is action-only — handled by setupFullscreen()
             if (tool === 'fullscreen') return;
             activateTool(tool);
+            // Trigger library data fetch on first activation
+            if (tool === 'library') onLibraryActivated();
             // Show/hide transform gizmo and orbit center line based on active tool
             if (sceneRefs.transformControls) {
                 try {
@@ -501,6 +504,7 @@ export function setupUIEvents(deps: EventWiringDeps): void {
     // btn-export-archive is now a tool rail button — pane switching handled by activateTool()
     addListener('btn-export-cancel', 'click', hideExportPanel);
     addListener('btn-export-download', 'click', deps.export.downloadArchive);
+    addListener('btn-save-to-library', 'click', deps.export.saveToLibrary);
 
     // Generic viewer download button
     addListener('btn-download-viewer', 'click', deps.export.downloadGenericViewer);
@@ -763,6 +767,7 @@ export function setupUIEvents(deps: EventWiringDeps): void {
             case 'c': activateTool('capture'); activatedTool = 'capture'; break;
             case 'd': activateTool('metadata'); activatedTool = 'metadata'; break;
             case ',': activateTool('settings'); activatedTool = 'settings'; break;
+            case 'l': activateTool('library'); activatedTool = 'library'; onLibraryActivated(); break;
             case 'f': deps.camera.toggleFlyMode(); break;
             default: break;
         }

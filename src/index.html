@@ -48,14 +48,25 @@
              TOOL RAIL (left, 48px)
              ============================================================ -->
         <aside id="tool-rail">
-            <!-- Logo -->
-            <div class="rail-logo" title="Vitrine3D">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <!-- Logo / Library toggle — becomes Library button when ADMIN_ENABLED -->
+            <button class="rail-logo" data-tool="library" data-tooltip="Library  L" id="btn-library" title="Vitrine3D">
+                <!-- Default: logo mark -->
+                <svg class="rail-logo-mark" width="22" height="22" viewBox="0 0 24 24" fill="none">
                     <rect x="3" y="3" width="18" height="18" rx="1" stroke="var(--accent)" stroke-width="1.5" fill="none" opacity="0.5"/>
                     <rect x="7" y="7" width="10" height="10" rx="0.5" fill="var(--accent)" opacity="0.35"/>
                     <rect x="9" y="9" width="6" height="6" rx="0.5" fill="var(--accent)" opacity="0.6"/>
                 </svg>
-            </div>
+                <!-- Library mode: shelf icon (shown when libraryEnabled) -->
+                <svg class="rail-library-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+                    <path d="M4 19V5"/>
+                    <path d="M8 19V5"/>
+                    <path d="M12 19V5"/>
+                    <path d="M16 19l3-14"/>
+                    <path d="M3 19h18"/>
+                </svg>
+            </button>
+
+            <div class="rail-sep rail-library-sep" style="display:none"></div>
 
             <!-- Assets — Load splats, meshes, point clouds -->
             <button class="tool-btn active" data-tool="assets" data-tooltip="Assets  A" title="Load and configure 3D assets">
@@ -239,6 +250,54 @@
             </div>
             <div id="proxy-mesh-indicator" class="hidden">
                 Viewing display proxy &middot; <a href="#" id="proxy-load-full-link">Load full resolution</a>
+            </div>
+
+            <!-- Library overlay — replaces canvas when Library mode is active -->
+            <div id="library-overlay" class="hidden">
+                <div class="library-header">
+                    <div class="library-header-left">
+                        <span class="library-title">Library</span>
+                        <span class="library-count" id="library-count"></span>
+                    </div>
+                    <div class="library-header-right">
+                        <div class="library-storage" id="library-storage" style="display:none">
+                            <div class="library-storage-track"><div class="library-storage-fill" id="library-storage-fill"></div></div>
+                            <span class="library-storage-text" id="library-storage-text"></span>
+                        </div>
+                        <div class="library-sort" id="library-sort">
+                            <button class="library-sort-btn active" data-sort="name" data-dir="asc">Name <span class="arrow">&#8593;</span></button>
+                            <button class="library-sort-btn" data-sort="date" data-dir="desc">Date</button>
+                            <button class="library-sort-btn" data-sort="size" data-dir="desc">Size</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="library-upload" id="library-upload">
+                    <div class="library-upload-content">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V3"/><path d="M4 6l4-4 4 4"/><path d="M2 14h12"/></svg>
+                        <span>Drop .a3d or .a3z files here, or <button class="library-upload-browse" id="library-upload-browse">browse</button></span>
+                    </div>
+                    <div class="library-upload-progress">
+                        <span class="library-progress-name" id="library-progress-name"></span>
+                        <div class="library-progress-track"><div class="library-progress-fill" id="library-progress-fill"></div></div>
+                        <span class="library-progress-pct" id="library-progress-pct">0%</span>
+                    </div>
+                    <input type="file" id="library-file-input" accept=".a3d,.a3z" multiple hidden>
+                </div>
+                <div class="library-gallery" id="library-gallery"></div>
+                <div class="library-empty" id="library-empty" style="display:none">
+                    <svg width="40" height="40" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1" opacity="0.2"><path d="M16 6l10 5.5v9L16 26 6 20.5v-9L16 6z"/><path d="M16 15.5V26"/><path d="M6 11.5L16 17l10-5.5"/></svg>
+                    <p>No archives yet</p>
+                    <p class="library-empty-hint">Upload .a3d or .a3z files to build your library</p>
+                </div>
+                <div class="library-auth" id="library-auth" style="display:none">
+                    <p>Authentication required</p>
+                    <p class="library-auth-hint">Enter credentials to access the archive library</p>
+                    <div class="library-auth-form">
+                        <input type="text" id="library-auth-user" placeholder="Username" autocomplete="username">
+                        <input type="password" id="library-auth-pass" placeholder="Password" autocomplete="current-password">
+                        <button class="library-auth-btn" id="library-auth-submit">Sign in</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1834,6 +1893,7 @@
                         </div>
                         <div class="prop-section-body">
                             <button class="prop-btn accent" id="btn-export-download" style="margin-bottom:6px;">Download Archive</button>
+                            <button class="prop-btn" id="btn-save-to-library" style="display:none; margin-bottom:6px;">Save to Library</button>
                             <!-- Offline viewer temporarily disabled — styling incomplete -->
                             <button class="prop-btn" id="btn-download-viewer" style="display:none">Download Offline Viewer</button>
                             <button class="prop-btn mt4" id="btn-export-cancel" style="display:none;">Cancel Export</button>
@@ -1889,6 +1949,56 @@
                         <div class="prop-row" style="display:none"><span class="prop-row-label">Textures</span><span class="font-mono" id="model-textures" style="font-size:10px; color:var(--text-secondary);">-</span></div>
                         <div class="prop-row"><span class="prop-row-label">Point cloud</span><span class="font-mono" id="pointcloud-points" style="font-size:10px; color:var(--text-secondary);">-</span></div>
                         <div class="prop-row"><span class="prop-row-label">FPS</span><span class="font-mono" id="fps-counter" style="font-size:10px; color:var(--accent-text);">-</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================================
+                 LIBRARY PANE — selected archive details
+                 ======================================================== -->
+            <div class="props-pane" id="pane-library">
+                <div id="library-detail-empty" class="library-detail-empty">
+                    <p>Select an archive to view details</p>
+                </div>
+                <div id="library-detail" style="display:none">
+                    <div class="prop-section open">
+                        <div class="prop-section-hd">
+                            <span class="prop-section-title">Preview</span>
+                            <span class="prop-section-chevron">&#9654;</span>
+                        </div>
+                        <div class="prop-section-body">
+                            <div class="library-detail-thumb" id="library-detail-thumb"></div>
+                        </div>
+                    </div>
+                    <div class="prop-section open">
+                        <div class="prop-section-hd">
+                            <span class="prop-section-title">Details</span>
+                            <span class="prop-section-chevron">&#9654;</span>
+                        </div>
+                        <div class="prop-section-body">
+                            <div class="prop-row"><span class="prop-row-label">Title</span><span class="font-mono library-detail-val" id="library-detail-title" style="font-size:10px;">-</span></div>
+                            <div class="prop-row"><span class="prop-row-label">Filename</span><span class="font-mono library-detail-val" id="library-detail-filename" style="font-size:10px;">-</span></div>
+                            <div class="prop-row"><span class="prop-row-label">Size</span><span class="font-mono library-detail-val" id="library-detail-size" style="font-size:10px;">-</span></div>
+                            <div class="prop-row"><span class="prop-row-label">Modified</span><span class="font-mono library-detail-val" id="library-detail-date" style="font-size:10px;">-</span></div>
+                        </div>
+                    </div>
+                    <div class="prop-section open">
+                        <div class="prop-section-hd">
+                            <span class="prop-section-title">Actions</span>
+                            <span class="prop-section-chevron">&#9654;</span>
+                        </div>
+                        <div class="prop-section-body">
+                            <button class="prop-btn accent" id="library-action-open" style="width:100%; margin-bottom:4px;">Open in Editor</button>
+                            <button class="prop-btn" id="library-action-view" style="width:100%; margin-bottom:4px;">Open in New Tab</button>
+                            <div style="display:flex; gap:4px;">
+                                <button class="prop-btn" id="library-action-share" style="flex:1; width:auto; margin-bottom:0;">Share</button>
+                                <button class="prop-btn" id="library-action-copy" style="flex:1; width:auto; margin-bottom:0;">Copy URL</button>
+                            </div>
+                            <div style="display:flex; gap:4px; margin-top:4px;">
+                                <button class="prop-btn" id="library-action-rename" style="flex:1; width:auto; margin-bottom:0;">Rename</button>
+                                <button class="prop-btn danger" id="library-action-delete" style="flex:1; width:auto; margin-bottom:0;">Delete</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

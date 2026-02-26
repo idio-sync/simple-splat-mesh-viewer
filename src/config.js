@@ -210,6 +210,9 @@
 
         // LOD splat budgets (0 = use quality-tier.ts defaults)
         lodBudgetSd: 0,
-        lodBudgetHd: 0
+        lodBudgetHd: 0,
+
+        // Library (archive management) — disabled in local dev, enabled via ADMIN_ENABLED in Docker
+        libraryEnabled: false
     };
 })();

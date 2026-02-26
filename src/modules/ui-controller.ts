@@ -210,6 +210,7 @@ const TOOL_PANE_MAP: Record<string, { pane: string; title: string }> = {
     metadata:     { pane: 'pane-metadata',     title: 'Metadata' },
     export:       { pane: 'pane-export',       title: 'Export' },
     settings:     { pane: 'pane-settings',     title: 'Settings' },
+    library:      { pane: 'pane-library',      title: 'Library' },
 };
 
 /**
@@ -235,8 +236,8 @@ export function activateTool(toolName: string): void {
     // Show props panel
     if (panel) panel.classList.remove('hidden');
 
-    // Update tool rail active state
-    document.querySelectorAll('#tool-rail .tool-btn').forEach(btn => {
+    // Update tool rail active state (includes .rail-logo which doubles as library button)
+    document.querySelectorAll('#tool-rail [data-tool]').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-tool') === toolName);
     });
 
@@ -248,6 +249,21 @@ export function activateTool(toolName: string): void {
 
     // Update header title
     if (headerTitle) headerTitle.textContent = mapping.title;
+
+    // Toggle library overlay — show when library tool is active, hide otherwise
+    const libraryOverlay = document.getElementById('library-overlay');
+    if (libraryOverlay) {
+        libraryOverlay.classList.toggle('hidden', toolName !== 'library');
+    }
+
+    // Hide viewport overlays when library is active (they sit above the overlay)
+    const isLibrary = toolName === 'library';
+    const annotationMarkers = document.getElementById('annotation-markers');
+    if (annotationMarkers) annotationMarkers.style.display = isLibrary ? 'none' : '';
+    const annotationLines = document.getElementById('annotation-line-overlay');
+    if (annotationLines) annotationLines.style.display = isLibrary ? 'none' : '';
+    const displayPill = document.getElementById('vp-display-pill');
+    if (displayPill) displayPill.style.display = isLibrary ? 'none' : '';
 
     log.debug(`Tool activated: ${toolName}`);
 }

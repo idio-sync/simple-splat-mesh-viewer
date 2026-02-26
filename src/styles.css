@@ -126,13 +126,40 @@ input, select, textarea {
 }
 
 .rail-logo {
-    width: 28px;
-    height: 28px;
-    margin-bottom: 10px;
+    width: 36px;
+    height: 36px;
+    margin-bottom: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-md);
+    cursor: default;
+    padding: 0;
+    position: relative;
+    transition: background 0.1s, color 0.1s;
+}
+
+/* When library is enabled, logo becomes a clickable tool button */
+.rail-logo[data-tool="library"] .rail-library-icon ~ * { pointer-events: auto; }
+.rail-logo.active {
+    background: var(--accent-muted);
+    cursor: pointer;
+}
+.rail-logo.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    background: var(--accent);
+    border-radius: 0 1px 1px 0;
+}
+.rail-logo:hover:not(:disabled) {
+    background: var(--bg-hover);
 }
 
 .tool-btn {
@@ -4808,4 +4835,372 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .wt-stop-item.drag-over {
     border-top: 2px solid var(--accent);
     margin-top: -2px;
+}
+
+/* ============================================================
+   Library Panel — Archive management overlay in viewport
+   ============================================================ */
+
+#library-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    background: var(--bg-deep);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+#library-overlay.hidden {
+    display: none !important;
+}
+
+.library-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px 0;
+    flex-shrink: 0;
+}
+
+.library-header-left {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.library-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.02em;
+}
+
+.library-count {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.library-header-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.library-storage {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.library-storage-track {
+    width: 60px;
+    height: 2px;
+    background: var(--border-subtle);
+    border-radius: 1px;
+    overflow: hidden;
+}
+
+.library-storage-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 1px;
+    transition: width 0.3s ease;
+}
+
+.library-sort {
+    display: flex;
+    gap: 1px;
+}
+
+.library-sort-btn {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+}
+
+.library-sort-btn:hover { color: var(--text-secondary); background: var(--bg-hover); }
+.library-sort-btn.active { color: var(--accent-text); background: var(--accent-muted); }
+.library-sort-btn .arrow { font-size: 8px; margin-left: 2px; }
+
+/* Upload zone */
+.library-upload {
+    margin: 10px 20px 0;
+    border: 1px dashed var(--border-default);
+    border-radius: var(--radius-md);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 11px;
+    transition: border-color 0.15s, background 0.15s;
+    flex-shrink: 0;
+}
+
+.library-upload:hover {
+    border-color: var(--accent);
+    background: var(--accent-muted);
+    color: var(--text-secondary);
+}
+
+.library-upload.dragover {
+    border-color: var(--accent-hover);
+    background: rgba(90,158,151,0.1);
+    color: var(--text-primary);
+}
+
+.library-upload.uploading { cursor: default; pointer-events: none; }
+
+.library-upload svg { flex-shrink: 0; opacity: 0.5; }
+.library-upload:hover svg { opacity: 0.8; }
+
+.library-upload-browse {
+    color: var(--accent-text);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    font-size: 11px;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.library-upload-browse:hover { color: var(--accent-hover); }
+
+.library-upload-content { display: flex; align-items: center; gap: 8px; }
+.library-upload-progress { display: none; flex: 1; align-items: center; gap: 10px; min-width: 0; }
+
+.library-upload.uploading .library-upload-content { display: none; }
+.library-upload.uploading .library-upload-progress { display: flex; }
+
+.library-progress-track {
+    flex: 1;
+    height: 2px;
+    background: var(--border-subtle);
+    border-radius: 1px;
+    overflow: hidden;
+    min-width: 80px;
+}
+
+.library-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 1px;
+    transition: width 0.15s ease;
+}
+
+.library-progress-name {
+    font-size: 10px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+}
+
+.library-progress-pct {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    min-width: 30px;
+    text-align: right;
+}
+
+/* Gallery grid */
+.library-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+    padding: 12px 20px 20px;
+    flex: 1;
+    align-content: start;
+}
+
+/* Card */
+.library-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    transition: border-color 0.15s;
+    cursor: pointer;
+    position: relative;
+}
+
+.library-card:hover { border-color: var(--border-default); }
+.library-card.selected { border-color: var(--accent); }
+
+.library-card-thumb {
+    aspect-ratio: 16 / 10;
+    background: var(--bg-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.library-card-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.library-card-placeholder {
+    color: var(--text-faint);
+}
+
+.library-card-body {
+    padding: 6px 8px 8px;
+}
+
+.library-card-title {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+}
+
+.library-card-meta {
+    font-size: 9px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 6px;
+}
+
+.library-card-meta span { white-space: nowrap; }
+
+/* Empty state */
+.library-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.library-empty p:first-of-type {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.library-empty-hint { font-size: 11px; }
+
+/* Auth state */
+.library-auth {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.library-auth p:first-of-type {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.library-auth-hint { font-size: 11px; margin-bottom: 8px; }
+
+.library-auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 200px;
+}
+
+.library-auth-form input {
+    font-size: 11px;
+    padding: 6px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    outline: none;
+}
+
+.library-auth-form input:focus { border-color: var(--accent); }
+
+.library-auth-btn {
+    font-size: 11px;
+    padding: 6px 14px;
+    background: var(--accent);
+    color: var(--bg-deep);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.15s;
+}
+
+.library-auth-btn:hover { background: var(--accent-hover); }
+
+/* Detail panel (props pane) */
+.library-detail-empty {
+    text-align: center;
+    padding: 40px 16px;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.library-detail-thumb {
+    aspect-ratio: 16 / 10;
+    background: var(--bg-surface);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.library-detail-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.library-detail-val {
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+}
+
+/* Rail mode button separator */
+.rail-library-sep {
+    margin: 2px 8px;
+}
+
+/* Mode button styling — same as tool-btn but used for top-level mode switching */
+.rail-mode-btn {
+    position: relative;
+}
+
+.rail-mode-btn.active::before {
+    background: var(--accent);
 }

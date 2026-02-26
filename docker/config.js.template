@@ -281,7 +281,10 @@
 
         // LOD splat budgets (overrides quality-tier.ts defaults)
         lodBudgetSd: envLodBudgetSd ? parseInt(envLodBudgetSd, 10) || 0 : 0,
-        lodBudgetHd: envLodBudgetHd ? parseInt(envLodBudgetHd, 10) || 0 : 0
+        lodBudgetHd: envLodBudgetHd ? parseInt(envLodBudgetHd, 10) || 0 : 0,
+
+        // Library (archive management) — enabled when ADMIN_ENABLED=true
+        libraryEnabled: "${ADMIN_ENABLED}" === "true"
     };
 
     console.log('[config.js] Generated Config:', window.APP_CONFIG);
