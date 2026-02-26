@@ -559,6 +559,18 @@ function escapeHtml(text: string): string {
         .replace(/'/g, '&#039;');
 }
 
+/** Check if a URL scheme is safe for use in href/src attributes */
+function isSafeUrl(url: string): boolean {
+    // Allow asset: protocol (resolved to blob: at runtime), data: images, and standard web protocols
+    if (url.startsWith('asset:') || url.startsWith('blob:')) return true;
+    try {
+        const parsed = new URL(url, 'https://placeholder.invalid');
+        return ['http:', 'https:', 'mailto:'].includes(parsed.protocol);
+    } catch {
+        return false;
+    }
+}
+
 /**
  * Parse inline markdown elements (links, bold, italic, code)
  * @param {string} text - Text to parse
@@ -570,13 +582,17 @@ function parseInlineMarkdown(text: string): string {
     // Images: ![alt](url) - must come before links
     html = html.replace(
         /!\[([^\]]*)\]\(([^)]+)\)/g,
-        '<img src="$2" alt="$1" class="md-image" loading="lazy">'
+        (_match, alt, url) => isSafeUrl(url)
+            ? `<img src="${url}" alt="${alt}" class="md-image" loading="lazy">`
+            : `${alt}`
     );
 
     // Links: [text](url)
     html = html.replace(
         /\[([^\]]+)\]\(([^)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>'
+        (_match, text, url) => isSafeUrl(url)
+            ? `<a href="${url}" target="_blank" rel="noopener noreferrer" class="md-link">${text}</a>`
+            : `${text}`
     );
 
     // Auto-link URLs that aren't already in anchor tags or blob: URLs

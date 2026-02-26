@@ -3141,13 +3141,26 @@ function escapeHtml(str: any): string {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/** Check if a URL scheme is safe for use in href/src attributes */
+function isSafeUrl(url: string): boolean {
+    if (url.startsWith('asset:') || url.startsWith('blob:')) return true;
+    try {
+        const parsed = new URL(url, 'https://placeholder.invalid');
+        return ['http:', 'https:', 'mailto:'].includes(parsed.protocol);
+    } catch {
+        return false;
+    }
+}
+
 /** Escape HTML, then convert [title](url) markdown links and bare URLs to clickable <a> tags */
 function linkifyValue(str: any): string {
     let html = escapeHtml(str);
     // Markdown links: [text](url)
     html = html.replace(
         /\[([^\]]+)\]\(([^)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>'
+        (_match: string, text: string, url: string) => isSafeUrl(url)
+            ? `<a href="${url}" target="_blank" rel="noopener noreferrer" class="md-link">${text}</a>`
+            : `${text}`
     );
     // Auto-link bare URLs not already in href
     html = html.replace(
