@@ -30,31 +30,39 @@ const log = Logger.getLogger('kiosk-viewer');
 // fflate from jsDelivr (self-contained ESM browser build).
 //
 // Keys are the import specifiers as they appear in module import statements.
-const CDN_DEPS: Record<string, string> = {
+// Optional `integrity` field is a SHA-384 hash of the fetched content (after
+// following esm.sh redirects). When present, the fetch pipeline verifies the
+// hash and rejects tampered content. Generate hashes with generateCdnHashes().
+interface CdnDep {
+    url: string;
+    integrity?: string;  // "sha384-..." — omit to skip verification
+}
+
+const CDN_DEPS: Record<string, CdnDep> = {
     'three':
-        'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js',
+        { url: 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js' },
     'three/addons/controls/OrbitControls.js':
-        'https://esm.sh/three@0.170.0/examples/jsm/controls/OrbitControls.js?external=three',
+        { url: 'https://esm.sh/three@0.170.0/examples/jsm/controls/OrbitControls.js?external=three' },
     'three/addons/controls/TransformControls.js':
-        'https://esm.sh/three@0.170.0/examples/jsm/controls/TransformControls.js?external=three',
+        { url: 'https://esm.sh/three@0.170.0/examples/jsm/controls/TransformControls.js?external=three' },
     'three/addons/loaders/GLTFLoader.js':
-        'https://esm.sh/three@0.170.0/examples/jsm/loaders/GLTFLoader.js?external=three',
+        { url: 'https://esm.sh/three@0.170.0/examples/jsm/loaders/GLTFLoader.js?external=three' },
     'three/addons/loaders/OBJLoader.js':
-        'https://esm.sh/three@0.170.0/examples/jsm/loaders/OBJLoader.js?external=three',
+        { url: 'https://esm.sh/three@0.170.0/examples/jsm/loaders/OBJLoader.js?external=three' },
     'three/addons/loaders/MTLLoader.js':
-        'https://esm.sh/three@0.170.0/examples/jsm/loaders/MTLLoader.js?external=three',
+        { url: 'https://esm.sh/three@0.170.0/examples/jsm/loaders/MTLLoader.js?external=three' },
     'three/addons/loaders/STLLoader.js':
-        'https://esm.sh/three@0.170.0/examples/jsm/loaders/STLLoader.js?external=three',
+        { url: 'https://esm.sh/three@0.170.0/examples/jsm/loaders/STLLoader.js?external=three' },
     'three/addons/loaders/DRACOLoader.js':
-        'https://esm.sh/three@0.170.0/examples/jsm/loaders/DRACOLoader.js?external=three',
+        { url: 'https://esm.sh/three@0.170.0/examples/jsm/loaders/DRACOLoader.js?external=three' },
     'three/addons/libs/meshopt_decoder.module.js':
-        'https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/libs/meshopt_decoder.module.js',
+        { url: 'https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/libs/meshopt_decoder.module.js' },
     'dxf-parser':
-        'https://esm.sh/dxf-parser@1.1.2',
+        { url: 'https://esm.sh/dxf-parser@1.1.2' },
     '@sparkjsdev/spark':
-        'https://sparkjs.dev/releases/spark/preview/2.0.0/spark.module.js',
+        { url: 'https://sparkjs.dev/releases/spark/preview/2.0.0/spark.module.js' },
     'fflate':
-        'https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js',
+        { url: 'https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js' },
 };
 
 // =============================================================================
@@ -159,6 +167,67 @@ async function fetchResolved(url: string): Promise<string> {
 }
 
 /**
+ * Compute SHA-384 hash of a string, returning "sha384-..." format.
+ */
+async function computeSha384(content: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(content);
+    const hashBuffer = await crypto.subtle.digest('SHA-384', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashBase64 = btoa(String.fromCharCode(...hashArray));
+    return `sha384-${hashBase64}`;
+}
+
+/**
+ * Verify fetched content against an expected SRI hash.
+ * Throws if the hash does not match.
+ */
+async function verifySri(content: string, expectedHash: string, specifier: string): Promise<void> {
+    const actualHash = await computeSha384(content);
+    if (actualHash !== expectedHash) {
+        throw new Error(
+            `SRI integrity check failed for "${specifier}".\n` +
+            `  Expected: ${expectedHash}\n` +
+            `  Actual:   ${actualHash}\n` +
+            `The CDN may have been compromised or the dependency was updated. ` +
+            `Run generateCdnHashes() in the browser console to regenerate hashes.`
+        );
+    }
+}
+
+/**
+ * Fetch all CDN deps and log their SHA-384 hashes.
+ * Run this in the browser console to generate integrity hashes for CDN_DEPS.
+ * Copy the output into the CDN_DEPS object's integrity fields.
+ */
+export async function generateCdnHashes(): Promise<Record<string, string>> {
+    const hashes: Record<string, string> = {};
+    for (const [specifier, dep] of Object.entries(CDN_DEPS)) {
+        const src = await fetchResolved(dep.url);
+        const hash = await computeSha384(src);
+        hashes[specifier] = hash;
+        console.log(`'${specifier}': { url: '...', integrity: '${hash}' },`);
+    }
+    // Also hash the Draco decoder
+    const dracoUrl = 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/libs/draco/gltf/draco_decoder.js';
+    try {
+        const dracoSrc = await fetchText(dracoUrl);
+        const dracoHash = await computeSha384(dracoSrc);
+        hashes['draco_decoder'] = dracoHash;
+        console.log(`'draco_decoder': '${dracoHash}',`);
+    } catch (e) {
+        console.warn('Could not fetch Draco decoder for hashing');
+    }
+    console.log('\nCopy the integrity values above into CDN_DEPS in kiosk-viewer.ts');
+    return hashes;
+}
+
+// Expose to browser console for hash generation
+if (typeof window !== 'undefined') {
+    (window as any).generateCdnHashes = generateCdnHashes;
+}
+
+/**
  * Base64-encode a UTF-8 string.
  */
 function toBase64(str: string): string {
@@ -194,13 +263,19 @@ export async function fetchDependencies(onProgress?: ProgressCallback): Promise<
         if (onProgress) onProgress(`${msg} (${step}/${totalSteps})`);
     }
 
-    // 1. Fetch CDN dependencies
+    // 1. Fetch CDN dependencies (with optional SRI verification)
     const cdn: Record<string, string> = {};
-    for (const [specifier, url] of cdnEntries) {
+    for (const [specifier, dep] of cdnEntries) {
         const shortName = specifier.split('/').pop()?.replace(/\.js.*$/, '') || specifier;
         progress(`Fetching ${shortName}...`);
         log.info(`Fetching CDN: ${specifier}`);
-        const src = await fetchResolved(url);
+        const src = await fetchResolved(dep.url);
+        if (dep.integrity) {
+            await verifySri(src, dep.integrity, specifier);
+            log.info(`SRI verified: ${specifier}`);
+        } else {
+            log.warn(`No SRI hash for ${specifier} — run generateCdnHashes() to generate`);
+        }
         cdn[specifier] = toBase64(src);
         log.info(`Fetched ${specifier}: ${(src.length / 1024).toFixed(1)} KB`);
     }

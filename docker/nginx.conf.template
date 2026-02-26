@@ -1,3 +1,8 @@
+# CORS origin matching — populated by entrypoint from CORS_ORIGINS env var.
+# When CORS_ORIGINS is empty (default), $cors_origin is always "" and no
+# Access-Control-Allow-Origin header is emitted (same-origin only).
+include /etc/nginx/conf.d/cors-origins-map.conf.inc;
+
 # Bot user-agent detection for OG meta tag injection
 # $is_bot = 1 when the request comes from a known crawler
 # Only active when meta-server is running (OG_ENABLED=true)
@@ -54,7 +59,9 @@ server {
         alias /usr/share/nginx/html/thumbs/;
         expires 7d;
         add_header Cache-Control "public";
-        add_header Access-Control-Allow-Origin *;
+        add_header Access-Control-Allow-Origin $cors_origin always;
+        add_header Access-Control-Allow-Methods "GET, OPTIONS" always;
+        add_header Vary "Origin" always;
     }
 
     # Enable gzip compression
@@ -71,9 +78,10 @@ server {
     location ~* \.(a3d|a3z)$ {
         expires 1d;
         add_header Cache-Control "public";
-        add_header Access-Control-Allow-Origin *;
-        add_header Access-Control-Allow-Methods "GET, OPTIONS";
-        add_header Access-Control-Allow-Headers "Origin, Content-Type, Accept, Range";
+        add_header Access-Control-Allow-Origin $cors_origin always;
+        add_header Access-Control-Allow-Methods "GET, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Origin, Content-Type, Accept, Range" always;
+        add_header Vary "Origin" always;
         # Serve as application/zip for proper handling
         types {
             application/zip a3d a3z;
@@ -84,18 +92,20 @@ server {
     location ~* \.e57$ {
         expires 1d;
         add_header Cache-Control "public";
-        add_header Access-Control-Allow-Origin *;
-        add_header Access-Control-Allow-Methods "GET, OPTIONS";
-        add_header Access-Control-Allow-Headers "Origin, Content-Type, Accept, Range";
+        add_header Access-Control-Allow-Origin $cors_origin always;
+        add_header Access-Control-Allow-Methods "GET, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Origin, Content-Type, Accept, Range" always;
+        add_header Vary "Origin" always;
         types {
             application/octet-stream e57;
         }
     }
 
-    # CORS headers for loading external splat/model files
-    add_header Access-Control-Allow-Origin *;
-    add_header Access-Control-Allow-Methods "GET, OPTIONS";
-    add_header Access-Control-Allow-Headers "Origin, Content-Type, Accept";
+    # CORS headers for all other responses (splat/model files, etc.)
+    add_header Access-Control-Allow-Origin $cors_origin always;
+    add_header Access-Control-Allow-Methods "GET, OPTIONS" always;
+    add_header Access-Control-Allow-Headers "Origin, Content-Type, Accept" always;
+    add_header Vary "Origin" always;
 
     # CSP frame-ancestors (prevents clickjacking) - configurable via FRAME_ANCESTORS env var
     add_header Content-Security-Policy "frame-ancestors ${FRAME_ANCESTORS}" always;

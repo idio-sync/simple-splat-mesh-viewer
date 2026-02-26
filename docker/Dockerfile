@@ -36,6 +36,7 @@ ENV DEFAULT_POINTCLOUD_URL=""
 ENV SHOW_CONTROLS="true"
 ENV ALLOWED_DOMAINS=""
 ENV FRAME_ANCESTORS="'self'"
+ENV CORS_ORIGINS=""
 
 # Kiosk embed security (see docs/DEPLOYMENT.md#kiosk-embed-security for details)
 ENV KIOSK_LOCK=""

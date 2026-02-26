@@ -688,17 +688,19 @@ When all kiosk embed env vars are unset, the viewer behaves exactly as before (z
 
 ### CORS Configuration
 
-nginx serves CORS headers for cross-origin file loading. The relevant headers are configured in `nginx.conf.template`:
+By default, no `Access-Control-Allow-Origin` header is emitted (same-origin only). To allow cross-origin access from specific origins, set the `CORS_ORIGINS` environment variable to a space-separated list of allowed origins:
 
-```nginx
-# Global CORS headers
-add_header Access-Control-Allow-Origin *;
-add_header Access-Control-Allow-Methods "GET, OPTIONS";
-add_header Access-Control-Allow-Headers "Origin, Content-Type, Accept";
-
-# Archive and E57 files additionally allow Range header (for partial downloads / click-to-load gate)
-add_header Access-Control-Allow-Headers "Origin, Content-Type, Accept, Range";
+```bash
+docker run -e CORS_ORIGINS="https://app.example.com https://portal.example.com" ...
 ```
+
+The entrypoint generates an nginx `map` block that matches the request's `Origin` header against the allowlist and reflects it back. Requests from unlisted origins receive no CORS header and are blocked by the browser.
+
+| Env var | Default | Description |
+|---------|---------|-------------|
+| `CORS_ORIGINS` | `""` (empty = same-origin only) | Space-separated list of allowed origins (e.g., `https://app.example.com`) |
+
+Archive and E57 files additionally allow the `Range` header for partial downloads.
 
 For Cloudflare R2 storage, the bucket also needs CORS configured — see [R2 CORS Configuration](#r2-cors-configuration) above.
 

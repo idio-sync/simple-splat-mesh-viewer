@@ -11,6 +11,27 @@ envsubst '${FRAME_ANCESTORS}' \
     < /etc/nginx/templates/nginx.conf.template \
     > /etc/nginx/conf.d/default.conf
 
+# Generate CORS origin map from CORS_ORIGINS env var
+# CORS_ORIGINS is a space-separated list of allowed origins (e.g., "https://app.example.com https://portal.example.com")
+# When empty (default), no Access-Control-Allow-Origin header is emitted (same-origin only)
+if [ -n "${CORS_ORIGINS}" ]; then
+    {
+        echo 'map $http_origin $cors_origin {'
+        echo '    default "";'
+        for origin in ${CORS_ORIGINS}; do
+            echo "    \"${origin}\" \"${origin}\";"
+        done
+        echo '}'
+    } > /etc/nginx/conf.d/cors-origins-map.conf.inc
+else
+    # No CORS origins — $cors_origin is always empty, so no header is emitted
+    cat > /etc/nginx/conf.d/cors-origins-map.conf.inc <<'CORSEOF'
+map $http_origin $cors_origin {
+    default "";
+}
+CORSEOF
+fi
+
 echo "Configuration generated:"
 echo "  DEFAULT_ARCHIVE_URL: ${DEFAULT_ARCHIVE_URL:-<not set>}"
 echo "  DEFAULT_SPLAT_URL: ${DEFAULT_SPLAT_URL:-<not set>}"
@@ -19,6 +40,7 @@ echo "  DEFAULT_POINTCLOUD_URL: ${DEFAULT_POINTCLOUD_URL:-<not set>}"
 echo "  SHOW_CONTROLS: ${SHOW_CONTROLS}"
 echo "  ALLOWED_DOMAINS: ${ALLOWED_DOMAINS:-<not set>}"
 echo "  FRAME_ANCESTORS: ${FRAME_ANCESTORS}"
+echo "  CORS_ORIGINS: ${CORS_ORIGINS:-<not set, same-origin only>}"
 echo "  ARCHIVE_PATH_PREFIX: ${ARCHIVE_PATH_PREFIX:-<not set>}"
 
 # Generate kiosk-lock nginx rules

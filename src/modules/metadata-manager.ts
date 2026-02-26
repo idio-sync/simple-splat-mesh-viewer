@@ -2338,7 +2338,9 @@ export function showAnnotationPopup(annotation: Annotation, imageAssets?: Map<st
 
     if (heroEl) {
         if (hero) {
-            heroEl.innerHTML = `<img src="${hero.src}" alt="${hero.alt}" class="annotation-hero-img" loading="lazy"><span class="annotation-hero-zoom" aria-label="Expand image"></span>`;
+            const safeSrc = hero.src.replace(/"/g, '&quot;');
+            const safeAlt = hero.alt.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            heroEl.innerHTML = `<img src="${safeSrc}" alt="${safeAlt}" class="annotation-hero-img" loading="lazy"><span class="annotation-hero-zoom" aria-label="Expand image"></span>`;
             heroEl.style.display = '';
             popup.classList.add('has-image');
 
