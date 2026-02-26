@@ -6,7 +6,6 @@
 //   DEFAULT_SPLAT_URL      - Default splat file to load
 //   DEFAULT_MODEL_URL      - Default model file to load
 //   DEFAULT_POINTCLOUD_URL - Default E57 point cloud file to load
-//   DEFAULT_ALIGNMENT_URL  - Default alignment JSON file to load
 //   SHOW_CONTROLS          - Show (true) or hide (false) the controls panel
 //   ALLOWED_DOMAINS        - Comma-separated list of trusted external domains
 //                            Supports wildcards: *.cdn.example.com
@@ -178,7 +177,7 @@
     const envSplat = "${DEFAULT_SPLAT_URL}";
     const envModel = "${DEFAULT_MODEL_URL}";
     const envPointcloud = "${DEFAULT_POINTCLOUD_URL}";
-    const envAlignment = "${DEFAULT_ALIGNMENT_URL}";
+    const envAlignment = "";
     const envShowControls = ${SHOW_CONTROLS}; // This becomes true/false
     const envLodBudgetSd = "${LOD_BUDGET_SD}";
     const envLodBudgetHd = "${LOD_BUDGET_HD}";

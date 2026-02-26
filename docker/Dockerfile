@@ -1,7 +1,10 @@
 FROM nginx:alpine
 
-# Install envsubst for environment variable substitution
-RUN apk add --no-cache gettext
+# Install envsubst for environment variable substitution,
+# Node.js for the OG/oEmbed meta-server,
+# python3 for metadata extraction JSON parsing,
+# and unzip for reading archive contents
+RUN apk add --no-cache gettext nodejs python3 unzip
 
 # Copy nginx configuration template (processed by entrypoint)
 COPY docker/nginx.conf.template /etc/nginx/templates/nginx.conf.template
@@ -15,12 +18,20 @@ COPY docker/config.js.template /usr/share/nginx/html/config.js.template
 COPY docker/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
+# Copy OG/oEmbed meta-server and metadata extraction script
+COPY docker/meta-server.js /opt/meta-server.js
+COPY docker/extract-meta.sh /opt/extract-meta.sh
+RUN chmod +x /opt/extract-meta.sh
+
+# Create directories for extracted metadata and thumbnails
+# Operators can mount /usr/share/nginx/html/thumbs/ for custom default thumbnail
+RUN mkdir -p /usr/share/nginx/html/meta /usr/share/nginx/html/thumbs
+
 # Environment variables with defaults
 ENV DEFAULT_ARCHIVE_URL=""
 ENV DEFAULT_SPLAT_URL=""
 ENV DEFAULT_MODEL_URL=""
 ENV DEFAULT_POINTCLOUD_URL=""
-ENV DEFAULT_ALIGNMENT_URL=""
 ENV SHOW_CONTROLS="true"
 ENV ALLOWED_DOMAINS=""
 ENV FRAME_ANCESTORS="'self'"
@@ -29,6 +40,14 @@ ENV FRAME_ANCESTORS="'self'"
 ENV KIOSK_LOCK=""
 ENV ARCHIVE_PATH_PREFIX=""
 ENV EMBED_REFERERS=""
+
+# OG/oEmbed link preview support (see docs/DEPLOYMENT.md#social-link-previews--oembed)
+ENV OG_ENABLED="false"
+ENV SITE_NAME="Vitrine3D"
+ENV SITE_URL=""
+ENV SITE_DESCRIPTION="Interactive 3D viewer"
+ENV OEMBED_WIDTH="960"
+ENV OEMBED_HEIGHT="540"
 
 EXPOSE 80
 

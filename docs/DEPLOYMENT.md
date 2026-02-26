@@ -53,7 +53,6 @@ docker compose up -d
 | `DEFAULT_SPLAT_URL` | _(empty)_ | Splat file URL to auto-load |
 | `DEFAULT_MODEL_URL` | _(empty)_ | Model file URL to auto-load |
 | `DEFAULT_POINTCLOUD_URL` | _(empty)_ | Point cloud URL to auto-load |
-| `DEFAULT_ALIGNMENT_URL` | _(empty)_ | Alignment JSON URL to auto-load |
 | `SHOW_CONTROLS` | `true` | Show/hide the controls panel |
 | `LOD_BUDGET_SD` | `1000000` | Splat LOD budget (max splats per frame) for SD quality tier |
 | `LOD_BUDGET_HD` | `5000000` | Splat LOD budget (max splats per frame) for HD quality tier |
@@ -162,6 +161,133 @@ Set the `FRAME_ANCESTORS` environment variable to include your company's domain:
 
 ```
 FRAME_ANCESTORS='self' https://yourcompany.com https://*.yourcompany.com
+```
+
+## Social Link Previews & oEmbed
+
+When a Vitrine3D viewer URL is shared on Slack, Discord, Twitter/X, Facebook, LinkedIn, or embedded in WordPress, the container can serve rich link previews with title, description, and thumbnail.
+
+### How It Works
+
+Two mechanisms are supported:
+
+1. **Open Graph / Twitter Card meta tags** — When a bot/crawler requests a page, nginx detects it by user-agent and proxies the request to a lightweight Node.js meta-server running inside the container. The meta-server reads pre-extracted archive metadata and returns HTML with `og:title`, `og:description`, `og:image`, and Twitter Card tags. Human visitors are unaffected — they get the normal SPA.
+
+2. **oEmbed** — A `/oembed` endpoint returns JSON per the [oEmbed spec](https://oembed.com/), enabling WordPress and other oEmbed consumers to embed an interactive 3D viewer iframe inline. The iframe uses `autoload=false` so users see the archive thumbnail as a click-to-load poster (like YouTube/Sketchfab).
+
+### Enabling Link Previews
+
+Set `OG_ENABLED=true` and `SITE_URL` in your environment:
+
+```yaml
+services:
+  viewer:
+    image: youruser/vitrine3d:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      - OG_ENABLED=true
+      - SITE_URL=https://viewer.yourcompany.com
+      - SITE_NAME=Your Company 3D Viewer
+      - SITE_DESCRIPTION=Interactive 3D scan viewer
+      - OEMBED_WIDTH=960
+      - OEMBED_HEIGHT=540
+    volumes:
+      # Mount archives directory for serving and auto-metadata extraction
+      - ./archives:/usr/share/nginx/html/archives:ro
+      # Mount a default thumbnail for archives without previews
+      - ./thumbs/default.jpg:/usr/share/nginx/html/thumbs/default.jpg:ro
+```
+
+### Archive Directory
+
+Archives (`.a3d`/`.a3z` files) must be accessible inside the container for both serving and metadata extraction. Mount your archives directory to `/usr/share/nginx/html/archives/` (or any subdirectory under the document root):
+
+```bash
+docker run -v /path/to/archives:/usr/share/nginx/html/archives:ro ...
+```
+
+The viewer URL becomes:
+```
+https://viewer.yourcompany.com/?archive=/archives/scan.a3d
+```
+
+On startup, the entrypoint scans the entire document root recursively for `.a3d`/`.a3z` files and extracts metadata into `/meta/` and thumbnails into `/thumbs/`. Subdirectory structure is preserved in the URL path — for example, `/archives/clients/project-123/scan.a3d` works as-is.
+
+**Note:** If your archives are hosted externally (e.g., Cloudflare R2), the auto-extraction cannot read them. In that case, run `extract-meta.sh` manually against local copies and mount the resulting `/meta/` and `/thumbs/` directories:
+
+```yaml
+volumes:
+  - ./meta:/usr/share/nginx/html/meta:ro
+  - ./thumbs:/usr/share/nginx/html/thumbs:ro
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OG_ENABLED` | `false` | Master switch — existing deploys completely unaffected |
+| `SITE_URL` | _(empty, required)_ | Canonical viewer URL (e.g., `https://viewer.yourcompany.com`). Required for absolute OG/oEmbed URLs |
+| `SITE_NAME` | `Vitrine3D` | Used in `og:site_name` and oEmbed `provider_name` |
+| `SITE_DESCRIPTION` | `Interactive 3D viewer` | Fallback description when an archive has none |
+| `OEMBED_WIDTH` | `960` | Default iframe width in oEmbed responses |
+| `OEMBED_HEIGHT` | `540` | Default iframe height in oEmbed responses |
+
+### Default Thumbnail
+
+The operator must provide a default thumbnail image for archives that don't have an embedded preview. Mount it as a Docker volume:
+
+```bash
+docker run -v /path/to/your/default.jpg:/usr/share/nginx/html/thumbs/default.jpg:ro ...
+```
+
+Recommended: 1200x630px JPEG (the optimal size for Open Graph images). If no default thumbnail is provided, link previews for archives without embedded thumbnails will have no image.
+
+### Automatic Metadata Extraction
+
+On container startup (when `OG_ENABLED=true`), the entrypoint automatically scans for `.a3d`/`.a3z` files and extracts:
+- **Title and description** from the archive's `manifest.json`
+- **Thumbnail** (`preview.jpg` or `thumbnail_0.png`) to `/thumbs/`
+- **Metadata sidecar** JSON to `/meta/`
+
+Extraction is idempotent — already-extracted archives are skipped. If you add new archives, restart the container to re-scan.
+
+### WordPress oEmbed
+
+WordPress automatically discovers oEmbed endpoints via the `<link rel="alternate" type="application/json+oembed">` tag in the bot-facing HTML. When a user pastes a Vitrine3D URL into a WordPress post:
+
+1. WordPress fetches the page, finds the oEmbed discovery tag
+2. Fetches `/oembed?url=...` and gets back JSON with `type: "rich"` and an iframe HTML snippet
+3. Renders the iframe inline in the post — showing the click-to-load poster with the archive thumbnail
+
+The oEmbed endpoint is accessible at:
+```
+https://viewer.yourcompany.com/oembed?url=https://viewer.yourcompany.com/?archive=/archives/scan.a3d&format=json
+```
+
+### Supported Crawlers
+
+Bot detection covers: Googlebot, Bingbot, Slackbot, Twitterbot, Facebook, LinkedIn, Discord, WhatsApp, Applebot, iframely, Embedly, Pinterest, Reddit, Telegram, Viber, Skype, Tumblr, VK, and WordPress.
+
+Unknown bots get the normal SPA (safe default — they just won't see rich previews).
+
+### Verifying It Works
+
+```bash
+# Test OG tags (simulate Slackbot)
+curl -H "User-Agent: Slackbot" "https://viewer.yourcompany.com/?archive=/archives/scan.a3d"
+# Should return HTML with og:title, og:image, og:description
+
+# Test oEmbed endpoint
+curl "https://viewer.yourcompany.com/oembed?url=https://viewer.yourcompany.com/?archive=/archives/scan.a3d&format=json"
+# Should return JSON with type: "rich" and an iframe html field
+
+# Facebook Sharing Debugger
+# https://developers.facebook.com/tools/debug/
+
+# Twitter Card Validator
+# https://cards-dev.twitter.com/validator
 ```
 
 ## SSL / HTTPS
