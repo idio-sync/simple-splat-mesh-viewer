@@ -555,7 +555,8 @@ export function loadSTL(fileOrUrl: File | string): Promise<THREE.Mesh> {
                     color: 0xaaaaaa,
                     metalness: 0.2,
                     roughness: 0.6,
-                    flatShading: false
+                    flatShading: false,
+                    side: THREE.DoubleSide
                 });
                 const mesh = new THREE.Mesh(geometry, material);
                 mesh.name = typeof fileOrUrl === 'string' ? 'stl_model' : fileOrUrl.name;
@@ -584,7 +585,8 @@ export function loadSTLFromUrl(url: string, onProgress?: (loaded: number, total:
                     color: 0xaaaaaa,
                     metalness: 0.2,
                     roughness: 0.6,
-                    flatShading: false
+                    flatShading: false,
+                    side: THREE.DoubleSide
                 });
                 const mesh = new THREE.Mesh(geometry, material);
                 mesh.name = 'stl_model';
@@ -1449,8 +1451,15 @@ export async function loadArchiveFullResMesh(archiveLoader: ArchiveLoader, deps:
         return { loaded: false, blob: null, error: 'Failed to extract full-resolution mesh' };
     }
 
-    // Clear existing model (the proxy) before loading
+    // Capture current modelGroup transform (preserves user edits during quality switch)
     const { modelGroup } = deps;
+    const currentTransform = modelGroup ? {
+        position: [modelGroup.position.x, modelGroup.position.y, modelGroup.position.z] as [number, number, number],
+        rotation: [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z] as [number, number, number],
+        scale: [modelGroup.scale.x, modelGroup.scale.y, modelGroup.scale.z] as [number, number, number]
+    } : null;
+
+    // Clear existing model (the proxy) before loading
     if (modelGroup) {
         while (modelGroup.children.length > 0) {
             const child = modelGroup.children[0];
@@ -1462,8 +1471,8 @@ export async function loadArchiveFullResMesh(archiveLoader: ArchiveLoader, deps:
     state.modelLoaded = false;
     const result = await loadModelFromBlobUrl(meshData.url, meshEntry.file_name, deps);
 
-    // Apply transform from manifest
-    const transform = archiveLoader.getEntryTransform(meshEntry);
+    // Re-apply the captured transform (user's current position), falling back to manifest
+    const transform = currentTransform || archiveLoader.getEntryTransform(meshEntry);
     if (callbacks.onApplyModelTransform) {
         callbacks.onApplyModelTransform(transform);
     }
@@ -1487,8 +1496,15 @@ export async function loadArchiveFullResSplat(archiveLoader: ArchiveLoader, deps
         return { loaded: false, blob: null, error: 'Failed to extract full-resolution splat' };
     }
 
-    // Remove existing splat (the proxy) before loading
+    // Capture current transform before disposing (preserves user edits during quality switch)
     const existingSplat = getSplatMesh();
+    const currentTransform = existingSplat ? {
+        position: [existingSplat.position.x, existingSplat.position.y, existingSplat.position.z] as [number, number, number],
+        rotation: [existingSplat.rotation.x, existingSplat.rotation.y, existingSplat.rotation.z] as [number, number, number],
+        scale: [existingSplat.scale.x, existingSplat.scale.y, existingSplat.scale.z] as [number, number, number]
+    } : null;
+
+    // Remove existing splat (the proxy) before loading
     if (existingSplat) {
         scene.remove(existingSplat);
         if (existingSplat.dispose) existingSplat.dispose();
@@ -1498,8 +1514,8 @@ export async function loadArchiveFullResSplat(archiveLoader: ArchiveLoader, deps
     state.splatLoaded = false;
     await loadSplatFromBlobUrl(splatData.url, sceneEntry.file_name, deps);
 
-    // Apply transform from manifest
-    const transform = archiveLoader.getEntryTransform(sceneEntry);
+    // Re-apply the captured transform (user's current position), falling back to manifest
+    const transform = currentTransform || archiveLoader.getEntryTransform(sceneEntry);
     if (callbacks.onApplySplatTransform) {
         callbacks.onApplySplatTransform(transform);
     }
@@ -1523,8 +1539,15 @@ export async function loadArchiveProxySplat(archiveLoader: ArchiveLoader, deps: 
         return { loaded: false, blob: null, error: 'Failed to extract proxy splat' };
     }
 
-    // Remove existing splat (the full-res) before loading
+    // Capture current transform before disposing (preserves user edits during quality switch)
     const existingSplat = getSplatMesh();
+    const currentTransform = existingSplat ? {
+        position: [existingSplat.position.x, existingSplat.position.y, existingSplat.position.z] as [number, number, number],
+        rotation: [existingSplat.rotation.x, existingSplat.rotation.y, existingSplat.rotation.z] as [number, number, number],
+        scale: [existingSplat.scale.x, existingSplat.scale.y, existingSplat.scale.z] as [number, number, number]
+    } : null;
+
+    // Remove existing splat (the full-res) before loading
     if (existingSplat) {
         scene.remove(existingSplat);
         if (existingSplat.dispose) existingSplat.dispose();
@@ -1534,9 +1557,9 @@ export async function loadArchiveProxySplat(archiveLoader: ArchiveLoader, deps: 
     state.splatLoaded = false;
     await loadSplatFromBlobUrl(splatData.url, proxyEntry.file_name, deps);
 
-    // Apply transform from the primary scene entry (proxy inherits the same transform)
+    // Re-apply the captured transform (user's current position), falling back to manifest
     const sceneEntry = archiveLoader.getSceneEntry();
-    const transform = archiveLoader.getEntryTransform(sceneEntry || proxyEntry);
+    const transform = currentTransform || archiveLoader.getEntryTransform(sceneEntry || proxyEntry);
     if (callbacks.onApplySplatTransform) {
         callbacks.onApplySplatTransform(transform);
     }
@@ -1560,8 +1583,15 @@ export async function loadArchiveProxyMesh(archiveLoader: ArchiveLoader, deps: L
         return { loaded: false, blob: null, error: 'Failed to extract proxy mesh' };
     }
 
-    // Clear existing model (the full-res) before loading
+    // Capture current modelGroup transform (preserves user edits during quality switch)
     const { modelGroup } = deps;
+    const currentTransform = modelGroup ? {
+        position: [modelGroup.position.x, modelGroup.position.y, modelGroup.position.z] as [number, number, number],
+        rotation: [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z] as [number, number, number],
+        scale: [modelGroup.scale.x, modelGroup.scale.y, modelGroup.scale.z] as [number, number, number]
+    } : null;
+
+    // Clear existing model (the full-res) before loading
     if (modelGroup) {
         while (modelGroup.children.length > 0) {
             const child = modelGroup.children[0];
@@ -1573,9 +1603,9 @@ export async function loadArchiveProxyMesh(archiveLoader: ArchiveLoader, deps: L
     state.modelLoaded = false;
     const result = await loadModelFromBlobUrl(meshData.url, proxyEntry.file_name, deps);
 
-    // Apply transform from the primary mesh entry (proxy inherits the same transform)
+    // Re-apply the captured transform (user's current position), falling back to manifest
     const meshEntry = archiveLoader.getMeshEntry();
-    const transform = archiveLoader.getEntryTransform(meshEntry || proxyEntry);
+    const transform = currentTransform || archiveLoader.getEntryTransform(meshEntry || proxyEntry);
     if (callbacks.onApplyModelTransform) {
         callbacks.onApplyModelTransform(transform);
     }
