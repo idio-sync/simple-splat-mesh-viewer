@@ -47,6 +47,8 @@ const CDN_DEPS: Record<string, string> = {
         'https://esm.sh/three@0.170.0/examples/jsm/loaders/STLLoader.js?external=three',
     'three/addons/loaders/DRACOLoader.js':
         'https://esm.sh/three@0.170.0/examples/jsm/loaders/DRACOLoader.js?external=three',
+    'three/addons/libs/meshopt_decoder.module.js':
+        'https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/libs/meshopt_decoder.module.js',
     'dxf-parser':
         'https://esm.sh/dxf-parser@1.1.2',
     '@sparkjsdev/spark':

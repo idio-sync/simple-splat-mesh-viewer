@@ -15,6 +15,7 @@ import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader } from './archive-loader.js';
 import { TIMING, ASSET_STATE } from './constants.js';
@@ -428,6 +429,7 @@ export function loadGLTF(source: File | string, onProgress?: (loaded: number, to
     return new Promise((resolve, reject) => {
         const loader = new GLTFLoader();
         loader.setDRACOLoader(dracoLoader);
+        loader.setMeshoptDecoder(MeshoptDecoder);
         const url = source instanceof File ? URL.createObjectURL(source) : source;
         const isFile = source instanceof File;
 

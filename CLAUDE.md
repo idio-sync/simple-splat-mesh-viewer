@@ -13,8 +13,8 @@ Two modes of use:
 - **Vite + TypeScript (hybrid).** Vite serves `src/` in dev and bundles to `dist/` for production. TypeScript configured with `allowJs: true` — existing `.js` files work unchanged, new modules written as `.ts`.
 - **ES modules only.** Bare specifiers (`'three'`, `'fflate'`, etc.) resolved by Vite from `node_modules/`.
 - **Runtime dependencies** installed via npm. Pinned versions:
-  - Three.js 0.170.0
-  - Spark.js 0.1.10 (Gaussian splat renderer)
+  - Three.js 0.182.0
+  - Spark.js 2.0.0-preview (Gaussian splat renderer, vendored in `src/vendor/`)
   - fflate 0.8.2 (ZIP compression)
   - three-e57-loader 1.2.0 / web-e57 1.2.0 (E57 point clouds, WASM)
 - **Docker deployment** via nginx:alpine. `docker/docker-entrypoint.sh` substitutes env vars into `config.js` at container start.
