@@ -332,7 +332,8 @@ function createDefaultMaterial(options: CreateDefaultMaterialOptions = {}): any 
         color: color instanceof THREE.Color ? color : new THREE.Color(color),
         map: map,
         metalness: MATERIAL.DEFAULT_METALNESS,
-        roughness: MATERIAL.DEFAULT_ROUGHNESS
+        roughness: MATERIAL.DEFAULT_ROUGHNESS,
+        side: THREE.DoubleSide
     });
 }
 

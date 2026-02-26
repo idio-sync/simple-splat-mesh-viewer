@@ -616,6 +616,7 @@ export function loadDRC(source: File | string, onProgress?: (loaded: number, tot
                     color: geometry.hasAttribute('color') ? 0xffffff : 0xaaaaaa,
                     metalness: 0.2,
                     roughness: 0.6,
+                    side: THREE.DoubleSide
                 });
                 const mesh = new THREE.Mesh(geometry, material);
                 mesh.name = 'drc_model';
