@@ -1024,8 +1024,8 @@ export function setup(manifest, deps) {
     toolsGroup.appendChild(textureToggle);
 
     // Combined Material Views dropdown (wireframe, normals, PBR channels, matcap presets)
-    const matcapPresets = ['clay', 'chrome', 'pearl', 'jade', 'copper'];
-    const matcapLabels = ['Clay', 'Chrome', 'Pearl', 'Jade', 'Copper'];
+    const matcapPresets = ['clay', 'chrome', 'pearl', 'jade', 'copper', 'bronze'];
+    const matcapLabels = ['Clay', 'Chrome', 'Pearl', 'Jade', 'Copper', 'Bronze'];
     let activeView = null; // null or: 'wireframe','normals','roughness','metalness','specularF0','matcap:clay', etc.
 
     const materialWrapper = document.createElement('div');
