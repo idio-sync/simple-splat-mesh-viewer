@@ -612,11 +612,15 @@
                     </div>
                     <div class="prop-section-body">
                         <p class="prop-hint mb4">Select which object the gizmo controls.</p>
-                        <div class="seg-ctrl">
+                        <div class="seg-ctrl" id="object-select-group" style="flex-wrap: wrap;">
                             <button class="seg-btn active" id="btn-select-none">None</button>
-                            <button class="seg-btn" id="btn-select-splat">Splat</button>
-                            <button class="seg-btn" id="btn-select-model">Model</button>
-                            <button class="seg-btn" id="btn-select-both">Both</button>
+                            <button class="seg-btn" id="btn-select-splat" style="display:none;">Splat</button>
+                            <button class="seg-btn" id="btn-select-model" style="display:none;">Model</button>
+                            <button class="seg-btn" id="btn-select-pointcloud" style="display:none;">Point Cloud</button>
+                            <button class="seg-btn" id="btn-select-stl" style="display:none;">STL</button>
+                            <button class="seg-btn" id="btn-select-cad" style="display:none;">CAD</button>
+                            <button class="seg-btn" id="btn-select-drawing" style="display:none;">Drawing</button>
+                            <button class="seg-btn" id="btn-select-both" style="display:none;">All</button>
                         </div>
                         <span id="transform-object-label" class="prop-hint mt4" style="display:block; font-style:italic;">No object selected</span>
                     </div>

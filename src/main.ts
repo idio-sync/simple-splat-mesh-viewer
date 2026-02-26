@@ -392,6 +392,7 @@ function createFileHandlerDeps(): any {
                 updateVisibility();
                 updateTransformInputs();
                 storeLastPositions();
+                updateObjectSelectButtons();
                 assets.splatBlob = file;
                 document.getElementById('splat-vertices').textContent = 'Loaded';
                 // Auto center-align if model is already loaded
@@ -419,6 +420,7 @@ function createFileHandlerDeps(): any {
                 updateVisibility();
                 updateTransformInputs();
                 storeLastPositions();
+                updateObjectSelectButtons();
                 assets.meshBlob = file;
                 document.getElementById('model-faces').textContent = (faceCount || 0).toLocaleString();
                 // Update texture info display
@@ -455,6 +457,7 @@ function createFileHandlerDeps(): any {
                 updateVisibility();
                 updateTransformInputs();
                 storeLastPositions();
+                updateObjectSelectButtons();
                 const filenameEl = document.getElementById('stl-filename');
                 if (filenameEl) filenameEl.textContent = file.name || 'STL loaded';
                 // Center STL on grid
@@ -463,6 +466,7 @@ function createFileHandlerDeps(): any {
             },
             onDrawingLoaded: (object: any, file: any) => {
                 updateVisibility();
+                updateObjectSelectButtons();
                 const filenameEl = document.getElementById('drawing-filename');
                 if (filenameEl) filenameEl.textContent = file.name || 'DXF loaded';
                 // Center drawing on grid
@@ -599,6 +603,11 @@ function createCADDeps(): any {
         state,
         showLoading,
         hideLoading,
+        onLoaded: () => {
+            updateTransformInputs();
+            storeLastPositions();
+            updateObjectSelectButtons();
+        },
     };
 }
 
@@ -996,37 +1005,37 @@ function setBackgroundColor(hexColor: string) {
 
 // Transform controls (delegated to transform-controller.js)
 function setSelectedObject(selection: SelectedObject) {
-    setSelectedObjectHandler(selection, { transformControls, splatMesh, modelGroup, state });
-    updateTransformPaneSelection(selection as string, splatMesh, modelGroup, pointcloudGroup);
+    setSelectedObjectHandler(selection, { transformControls, splatMesh, modelGroup, pointcloudGroup, stlGroup, cadGroup, drawingGroup, state });
+    updateTransformPaneSelection(selection as string, splatMesh, modelGroup, pointcloudGroup, stlGroup, cadGroup, drawingGroup);
 }
 
 function syncBothObjects() {
-    syncBothObjectsHandler({ transformControls, splatMesh, modelGroup, pointcloudGroup });
+    syncBothObjectsHandler({ transformControls, splatMesh, modelGroup, pointcloudGroup, stlGroup, cadGroup, drawingGroup });
 }
 
 function applyPivotRotation() {
-    applyPivotRotationHandler({ transformControls, splatMesh, modelGroup, pointcloudGroup, state });
+    applyPivotRotationHandler({ transformControls, splatMesh, modelGroup, pointcloudGroup, stlGroup, cadGroup, drawingGroup, state });
 }
 
 function applyUniformScale() {
-    applyUniformScaleHandler({ transformControls, splatMesh, modelGroup, state });
+    applyUniformScaleHandler({ transformControls, splatMesh, modelGroup, pointcloudGroup, stlGroup, cadGroup, drawingGroup, state });
 }
 
 function storeLastPositions() {
-    storeLastPositionsHandler({ splatMesh, modelGroup, pointcloudGroup });
+    storeLastPositionsHandler({ splatMesh, modelGroup, pointcloudGroup, stlGroup, cadGroup, drawingGroup });
 }
 
 function setTransformMode(mode: TransformMode) {
-    setTransformModeHandler(mode, { transformControls, state, splatMesh, modelGroup, pointcloudGroup });
+    setTransformModeHandler(mode, { transformControls, state, splatMesh, modelGroup, pointcloudGroup, stlGroup, cadGroup, drawingGroup });
 }
 
 function centerAtOrigin() {
-    centerAtOriginHandler({ splatMesh, modelGroup, pointcloudGroup, camera, controls, state });
+    centerAtOriginHandler({ splatMesh, modelGroup, pointcloudGroup, stlGroup, cadGroup, drawingGroup, camera, controls, state });
     updateTransformInputs();
 }
 
 function resetTransform() {
-    resetTransformHandler({ splatMesh, modelGroup, pointcloudGroup, state });
+    resetTransformHandler({ splatMesh, modelGroup, pointcloudGroup, stlGroup, cadGroup, drawingGroup, state });
     updateTransformInputs();
 }
 
@@ -1038,10 +1047,28 @@ function updateVisibility() {
         pointcloud: state.pointcloudLoaded,
         stl: state.stlLoaded
     });
+    updateObjectSelectButtons();
 }
 
 function updateTransformInputs() {
-    updateTransformInputsHandler(splatMesh, modelGroup, pointcloudGroup);
+    updateTransformInputsHandler(splatMesh, modelGroup, pointcloudGroup, stlGroup, cadGroup, drawingGroup);
+}
+
+/** Show/hide the object-select buttons in the Transform pane based on what is loaded. */
+function updateObjectSelectButtons() {
+    const show = (id: string, visible: boolean) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = visible ? '' : 'none';
+    };
+    show('btn-select-splat', state.splatLoaded);
+    show('btn-select-model', state.modelLoaded);
+    show('btn-select-pointcloud', state.pointcloudLoaded);
+    show('btn-select-stl', state.stlLoaded);
+    show('btn-select-cad', state.cadLoaded);
+    show('btn-select-drawing', state.drawingLoaded);
+    // "All" only when 2+ types are loaded
+    const loadedCount = [state.splatLoaded, state.modelLoaded, state.pointcloudLoaded, state.stlLoaded, state.cadLoaded, state.drawingLoaded].filter(Boolean).length;
+    show('btn-select-both', loadedCount >= 2);
 }
 
 // Handle loading splat from URL via prompt
@@ -1630,6 +1657,7 @@ function createPointcloudDeps(): any {
                 updateVisibility();
                 updateTransformInputs();
                 storeLastPositions();
+                updateObjectSelectButtons();
 
                 // Update UI
                 const fileName = file.name || file;

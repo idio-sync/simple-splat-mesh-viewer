@@ -39,6 +39,7 @@ export interface LoadCADDeps {
     state: AppState;
     showLoading: (msg: string) => void;
     hideLoading: () => void;
+    onLoaded?: () => void;
 }
 
 export interface CADLoadResult {
@@ -126,6 +127,8 @@ export async function loadCADFromBuffer(
 
     deps.state.cadLoaded = true;
     log.info(`CAD loaded: ${result.meshes.length} mesh(es)`);
+
+    if (deps.onLoaded) deps.onLoaded();
 
     return { group: deps.cadGroup, meshCount: result.meshes.length };
 }

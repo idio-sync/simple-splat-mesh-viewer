@@ -298,6 +298,10 @@ export function setupUIEvents(deps: EventWiringDeps): void {
     addListener('btn-select-none', 'click', () => deps.transform.setSelectedObject('none' as any));
     addListener('btn-select-splat', 'click', () => deps.transform.setSelectedObject('splat' as any));
     addListener('btn-select-model', 'click', () => deps.transform.setSelectedObject('model' as any));
+    addListener('btn-select-pointcloud', 'click', () => deps.transform.setSelectedObject('pointcloud' as any));
+    addListener('btn-select-stl', 'click', () => deps.transform.setSelectedObject('stl' as any));
+    addListener('btn-select-cad', 'click', () => deps.transform.setSelectedObject('cad' as any));
+    addListener('btn-select-drawing', 'click', () => deps.transform.setSelectedObject('drawing' as any));
     addListener('btn-select-both', 'click', () => deps.transform.setSelectedObject('both' as any));
     const pivotSection = document.getElementById('rotation-pivot-section');
     const scaleLockSection = document.getElementById('scale-lock-section');
@@ -342,10 +346,21 @@ export function setupUIEvents(deps: EventWiringDeps): void {
                 (sceneRefs.splatMesh as any).position[axis] = val;
             } else if (sel === 'model' && sceneRefs.modelGroup) {
                 (sceneRefs.modelGroup as any).position[axis] = val;
+            } else if (sel === 'pointcloud' && sceneRefs.pointcloudGroup) {
+                (sceneRefs.pointcloudGroup as any).position[axis] = val;
+            } else if (sel === 'stl' && (sceneRefs as any).stlGroup) {
+                (sceneRefs as any).stlGroup.position[axis] = val;
+            } else if (sel === 'cad' && (sceneRefs as any).cadGroup) {
+                (sceneRefs as any).cadGroup.position[axis] = val;
+            } else if (sel === 'drawing' && (sceneRefs as any).drawingGroup) {
+                (sceneRefs as any).drawingGroup.position[axis] = val;
             } else if (sel === 'both') {
                 if (sceneRefs.splatMesh) (sceneRefs.splatMesh as any).position[axis] = val;
                 if (sceneRefs.modelGroup) (sceneRefs.modelGroup as any).position[axis] = val;
                 if (sceneRefs.pointcloudGroup) (sceneRefs.pointcloudGroup as any).position[axis] = val;
+                if ((sceneRefs as any).stlGroup) (sceneRefs as any).stlGroup.position[axis] = val;
+                if ((sceneRefs as any).cadGroup) (sceneRefs as any).cadGroup.position[axis] = val;
+                if ((sceneRefs as any).drawingGroup) (sceneRefs as any).drawingGroup.position[axis] = val;
             }
         });
         addListener(`transform-rot-${axis}`, 'change', (e: Event) => {
@@ -356,10 +371,21 @@ export function setupUIEvents(deps: EventWiringDeps): void {
                 (sceneRefs.splatMesh as any).rotation[axis] = rad;
             } else if (sel === 'model' && sceneRefs.modelGroup) {
                 (sceneRefs.modelGroup as any).rotation[axis] = rad;
+            } else if (sel === 'pointcloud' && sceneRefs.pointcloudGroup) {
+                (sceneRefs.pointcloudGroup as any).rotation[axis] = rad;
+            } else if (sel === 'stl' && (sceneRefs as any).stlGroup) {
+                (sceneRefs as any).stlGroup.rotation[axis] = rad;
+            } else if (sel === 'cad' && (sceneRefs as any).cadGroup) {
+                (sceneRefs as any).cadGroup.rotation[axis] = rad;
+            } else if (sel === 'drawing' && (sceneRefs as any).drawingGroup) {
+                (sceneRefs as any).drawingGroup.rotation[axis] = rad;
             } else if (sel === 'both') {
                 if (sceneRefs.splatMesh) (sceneRefs.splatMesh as any).rotation[axis] = rad;
                 if (sceneRefs.modelGroup) (sceneRefs.modelGroup as any).rotation[axis] = rad;
                 if (sceneRefs.pointcloudGroup) (sceneRefs.pointcloudGroup as any).rotation[axis] = rad;
+                if ((sceneRefs as any).stlGroup) (sceneRefs as any).stlGroup.rotation[axis] = rad;
+                if ((sceneRefs as any).cadGroup) (sceneRefs as any).cadGroup.rotation[axis] = rad;
+                if ((sceneRefs as any).drawingGroup) (sceneRefs as any).drawingGroup.rotation[axis] = rad;
             }
         });
         addListener(`transform-scale-${axis}`, 'change', (e: Event) => {
@@ -375,10 +401,21 @@ export function setupUIEvents(deps: EventWiringDeps): void {
                 apply(sceneRefs.splatMesh);
             } else if (sel === 'model' && sceneRefs.modelGroup) {
                 apply(sceneRefs.modelGroup);
+            } else if (sel === 'pointcloud' && sceneRefs.pointcloudGroup) {
+                apply(sceneRefs.pointcloudGroup);
+            } else if (sel === 'stl' && (sceneRefs as any).stlGroup) {
+                apply((sceneRefs as any).stlGroup);
+            } else if (sel === 'cad' && (sceneRefs as any).cadGroup) {
+                apply((sceneRefs as any).cadGroup);
+            } else if (sel === 'drawing' && (sceneRefs as any).drawingGroup) {
+                apply((sceneRefs as any).drawingGroup);
             } else if (sel === 'both') {
                 if (sceneRefs.splatMesh) apply(sceneRefs.splatMesh);
                 if (sceneRefs.modelGroup) apply(sceneRefs.modelGroup);
                 if (sceneRefs.pointcloudGroup) apply(sceneRefs.pointcloudGroup);
+                if ((sceneRefs as any).stlGroup) apply((sceneRefs as any).stlGroup);
+                if ((sceneRefs as any).cadGroup) apply((sceneRefs as any).cadGroup);
+                if ((sceneRefs as any).drawingGroup) apply((sceneRefs as any).drawingGroup);
             }
             if (uniform) {
                 // Sync the other two axis inputs
