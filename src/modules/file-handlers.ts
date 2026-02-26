@@ -1766,6 +1766,7 @@ function generateMatcapTexture(style: string): THREE.CanvasTexture {
         jade:   { stops: [[0, '#c8e8c0'], [0.4, '#80c078'], [0.7, '#488040'], [0.9, '#285828'], [1, '#183818']] },
         copper: { stops: [[0, '#f0c8a0'], [0.35, '#d89860'], [0.6, '#b07038'], [0.85, '#704020'], [1, '#402010']] },
         bronze: { stops: [[0, '#f4c27a'], [0.3, '#c8864a'], [0.55, '#8b5a2b'], [0.8, '#5a3518'], [1, '#1a0a00']] },
+        'dark-bronze': { stops: [[0, '#8a7260'], [0.3, '#6b5545'], [0.5, '#4e3a2a'], [0.75, '#332215'], [1, '#1a0f08']] },
     };
 
     const preset = presets[style] || presets.clay;
@@ -1794,7 +1795,7 @@ function generateMatcapTexture(style: string): THREE.CanvasTexture {
  * Return the list of available matcap preset names.
  */
 export function getMatcapPresets(): string[] {
-    return ['clay', 'chrome', 'pearl', 'jade', 'copper', 'bronze'];
+    return ['clay', 'chrome', 'pearl', 'jade', 'copper', 'bronze', 'dark-bronze'];
 }
 
 /**

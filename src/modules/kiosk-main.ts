@@ -1354,6 +1354,16 @@ async function handleArchiveFile(file: File, preloadedLoader?: ArchiveLoader): P
                 controls.target.set(savedCamTarget.x, savedCamTarget.y, savedCamTarget.z);
                 controls.update();
             }
+            // Apply default matcap
+            if (manifest.viewer_settings.default_matcap && modelGroup) {
+                updateModelMatcap(modelGroup, true, manifest.viewer_settings.default_matcap);
+                const matcapCb = document.getElementById('model-matcap') as HTMLInputElement;
+                if (matcapCb) matcapCb.checked = true;
+                const styleGroup = document.getElementById('matcap-style-group') as HTMLElement;
+                if (styleGroup) styleGroup.style.display = '';
+                const styleSel = document.getElementById('matcap-style') as HTMLSelectElement;
+                if (styleSel) styleSel.value = manifest.viewer_settings.default_matcap;
+            }
             // Apply annotations visibility setting
             if (manifest.viewer_settings.annotations_visible === false && annotationSystem) {
                 state.annotationsVisible = false;

@@ -772,18 +772,82 @@ body.kiosk-mode.kiosk-editorial .editorial-info-description {
     margin-bottom: 20px;
 }
 
-body.kiosk-mode.kiosk-editorial .editorial-info-description h2 {
+body.kiosk-mode.kiosk-editorial .editorial-info-description h1,
+body.kiosk-mode.kiosk-editorial .editorial-info-description h2,
+body.kiosk-mode.kiosk-editorial .editorial-info-description h3,
+body.kiosk-mode.kiosk-editorial .editorial-info-description h4 {
     font-family: var(--kiosk-font-body);
-    font-size: 0.82rem;
     font-weight: 600;
     color: var(--kiosk-text-primary);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
     margin: 16px 0 8px 0;
 }
 
-body.kiosk-mode.kiosk-editorial .editorial-info-description h2:first-child {
+body.kiosk-mode.kiosk-editorial .editorial-info-description h1:first-child,
+body.kiosk-mode.kiosk-editorial .editorial-info-description h2:first-child,
+body.kiosk-mode.kiosk-editorial .editorial-info-description h3:first-child,
+body.kiosk-mode.kiosk-editorial .editorial-info-description h4:first-child {
     margin-top: 0;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-info-description h1 {
+    font-size: 1.1rem;
+    letter-spacing: 0.01em;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-info-description h2 {
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-info-description h3 {
+    font-size: 0.88rem;
+    letter-spacing: 0.01em;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-info-description h4 {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--kiosk-text-secondary);
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-info-description strong {
+    font-weight: 600;
+    color: var(--kiosk-text-primary);
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-info-description em {
+    font-style: italic;
+    color: rgba(var(--kiosk-text-body-rgb), 1);
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-info-description code {
+    font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.78rem;
+    background: rgba(var(--kiosk-surface-rgb), 0.6);
+    color: rgba(var(--kiosk-text-bright-rgb), 0.9);
+    padding: 1px 5px;
+    border-radius: 3px;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-info-description ul,
+body.kiosk-mode.kiosk-editorial .editorial-info-description ol {
+    font-family: var(--kiosk-font-body);
+    font-size: 0.82rem;
+    line-height: 1.7;
+    color: var(--kiosk-text-secondary);
+    margin: 4px 0 8px 0;
+    padding-left: 20px;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-info-description li {
+    margin-bottom: 2px;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-info-description hr {
+    border: none;
+    border-top: 1px solid var(--kiosk-border-subtle);
+    margin: 14px 0;
 }
 
 body.kiosk-mode.kiosk-editorial .editorial-info-description p {
@@ -1155,6 +1219,67 @@ body.kiosk-mode.kiosk-editorial .editorial-prose-block a {
     text-underline-offset: 2px;
 }
 
+body.kiosk-mode.kiosk-editorial .editorial-prose-block h1,
+body.kiosk-mode.kiosk-editorial .editorial-prose-block h2,
+body.kiosk-mode.kiosk-editorial .editorial-prose-block h3,
+body.kiosk-mode.kiosk-editorial .editorial-prose-block h4 {
+    font-family: var(--kiosk-font-body);
+    font-weight: 600;
+    color: var(--kiosk-text-primary);
+    margin: 12px 0 6px 0;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-prose-block h1:first-child,
+body.kiosk-mode.kiosk-editorial .editorial-prose-block h2:first-child,
+body.kiosk-mode.kiosk-editorial .editorial-prose-block h3:first-child,
+body.kiosk-mode.kiosk-editorial .editorial-prose-block h4:first-child {
+    margin-top: 0;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-prose-block h1 { font-size: 1rem; }
+body.kiosk-mode.kiosk-editorial .editorial-prose-block h2 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+body.kiosk-mode.kiosk-editorial .editorial-prose-block h3 { font-size: 0.85rem; }
+body.kiosk-mode.kiosk-editorial .editorial-prose-block h4 { font-size: 0.8rem; font-weight: 500; color: var(--kiosk-text-secondary); }
+
+body.kiosk-mode.kiosk-editorial .editorial-prose-block strong {
+    font-weight: 600;
+    color: var(--kiosk-text-primary);
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-prose-block em {
+    font-style: italic;
+    color: rgba(var(--kiosk-text-body-rgb), 1);
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-prose-block code {
+    font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.76rem;
+    background: rgba(var(--kiosk-surface-rgb), 0.6);
+    color: rgba(var(--kiosk-text-bright-rgb), 0.9);
+    padding: 1px 5px;
+    border-radius: 3px;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-prose-block ul,
+body.kiosk-mode.kiosk-editorial .editorial-prose-block ol {
+    font-family: var(--kiosk-font-body);
+    font-size: 0.8rem;
+    line-height: 1.7;
+    color: var(--kiosk-text-secondary);
+    margin: 4px 0 8px 0;
+    padding-left: 20px;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-prose-block li {
+    margin-bottom: 2px;
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-prose-block hr {
+    border: none;
+    border-top: 1px solid var(--kiosk-border-subtle);
+    margin: 10px 0;
+}
+
 /* --- Processing --- */
 
 body.kiosk-mode.kiosk-editorial .editorial-software-line {
@@ -1464,7 +1589,54 @@ body.kiosk-mode.kiosk-editorial .annotation-info-body .md-code {
 }
 
 body.kiosk-mode.kiosk-editorial .annotation-info-body strong {
+    font-weight: 600;
     color: var(--kiosk-text-primary);
+}
+
+body.kiosk-mode.kiosk-editorial .annotation-info-body em {
+    font-style: italic;
+    color: rgba(var(--kiosk-text-body-rgb), 1);
+}
+
+body.kiosk-mode.kiosk-editorial .annotation-info-body h1,
+body.kiosk-mode.kiosk-editorial .annotation-info-body h2,
+body.kiosk-mode.kiosk-editorial .annotation-info-body h3,
+body.kiosk-mode.kiosk-editorial .annotation-info-body h4 {
+    font-family: var(--kiosk-font-body);
+    font-weight: 600;
+    color: var(--kiosk-text-primary);
+    margin: 10px 0 4px 0;
+}
+
+body.kiosk-mode.kiosk-editorial .annotation-info-body h1:first-child,
+body.kiosk-mode.kiosk-editorial .annotation-info-body h2:first-child,
+body.kiosk-mode.kiosk-editorial .annotation-info-body h3:first-child,
+body.kiosk-mode.kiosk-editorial .annotation-info-body h4:first-child {
+    margin-top: 0;
+}
+
+body.kiosk-mode.kiosk-editorial .annotation-info-body h1 { font-size: 1rem; }
+body.kiosk-mode.kiosk-editorial .annotation-info-body h2 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.03em; }
+body.kiosk-mode.kiosk-editorial .annotation-info-body h3 { font-size: 0.85rem; }
+body.kiosk-mode.kiosk-editorial .annotation-info-body h4 { font-size: 0.8rem; font-weight: 500; color: var(--kiosk-text-secondary); }
+
+body.kiosk-mode.kiosk-editorial .annotation-info-body ul,
+body.kiosk-mode.kiosk-editorial .annotation-info-body ol {
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: var(--kiosk-text-secondary);
+    margin: 4px 0 8px 0;
+    padding-left: 18px;
+}
+
+body.kiosk-mode.kiosk-editorial .annotation-info-body li {
+    margin-bottom: 2px;
+}
+
+body.kiosk-mode.kiosk-editorial .annotation-info-body hr {
+    border: none;
+    border-top: 1px solid var(--kiosk-border-subtle);
+    margin: 8px 0;
 }
 
 /* Annotation number badge — yellow to match 3D markers */

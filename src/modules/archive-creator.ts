@@ -1092,6 +1092,7 @@ export class ArchiveCreator {
         if (settings.singleSided !== undefined) this.manifest.viewer_settings.single_sided = settings.singleSided;
         if (settings.backgroundColor !== undefined) this.manifest.viewer_settings.background_color = settings.backgroundColor;
         if (settings.displayMode !== undefined) this.manifest.viewer_settings.display_mode = settings.displayMode;
+        if (settings.defaultMatcap !== undefined) this.manifest.viewer_settings.default_matcap = settings.defaultMatcap;
         if (settings.cameraPosition !== undefined) this.manifest.viewer_settings.camera_position = settings.cameraPosition;
         if (settings.cameraTarget !== undefined) this.manifest.viewer_settings.camera_target = settings.cameraTarget;
         if (settings.autoRotate !== undefined) this.manifest.viewer_settings.auto_rotate = settings.autoRotate;

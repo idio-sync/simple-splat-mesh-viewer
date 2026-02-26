@@ -193,6 +193,7 @@ export interface ViewerSettings {
     singleSided: boolean;
     backgroundColor: string | null;
     displayMode: string;
+    defaultMatcap: string;
     cameraPosition: { x: number; y: number; z: number } | null;
     cameraTarget: { x: number; y: number; z: number } | null;
     autoRotate: boolean;
@@ -1271,6 +1272,7 @@ export function collectMetadata(): CollectedMetadata {
                 ? ((document.getElementById('meta-viewer-bg-color') as HTMLInputElement)?.value || '#1a1a2e')
                 : null,
             displayMode: (document.getElementById('meta-viewer-display-mode') as HTMLSelectElement)?.value || '',
+            defaultMatcap: (document.getElementById('meta-viewer-default-matcap') as HTMLSelectElement)?.value || '',
             cameraPosition: getCameraFromHiddenFields('pos'),
             cameraTarget: getCameraFromHiddenFields('target'),
             autoRotate: (document.getElementById('meta-viewer-auto-rotate') as HTMLInputElement)?.checked ?? false,
@@ -1761,6 +1763,12 @@ export function prefillMetadataFromArchive(manifest: any): void {
         const displayModeEl = document.getElementById('meta-viewer-display-mode') as HTMLSelectElement | null;
         if (displayModeEl && manifest.viewer_settings.display_mode) {
             displayModeEl.value = manifest.viewer_settings.display_mode;
+        }
+
+        // Default matcap
+        const defaultMatcapEl = document.getElementById('meta-viewer-default-matcap') as HTMLSelectElement | null;
+        if (defaultMatcapEl) {
+            defaultMatcapEl.value = manifest.viewer_settings.default_matcap || '';
         }
 
         // Camera position
