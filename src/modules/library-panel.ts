@@ -514,14 +514,22 @@ function setupDetailActions(): void {
         if (a) openInNewTab(a);
     });
 
-    document.getElementById('library-action-share')?.addEventListener('click', () => {
+    document.getElementById('library-action-share')?.addEventListener('click', async () => {
         const a = getSelected();
         if (a) {
-            const fullUrl = location.origin + a.viewerUrl;
-            navigator.clipboard.writeText(fullUrl).then(
-                () => notify.success('Share link copied'),
-                () => notify.error('Copy failed')
-            );
+            // Extract the archive URL from the viewerUrl query param
+            try {
+                const params = new URLSearchParams(a.viewerUrl.split('?')[1] || '');
+                const archiveUrl = params.get('archive');
+                if (archiveUrl) {
+                    const { showShareDialog } = await import('./share-dialog.js');
+                    showShareDialog({ archiveUrl });
+                } else {
+                    notify.warning('Cannot share: no archive URL found');
+                }
+            } catch {
+                notify.error('Failed to open share dialog');
+            }
         }
     });
 
