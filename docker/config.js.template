@@ -172,6 +172,9 @@
         return null;
     }
 
+    // Clean URL injection (set by meta-server for /view/{hash} routes)
+    const _inj = window.__VITRINE_CLEAN_URL || {};
+
     // Server-Side Defaults (Injected by Docker)
     const envArchive = "${DEFAULT_ARCHIVE_URL}";
     const envSplat = "${DEFAULT_SPLAT_URL}";
@@ -186,7 +189,7 @@
     // When KIOSK_LOCK is active: archive URL param still works (needed for per-embed URLs)
     // but splat/model/pointcloud/alignment are locked to env defaults only
     const archiveUrl = validateArchivePath(
-        validateUrl(params.get('archive') || envArchive, 'archive'),
+        validateUrl(params.get('archive') || _inj.archive || envArchive, 'archive'),
         'archive'
     );
     const splatUrl = validateUrl(KIOSK_LOCK ? envSplat : (params.get('splat') || envSplat), 'splat');
@@ -194,8 +197,8 @@
     const pointcloudUrl = validateUrl(KIOSK_LOCK ? envPointcloud : (params.get('pointcloud') || envPointcloud), 'pointcloud');
     const alignmentUrl = validateUrl(KIOSK_LOCK ? envAlignment : (params.get('alignment') || envAlignment), 'alignment');
 
-    // Kiosk mode — forced true when KIOSK_LOCK is active
-    const kioskMode = KIOSK_LOCK || params.get('kiosk') === 'true';
+    // Kiosk mode — forced true when KIOSK_LOCK is active, or via clean URL injection
+    const kioskMode = KIOSK_LOCK || params.get('kiosk') === 'true' || (!params.has('kiosk') && _inj.kiosk === true);
 
     // Control and view mode settings (kiosk and KIOSK_LOCK override defaults)
     const urlControls = params.get('controls'); // 'full', 'minimal', 'none', or null
@@ -203,7 +206,7 @@
     const viewMode = params.get('mode') || (kioskMode ? 'both' : 'model'); // splat, model, pointcloud, both, split
     const toolbarMode = KIOSK_LOCK ? 'show' : (kioskMode ? 'show' : (params.get('toolbar') || 'show')); // show, hide
     const sidebarMode = KIOSK_LOCK ? 'closed' : (kioskMode ? 'closed' : (params.get('sidebar') || 'closed')); // closed, view, edit
-    const autoload = params.get('autoload') !== 'false'; // default true; false defers archive download until click
+    const autoload = params.has('autoload') ? params.get('autoload') !== 'false' : (_inj.autoload !== undefined ? _inj.autoload : true);
 
     // Parse inline alignment params
     const splatPos = parseVec3(params.get('sp'));
@@ -266,7 +269,7 @@
         sidebarMode: sidebarMode, // closed, view, edit
 
         // Theme and layout (cosmetic, allowed even when locked)
-        theme: params.get('theme') || '',
+        theme: params.get('theme') || _inj.theme || '',
         layout: params.get('layout') || '',
         autoload: autoload, // false = show click-to-load gate before downloading
 

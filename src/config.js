@@ -126,20 +126,23 @@
         return null;
     }
 
+    // Clean URL injection (set by meta-server for /view/{hash} routes)
+    const _inj = window.__VITRINE_CLEAN_URL || {};
+
     // Get and validate URL parameters
-    const archiveUrl = validateUrl(params.get('archive'), 'archive');
+    const archiveUrl = validateUrl(params.get('archive') || _inj.archive || '', 'archive');
     const splatUrl = validateUrl(params.get('splat'), 'splat');
     const modelUrl = validateUrl(params.get('model'), 'model');
     const pointcloudUrl = validateUrl(params.get('pointcloud'), 'pointcloud');
     const alignmentUrl = validateUrl(params.get('alignment'), 'alignment');
-    const kioskMode = params.get('kiosk') === 'true';
+    const kioskMode = params.get('kiosk') === 'true' || (!params.has('kiosk') && _inj.kiosk === true);
     const controlsMode = kioskMode ? 'none' : (params.get('controls') || 'full'); // full, minimal, none
     const viewMode = params.get('mode') || (kioskMode ? 'both' : 'model'); // splat, model, pointcloud, both, split
     const toolbarMode = kioskMode ? 'show' : (params.get('toolbar') || 'show'); // show, hide
     const sidebarMode = kioskMode ? 'closed' : (params.get('sidebar') || 'closed'); // closed, view, edit
-    const themeName = params.get('theme') || '';
+    const themeName = params.get('theme') || _inj.theme || '';
     const layoutStyle = params.get('layout') || ''; // optional override; theme provides default
-    const autoload = params.get('autoload') !== 'false'; // default true; false defers archive download until click
+    const autoload = params.has('autoload') ? params.get('autoload') !== 'false' : (_inj.autoload !== undefined ? _inj.autoload : true);
 
     // Parse inline alignment params
     const splatPos = parseVec3(params.get('sp'));

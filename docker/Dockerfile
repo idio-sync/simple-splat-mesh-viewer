@@ -18,8 +18,9 @@ COPY docker/config.js.template /usr/share/nginx/html/config.js.template
 COPY docker/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-# Copy OG/oEmbed meta-server and metadata extraction script
+# Copy OG/oEmbed meta-server, admin panel, and metadata extraction script
 COPY docker/meta-server.js /opt/meta-server.js
+COPY docker/admin.html /opt/admin.html
 COPY docker/extract-meta.sh /opt/extract-meta.sh
 RUN chmod +x /opt/extract-meta.sh
 
@@ -48,6 +49,15 @@ ENV SITE_URL=""
 ENV SITE_DESCRIPTION="Interactive 3D viewer"
 ENV OEMBED_WIDTH="960"
 ENV OEMBED_HEIGHT="540"
+
+# Admin panel (see docs/DEPLOYMENT.md#admin-panel)
+ENV ADMIN_ENABLED="false"
+ENV ADMIN_USER="admin"
+ENV ADMIN_PASS=""
+ENV MAX_UPLOAD_SIZE="1024"
+
+# Clean URL defaults (see docs/DEPLOYMENT.md#clean-archive-urls)
+ENV DEFAULT_KIOSK_THEME=""
 
 EXPOSE 80
 

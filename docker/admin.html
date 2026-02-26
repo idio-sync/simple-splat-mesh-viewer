@@ -1,0 +1,1813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vitrine3D — Admin</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --bg-deep: #111318;
+    --bg-panel: #16181d;
+    --bg-surface: #1c1f25;
+    --bg-elevated: #22252c;
+    --bg-input: #1a1d23;
+    --bg-hover: #282b33;
+    --bg-active: #2e323b;
+    --border-subtle: #24272e;
+    --border-default: #2e323a;
+    --border-strong: #3a3f49;
+    --accent: #5a9e97;
+    --accent-hover: #6bb3ab;
+    --accent-muted: rgba(90,158,151,0.15);
+    --accent-text: #7cc4bc;
+    --text-primary: #c8ccd4;
+    --text-secondary: #8a8f9a;
+    --text-muted: #5c6170;
+    --text-faint: #3e4350;
+    --danger: #c45c5c;
+    --danger-hover: #d06a6a;
+    --warning: #c4a05c;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+    --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+    --radius-sm: 2px;
+    --radius-md: 3px;
+}
+
+body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    line-height: 1.5;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 2px; }
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+
+/* ── Header ── */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    height: 42px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border-subtle);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.wordmark {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.wordmark-accent { color: var(--accent); }
+
+.badge {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--accent-muted);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.storage-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.storage-track {
+    width: 80px;
+    height: 3px;
+    background: var(--border-subtle);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.storage-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+/* ── Main ── */
+.main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 16px 20px 40px;
+}
+
+/* ── Upload Zone ── */
+.upload-zone {
+    border: 1px dashed var(--border-default);
+    border-radius: var(--radius-md);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    margin-bottom: 16px;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.upload-zone:hover {
+    border-color: var(--accent);
+    background: var(--accent-muted);
+    color: var(--text-secondary);
+}
+
+.upload-zone.dragover {
+    border-color: var(--accent-hover);
+    background: rgba(90,158,151,0.1);
+    color: var(--text-primary);
+}
+
+.upload-zone.uploading {
+    cursor: default;
+    pointer-events: none;
+}
+
+.upload-zone svg {
+    flex-shrink: 0;
+    opacity: 0.5;
+}
+
+.upload-zone:hover svg { opacity: 0.8; }
+
+.upload-browse {
+    color: var(--accent-text);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    font-size: 11px;
+    padding: 0;
+}
+
+.upload-browse:hover { color: var(--accent-hover); }
+
+.upload-content { display: flex; align-items: center; gap: 8px; }
+.upload-progress-wrap { display: none; flex: 1; align-items: center; gap: 10px; min-width: 0; }
+
+.upload-zone.uploading .upload-content { display: none; }
+.upload-zone.uploading .upload-progress-wrap { display: flex; }
+
+.progress-track {
+    flex: 1;
+    height: 3px;
+    background: var(--border-subtle);
+    border-radius: 2px;
+    overflow: hidden;
+    min-width: 100px;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.15s ease;
+}
+
+.progress-text {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    min-width: 36px;
+    text-align: right;
+}
+
+/* ── Toolbar ── */
+.toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding: 0 2px;
+}
+
+.archive-count {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.sort-controls {
+    display: flex;
+    gap: 2px;
+}
+
+.sort-btn {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    transition: color 0.15s, background 0.15s;
+}
+
+.sort-btn:hover { color: var(--text-secondary); background: var(--bg-hover); }
+.sort-btn.active { color: var(--accent-text); background: var(--accent-muted); }
+
+.sort-btn .arrow {
+    font-size: 8px;
+    margin-left: 2px;
+    display: inline-block;
+}
+
+/* ── Gallery Grid ── */
+.gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 10px;
+}
+
+/* ── Card ── */
+.card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    transition: border-color 0.15s;
+    position: relative;
+}
+
+.card:hover { border-color: var(--border-default); }
+
+.card-thumb {
+    aspect-ratio: 16 / 10;
+    background: var(--bg-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+}
+
+.card-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.card-thumb-placeholder {
+    color: var(--text-faint);
+}
+
+.card-body {
+    padding: 8px 10px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.card-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.card-meta {
+    font-size: 10px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 8px;
+}
+
+.card-meta span { white-space: nowrap; }
+
+/* ── Card Actions ── */
+.card-actions {
+    display: flex;
+    gap: 4px;
+    padding: 0 10px 8px;
+}
+
+.card-action {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    transition: color 0.15s, background 0.15s;
+}
+
+.card-action:hover { color: var(--text-primary); background: var(--bg-hover); }
+.card-action.primary { color: var(--accent-text); }
+.card-action.primary:hover { background: var(--accent-muted); }
+.card-action.danger:hover { color: var(--danger); background: rgba(196,92,92,0.1); }
+
+/* ── Empty State ── */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+}
+
+.empty-state p:first-child {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.empty-state p:last-child { font-size: 11px; }
+
+/* ── Toast Notifications ── */
+.toast-container {
+    position: fixed;
+    top: 52px;
+    right: 16px;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: none;
+}
+
+.toast {
+    font-size: 11px;
+    padding: 8px 14px;
+    border-radius: var(--radius-md);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    color: var(--text-primary);
+    pointer-events: auto;
+    transform: translateX(120%);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s;
+    opacity: 0;
+    max-width: 320px;
+}
+
+.toast.show { transform: translateX(0); opacity: 1; }
+.toast.success { border-left: 2px solid var(--accent); }
+.toast.error { border-left: 2px solid var(--danger); }
+
+/* ── Rename Modal ── */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.modal-backdrop.show { opacity: 1; }
+
+.modal {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: 16px 20px;
+    width: 360px;
+    max-width: 90vw;
+    transform: scale(0.96);
+    transition: transform 0.15s;
+}
+
+.modal-backdrop.show .modal { transform: scale(1); }
+
+.modal-title {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.modal-input {
+    width: 100%;
+    font-size: 12px;
+    padding: 6px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.modal-input:focus { border-color: var(--accent); }
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.modal-btn {
+    font-size: 11px;
+    padding: 5px 14px;
+    border-radius: var(--radius-sm);
+    transition: background 0.15s, color 0.15s;
+}
+
+.modal-btn-secondary {
+    color: var(--text-secondary);
+    background: var(--bg-surface);
+}
+
+.modal-btn-secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.modal-btn-primary {
+    color: var(--bg-deep);
+    background: var(--accent);
+    font-weight: 500;
+}
+
+.modal-btn-primary:hover { background: var(--accent-hover); }
+
+.modal-btn-danger {
+    color: #fff;
+    background: var(--danger);
+    font-weight: 500;
+}
+
+.modal-btn-danger:hover { background: var(--danger-hover); }
+
+/* ── Share/Embed Dialog ── */
+.share-dialog {
+    width: 480px;
+    max-width: 92vw;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.share-dialog .modal-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.share-dialog .modal-title .share-archive-name {
+    font-weight: 400;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.share-tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 0;
+}
+
+.share-tab {
+    font-size: 11px;
+    padding: 5px 12px 7px;
+    color: var(--text-muted);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.share-tab:hover { color: var(--text-secondary); }
+.share-tab.active { color: var(--accent-text); border-bottom-color: var(--accent); }
+
+.share-panel { display: none; }
+.share-panel.active { display: block; }
+
+.share-presets {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.share-preset {
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    background: var(--bg-surface);
+    transition: color 0.15s, background 0.15s;
+}
+
+.share-preset:hover { color: var(--text-primary); background: var(--bg-hover); }
+.share-preset.active { color: var(--accent-text); background: var(--accent-muted); }
+
+.share-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.share-field label {
+    display: block;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.share-select {
+    width: 100%;
+    font-size: 11px;
+    padding: 4px 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    outline: none;
+    appearance: none;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%235c6170'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 22px;
+}
+
+.share-select:focus { border-color: var(--accent); }
+
+.share-checks {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.share-check {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.share-check input {
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.share-output-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.share-output {
+    flex: 1;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    padding: 6px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--accent-text);
+    outline: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.share-output-code {
+    flex: 1;
+    font-size: 10px;
+    font-family: var(--font-mono);
+    padding: 8px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+    min-height: 56px;
+    max-height: 100px;
+    overflow-y: auto;
+    resize: none;
+}
+
+.share-copy-btn {
+    font-size: 10px;
+    padding: 4px 12px;
+    background: var(--accent);
+    color: var(--bg-deep);
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background 0.15s;
+    align-self: flex-start;
+}
+
+.share-copy-btn:hover { background: var(--accent-hover); }
+
+.share-qr {
+    display: flex;
+    justify-content: center;
+    margin: 8px 0;
+}
+
+.share-qr svg {
+    border-radius: var(--radius-md);
+    max-width: 140px;
+    height: auto;
+}
+
+.embed-dims {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.embed-dim-input {
+    width: 70px;
+    font-size: 11px;
+    padding: 4px 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    outline: none;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.embed-dim-input:focus { border-color: var(--accent); }
+.embed-dim-input:disabled { opacity: 0.4; }
+
+.embed-dim-label {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.embed-dim-x {
+    font-size: 10px;
+    color: var(--text-faint);
+}
+
+.share-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 14px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+    .gallery { grid-template-columns: 1fr; }
+    .header { padding: 0 12px; }
+    .main { padding: 12px; }
+    .storage-bar { display: none; }
+}
+
+@media (min-width: 641px) and (max-width: 960px) {
+    .gallery { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+}
+</style>
+</head>
+<body>
+<header class="header">
+    <div class="header-left">
+        <span class="wordmark">VITRINE<span class="wordmark-accent">3D</span></span>
+        <span class="badge">Admin</span>
+    </div>
+    <div class="header-right">
+        <div class="storage-bar" id="storage-bar" style="display:none">
+            <div class="storage-track"><div class="storage-fill" id="storage-fill"></div></div>
+            <span id="storage-text"></span>
+        </div>
+    </div>
+</header>
+
+<main class="main">
+    <div class="upload-zone" id="upload-zone">
+        <div class="upload-content">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V3"/><path d="M4 6l4-4 4 4"/><path d="M2 14h12"/></svg>
+            <span>Drop .a3d or .a3z files here, or <button class="upload-browse" id="upload-browse">browse</button></span>
+        </div>
+        <div class="upload-progress-wrap">
+            <span class="progress-text" id="progress-name"></span>
+            <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+            <span class="progress-text" id="progress-pct">0%</span>
+        </div>
+        <input type="file" id="file-input" accept=".a3d,.a3z" multiple hidden>
+    </div>
+
+    <div class="toolbar" id="toolbar" style="display:none">
+        <span class="archive-count" id="archive-count"></span>
+        <div class="sort-controls">
+            <button class="sort-btn active" data-sort="name" data-dir="asc">Name <span class="arrow">↑</span></button>
+            <button class="sort-btn" data-sort="date" data-dir="desc">Date</button>
+            <button class="sort-btn" data-sort="size" data-dir="desc">Size</button>
+        </div>
+    </div>
+
+    <div class="gallery" id="gallery"></div>
+
+    <div class="empty-state" id="empty-state" style="display:none">
+        <p>No archives yet</p>
+        <p>Upload your first .a3d or .a3z file to get started</p>
+    </div>
+</main>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+(function () {
+'use strict';
+
+const $ = (s) => document.getElementById(s);
+const gallery = $('gallery');
+const emptyState = $('empty-state');
+const toolbar = $('toolbar');
+const uploadZone = $('upload-zone');
+const fileInput = $('file-input');
+const progressFill = $('progress-fill');
+const progressPct = $('progress-pct');
+const progressName = $('progress-name');
+const storageBar = $('storage-bar');
+const storageFill = $('storage-fill');
+const storageText = $('storage-text');
+const archiveCount = $('archive-count');
+const toastContainer = $('toast-container');
+
+let archives = [];
+let currentSort = 'name';
+let currentDir = 'asc';
+let uploadQueue = [];
+let uploading = false;
+
+// ── Helpers ──
+
+function formatBytes(b) {
+    if (b === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(b) / Math.log(1024));
+    return (b / Math.pow(1024, i)).toFixed(i > 1 ? 1 : 0) + ' ' + units[i];
+}
+
+function formatDate(iso) {
+    const d = new Date(iso);
+    const now = new Date();
+    const diff = now - d;
+    if (diff < 86400000) return 'Today';
+    if (diff < 172800000) return 'Yesterday';
+    if (diff < 604800000) return Math.floor(diff / 86400000) + 'd ago';
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+// ── Toast ──
+
+function toast(msg, type) {
+    const el = document.createElement('div');
+    el.className = 'toast ' + (type || '');
+    el.textContent = msg;
+    toastContainer.appendChild(el);
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+    setTimeout(() => {
+        el.classList.remove('show');
+        setTimeout(() => el.remove(), 250);
+    }, 3500);
+}
+
+// ── Modal ──
+
+function showModal(opts) {
+    return new Promise((resolve) => {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        backdrop.innerHTML =
+            '<div class="modal">' +
+                '<div class="modal-title">' + escapeHtml(opts.title) + '</div>' +
+                (opts.input !== undefined
+                    ? '<input class="modal-input" id="modal-input" value="' + escapeHtml(opts.input) + '">'
+                    : '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">' + escapeHtml(opts.message || '') + '</div>') +
+                '<div class="modal-footer">' +
+                    '<button class="modal-btn modal-btn-secondary" data-action="cancel">Cancel</button>' +
+                    '<button class="modal-btn ' + (opts.danger ? 'modal-btn-danger' : 'modal-btn-primary') + '" data-action="confirm">' +
+                        escapeHtml(opts.confirmText || 'OK') +
+                    '</button>' +
+                '</div>' +
+            '</div>';
+
+        document.body.appendChild(backdrop);
+        requestAnimationFrame(() => backdrop.classList.add('show'));
+
+        const input = backdrop.querySelector('#modal-input');
+        if (input) {
+            input.focus();
+            // Select the filename without extension
+            const dot = input.value.lastIndexOf('.');
+            if (dot > 0) input.setSelectionRange(0, dot);
+        }
+
+        function close(value) {
+            backdrop.classList.remove('show');
+            setTimeout(() => backdrop.remove(), 150);
+            resolve(value);
+        }
+
+        backdrop.addEventListener('click', (e) => {
+            const action = e.target.dataset.action;
+            if (action === 'cancel' || e.target === backdrop) close(null);
+            else if (action === 'confirm') close(input ? input.value.trim() : true);
+        });
+
+        if (input) {
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') close(input.value.trim());
+                if (e.key === 'Escape') close(null);
+            });
+        }
+
+        backdrop.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') close(null);
+        });
+    });
+}
+
+// ── API ──
+
+async function fetchArchives() {
+    const res = await fetch('/api/archives');
+    if (!res.ok) throw new Error('Failed to fetch archives');
+    return res.json();
+}
+
+function uploadFile(file) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const form = new FormData();
+        form.append('file', file);
+
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+                const pct = Math.round((e.loaded / e.total) * 100);
+                progressFill.style.width = pct + '%';
+                progressPct.textContent = pct + '%';
+            }
+        });
+
+        xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try { resolve(JSON.parse(xhr.responseText)); }
+                catch { reject(new Error('Invalid response')); }
+            } else {
+                try {
+                    const err = JSON.parse(xhr.responseText);
+                    reject(new Error(err.error || 'Upload failed'));
+                } catch { reject(new Error('Upload failed: ' + xhr.status)); }
+            }
+        });
+
+        xhr.addEventListener('error', () => reject(new Error('Network error')));
+        xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+        xhr.open('POST', '/api/archives');
+        xhr.send(form);
+    });
+}
+
+async function deleteArchive(hash) {
+    const res = await fetch('/api/archives/' + hash, { method: 'DELETE' });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Delete failed');
+    }
+    return res.json();
+}
+
+async function renameArchive(hash, newFilename) {
+    const res = await fetch('/api/archives/' + hash, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: newFilename })
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Rename failed');
+    }
+    return res.json();
+}
+
+// ── Rendering ──
+
+const placeholderSvg = '<svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1" opacity="0.35"><path d="M16 6l10 5.5v9L16 26 6 20.5v-9L16 6z"/><path d="M16 15.5V26"/><path d="M6 11.5L16 17l10-5.5"/></svg>';
+
+function renderCard(a) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.dataset.hash = a.hash;
+
+    const thumbHtml = a.thumbnail
+        ? '<img src="' + escapeHtml(a.thumbnail) + '" alt="" loading="lazy">'
+        : '<div class="card-thumb-placeholder">' + placeholderSvg + '</div>';
+
+    card.innerHTML =
+        '<div class="card-thumb">' + thumbHtml + '</div>' +
+        '<div class="card-body">' +
+            '<div class="card-title" title="' + escapeHtml(a.title) + '">' + escapeHtml(a.title) + '</div>' +
+            '<div class="card-meta">' +
+                '<span>' + formatBytes(a.size) + '</span>' +
+                '<span>' + formatDate(a.modified) + '</span>' +
+                '<span style="color:var(--text-faint)">' + escapeHtml(a.filename) + '</span>' +
+            '</div>' +
+        '</div>' +
+        '<div class="card-actions">' +
+            '<button class="card-action primary" data-action="view">View</button>' +
+            '<button class="card-action" data-action="share">Share</button>' +
+            '<button class="card-action" data-action="copy">Copy URL</button>' +
+            '<button class="card-action" data-action="rename">Rename</button>' +
+            '<button class="card-action danger" data-action="delete">Delete</button>' +
+        '</div>';
+
+    return card;
+}
+
+function render() {
+    gallery.innerHTML = '';
+
+    if (archives.length === 0) {
+        emptyState.style.display = '';
+        toolbar.style.display = 'none';
+        return;
+    }
+
+    emptyState.style.display = 'none';
+    toolbar.style.display = '';
+    archiveCount.textContent = archives.length + ' archive' + (archives.length !== 1 ? 's' : '');
+
+    const sorted = [...archives].sort((a, b) => {
+        let cmp = 0;
+        if (currentSort === 'name') cmp = a.title.localeCompare(b.title);
+        else if (currentSort === 'date') cmp = new Date(a.modified) - new Date(b.modified);
+        else if (currentSort === 'size') cmp = a.size - b.size;
+        return currentDir === 'asc' ? cmp : -cmp;
+    });
+
+    for (const a of sorted) gallery.appendChild(renderCard(a));
+}
+
+function updateStorage(data) {
+    if (data.storageUsed > 0) {
+        storageBar.style.display = '';
+        storageText.textContent = formatBytes(data.storageUsed);
+        // Visual fill capped at an assumed 10GB for the bar
+        const pct = Math.min(100, (data.storageUsed / (10 * 1024 * 1024 * 1024)) * 100);
+        storageFill.style.width = pct + '%';
+    } else {
+        storageBar.style.display = 'none';
+    }
+}
+
+// ── Event Handlers ──
+
+// Sort buttons
+document.querySelector('.sort-controls').addEventListener('click', (e) => {
+    const btn = e.target.closest('.sort-btn');
+    if (!btn) return;
+    const sort = btn.dataset.sort;
+    const arrow = btn.querySelector('.arrow');
+
+    if (sort === currentSort) {
+        currentDir = currentDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSort = sort;
+        currentDir = sort === 'name' ? 'asc' : 'desc';
+    }
+
+    document.querySelectorAll('.sort-btn').forEach((b) => {
+        b.classList.remove('active');
+        const a = b.querySelector('.arrow');
+        if (a) a.remove();
+    });
+    btn.classList.add('active');
+    const newArrow = document.createElement('span');
+    newArrow.className = 'arrow';
+    newArrow.textContent = currentDir === 'asc' ? '↑' : '↓';
+    btn.appendChild(newArrow);
+    render();
+});
+
+// Card actions (delegated)
+gallery.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.card-action');
+    if (!btn) return;
+    const card = btn.closest('.card');
+    const hash = card.dataset.hash;
+    const action = btn.dataset.action;
+    const archive = archives.find((a) => a.hash === hash);
+    if (!archive) return;
+
+    if (action === 'view') {
+        window.open(archive.viewerUrl, '_blank');
+    }
+
+    if (action === 'share') {
+        showShareDialog(archive);
+    }
+
+    if (action === 'copy') {
+        const fullUrl = location.origin + archive.viewerUrl;
+        try {
+            await navigator.clipboard.writeText(fullUrl);
+            toast('Viewer URL copied', 'success');
+        } catch {
+            toast('Copy failed', 'error');
+        }
+    }
+
+    if (action === 'rename') {
+        const newName = await showModal({
+            title: 'Rename archive',
+            input: archive.filename,
+            confirmText: 'Rename'
+        });
+        if (!newName || newName === archive.filename) return;
+        try {
+            const updated = await renameArchive(hash, newName);
+            const idx = archives.findIndex((a) => a.hash === hash);
+            if (idx !== -1) archives[idx] = updated;
+            render();
+            toast('Renamed to ' + updated.filename, 'success');
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+    }
+
+    if (action === 'delete') {
+        const confirmed = await showModal({
+            title: 'Delete archive',
+            message: 'Delete "' + archive.filename + '"? This cannot be undone.',
+            confirmText: 'Delete',
+            danger: true
+        });
+        if (!confirmed) return;
+        try {
+            await deleteArchive(hash);
+            archives = archives.filter((a) => a.hash !== hash);
+            render();
+            toast('Deleted ' + archive.filename, 'success');
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+    }
+});
+
+// Upload zone — drag and drop
+uploadZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadZone.classList.add('dragover');
+});
+
+uploadZone.addEventListener('dragleave', () => {
+    uploadZone.classList.remove('dragover');
+});
+
+uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    const files = Array.from(e.dataTransfer.files).filter(
+        (f) => /\.(a3d|a3z)$/i.test(f.name)
+    );
+    if (files.length === 0) {
+        toast('Only .a3d and .a3z files are accepted', 'error');
+        return;
+    }
+    queueUploads(files);
+});
+
+// Upload zone — click / browse
+$('upload-browse').addEventListener('click', (e) => {
+    e.stopPropagation();
+    fileInput.click();
+});
+
+uploadZone.addEventListener('click', (e) => {
+    if (e.target.closest('.upload-browse')) return;
+    if (uploadZone.classList.contains('uploading')) return;
+    fileInput.click();
+});
+
+fileInput.addEventListener('change', () => {
+    const files = Array.from(fileInput.files);
+    if (files.length > 0) queueUploads(files);
+    fileInput.value = '';
+});
+
+// Upload queue (sequential)
+function queueUploads(files) {
+    uploadQueue.push(...files);
+    if (!uploading) processQueue();
+}
+
+async function processQueue() {
+    if (uploadQueue.length === 0) {
+        uploading = false;
+        uploadZone.classList.remove('uploading');
+        return;
+    }
+
+    uploading = true;
+    uploadZone.classList.add('uploading');
+
+    const file = uploadQueue.shift();
+    progressName.textContent = file.name;
+    progressFill.style.width = '0%';
+    progressPct.textContent = '0%';
+
+    try {
+        const result = await uploadFile(file);
+        archives.push(result);
+        render();
+        toast('Uploaded ' + result.filename, 'success');
+        // Refresh full list to get accurate storage
+        refreshList();
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+
+    processQueue();
+}
+
+// ── QR Code Encoder (Byte mode, EC Level L, versions 1-7) ──
+
+const QR = (() => {
+    // GF(256) with polynomial 0x11d
+    const EXP = new Uint8Array(256), LOG = new Uint8Array(256);
+    let v = 1;
+    for (let i = 0; i < 255; i++) {
+        EXP[i] = v; LOG[v] = i;
+        v = (v << 1) ^ (v & 128 ? 0x11d : 0);
+    }
+    EXP[255] = EXP[0];
+
+    function gfMul(a, b) { return a === 0 || b === 0 ? 0 : EXP[(LOG[a] + LOG[b]) % 255]; }
+
+    // Reed-Solomon generator polynomial for given EC codeword count
+    function rsGenPoly(n) {
+        let g = [1];
+        for (let i = 0; i < n; i++) {
+            const ng = new Array(g.length + 1).fill(0);
+            const root = EXP[i];
+            for (let j = 0; j < g.length; j++) {
+                ng[j] ^= g[j];
+                ng[j + 1] ^= gfMul(g[j], root);
+            }
+            g = ng;
+        }
+        return g;
+    }
+
+    function rsEncode(data, ecLen) {
+        const gen = rsGenPoly(ecLen);
+        const msg = new Uint8Array(data.length + ecLen);
+        msg.set(data);
+        for (let i = 0; i < data.length; i++) {
+            const coef = msg[i];
+            if (coef === 0) continue;
+            for (let j = 0; j < gen.length; j++) {
+                msg[i + j] ^= gfMul(gen[j], coef);
+            }
+        }
+        return msg.slice(data.length);
+    }
+
+    // Version params: [size, totalDataCodewords, ecCodewordsPerBlock]
+    // EC Level L only, single block for versions 1-7
+    const VERSIONS = [
+        null,
+        [21, 19, 7],    // v1: 17 chars
+        [25, 34, 10],   // v2: 32 chars
+        [29, 55, 15],   // v3: 53 chars
+        [33, 80, 20],   // v4: 78 chars
+        [37, 108, 26],  // v5: 106 chars
+        [41, 136, 18],  // v6: 134 chars (2 blocks: 68+68, 18 ec each)
+        [45, 156, 20],  // v7: 154 chars (2 blocks: 78+78, 20 ec each)
+    ];
+
+    // Alignment pattern centers (v2+)
+    const ALIGN = [null, [], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34], [6, 22, 38]];
+
+    // Format info bits for EC Level L, masks 0-7 (pre-computed with BCH)
+    const FORMAT_BITS = [0x77c4, 0x72f3, 0x7daa, 0x789d, 0x662f, 0x6318, 0x6c41, 0x6976];
+
+    // Version info bits for v7+ (pre-computed with BCH(18,6))
+    const VERSION_BITS = [null, null, null, null, null, null, null, 0x07c94];
+
+    function pickVersion(len) {
+        for (let v = 1; v < VERSIONS.length; v++) {
+            const cap = VERSIONS[v][1] - 2; // subtract 2 for mode + length byte(s)
+            // For v1-9, byte mode uses 1 mode nibble + 8-bit length = ~2 bytes overhead
+            if (len <= cap) return v;
+        }
+        return 0; // too long
+    }
+
+    function encodeData(bytes, ver) {
+        const [, totalDC] = VERSIONS[ver];
+        const bits = [];
+        function push(val, len) {
+            for (let i = len - 1; i >= 0; i--) bits.push((val >> i) & 1);
+        }
+
+        // Byte mode indicator: 0100
+        push(0b0100, 4);
+        // Character count (8 bits for v1-9)
+        push(bytes.length, 8);
+        // Data
+        for (const b of bytes) push(b, 8);
+        // Terminator (up to 4 zero bits)
+        const rem = totalDC * 8 - bits.length;
+        push(0, Math.min(4, rem));
+        // Pad to byte boundary
+        while (bits.length % 8 !== 0) bits.push(0);
+        // Pad bytes 0xEC, 0x11
+        let padIdx = 0;
+        while (bits.length < totalDC * 8) {
+            push(padIdx % 2 === 0 ? 0xec : 0x11, 8);
+            padIdx++;
+        }
+
+        // Convert to bytes
+        const data = new Uint8Array(totalDC);
+        for (let i = 0; i < totalDC; i++) {
+            let byte = 0;
+            for (let b = 0; b < 8; b++) byte = (byte << 1) | bits[i * 8 + b];
+            data[i] = byte;
+        }
+        return data;
+    }
+
+    function buildCodewords(data, ver) {
+        const [, totalDC, ecPerBlock] = VERSIONS[ver];
+
+        // Versions 1-5: single block. v6-7: 2 blocks
+        if (ver <= 5) {
+            const ec = rsEncode(data, ecPerBlock);
+            const result = new Uint8Array(totalDC + ecPerBlock);
+            result.set(data);
+            result.set(ec, totalDC);
+            return result;
+        }
+
+        // v6-7: 2 equal blocks
+        const blockSize = totalDC / 2;
+        const block1 = data.slice(0, blockSize);
+        const block2 = data.slice(blockSize);
+        const ec1 = rsEncode(block1, ecPerBlock);
+        const ec2 = rsEncode(block2, ecPerBlock);
+
+        // Interleave data codewords, then EC codewords
+        const result = [];
+        for (let i = 0; i < blockSize; i++) {
+            result.push(block1[i]);
+            result.push(block2[i]);
+        }
+        for (let i = 0; i < ecPerBlock; i++) {
+            result.push(ec1[i]);
+            result.push(ec2[i]);
+        }
+        return new Uint8Array(result);
+    }
+
+    function createMatrix(ver) {
+        const size = VERSIONS[ver][0];
+        // 0 = empty, 1 = dark-fixed, 2 = light-fixed, 3 = dark-data, 4 = light-data
+        const m = Array.from({ length: size }, () => new Uint8Array(size));
+        return m;
+    }
+
+    function placeFinders(m, size) {
+        function placeOne(r, c) {
+            for (let dr = -1; dr <= 7; dr++) {
+                for (let dc = -1; dc <= 7; dc++) {
+                    const rr = r + dr, cc = c + dc;
+                    if (rr < 0 || rr >= size || cc < 0 || cc >= size) continue;
+                    if (dr === -1 || dr === 7 || dc === -1 || dc === 7) {
+                        m[rr][cc] = 2; // separator (light-fixed)
+                    } else if (dr === 0 || dr === 6 || dc === 0 || dc === 6) {
+                        m[rr][cc] = 1; // dark border
+                    } else if (dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4) {
+                        m[rr][cc] = 1; // dark center
+                    } else {
+                        m[rr][cc] = 2; // light inside
+                    }
+                }
+            }
+        }
+        placeOne(0, 0);
+        placeOne(0, size - 7);
+        placeOne(size - 7, 0);
+    }
+
+    function placeAlignment(m, ver) {
+        const positions = ALIGN[ver];
+        if (!positions || positions.length < 2) return;
+        for (const r of positions) {
+            for (const c of positions) {
+                // Skip if overlapping finder
+                if (m[r][c] !== 0) continue;
+                for (let dr = -2; dr <= 2; dr++) {
+                    for (let dc = -2; dc <= 2; dc++) {
+                        const isDark = Math.abs(dr) === 2 || Math.abs(dc) === 2 || (dr === 0 && dc === 0);
+                        m[r + dr][c + dc] = isDark ? 1 : 2;
+                    }
+                }
+            }
+        }
+    }
+
+    function placeTiming(m, size) {
+        for (let i = 8; i < size - 8; i++) {
+            if (m[6][i] === 0) m[6][i] = (i % 2 === 0) ? 1 : 2;
+            if (m[i][6] === 0) m[i][6] = (i % 2 === 0) ? 1 : 2;
+        }
+    }
+
+    function reserveFormatAreas(m, size) {
+        // Around top-left finder
+        for (let i = 0; i <= 8; i++) {
+            if (m[8][i] === 0) m[8][i] = 2;
+            if (m[i][8] === 0) m[i][8] = 2;
+        }
+        // Around top-right finder
+        for (let i = 0; i <= 7; i++) {
+            if (m[8][size - 1 - i] === 0) m[8][size - 1 - i] = 2;
+        }
+        // Around bottom-left finder
+        for (let i = 0; i <= 7; i++) {
+            if (m[size - 1 - i][8] === 0) m[size - 1 - i][8] = 2;
+        }
+        // Dark module
+        m[size - 8][8] = 1;
+    }
+
+    function placeVersionInfo(m, ver, size) {
+        if (ver < 7) return;
+        const bits = VERSION_BITS[ver];
+        if (!bits) return;
+        for (let i = 0; i < 18; i++) {
+            const bit = (bits >> i) & 1;
+            const r = Math.floor(i / 3);
+            const c = size - 11 + (i % 3);
+            m[r][c] = bit ? 1 : 2;
+            m[c][r] = bit ? 1 : 2;
+        }
+    }
+
+    function placeData(m, codewords, size) {
+        let bitIdx = 0;
+        const totalBits = codewords.length * 8;
+        // Zigzag right-to-left, bottom-to-top traversal
+        let col = size - 1;
+        while (col >= 0) {
+            if (col === 6) col--; // skip timing column
+            for (let row = 0; row < size; row++) {
+                for (let dx = 0; dx <= 1; dx++) {
+                    const c = col - dx;
+                    // Which row? Depends on direction (upward for even col-pairs, downward for odd)
+                    const isUpward = ((size - 1 - col) >> 1) % 2 === 0;
+                    const r = isUpward ? size - 1 - row : row;
+                    if (c < 0 || m[r][c] !== 0) continue;
+                    if (bitIdx < totalBits) {
+                        const byte = codewords[bitIdx >> 3];
+                        const bit = (byte >> (7 - (bitIdx & 7))) & 1;
+                        m[r][c] = bit ? 3 : 4; // data dark/light
+                        bitIdx++;
+                    } else {
+                        m[r][c] = 4; // remainder = light
+                    }
+                }
+            }
+            col -= 2;
+        }
+    }
+
+    // Mask functions
+    const MASKS = [
+        (r, c) => (r + c) % 2 === 0,
+        (r, c) => r % 2 === 0,
+        (r, c) => c % 3 === 0,
+        (r, c) => (r + c) % 3 === 0,
+        (r, c) => (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0,
+        (r, c) => ((r * c) % 2 + (r * c) % 3) === 0,
+        (r, c) => ((r * c) % 2 + (r * c) % 3) % 2 === 0,
+        (r, c) => ((r + c) % 2 + (r * c) % 3) % 2 === 0,
+    ];
+
+    function applyMask(m, size, maskIdx) {
+        const fn = MASKS[maskIdx];
+        const copy = m.map(row => row.slice());
+        for (let r = 0; r < size; r++) {
+            for (let c = 0; c < size; c++) {
+                if (copy[r][c] < 3) continue; // fixed module
+                const isDark = copy[r][c] === 3;
+                if (fn(r, c)) copy[r][c] = isDark ? 4 : 3; // flip
+            }
+        }
+        return copy;
+    }
+
+    function writeFormatInfo(m, size, maskIdx) {
+        const bits = FORMAT_BITS[maskIdx];
+        // Two copies of 15-bit format string
+        const positions1 = [
+            [8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],
+            [7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]
+        ];
+        const positions2 = [];
+        for (let i = 0; i < 7; i++) positions2.push([size - 1 - i, 8]);
+        for (let i = 7; i < 15; i++) positions2.push([8, size - 15 + i]);
+
+        for (let i = 0; i < 15; i++) {
+            const bit = (bits >> (14 - i)) & 1;
+            const val = bit ? 1 : 2;
+            const [r1, c1] = positions1[i];
+            m[r1][c1] = val;
+            const [r2, c2] = positions2[i];
+            m[r2][c2] = val;
+        }
+    }
+
+    function penalty(m, size) {
+        let score = 0;
+        const isDark = (r, c) => m[r][c] === 1 || m[r][c] === 3;
+
+        // Rule 1: runs of 5+ same color in row/col
+        for (let r = 0; r < size; r++) {
+            let run = 1;
+            for (let c = 1; c < size; c++) {
+                if (isDark(r, c) === isDark(r, c - 1)) { run++; }
+                else { if (run >= 5) score += run - 2; run = 1; }
+            }
+            if (run >= 5) score += run - 2;
+        }
+        for (let c = 0; c < size; c++) {
+            let run = 1;
+            for (let r = 1; r < size; r++) {
+                if (isDark(r, c) === isDark(r - 1, c)) { run++; }
+                else { if (run >= 5) score += run - 2; run = 1; }
+            }
+            if (run >= 5) score += run - 2;
+        }
+
+        // Rule 2: 2x2 blocks of same color
+        for (let r = 0; r < size - 1; r++) {
+            for (let c = 0; c < size - 1; c++) {
+                const d = isDark(r, c);
+                if (d === isDark(r, c + 1) && d === isDark(r + 1, c) && d === isDark(r + 1, c + 1)) {
+                    score += 3;
+                }
+            }
+        }
+
+        return score;
+    }
+
+    function toSvg(m, size, quiet) {
+        const q = quiet || 4;
+        const total = size + q * 2;
+        const isDark = (r, c) => m[r][c] === 1 || m[r][c] === 3;
+
+        let paths = '';
+        for (let r = 0; r < size; r++) {
+            for (let c = 0; c < size; c++) {
+                if (isDark(r, c)) {
+                    paths += 'M' + (c + q) + ',' + (r + q) + 'h1v1h-1z';
+                }
+            }
+        }
+
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + total + ' ' + total +
+            '" shape-rendering="crispEdges">' +
+            '<rect width="' + total + '" height="' + total + '" fill="#fff"/>' +
+            '<path d="' + paths + '" fill="#000"/></svg>';
+    }
+
+    return function qrSvg(text) {
+        const bytes = new TextEncoder().encode(text);
+        const ver = pickVersion(bytes.length);
+        if (ver === 0) return ''; // too long
+
+        const size = VERSIONS[ver][0];
+        const data = encodeData(bytes, ver);
+        const codewords = buildCodewords(data, ver);
+        const m = createMatrix(ver);
+
+        placeFinders(m, size);
+        placeAlignment(m, ver);
+        placeTiming(m, size);
+        reserveFormatAreas(m, size);
+        placeVersionInfo(m, ver, size);
+        placeData(m, codewords, size);
+
+        // Try all 8 masks, pick lowest penalty
+        let bestMask = 0, bestScore = Infinity, bestMatrix = null;
+        for (let i = 0; i < 8; i++) {
+            const masked = applyMask(m, size, i);
+            writeFormatInfo(masked, size, i);
+            const s = penalty(masked, size);
+            if (s < bestScore) { bestScore = s; bestMask = i; bestMatrix = masked; }
+        }
+
+        writeFormatInfo(bestMatrix, size, bestMask);
+        return toSvg(bestMatrix, size);
+    };
+})();
+
+// ── Share / Embed Dialog ──
+
+function buildViewerUrl(archive, opts) {
+    // Clean URL format: /view/{hash} (defaults to kiosk=true, autoload=true)
+    const base = location.origin + '/view/' + archive.hash;
+
+    const params = [];
+    if (opts.mode && opts.mode !== 'default') params.push('mode=' + opts.mode);
+    if (opts.controls === 'hidden') params.push('controls=0');
+    if (opts.toolbar === 'hidden') params.push('toolbar=0');
+    if (opts.sidebar === 'hidden') params.push('sidebar=0');
+    if (opts.theme && opts.theme !== 'default') params.push('theme=' + opts.theme);
+    // Clean URL defaults: kiosk=true, autoload=false (click gate) — only add when overriding
+    if (!opts.kiosk) params.push('kiosk=false');
+    if (opts.autoload) params.push('autoload=true');
+
+    return base + (params.length ? '?' + params.join('&') : '');
+}
+
+function buildEmbedCode(archive, opts, dims) {
+    const url = buildViewerUrl(archive, opts);
+    if (dims.responsive) {
+        return '<div style="position:relative;width:100%;padding-bottom:56.25%;overflow:hidden">' +
+            '<iframe src="' + escapeHtml(url) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" ' +
+            'allow="fullscreen" loading="lazy"></iframe></div>';
+    }
+    return '<iframe src="' + escapeHtml(url) + '" width="' + dims.width + '" height="' + dims.height +
+        '" style="border:0" allow="fullscreen" loading="lazy"></iframe>';
+}
+
+function getShareOpts(container) {
+    return {
+        mode: container.querySelector('[data-opt="mode"]')?.value || 'default',
+        controls: container.querySelector('[data-opt="controls"]')?.value || 'visible',
+        toolbar: container.querySelector('[data-opt="toolbar"]')?.value || 'visible',
+        sidebar: container.querySelector('[data-opt="sidebar"]')?.value || 'visible',
+        theme: container.querySelector('[data-opt="theme"]')?.value || 'default',
+        kiosk: container.querySelector('[data-opt="kiosk"]')?.checked || false,
+        autoload: container.querySelector('[data-opt="autoload"]')?.checked || false,
+    };
+}
+
+const SHARE_PRESETS = {
+    viewer: { mode: 'default', controls: 'visible', toolbar: 'visible', sidebar: 'visible', theme: 'default', kiosk: false, autoload: false },
+    kiosk: { mode: 'default', controls: 'visible', toolbar: 'hidden', sidebar: 'hidden', theme: 'default', kiosk: true, autoload: false },
+    minimal: { mode: 'default', controls: 'hidden', toolbar: 'hidden', sidebar: 'hidden', theme: 'default', kiosk: true, autoload: false },
+};
+
+function showShareDialog(archive) {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+
+    backdrop.innerHTML =
+        '<div class="modal share-dialog">' +
+            '<div class="modal-title">Share <span class="share-archive-name">' + escapeHtml(archive.title) + '</span></div>' +
+            '<div class="share-tabs">' +
+                '<button class="share-tab active" data-tab="link">Link</button>' +
+                '<button class="share-tab" data-tab="embed">Embed</button>' +
+            '</div>' +
+
+            // ── Link Panel ──
+            '<div class="share-panel active" data-panel="link">' +
+                '<div class="share-presets">' +
+                    '<button class="share-preset active" data-preset="viewer">Viewer</button>' +
+                    '<button class="share-preset" data-preset="kiosk">Kiosk</button>' +
+                    '<button class="share-preset" data-preset="minimal">Minimal</button>' +
+                '</div>' +
+                '<div class="share-grid">' +
+                    '<div class="share-field"><label>Mode</label>' +
+                        '<select class="share-select" data-opt="mode">' +
+                            '<option value="default">Default</option>' +
+                            '<option value="orbit">Orbit</option>' +
+                            '<option value="fly">Fly</option>' +
+                        '</select></div>' +
+                    '<div class="share-field"><label>Theme</label>' +
+                        '<select class="share-select" data-opt="theme">' +
+                            '<option value="default">Default</option>' +
+                            '<option value="editorial">Editorial</option>' +
+                            '<option value="museum">Museum</option>' +
+                            '<option value="technical">Technical</option>' +
+                        '</select></div>' +
+                    '<div class="share-field"><label>Controls</label>' +
+                        '<select class="share-select" data-opt="controls">' +
+                            '<option value="visible">Visible</option>' +
+                            '<option value="hidden">Hidden</option>' +
+                        '</select></div>' +
+                    '<div class="share-field"><label>Toolbar</label>' +
+                        '<select class="share-select" data-opt="toolbar">' +
+                            '<option value="visible">Visible</option>' +
+                            '<option value="hidden">Hidden</option>' +
+                        '</select></div>' +
+                    '<div class="share-field"><label>Sidebar</label>' +
+                        '<select class="share-select" data-opt="sidebar">' +
+                            '<option value="visible">Visible</option>' +
+                            '<option value="hidden">Hidden</option>' +
+                        '</select></div>' +
+                '</div>' +
+                '<div class="share-checks">' +
+                    '<label class="share-check"><input type="checkbox" data-opt="kiosk"> Kiosk mode</label>' +
+                    '<label class="share-check"><input type="checkbox" data-opt="autoload"> Auto-load</label>' +
+                '</div>' +
+                '<div class="share-output-row">' +
+                    '<input class="share-output" data-ref="url-output" readonly>' +
+                    '<button class="share-copy-btn" data-ref="copy-url">Copy</button>' +
+                '</div>' +
+                '<div class="share-qr" data-ref="qr-container"></div>' +
+            '</div>' +
+
+            // ── Embed Panel ──
+            '<div class="share-panel" data-panel="embed">' +
+                '<div class="embed-dims">' +
+                    '<span class="embed-dim-label">Size</span>' +
+                    '<input class="embed-dim-input" data-ref="embed-w" type="number" value="800" min="200" max="3840">' +
+                    '<span class="embed-dim-x">&times;</span>' +
+                    '<input class="embed-dim-input" data-ref="embed-h" type="number" value="450" min="200" max="2160">' +
+                    '<span class="embed-dim-label">px</span>' +
+                    '<label class="share-check" style="margin-left:auto"><input type="checkbox" data-ref="embed-responsive"> Responsive</label>' +
+                '</div>' +
+                '<div class="share-output-row">' +
+                    '<textarea class="share-output-code" data-ref="embed-output" readonly></textarea>' +
+                    '<button class="share-copy-btn" data-ref="copy-embed">Copy</button>' +
+                '</div>' +
+            '</div>' +
+
+            '<div class="share-footer">' +
+                '<button class="modal-btn modal-btn-secondary" data-action="cancel">Close</button>' +
+            '</div>' +
+        '</div>';
+
+    document.body.appendChild(backdrop);
+    requestAnimationFrame(() => backdrop.classList.add('show'));
+
+    const dialog = backdrop.querySelector('.share-dialog');
+    const urlOutput = dialog.querySelector('[data-ref="url-output"]');
+    const qrContainer = dialog.querySelector('[data-ref="qr-container"]');
+    const embedOutput = dialog.querySelector('[data-ref="embed-output"]');
+    const embedW = dialog.querySelector('[data-ref="embed-w"]');
+    const embedH = dialog.querySelector('[data-ref="embed-h"]');
+    const embedResponsive = dialog.querySelector('[data-ref="embed-responsive"]');
+
+    function updateOutputs() {
+        const opts = getShareOpts(dialog);
+        const url = buildViewerUrl(archive, opts);
+        urlOutput.value = url;
+
+        // QR
+        const svg = QR(url);
+        qrContainer.innerHTML = svg || '<span style="color:var(--text-muted);font-size:10px">URL too long for QR</span>';
+
+        // Embed
+        const dims = {
+            width: parseInt(embedW.value) || 800,
+            height: parseInt(embedH.value) || 450,
+            responsive: embedResponsive.checked,
+        };
+        embedOutput.value = buildEmbedCode(archive, opts, dims);
+
+        // Disable dimension inputs when responsive
+        embedW.disabled = embedResponsive.checked;
+        embedH.disabled = embedResponsive.checked;
+    }
+
+    // Apply preset
+    function applyPreset(name) {
+        const p = SHARE_PRESETS[name];
+        if (!p) return;
+        dialog.querySelectorAll('.share-preset').forEach(b => b.classList.toggle('active', b.dataset.preset === name));
+        dialog.querySelector('[data-opt="mode"]').value = p.mode;
+        dialog.querySelector('[data-opt="controls"]').value = p.controls;
+        dialog.querySelector('[data-opt="toolbar"]').value = p.toolbar;
+        dialog.querySelector('[data-opt="sidebar"]').value = p.sidebar;
+        dialog.querySelector('[data-opt="theme"]').value = p.theme;
+        dialog.querySelector('[data-opt="kiosk"]').checked = p.kiosk;
+        dialog.querySelector('[data-opt="autoload"]').checked = p.autoload;
+        updateOutputs();
+    }
+
+    // Tab switching
+    dialog.querySelector('.share-tabs').addEventListener('click', (e) => {
+        const tab = e.target.closest('.share-tab');
+        if (!tab) return;
+        dialog.querySelectorAll('.share-tab').forEach(t => t.classList.remove('active'));
+        dialog.querySelectorAll('.share-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        dialog.querySelector('[data-panel="' + tab.dataset.tab + '"]').classList.add('active');
+    });
+
+    // Presets
+    dialog.querySelector('.share-presets').addEventListener('click', (e) => {
+        const btn = e.target.closest('.share-preset');
+        if (btn) applyPreset(btn.dataset.preset);
+    });
+
+    // Option changes — clear active preset, update outputs
+    dialog.querySelectorAll('.share-select, .share-check input').forEach(el => {
+        el.addEventListener('change', () => {
+            dialog.querySelectorAll('.share-preset').forEach(b => b.classList.remove('active'));
+            updateOutputs();
+        });
+    });
+
+    // Embed dimension changes
+    embedW.addEventListener('input', updateOutputs);
+    embedH.addEventListener('input', updateOutputs);
+    embedResponsive.addEventListener('change', updateOutputs);
+
+    // Copy buttons
+    dialog.querySelector('[data-ref="copy-url"]').addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(urlOutput.value);
+            toast('URL copied', 'success');
+        } catch { toast('Copy failed', 'error'); }
+    });
+
+    dialog.querySelector('[data-ref="copy-embed"]').addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(embedOutput.value);
+            toast('Embed code copied', 'success');
+        } catch { toast('Copy failed', 'error'); }
+    });
+
+    // Close
+    function close() {
+        backdrop.classList.remove('show');
+        setTimeout(() => backdrop.remove(), 150);
+    }
+
+    backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop || e.target.dataset.action === 'cancel') close();
+    });
+    backdrop.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') close();
+    });
+
+    // Initial render
+    updateOutputs();
+}
+
+// ── Init ──
+
+async function refreshList() {
+    try {
+        const data = await fetchArchives();
+        archives = data.archives || [];
+        render();
+        updateStorage(data);
+    } catch (err) {
+        toast('Failed to load archives', 'error');
+    }
+}
+
+refreshList();
+})();
+</script>
+</body>
+</html>

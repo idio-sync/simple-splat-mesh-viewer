@@ -56,6 +56,10 @@ docker compose up -d
 | `SHOW_CONTROLS` | `true` | Show/hide the controls panel |
 | `LOD_BUDGET_SD` | `1000000` | Splat LOD budget (max splats per frame) for SD quality tier |
 | `LOD_BUDGET_HD` | `5000000` | Splat LOD budget (max splats per frame) for HD quality tier |
+| `ADMIN_ENABLED` | `false` | Enable admin panel at `/admin` |
+| `ADMIN_USER` | `admin` | Admin basic auth username |
+| `ADMIN_PASS` | _(empty)_ | Admin basic auth password (required when ADMIN_ENABLED=true) |
+| `MAX_UPLOAD_SIZE` | `1024` | Maximum upload size in MB |
 
 ### 3. Docker Compose
 
@@ -341,21 +345,111 @@ volumes:
   caddy_data:
 ```
 
-## Future: Admin Panel
+## Admin Panel
 
-The viewer is stateless by design. Add an admin panel as a **separate service** in docker-compose:
+The container includes an optional admin panel at `/admin` for browser-based archive management: upload, delete, rename, and a gallery view. Protected by HTTP basic auth.
 
+### Enabling the Admin Panel
+
+Set `ADMIN_ENABLED=true` and provide `ADMIN_PASS`:
+
+```yaml
+services:
+  viewer:
+    image: youruser/vitrine3d:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      - ADMIN_ENABLED=true
+      - ADMIN_USER=admin
+      - ADMIN_PASS=your-secure-password
+      - MAX_UPLOAD_SIZE=1024
+      # Archives must be mounted read-write for upload/delete/rename
+    volumes:
+      - ./archives:/usr/share/nginx/html/archives:rw
 ```
-[Admin Panel]  ------>  [Object Storage (R2)]
-  (Node/Go)                    |
-     |                   [CDN (Cloudflare)]
-     |                         |
-[SQLite DB]              [Viewer (unchanged)]
+
+**Important:** The archives volume must be mounted with `:rw` (not `:ro`) when the admin panel is enabled.
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ADMIN_ENABLED` | `false` | Master switch for admin panel |
+| `ADMIN_USER` | `admin` | Basic auth username |
+| `ADMIN_PASS` | _(required)_ | Basic auth password. Container refuses to start if not set when `ADMIN_ENABLED=true` |
+| `MAX_UPLOAD_SIZE` | `1024` | Maximum upload size in MB |
+
+### How It Works
+
+- The admin panel is served by the same Node.js meta-server that handles OG/oEmbed
+- nginx protects `/admin` and `/api/*` routes with HTTP basic auth (htpasswd generated at container start)
+- Uploads are streamed to disk (no in-memory buffering) — supports files up to `MAX_UPLOAD_SIZE`
+- After upload, `extract-meta.sh` runs automatically to generate metadata sidecars and thumbnails
+- The admin panel works independently of OG/oEmbed (`ADMIN_ENABLED=true` alone starts the meta-server)
+
+### API Endpoints
+
+All API routes require basic auth and are proxied through nginx:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/admin` | Admin panel HTML page |
+| `GET` | `/api/archives` | List all archives with metadata, sizes, thumbnails |
+| `POST` | `/api/archives` | Upload new archive (multipart/form-data) |
+| `DELETE` | `/api/archives/:hash` | Delete archive and sidecar files |
+| `PATCH` | `/api/archives/:hash` | Rename archive (JSON body: `{"filename": "new-name.a3d"}`) |
+
+### Security Notes
+
+- **HTTPS required in production.** Basic auth sends credentials as base64 — always deploy behind TLS (Cloudflare, Caddy, or similar)
+- Path traversal protection on all operations (uploads sanitized, deletes/renames resolved via hash lookup)
+- Uploads validated: file extension check, size limit enforced by both nginx and Node.js
+- The admin panel does not affect existing deployments — all features are opt-in via `ADMIN_ENABLED`
+
+### Verifying It Works
+
+```bash
+# Test API (with basic auth)
+curl -u admin:your-secure-password https://viewer.yourcompany.com/api/archives
+
+# Upload an archive
+curl -u admin:your-secure-password -F file=@scan.a3d https://viewer.yourcompany.com/api/archives
+
+# Delete by hash (hash from the list response)
+curl -u admin:your-secure-password -X DELETE https://viewer.yourcompany.com/api/archives/a1b2c3d4e5f6g7h8
+
+# Rename
+curl -u admin:your-secure-password -X PATCH \
+  -H "Content-Type: application/json" \
+  -d '{"filename":"new-name.a3d"}' \
+  https://viewer.yourcompany.com/api/archives/a1b2c3d4e5f6g7h8
 ```
 
-- **Phase 1 (now):** CLI uploads, viewer reads archives via URL params
-- **Phase 2:** Admin panel manages upload, metadata, embed code generation
-- **Phase 3:** Presigned R2 URLs with expiry for access control (no viewer changes needed -- the signed URL IS the authorization)
+### Combined Deployment (Admin + OG + Kiosk Security)
+
+```yaml
+services:
+  viewer:
+    image: youruser/vitrine3d:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      - ADMIN_ENABLED=true
+      - ADMIN_USER=admin
+      - ADMIN_PASS=${ADMIN_PASS}
+      - MAX_UPLOAD_SIZE=1024
+      - OG_ENABLED=true
+      - SITE_URL=https://viewer.yourcompany.com
+      - SITE_NAME=Your Company 3D Viewer
+      - ALLOWED_DOMAINS=assets.yourcompany.com
+      - FRAME_ANCESTORS='self' https://yourcompany.com
+    volumes:
+      - ./archives:/usr/share/nginx/html/archives:rw
+      - ./thumbs/default.jpg:/usr/share/nginx/html/thumbs/default.jpg:ro
+```
 
 ## Nginx Configuration
 
@@ -502,7 +596,7 @@ docker run -e KIOSK_LOCK=true \
 /archives/client-name/scan.a3d                              (bad — guessable)
 ```
 
-**Threat model:** Archives are served as static files. Anyone who knows the direct URL can download the raw `.a3d` file regardless of viewer UI restrictions. The lockdown controls the **UI experience** only. For true per-file access control, use non-guessable UUID paths. If stronger access control is needed (time-limited access, per-user authentication), a backend signing service would be required — see the [Future: Admin Panel](#future-admin-panel) section on presigned R2 URLs.
+**Threat model:** Archives are served as static files. Anyone who knows the direct URL can download the raw `.a3d` file regardless of viewer UI restrictions. The lockdown controls the **UI experience** only. For true per-file access control, use non-guessable UUID paths. If stronger access control is needed (time-limited access, per-user authentication), consider signed URLs with expiry or UUID aliasing — see the [Admin Panel](#admin-panel) section.
 
 When all kiosk embed env vars are unset, the viewer behaves exactly as before (zero breaking changes).
 

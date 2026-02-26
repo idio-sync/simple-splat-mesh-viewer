@@ -6,11 +6,12 @@
 # preview thumbnails into sidecar files for the meta-server.
 #
 # Usage:
-#   ./extract-meta.sh [archives-dir] [output-root]
+#   ./extract-meta.sh [archives-dir] [output-root] [single-file]
 #
 # Defaults:
 #   archives-dir:  /usr/share/nginx/html (scans recursively)
 #   output-root:   /usr/share/nginx/html
+#   single-file:   (optional) Process only this specific file
 #
 # Output:
 #   {output-root}/meta/{hash}.json    — metadata sidecar
@@ -22,6 +23,7 @@ set -e
 
 ARCHIVES_DIR="${1:-/usr/share/nginx/html}"
 OUTPUT_ROOT="${2:-/usr/share/nginx/html}"
+SINGLE_FILE="${3:-}"
 META_DIR="$OUTPUT_ROOT/meta"
 THUMBS_DIR="$OUTPUT_ROOT/thumbs"
 
@@ -126,12 +128,27 @@ with open(sys.argv[5], 'w') as f:
 
 # --- Main ---
 
-echo "[extract-meta] Scanning $ARCHIVES_DIR for .a3d/.a3z files..."
+if [ -n "$SINGLE_FILE" ]; then
+    # Single-file mode: process one specific file (used by admin upload)
+    if [ -f "$SINGLE_FILE" ]; then
+        echo "[extract-meta] Processing single file: $SINGLE_FILE"
+        # Force re-extraction by removing existing sidecar
+        rel_url=$(relative_url "$SINGLE_FILE")
+        hash=$(archive_hash "$rel_url")
+        rm -f "$META_DIR/$hash.json"
+        process_archive "$SINGLE_FILE"
+    else
+        echo "[extract-meta] File not found: $SINGLE_FILE"
+    fi
+else
+    # Batch mode: scan directory recursively
+    echo "[extract-meta] Scanning $ARCHIVES_DIR for .a3d/.a3z files..."
 
-count=0
-find "$ARCHIVES_DIR" -type f \( -name "*.a3d" -o -name "*.a3z" \) | while read -r archive; do
-    process_archive "$archive"
-    count=$((count + 1))
-done
+    count=0
+    find "$ARCHIVES_DIR" -type f \( -name "*.a3d" -o -name "*.a3z" \) | while read -r archive; do
+        process_archive "$archive"
+        count=$((count + 1))
+    done
+fi
 
 echo "[extract-meta] Done."

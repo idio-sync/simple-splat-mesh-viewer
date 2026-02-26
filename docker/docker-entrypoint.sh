@@ -49,6 +49,64 @@ else
     echo "  EMBED_REFERERS: off (all referers allowed)"
 fi
 
+# Initialize conditional includes as empty (populated below if applicable)
+: > /etc/nginx/conf.d/view-proxy.conf.inc
+
+# --- Admin panel support ---
+
+if [ "${ADMIN_ENABLED}" = "true" ]; then
+    echo ""
+    echo "Admin panel: ENABLED"
+
+    if [ -z "${ADMIN_PASS}" ]; then
+        echo "ERROR: ADMIN_PASS is required when ADMIN_ENABLED=true"
+        exit 1
+    fi
+
+    # Generate htpasswd file using openssl (available in Alpine)
+    printf "%s:%s\n" "${ADMIN_USER:-admin}" "$(openssl passwd -apr1 "${ADMIN_PASS}")" > /etc/nginx/.htpasswd
+    echo "  ADMIN_USER: ${ADMIN_USER:-admin}"
+    echo "  MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-1024}MB"
+
+    # Generate admin nginx config snippet
+    cat > /etc/nginx/conf.d/admin-auth.conf.inc <<ADMINEOF
+# Admin panel — proxied to meta-server, protected by basic auth
+location /admin {
+    auth_basic "Vitrine3D Admin";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+    proxy_pass http://127.0.0.1:3001;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+}
+
+# API routes — proxied to meta-server, protected by basic auth
+location /api/ {
+    auth_basic "Vitrine3D Admin";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+    proxy_pass http://127.0.0.1:3001;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+
+    # Large upload support
+    client_max_body_size ${MAX_UPLOAD_SIZE:-1024}m;
+    proxy_request_buffering off;
+    proxy_read_timeout 600s;
+    proxy_send_timeout 600s;
+}
+ADMINEOF
+
+    # Check archives directory is writable
+    if [ ! -w "/usr/share/nginx/html/archives/" ]; then
+        echo "  WARNING: /usr/share/nginx/html/archives/ is not writable."
+        echo "  Mount with :rw for upload/delete/rename to work."
+    fi
+else
+    : > /etc/nginx/conf.d/admin-auth.conf.inc
+    echo ""
+    echo "Admin panel: disabled (set ADMIN_ENABLED=true to enable)"
+fi
+
 # --- OG/oEmbed link preview support ---
 
 if [ "${OG_ENABLED}" = "true" ]; then
@@ -110,16 +168,6 @@ location /__og_bot_proxy {
 }
 OEMBEDEOF
 
-    # Start the meta-server as a background process
-    SITE_NAME="${SITE_NAME}" \
-    SITE_URL="${SITE_URL}" \
-    SITE_DESCRIPTION="${SITE_DESCRIPTION}" \
-    OEMBED_WIDTH="${OEMBED_WIDTH}" \
-    OEMBED_HEIGHT="${OEMBED_HEIGHT}" \
-    node /opt/meta-server.js &
-
-    echo ""
-    echo "Meta-server started on port 3001"
 else
     # OG disabled — generate plain root location and empty oEmbed include
     cat > /etc/nginx/conf.d/og-location-root.conf.inc <<'ROOTEOF'
@@ -130,6 +178,34 @@ ROOTEOF
     : > /etc/nginx/conf.d/og-oembed.conf.inc
     echo ""
     echo "OG/oEmbed link previews: disabled (set OG_ENABLED=true to enable)"
+fi
+
+# --- Start meta-server if any feature needs it ---
+
+if [ "${OG_ENABLED}" = "true" ] || [ "${ADMIN_ENABLED}" = "true" ]; then
+    # Generate clean archive URL proxy: /view/{hash} → meta-server
+    cat > /etc/nginx/conf.d/view-proxy.conf.inc <<'VIEWEOF'
+location ~ ^/view/[a-f0-9]{16}$ {
+    proxy_pass http://127.0.0.1:3001;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+VIEWEOF
+    echo "  Clean URLs: /view/{hash} enabled"
+
+    SITE_NAME="${SITE_NAME}" \
+    SITE_URL="${SITE_URL}" \
+    SITE_DESCRIPTION="${SITE_DESCRIPTION}" \
+    OEMBED_WIDTH="${OEMBED_WIDTH}" \
+    OEMBED_HEIGHT="${OEMBED_HEIGHT}" \
+    ADMIN_ENABLED="${ADMIN_ENABLED}" \
+    MAX_UPLOAD_SIZE="${MAX_UPLOAD_SIZE:-1024}" \
+    DEFAULT_KIOSK_THEME="${DEFAULT_KIOSK_THEME}" \
+    node /opt/meta-server.js &
+
+    echo ""
+    echo "Meta-server started on port 3001"
 fi
 
 # Execute the main command
