@@ -25,7 +25,12 @@ Powered by [Three.js](https://github.com/mrdoob/three.js/) and [Spark](https://s
 - **Kiosk themes** — customizable color palettes and layouts via self-contained theme packages
 - **Lazy archive loading** — only the manifest is decompressed on open; individual assets load on demand
 - **SIP compliance validation** — required/recommended field checking, compliance scoring, and manifest audit trail at export time
-- **Docker deployment** with environment-variable configuration and kiosk mode support
+- **Library panel** — built-in archive browser in the viewer when admin is enabled: gallery view, detail pane, upload, rename, delete, and direct-to-editor loading
+- **Admin panel** (`/admin`) — standalone archive management page with the same upload/rename/delete capabilities
+- **Share dialog** — generate customized share links, embed codes, and QR codes with preset modes (kiosk, minimal, editor) and theme selection
+- **Clean archive URLs** — shareable `/view/{hash}` URLs that load archives in kiosk mode without query parameters
+- **Social link previews** — Open Graph, Twitter Card, and oEmbed support for rich previews when sharing viewer URLs on Slack, Discord, Twitter, WordPress, etc.
+- **Docker deployment** with environment-variable configuration, kiosk mode support, and optional admin/library features
 - **Digital preservation metadata** aligned with Dublin Core, PRONOM, and Smithsonian EDAN standards
 
 ## Quick Start
@@ -99,7 +104,7 @@ docker run -p 8080:80 \
 | [Archive Format](docs/archive/ARCHIVE-GUIDE.md) | Container structure, manifest schema, loading/exporting, preservation |
 | [Metadata Editor](docs/archive/METADATA.md) | 8-tab editor, field validation, Dublin Core alignment |
 | [Kiosk Viewer](docs/KIOSK-VIEWER.md) | Display only view for presentation |
-| [Deployment](docs/DEPLOYMENT.md) | Docker env vars, compose, nginx, production setup |
+| [Deployment](docs/DEPLOYMENT.md) | Docker env vars, compose, nginx, admin/library, clean URLs, link previews |
 | [Architecture](docs/reference/ARCHITECTURE.md) | Codebase structure and module relationships |
 | [Specification](docs/archive/SPECIFICATION.md) | Formal archive-3d container format spec |
 | [Roadmap](docs/ROADMAP.md) | Planned features and priorities |

@@ -56,10 +56,11 @@ docker compose up -d
 | `SHOW_CONTROLS` | `true` | Show/hide the controls panel |
 | `LOD_BUDGET_SD` | `1000000` | Splat LOD budget (max splats per frame) for SD quality tier |
 | `LOD_BUDGET_HD` | `5000000` | Splat LOD budget (max splats per frame) for HD quality tier |
-| `ADMIN_ENABLED` | `false` | Enable admin panel at `/admin` |
+| `ADMIN_ENABLED` | `false` | Enable admin panel and library. See [Admin Panel](#admin-panel) and [Library Panel](#library-panel) |
 | `ADMIN_USER` | `admin` | Admin basic auth username |
 | `ADMIN_PASS` | _(empty)_ | Admin basic auth password (required when ADMIN_ENABLED=true) |
 | `MAX_UPLOAD_SIZE` | `1024` | Maximum upload size in MB |
+| `DEFAULT_KIOSK_THEME` | _(empty)_ | Default theme for clean URL kiosk views (e.g., `editorial`). See [Clean Archive URLs](#clean-archive-urls) |
 
 ### 3. Docker Compose
 
@@ -347,7 +348,7 @@ volumes:
 
 ## Admin Panel
 
-The container includes an optional admin panel at `/admin` for browser-based archive management: upload, delete, rename, and a gallery view. Protected by HTTP basic auth.
+The container includes an optional admin panel at `/admin` for browser-based archive management: upload, delete, rename, and a gallery view. Protected by HTTP basic auth. Enabling the admin panel also activates the [Library Panel](#library-panel) inside the main viewer.
 
 ### Enabling the Admin Panel
 
@@ -426,6 +427,91 @@ curl -u admin:your-secure-password -X PATCH \
   -d '{"filename":"new-name.a3d"}' \
   https://viewer.yourcompany.com/api/archives/a1b2c3d4e5f6g7h8
 ```
+
+## Library Panel
+
+When `ADMIN_ENABLED=true`, the main viewer app gains a built-in **Library panel** — an archive browser integrated directly into the 3D viewer's tool rail. This is separate from the standalone admin page at `/admin` and provides a more seamless workflow for managing archives without leaving the viewer.
+
+### How It Works
+
+- The logo button in the left tool rail becomes a **Library** button
+- Clicking it switches the viewport to a gallery view of all archives on the server
+- Archives are displayed as cards with thumbnails, titles, sizes, and dates
+- A detail pane on the right shows asset contents and metadata field coverage
+- Sorting by name, date, or size is supported
+
+### Actions
+
+| Action | Description |
+|--------|-------------|
+| **Single-click** | Select an archive to view its details |
+| **Double-click** | Open the archive in the current editor session |
+| **Open** | Load the selected archive in the editor |
+| **View** | Open the archive in a new tab (kiosk mode via clean URL) |
+| **Share** | Open the share dialog with the archive's URL pre-filled |
+| **Copy URL** | Copy the archive's viewer URL to clipboard |
+| **Rename** | Rename the archive file on the server |
+| **Delete** | Permanently delete the archive and its sidecar files |
+
+### Upload
+
+The Library panel includes a drag-and-drop upload zone at the bottom. Drop `.a3d`/`.a3z` files or click to browse. Uploads show real-time progress and automatically extract metadata and thumbnails on completion.
+
+### Authentication
+
+The Library panel uses the same HTTP Basic Auth credentials as the admin panel (`ADMIN_USER`/`ADMIN_PASS`). On first access, if the API returns 401, a login form is displayed. Credentials are stored in memory for the session (not persisted).
+
+### Save to Library
+
+When `ADMIN_ENABLED=true`, a **Save to Library** button appears in the export panel. This uploads the current archive directly to the server's archive directory after export, without requiring a separate upload step.
+
+### Relationship to Admin Panel
+
+| Feature | Admin Page (`/admin`) | Library Panel (viewer) |
+|---------|----------------------|----------------------|
+| URL | `/admin` | Main viewer, Library tool button |
+| Authentication | nginx basic auth prompt | In-app login form |
+| Archive gallery | Standalone HTML page | Integrated into viewport |
+| Upload | Drag-and-drop | Drag-and-drop |
+| Share dialog | Built-in | Built-in (with QR codes) |
+| 3D preview | Opens in new tab | Double-click to load in editor |
+| API used | Same `/api/archives` REST API | Same `/api/archives` REST API |
+
+Both interfaces use the same backend API and the same credentials. Choose whichever fits your workflow — the admin page for dedicated management, or the Library panel for quick access while working in the editor.
+
+## Clean Archive URLs
+
+When the meta-server is running (`OG_ENABLED=true` or `ADMIN_ENABLED=true`), archives can be accessed via clean URLs without query parameters:
+
+```
+https://viewer.yourcompany.com/view/a1b2c3d4e5f6g7h8
+```
+
+The 16-character hex hash is a truncated SHA-256 of the archive's URL path (e.g., `/archives/scan.a3d`). The meta-server resolves this hash to the actual archive file and serves `index.html` with the archive configuration injected server-side.
+
+### Benefits
+
+- **Shorter, cleaner URLs** — no `?archive=` query parameter visible
+- **Better for sharing** — simpler to paste into chat, email, or social media
+- **Kiosk mode by default** — clean URLs automatically use kiosk mode with `autoload=false` (click-to-load poster)
+- **Theme support** — set `DEFAULT_KIOSK_THEME` to apply a default theme to all clean URL views
+
+### How It Works
+
+1. nginx proxies `/view/{hash}` requests to the meta-server
+2. The meta-server looks up the archive by hash (via sidecar metadata or directory scan)
+3. It serves `index.html` with a `<script>` tag injecting `window.__VITRINE_CLEAN_URL` containing the archive path, kiosk mode flag, and theme
+4. `config.js` reads this injection and configures the viewer automatically
+
+### Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DEFAULT_KIOSK_THEME` | _(empty)_ | Theme applied to all clean URL views (e.g., `editorial`, `museum`, `technical`) |
+
+### Share Dialog Integration
+
+The share dialog in both the Library panel and the main viewer generates clean URLs automatically when sharing in kiosk mode. If the archive has a known hash (from the library), the share URL uses `/view/{hash}` format. The dialog also generates QR codes and embed snippets using these clean URLs.
 
 ### Combined Deployment (Admin + OG + Kiosk Security)
 

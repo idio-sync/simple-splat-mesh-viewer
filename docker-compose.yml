@@ -10,13 +10,47 @@ services:
     ports:
       - "${PORT:-80}:80"
     environment:
+      # Content defaults
       - DEFAULT_ARCHIVE_URL=${DEFAULT_ARCHIVE_URL:-}
       - DEFAULT_SPLAT_URL=${DEFAULT_SPLAT_URL:-}
       - DEFAULT_MODEL_URL=${DEFAULT_MODEL_URL:-}
       - DEFAULT_POINTCLOUD_URL=${DEFAULT_POINTCLOUD_URL:-}
       - SHOW_CONTROLS=${SHOW_CONTROLS:-true}
+
+      # Security
       - ALLOWED_DOMAINS=${ALLOWED_DOMAINS:-}
       - FRAME_ANCESTORS=${FRAME_ANCESTORS:-'self'}
+
+      # Kiosk embed security (optional — see docs/DEPLOYMENT.md#kiosk-embed-security)
+      # - KIOSK_LOCK=true
+      # - ARCHIVE_PATH_PREFIX=/archives/
+      # - EMBED_REFERERS=client.com *.client.com
+
+      # Rendering
+      # - LOD_BUDGET_SD=1000000
+      # - LOD_BUDGET_HD=5000000
+
+      # Admin panel + Library (optional — see docs/DEPLOYMENT.md#admin-panel)
+      - ADMIN_ENABLED=${ADMIN_ENABLED:-false}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASS=${ADMIN_PASS:-}
+      - MAX_UPLOAD_SIZE=${MAX_UPLOAD_SIZE:-1024}
+
+      # Social link previews / oEmbed (optional — see docs/DEPLOYMENT.md#social-link-previews--oembed)
+      - OG_ENABLED=${OG_ENABLED:-false}
+      - SITE_URL=${SITE_URL:-}
+      - SITE_NAME=${SITE_NAME:-Vitrine3D}
+      - SITE_DESCRIPTION=${SITE_DESCRIPTION:-Interactive 3D viewer}
+      # - OEMBED_WIDTH=960
+      # - OEMBED_HEIGHT=540
+
+      # Clean URL defaults (optional — see docs/DEPLOYMENT.md#clean-archive-urls)
+      # - DEFAULT_KIOSK_THEME=editorial
+    volumes:
+      # Mount archives directory (use :rw when ADMIN_ENABLED=true for upload/delete/rename)
+      - ./archives:/usr/share/nginx/html/archives:ro
+      # Mount a default thumbnail for link previews (optional)
+      # - ./thumbs/default.jpg:/usr/share/nginx/html/thumbs/default.jpg:ro
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
       interval: 30s
