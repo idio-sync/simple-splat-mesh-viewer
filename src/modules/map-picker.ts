@@ -101,9 +101,10 @@ export function openMapPicker(options: MapPickerOptions): void {
     let pickedName: string | undefined;
 
     // Default center: provided coords, or world view
-    const defaultLat = lat || 40;
-    const defaultLon = lon || 0;
-    const defaultZoom = (lat && lon) ? 14 : 2;
+    const hasCoords = lat !== undefined && lon !== undefined;
+    const defaultLat = lat ?? 40;
+    const defaultLon = lon ?? 0;
+    const defaultZoom = hasCoords ? 14 : 2;
 
     // Create or reset map
     if (map) {
@@ -126,7 +127,7 @@ export function openMapPicker(options: MapPickerOptions): void {
         }).addTo(map);
 
         // Place initial marker if coordinates provided
-        if (lat && lon) {
+        if (hasCoords) {
             marker = L.marker([lat, lon], { draggable: true }).addTo(map);
             updateCoordDisplay(lat, lon);
             setupMarkerDrag();
