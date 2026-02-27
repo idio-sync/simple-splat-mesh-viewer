@@ -142,7 +142,7 @@
     const viewMode = params.get('mode') || (kioskMode ? 'both' : 'model'); // splat, model, pointcloud, both, split
     const toolbarMode = kioskMode ? 'show' : (params.get('toolbar') || 'show'); // show, hide
     const sidebarMode = kioskMode ? 'closed' : (params.get('sidebar') || 'closed'); // closed, view, edit
-    const themeName = params.get('theme') || _inj.theme || '';
+    const themeName = params.get('theme') || _inj.theme || (kioskMode ? 'editorial' : '');
     const layoutStyle = params.get('layout') || ''; // optional override; theme provides default
     const autoload = params.has('autoload') ? params.get('autoload') !== 'false' : (_inj.autoload !== undefined ? _inj.autoload : true);
 

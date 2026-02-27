@@ -857,7 +857,7 @@ function handleViewArchive(req, res, hash) {
 
     const archiveUrl = '/archives/' + archive.filename;
     const inject = { archive: archiveUrl, kiosk: true, autoload: false };
-    if (DEFAULT_KIOSK_THEME) inject.theme = DEFAULT_KIOSK_THEME;
+    inject.theme = DEFAULT_KIOSK_THEME || 'editorial';
     const injectTag = '<script>window.__VITRINE_CLEAN_URL=' + JSON.stringify(inject) + ';</script>\n';
 
     // Insert <base href="/"> so relative asset paths resolve from root (Vite uses base: './')
@@ -892,7 +892,7 @@ function handleViewArchiveByUuid(req, res, uuid) {
 
     const archiveUrl = '/archives/' + archive.filename;
     const inject = { archive: archiveUrl, kiosk: true, autoload: false };
-    if (DEFAULT_KIOSK_THEME) inject.theme = DEFAULT_KIOSK_THEME;
+    inject.theme = DEFAULT_KIOSK_THEME || 'editorial';
     const injectTag = '<script>window.__VITRINE_CLEAN_URL=' + JSON.stringify(inject) + ';</script>\n';
 
     let html = indexHtml.replace(/<head>/i, '<head>\n<base href="/">');
