@@ -402,8 +402,13 @@ export class ArchiveLoader {
         this._switchingToBuffer = (async () => {
             if (!this._bulkReadFn) return;
             log.info('Switching from IPC to in-memory mode for large file extraction');
-            this._rawData = await this._bulkReadFn();
-            this._fileSize = this._rawData.length;
+            const data = await this._bulkReadFn();
+            // Use Blob (not _rawData) so reads go through Blob.slice() → isolated
+            // ArrayBuffers at offset 0. The _rawData.subarray() path returns views
+            // with non-zero byteOffset which can cause silent corruption if any
+            // downstream consumer (fflate, WASM) accesses .buffer directly.
+            this._file = new Blob([data]);
+            this._fileSize = data.length;
             this._ipcReadFn = null;
             this._bulkReadFn = null;
             if (this._ipcCloseFn) {
