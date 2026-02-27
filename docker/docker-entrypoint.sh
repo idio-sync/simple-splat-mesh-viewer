@@ -153,11 +153,6 @@ if [ "${OG_ENABLED}" = "true" ]; then
         echo "  Mount a default.jpg to /usr/share/nginx/html/thumbs/default.jpg for fallback previews"
     fi
 
-    # Auto-extract metadata from archives on startup
-    echo ""
-    echo "Extracting metadata from archives..."
-    /opt/extract-meta.sh /usr/share/nginx/html /usr/share/nginx/html
-
     # Generate root location with bot detection
     # Uses rewrite to internal location (safe nginx pattern — avoids proxy_pass inside if)
     cat > /etc/nginx/conf.d/og-location-root.conf.inc <<'ROOTEOF'
@@ -205,6 +200,11 @@ fi
 # --- Start meta-server if any feature needs it ---
 
 if [ "${OG_ENABLED}" = "true" ] || [ "${ADMIN_ENABLED}" = "true" ]; then
+    # Auto-extract metadata from archives on startup
+    echo ""
+    echo "Extracting metadata from archives..."
+    /opt/extract-meta.sh /usr/share/nginx/html /usr/share/nginx/html
+
     # Generate clean archive URL proxy: /view/{hash} → meta-server
     cat > /etc/nginx/conf.d/view-proxy.conf.inc <<'VIEWEOF'
 location ~ "^/view/[a-f0-9]{16}$" {
