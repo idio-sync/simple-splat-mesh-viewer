@@ -429,6 +429,16 @@ body.kiosk-mode.kiosk-editorial .editorial-material-divider {
     margin: 3px 10px;
 }
 
+/* --- Overflow menu — tools dropdown for compact viewports --- */
+
+body.kiosk-mode.kiosk-editorial .editorial-overflow-btn {
+    display: none; /* hidden at full size */
+}
+
+body.kiosk-mode.kiosk-editorial .editorial-ribbon-overflow {
+    display: contents; /* children render inline in parent flex at full size */
+}
+
 /* --- FOV Camera popover --- */
 
 body.kiosk-mode.kiosk-editorial .editorial-fov-wrapper {
@@ -2421,27 +2431,95 @@ body.kiosk-mode.kiosk-editorial .editorial-slice-btn.active {
 
 @media (max-width: 1023px) {
     html:has(body.kiosk-mode.kiosk-editorial) {
-        font-size: 112%;
+        font-size: 106%;
     }
 
+    /* Title block — tighter */
     body.kiosk-mode.kiosk-editorial .editorial-title-block {
-        padding: 20px 32px 14px 18px;
+        padding: 16px 24px 12px 16px;
     }
 
     body.kiosk-mode.kiosk-editorial .editorial-title-block h1 {
-        font-size: 1.25rem;
+        font-size: 1.15rem;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-title-meta {
+        font-size: 0.6rem;
+    }
+
+    /* Ribbon — aggressively compact */
+    body.kiosk-mode.kiosk-editorial .editorial-bottom-ribbon {
+        padding: 0 10px;
     }
 
     body.kiosk-mode.kiosk-editorial .editorial-view-modes {
-        gap: 12px;
+        gap: 8px;
     }
 
-    body.kiosk-mode.kiosk-editorial .editorial-bottom-ribbon {
-        padding: 0 16px;
+    body.kiosk-mode.kiosk-editorial .editorial-view-mode-link,
+    body.kiosk-mode.kiosk-editorial .quality-toggle-btn {
+        font-size: 0.62rem;
+        letter-spacing: 0.03em;
     }
 
+    body.kiosk-mode.kiosk-editorial .editorial-ribbon-rule {
+        margin: 0 8px;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-ribbon-logo + .editorial-ribbon-rule {
+        margin: 0 6px 0 8px;
+    }
+
+    /* Hide annotation sequence chain — too wide for compact ribbon */
+    body.kiosk-mode.kiosk-editorial .editorial-anno-sequence {
+        display: none;
+    }
+
+    /* Overflow menu — show button, tools become dropdown */
+    body.kiosk-mode.kiosk-editorial .editorial-overflow-btn {
+        display: flex;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-ribbon-tools {
+        position: relative;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-ribbon-overflow {
+        display: none;
+        position: absolute;
+        bottom: calc(100% + 8px);
+        right: 0;
+        background: rgba(var(--kiosk-surface-rgb), 0.95);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--kiosk-border-subtle);
+        border-radius: 6px;
+        padding: 6px;
+        gap: 2px;
+        z-index: 200;
+        min-width: 36px;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-ribbon-overflow.open {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        animation: editorialDropdownIn 0.15s ease-out;
+    }
+
+    /* Hide viz rule separators inside overflow — not needed in dropdown */
+    body.kiosk-mode.kiosk-editorial .editorial-ribbon-overflow .editorial-ribbon-rule {
+        display: none;
+    }
+
+    /* Ribbon logo — smaller */
+    body.kiosk-mode.kiosk-editorial .editorial-ribbon-logo {
+        height: 12px;
+    }
+
+    /* Info panel — tighter min-width */
     body.kiosk-mode.kiosk-editorial .editorial-panel-inner {
-        min-width: 360px;
+        min-width: 340px;
     }
 
     body.kiosk-mode.kiosk-editorial #annotation-info-popup {

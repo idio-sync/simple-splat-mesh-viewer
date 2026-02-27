@@ -1319,6 +1319,35 @@ export function setup(manifest, deps) {
     fovWrapper.appendChild(fovDropdown);
     toolsGroup.appendChild(fovWrapper);
 
+    // --- Overflow menu for compact viewports ---
+    // At full width: panel uses display:contents so tools render inline in toolsGroup.
+    // At compact width (≤1023px via CSS): panel becomes a dropdown, overflow button visible.
+    const overflowBtn = document.createElement('button');
+    overflowBtn.className = 'editorial-marker-toggle editorial-overflow-btn';
+    overflowBtn.title = 'More tools';
+    overflowBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>';
+
+    const overflowPanel = document.createElement('div');
+    overflowPanel.className = 'editorial-ribbon-overflow';
+
+    // Move advanced/visualization tools into overflow panel (appendChild moves existing DOM nodes)
+    if (sliceWrapper && sliceWrapper.parentNode === toolsGroup) overflowPanel.appendChild(sliceWrapper);
+    if (measureWrapper && measureWrapper.parentNode === toolsGroup) overflowPanel.appendChild(measureWrapper);
+    overflowPanel.appendChild(vizRule);
+    overflowPanel.appendChild(textureToggle);
+    overflowPanel.appendChild(materialWrapper);
+    overflowPanel.appendChild(fovWrapper);
+
+    overflowBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        overflowPanel.classList.toggle('open');
+    });
+    document.addEventListener('click', () => overflowPanel.classList.remove('open'));
+    overflowPanel.addEventListener('click', (e) => e.stopPropagation());
+
+    toolsGroup.appendChild(overflowBtn);
+    toolsGroup.appendChild(overflowPanel);
+
     // Fullscreen button — appended next to logo on far right
     let fsBtn = null;
     if (document.fullscreenEnabled) {
