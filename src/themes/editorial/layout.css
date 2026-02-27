@@ -1770,6 +1770,7 @@ body.kiosk-mode.kiosk-editorial .editorial-loading-center {
     justify-content: center;
     gap: 16px;
     z-index: 1;
+    padding-bottom: 64px; /* clearance for absolute-positioned .editorial-loading-bottom */
 }
 
 body.kiosk-mode.kiosk-editorial .editorial-loading-eyebrow {
@@ -2718,8 +2719,22 @@ body.kiosk-mode.kiosk-editorial .editorial-slice-btn.active {
         margin: 6px auto;
     }
 
+    body.kiosk-mode.kiosk-editorial .editorial-loading-center {
+        padding-bottom: 52px;
+        gap: 10px;
+    }
+
     body.kiosk-mode.kiosk-editorial .editorial-loading-bottom {
-        padding: 0 16px 12px;
+        padding: 0 16px 10px;
+        gap: 4px;
+    }
+
+    body.kiosk-mode.kiosk-editorial #loading-text {
+        font-size: 0.6rem;
+    }
+
+    body.kiosk-mode.kiosk-editorial #loading-progress-text {
+        font-size: 0.55rem;
     }
 
     body.kiosk-mode.kiosk-editorial .editorial-loading-logo {
@@ -2812,7 +2827,25 @@ body.kiosk-mode.kiosk-editorial .editorial-slice-btn.active {
     }
 
     body.kiosk-mode.kiosk-editorial .editorial-loading-center {
-        gap: 10px;
+        padding-bottom: 40px;
+        gap: 8px;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-loading-bottom {
+        padding: 0 12px 8px;
+        gap: 3px;
+    }
+
+    body.kiosk-mode.kiosk-editorial #loading-text {
+        font-size: 0.55rem;
+    }
+
+    body.kiosk-mode.kiosk-editorial #loading-progress-text {
+        font-size: 0.5rem;
+    }
+
+    body.kiosk-mode.kiosk-editorial #loading-progress-container {
+        max-width: 200px;
     }
 
     /* Gate screen — minimal */
