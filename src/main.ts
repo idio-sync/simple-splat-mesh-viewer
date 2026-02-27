@@ -406,8 +406,8 @@ function createFileHandlerDeps(): any {
                 updatePronomRegistry(state);
             },
             onModelLoaded: (object: any, file: any, faceCount: number) => {
-                // Detect mesh format from filename
-                const meshName = file?.name || '';
+                // Detect mesh format — prefer _meshFileName (set by loadModelFromFile for GLB conversions)
+                const meshName = state._meshFileName || file?.name || '';
                 const meshExt = meshName.split('.').pop()?.toLowerCase() || 'glb';
                 state.meshFormat = meshExt;
                 // Auto-switch display mode to show the newly loaded model

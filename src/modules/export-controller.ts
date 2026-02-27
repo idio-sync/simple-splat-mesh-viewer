@@ -277,7 +277,7 @@ async function prepareArchive(deps: ExportDeps): Promise<PreparedArchive | null>
         }
     }
     if (includeModel && assets.meshBlob && state.modelLoaded) {
-        const fileName = document.getElementById('model-filename')?.textContent || 'mesh.glb';
+        const fileName = state._meshFileName || document.getElementById('model-filename')?.textContent || 'mesh.glb';
         const position = modelGroup ? [modelGroup.position.x, modelGroup.position.y, modelGroup.position.z] : [0, 0, 0];
         const rotation = modelGroup ? [modelGroup.rotation.x, modelGroup.rotation.y, modelGroup.rotation.z] : [0, 0, 0];
         const scale: [number, number, number] = modelGroup ? [modelGroup.scale.x, modelGroup.scale.y, modelGroup.scale.z] : [1, 1, 1];

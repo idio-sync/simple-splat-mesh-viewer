@@ -265,9 +265,19 @@ export async function handleModelFile(event: Event, deps: FileInputDeps) {
     const files = (event.target as HTMLInputElement).files;
     if (!files.length) return;
 
-    const mainFile = files[0];
-    document.getElementById('model-filename').textContent = mainFile.name;
-    deps.showLoading('Loading 3D Model...');
+    // Determine display name — show part count for multi-OBJ selections
+    const fileArray = Array.from(files);
+    const objFiles = fileArray.filter(f => f.name.toLowerCase().endsWith('.obj'));
+    const companionExts = new Set(['mtl', 'png', 'jpg', 'jpeg', 'tga', 'bmp', 'webp']);
+    const displayName = objFiles.length > 1
+        ? `${objFiles.length} OBJ parts`
+        : (fileArray.find(f => {
+            const ext = f.name.split('.').pop()?.toLowerCase() || '';
+            return !companionExts.has(ext);
+          }) || fileArray[0]).name;
+
+    document.getElementById('model-filename').textContent = displayName;
+    deps.showLoading(objFiles.length > 1 ? `Loading ${objFiles.length} OBJ parts...` : 'Loading 3D Model...');
 
     try {
         await loadModelFromFileHandler(files, deps.createFileHandlerDeps());

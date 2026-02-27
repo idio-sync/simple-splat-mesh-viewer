@@ -15,6 +15,7 @@ import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { SplatMesh } from '@sparkjsdev/spark';
 import { ArchiveLoader } from './archive-loader.js';
@@ -450,17 +451,55 @@ export function loadGLTF(source: File | string, onProgress?: (loaded: number, to
 }
 
 /**
- * Load OBJ model (with optional MTL)
+ * Texture file extensions recognized when loading OBJ companions.
  */
-export function loadOBJ(objFile: File, mtlFile: File | null): Promise<THREE.Group> {
+const TEXTURE_EXTS = new Set(['png', 'jpg', 'jpeg', 'tga', 'bmp', 'webp']);
+
+/**
+ * Load OBJ model with optional MTL and texture files.
+ * When textureFiles are provided, a LoadingManager URL modifier maps
+ * texture filenames referenced in the MTL to blob URLs so they resolve correctly.
+ */
+export function loadOBJ(objFile: File, mtlFile: File | null, textureFiles?: File[]): Promise<THREE.Group> {
     const objUrl = URL.createObjectURL(objFile);
 
+    // Build blob URL map for textures so MTLLoader can resolve them
+    const textureBlobMap = new Map<string, string>();
+    const cleanupUrls: string[] = [];
+    if (textureFiles && textureFiles.length > 0) {
+        for (const file of textureFiles) {
+            const blobUrl = URL.createObjectURL(file);
+            textureBlobMap.set(file.name.toLowerCase(), blobUrl);
+            cleanupUrls.push(blobUrl);
+        }
+    }
+
+    const hasTextures = textureBlobMap.size > 0;
+
+    // Custom LoadingManager to redirect texture path lookups to blob URLs
+    const manager = new THREE.LoadingManager();
+    if (hasTextures) {
+        manager.setURLModifier((url: string) => {
+            const filename = url.split(/[/\\]/).pop()?.toLowerCase() || '';
+            const mapped = textureBlobMap.get(filename);
+            if (mapped) {
+                log.info(`Texture resolved: ${filename}`);
+                return mapped;
+            }
+            return url;
+        });
+    }
+
+    const revokeAll = () => {
+        for (const url of cleanupUrls) URL.revokeObjectURL(url);
+    };
+
     return new Promise((resolve, reject) => {
-        const objLoader = new OBJLoader();
+        const objLoader = new OBJLoader(manager);
 
         if (mtlFile) {
             const mtlUrl = URL.createObjectURL(mtlFile);
-            const mtlLoader = new MTLLoader();
+            const mtlLoader = new MTLLoader(manager);
 
             mtlLoader.load(
                 mtlUrl,
@@ -473,13 +512,20 @@ export function loadOBJ(objFile: File, mtlFile: File | null): Promise<THREE.Grou
                         (object) => {
                             URL.revokeObjectURL(objUrl);
                             URL.revokeObjectURL(mtlUrl);
-                            processMeshMaterials(object, { forceDefaultMaterial: true, preserveTextures: true });
+                            // Preserve textures when MTL loaded them; only force default if no textures
+                            processMeshMaterials(object, {
+                                forceDefaultMaterial: !hasTextures,
+                                preserveTextures: true
+                            });
+                            // Delay texture blob cleanup to ensure GPU upload completes
+                            setTimeout(revokeAll, TIMING.BLOB_REVOKE_DELAY || 5000);
                             resolve(object);
                         },
                         undefined,
                         (error) => {
                             URL.revokeObjectURL(objUrl);
                             URL.revokeObjectURL(mtlUrl);
+                            revokeAll();
                             reject(error);
                         }
                     );
@@ -487,11 +533,11 @@ export function loadOBJ(objFile: File, mtlFile: File | null): Promise<THREE.Grou
                 undefined,
                 () => {
                     URL.revokeObjectURL(mtlUrl);
-                    loadOBJWithoutMaterials(objLoader, objUrl, resolve, reject);
+                    loadOBJWithoutMaterials(objLoader, objUrl, resolve, reject, revokeAll);
                 }
             );
         } else {
-            loadOBJWithoutMaterials(objLoader, objUrl, resolve, reject);
+            loadOBJWithoutMaterials(objLoader, objUrl, resolve, reject, revokeAll);
         }
     });
 }
@@ -503,21 +549,101 @@ function loadOBJWithoutMaterials(
     loader: OBJLoader,
     url: string,
     resolve: (value: THREE.Group) => void,
-    reject: (reason?: any) => void
+    reject: (reason?: any) => void,
+    cleanupFn?: () => void
 ): void {
     loader.load(
         url,
         (object) => {
             URL.revokeObjectURL(url);
             processMeshMaterials(object, { forceDefaultMaterial: true });
+            if (cleanupFn) cleanupFn();
             resolve(object);
         },
         undefined,
         (error) => {
             URL.revokeObjectURL(url);
+            if (cleanupFn) cleanupFn();
             reject(error);
         }
     );
+}
+
+/**
+ * Describes one OBJ file and its companion MTL + texture files.
+ */
+export interface OBJGroup {
+    objFile: File;
+    mtlFile: File | null;
+    textureFiles: File[];
+}
+
+/**
+ * Parse a FileList into OBJ groups — each OBJ matched with its MTL by base name.
+ * All texture images are shared across groups (MTLLoader requests only what it needs).
+ */
+export function parseMultiPartOBJ(files: File[]): OBJGroup[] {
+    const objFiles: File[] = [];
+    const mtlFiles: File[] = [];
+    const textureFiles: File[] = [];
+
+    for (const file of files) {
+        const ext = file.name.split('.').pop()?.toLowerCase() || '';
+        if (ext === 'obj') objFiles.push(file);
+        else if (ext === 'mtl') mtlFiles.push(file);
+        else if (TEXTURE_EXTS.has(ext)) textureFiles.push(file);
+    }
+
+    const groups: OBJGroup[] = [];
+
+    for (const objFile of objFiles) {
+        let matchedMtl: File | null = null;
+        const baseName = objFile.name.replace(/\.obj$/i, '').toLowerCase();
+
+        // Match by base name: part1.obj → part1.mtl
+        for (const mtl of mtlFiles) {
+            if (mtl.name.replace(/\.mtl$/i, '').toLowerCase() === baseName) {
+                matchedMtl = mtl;
+                break;
+            }
+        }
+
+        // Fallback: single OBJ + single MTL → pair them
+        if (!matchedMtl && objFiles.length === 1 && mtlFiles.length === 1) {
+            matchedMtl = mtlFiles[0];
+        }
+
+        groups.push({ objFile, mtlFile: matchedMtl, textureFiles });
+    }
+
+    return groups;
+}
+
+/**
+ * Load multiple OBJ parts into a single combined THREE.Group.
+ */
+export async function loadMultiPartOBJ(groups: OBJGroup[]): Promise<THREE.Group> {
+    const combinedGroup = new THREE.Group();
+    combinedGroup.name = 'multi_obj_combined';
+
+    for (const group of groups) {
+        const partGroup = await loadOBJ(group.objFile, group.mtlFile, group.textureFiles);
+        partGroup.name = group.objFile.name;
+        combinedGroup.add(partGroup);
+    }
+
+    log.info(`Loaded ${groups.length} OBJ parts into combined group`);
+    return combinedGroup;
+}
+
+/**
+ * Export a THREE.Object3D to a self-contained GLB Blob.
+ * Used to convert multi-part OBJ scenes into a single archivable binary.
+ */
+export async function exportToGLB(object: THREE.Object3D): Promise<Blob> {
+    const exporter = new GLTFExporter();
+    const glbBuffer = await exporter.parseAsync(object, { binary: true });
+    return new Blob([glbBuffer as ArrayBuffer], { type: 'model/gltf-binary' });
 }
 
 /**
@@ -956,11 +1082,16 @@ export async function loadDrawingFromBlobUrl(blobUrl: string, fileName: string, 
 }
 
 /**
- * Load model from a file
+ * Extensions to skip when identifying the "main" model file from a multi-file selection.
+ */
+const COMPANION_EXTS = new Set(['mtl', 'png', 'jpg', 'jpeg', 'tga', 'bmp', 'webp']);
+
+/**
+ * Load model from a file (supports multi-part OBJ with textures).
  */
 export async function loadModelFromFile(files: FileList, deps: LoadModelDeps): Promise<THREE.Object3D | undefined> {
     const { modelGroup, state, archiveCreator, callbacks } = deps;
-    const mainFile = files[0];
+    const fileArray = Array.from(files);
 
     // Clear existing model
     while (modelGroup.children.length > 0) {
@@ -969,20 +1100,24 @@ export async function loadModelFromFile(files: FileList, deps: LoadModelDeps): P
         modelGroup.remove(child);
     }
 
+    // Find the primary model file (skip companion MTL/texture files)
+    const mainFile = fileArray.find(f => {
+        const ext = f.name.split('.').pop()?.toLowerCase() || '';
+        return !COMPANION_EXTS.has(ext);
+    }) || fileArray[0];
+
     const extension = mainFile.name.split('.').pop()?.toLowerCase();
     let loadedObject: THREE.Object3D | undefined;
 
     if (extension === 'glb' || extension === 'gltf') {
         loadedObject = await loadGLTF(mainFile);
     } else if (extension === 'obj') {
-        let mtlFile: File | null = null;
-        for (const f of Array.from(files)) {
-            if (f.name.toLowerCase().endsWith('.mtl')) {
-                mtlFile = f;
-                break;
-            }
+        const groups = parseMultiPartOBJ(fileArray);
+        if (groups.length > 1) {
+            loadedObject = await loadMultiPartOBJ(groups);
+        } else if (groups.length === 1) {
+            loadedObject = await loadOBJ(groups[0].objFile, groups[0].mtlFile, groups[0].textureFiles);
         }
-        loadedObject = await loadOBJ(mainFile, mtlFile);
     } else if (extension === 'stl') {
         loadedObject = await loadSTL(mainFile);
     } else if (extension === 'drc') {
@@ -994,9 +1129,29 @@ export async function loadModelFromFile(files: FileList, deps: LoadModelDeps): P
         state.modelLoaded = true;
         state.currentModelUrl = null; // Local files cannot be shared
 
+        // For OBJ with textures or multi-part: convert to self-contained GLB for archival
+        const objGroups = extension === 'obj' ? parseMultiPartOBJ(fileArray) : [];
+        const isMultiPart = objGroups.length > 1;
+        const hasTextures = objGroups.some(g => g.textureFiles.length > 0);
+
+        let archiveBlob: Blob;
+        let archiveFileName: string;
+
+        if (isMultiPart || hasTextures) {
+            archiveBlob = await exportToGLB(loadedObject);
+            archiveFileName = mainFile.name.replace(/\.obj$/i, '_combined.glb');
+            log.info(`Converted ${objGroups.length} OBJ part(s) to GLB for archival (${(archiveBlob.size / 1024 / 1024).toFixed(1)} MB)`);
+        } else {
+            archiveBlob = mainFile;
+            archiveFileName = mainFile.name;
+        }
+
+        // Store archive-ready filename on state for export-controller
+        state._meshFileName = archiveFileName;
+
         // Pre-compute hash in background
         if (archiveCreator) {
-            archiveCreator.precomputeHash(mainFile).catch((e: Error) => {
+            archiveCreator.precomputeHash(archiveBlob).catch((e: Error) => {
                 log.warn('Background hash precompute failed:', e);
             });
         }
@@ -1004,9 +1159,9 @@ export async function loadModelFromFile(files: FileList, deps: LoadModelDeps): P
         // Count faces
         const faceCount = computeMeshFaceCount(loadedObject);
 
-        // Call callbacks
+        // Call callbacks — pass the archive blob (GLB for multi-part, original file otherwise)
         if (callbacks?.onModelLoaded) {
-            callbacks.onModelLoaded(loadedObject, mainFile, faceCount);
+            callbacks.onModelLoaded(loadedObject, archiveBlob, faceCount);
         }
     }
 
