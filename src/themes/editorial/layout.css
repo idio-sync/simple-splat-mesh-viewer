@@ -2517,9 +2517,38 @@ body.kiosk-mode.kiosk-editorial .editorial-slice-btn.active {
         height: 12px;
     }
 
-    /* Info panel — tighter min-width */
+    /* Info panel — tighter, thinner image strip, smaller text */
     body.kiosk-mode.kiosk-editorial .editorial-panel-inner {
         min-width: 340px;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-image-strip {
+        width: 28%;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-info-content {
+        padding: 20px 18px 32px 16px;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-info-title {
+        font-size: 1.05rem;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-info-header {
+        margin-bottom: 14px;
+        padding-bottom: 12px;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-info-byline {
+        font-size: 0.6rem;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-info-description {
+        font-size: 0.72rem;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-info-model-stats {
+        font-size: 0.58rem;
     }
 
     body.kiosk-mode.kiosk-editorial #annotation-info-popup {
