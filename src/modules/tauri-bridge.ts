@@ -44,6 +44,8 @@ interface TauriAPI {
     core: {
         /** Convert a filesystem path to a Tauri asset URL (https://asset.localhost/...) */
         convertFileSrc: (filePath: string, protocol?: string) => string;
+        /** Invoke a Rust command via Tauri IPC */
+        invoke: <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
     };
     path: {
         /** Resolve a path relative to the app's resource directory */
@@ -309,6 +311,38 @@ export function wireNativeFileDialogs(handlers: FileHandlers): void {
     wireInput('source-files-input', 'all', true, handlers.onSourceFiles);
     wireInput('bg-image-input', 'image', false, handlers.onBgImageFiles);
     wireInput('hdr-file-input', 'hdr', false, handlers.onHdrFiles);
+}
+
+// ============================================================
+// IPC BYTE SERVING — direct file access via Rust commands
+// ============================================================
+
+/**
+ * Open a file on disk via Rust IPC. Returns a handle ID and file size.
+ * The handle stays open until ipcCloseFile() is called.
+ */
+export async function ipcOpenFile(path: string): Promise<{ handleId: string; size: number }> {
+    const [handleId, size] = await window.__TAURI__!.core.invoke<[string, number]>(
+        'ipc_open_file', { path }
+    );
+    return { handleId, size };
+}
+
+/**
+ * Read a byte range from an open file handle via Rust IPC.
+ */
+export async function ipcReadBytes(handleId: string, offset: number, length: number): Promise<Uint8Array> {
+    const bytes = await window.__TAURI__!.core.invoke<number[]>(
+        'ipc_read_bytes', { handleId, offset, length }
+    );
+    return new Uint8Array(bytes);
+}
+
+/**
+ * Close an open file handle, releasing Rust-side resources.
+ */
+export async function ipcCloseFile(handleId: string): Promise<void> {
+    await window.__TAURI__!.core.invoke<void>('ipc_close_file', { handleId });
 }
 
 // ============================================================

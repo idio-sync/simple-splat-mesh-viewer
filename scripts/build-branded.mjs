@@ -17,6 +17,7 @@ import { join, basename, resolve, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
+import { randomBytes } from 'node:crypto';
 
 const __dirname = join(fileURLToPath(import.meta.url), '..');
 const ROOT = join(__dirname, '..');
@@ -37,18 +38,20 @@ function parseArgs() {
         if (args[i] === '--archive' && args[i + 1]) parsed.archive = args[++i];
         else if (args[i] === '--name' && args[i + 1]) parsed.name = args[++i];
         else if (args[i] === '--icon' && args[i + 1]) parsed.icon = args[++i];
+        else if (args[i] === '--encrypt') parsed.encrypt = true;
         else if (args[i] === '--help' || args[i] === '-h') {
             console.log(`
   build-branded — Build a branded Tauri executable with a bundled archive.
 
   Usage:
     node scripts/build-branded.mjs                          (interactive GUI)
-    node scripts/build-branded.mjs --archive <file> --name <name> [--icon <png>]
+    node scripts/build-branded.mjs --archive <file> --name <name> [--icon <png>] [--encrypt]
 
   Options:
     --archive <path>   Path to .a3d or .a3z archive to bundle
     --name <string>    Product name (e.g. "Acme Site Tour")
     --icon <path>      Optional .png icon (1024x1024 recommended)
+    --encrypt          XOR-obfuscate the bundled archive (deters casual extraction)
     --help             Show this help
 `);
             process.exit(0);
@@ -183,14 +186,14 @@ async function collectInputs(cliArgs) {
     }
     if (iconPath) iconPath = resolve(iconPath);
 
-    return { archivePath, productName, iconPath };
+    return { archivePath, productName, iconPath, encrypt: !!cliArgs.encrypt };
 }
 
 // =============================================================================
 // BUILD PIPELINE
 // =============================================================================
 
-async function build({ archivePath, productName, iconPath }) {
+async function build({ archivePath, productName, iconPath, encrypt }) {
     const archiveFilename = 'bundled-archive' + extname(archivePath);
 
     // Summary
@@ -235,6 +238,20 @@ async function build({ archivePath, productName, iconPath }) {
         console.log(`[4/7] Copying archive to dist/${archiveFilename}...`);
         copyFileSync(archivePath, join(DIST, archiveFilename));
 
+        // Step 4b: XOR-obfuscate the archive (optional)
+        let archiveKey = null;
+        if (encrypt) {
+            console.log('[4b/7] XOR-obfuscating bundled archive...');
+            archiveKey = randomBytes(32);
+            const destPath = join(DIST, archiveFilename);
+            const archiveData = readFileSync(destPath);
+            for (let i = 0; i < archiveData.length; i++) {
+                archiveData[i] ^= archiveKey[i % archiveKey.length];
+            }
+            writeFileSync(destPath, archiveData);
+            console.log(`        Key: ${archiveKey.toString('hex').substring(0, 16)}...`);
+        }
+
         // Step 5: Generate icons (if provided)
         if (iconPath) {
             console.log('[5/7] Generating icons from custom icon...');
@@ -248,10 +265,14 @@ async function build({ archivePath, productName, iconPath }) {
 
         // Step 6: Build
         console.log('[6/7] Building Tauri application (this may take several minutes)...');
-        const cargoTauri = isWindows
+        const cargoTauri2 = isWindows
             ? join(process.env.USERPROFILE || '', '.cargo', 'bin', 'cargo-tauri.exe')
             : 'cargo-tauri';
-        execSync(`"${cargoTauri}" build`, { cwd: ROOT, stdio: 'inherit' });
+        const buildEnv = { ...process.env };
+        if (archiveKey) {
+            buildEnv.VITRINE_ARCHIVE_KEY = archiveKey.toString('hex');
+        }
+        execSync(`"${cargoTauri2}" build`, { cwd: ROOT, stdio: 'inherit', env: buildEnv });
 
         // Step 7: Report output
         const bundleDir = join(ROOT, 'src-tauri', 'target', 'release', 'bundle');

@@ -667,7 +667,13 @@ function setupFilePicker(): void {
             const isFilesystemPath = /^[A-Za-z]:[\\\/]|^[\\\/]/.test(archiveUrl);
             if (isFilesystemPath) {
                 log.info('Tauri: loading archive from filesystem path:', archiveUrl);
-                loadArchiveFromTauri(archiveUrl);
+                (async () => {
+                    try {
+                        await loadArchiveFromIpc(archiveUrl, archiveUrl.split(/[\\/]/).pop() || 'archive.a3d');
+                    } catch {
+                        loadArchiveFromTauri(archiveUrl);
+                    }
+                })();
             } else {
                 // Resolve relative dist URL to an absolute resource path, then convert
                 // to an asset protocol URL (https://asset.localhost/...) which supports
@@ -677,12 +683,17 @@ function setupFilePicker(): void {
                 (async () => {
                     try {
                         const absPath = await window.__TAURI__!.path.resolveResource(archiveUrl);
-                        const assetUrl = window.__TAURI__!.core.convertFileSrc(absPath);
-                        log.info('Tauri: loading bundled archive via asset protocol:', assetUrl);
-                        loadArchiveFromAssetUrl(assetUrl, name, () => loadBundledArchiveFromFetch(archiveUrl));
+                        try {
+                            log.info('Tauri: loading bundled archive via IPC:', absPath);
+                            await loadArchiveFromIpc(absPath, name);
+                        } catch (ipcErr) {
+                            log.warn('IPC loading failed, trying asset protocol:', (ipcErr as Error).message);
+                            const assetUrl = window.__TAURI__!.core.convertFileSrc(absPath);
+                            await loadArchiveFromAssetUrl(assetUrl, name, () => loadBundledArchiveFromFetch(archiveUrl));
+                        }
                     } catch (err) {
                         log.warn('Could not resolve resource path, using direct fetch:', (err as Error).message);
-                        loadBundledArchiveFromFetch(archiveUrl);
+                        await loadBundledArchiveFromFetch(archiveUrl);
                     }
                 })();
             }
@@ -723,10 +734,13 @@ function setupFilePicker(): void {
 
                     const ext = result.name.split('.').pop()?.toLowerCase() ?? '';
                     if (ext === 'a3d' || ext === 'a3z') {
-                        // Archive: use Range-based loading — reads only the ZIP central directory
-                        // and individual entries on demand. Shows metadata screen in ~1s instead
-                        // of 15-20s because we never read the whole file into memory upfront.
-                        await loadArchiveFromAssetUrl(result.assetUrl, result.name, () => loadArchiveFromTauri(result.filePath));
+                        // Archive: IPC byte serving is fastest — reads bytes directly from
+                        // disk via Rust. Falls back to asset URL Range requests, then full read.
+                        try {
+                            await loadArchiveFromIpc(result.filePath, result.name);
+                        } catch {
+                            await loadArchiveFromAssetUrl(result.assetUrl, result.name, () => loadArchiveFromTauri(result.filePath));
+                        }
                     } else {
                         // Direct file (splat, mesh, etc.): full content needed by renderer.
                         // Read by path using the already-resolved filePath — no second dialog.
@@ -1175,6 +1189,21 @@ async function loadArchiveFromAssetUrl(assetUrl: string, name: string, fallback:
         log.warn('Range-based loading failed, falling back to full read:', (err as Error).message);
         await fallback();
     }
+}
+
+/**
+ * Load archive via Rust IPC byte serving — fastest path for Tauri desktop.
+ * Reads bytes directly from disk via Rust commands, bypassing HTTP entirely.
+ * Only the ZIP central directory (~64KB) is transferred initially.
+ */
+async function loadArchiveFromIpc(filePath: string, name: string): Promise<void> {
+    showLoading('Loading archive...', true);
+    const { ipcOpenFile, ipcReadBytes, ipcCloseFile } = await import('./tauri-bridge.js');
+    updateProgress(5, 'Indexing archive...');
+    const archiveLoader = new ArchiveLoader();
+    await archiveLoader.loadFromIpc(ipcOpenFile, ipcReadBytes, ipcCloseFile, filePath);
+    state.archiveSourceUrl = null;
+    await handleArchiveFile(new File([], name), archiveLoader);
 }
 
 // =============================================================================

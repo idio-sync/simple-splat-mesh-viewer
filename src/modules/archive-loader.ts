@@ -231,6 +231,8 @@ export class ArchiveLoader {
     private _file: File | Blob | null = null;
     private _rawData: Uint8Array | null = null;
     private _url: string | null = null;
+    private _ipcHandleId: string | null = null;
+    private _ipcReadFn: ((offset: number, length: number) => Promise<Uint8Array>) | null = null;
     private _fileSize: number = 0;
     private _fileCache: Map<string, Uint8Array> = new Map();
     private _fileIndex: FileIndexEntry[] = [];
@@ -242,7 +244,7 @@ export class ArchiveLoader {
      * Check if archive data is available (either File reference or raw buffer).
      */
     private get _hasData(): boolean {
-        return !!(this._file || this._rawData || this._url);
+        return !!(this._file || this._rawData || this._url || this._ipcReadFn);
     }
 
     /**
@@ -337,6 +339,30 @@ export class ArchiveLoader {
     }
 
     /**
+     * Load archive via Tauri IPC byte serving.
+     * Opens a Rust-side file handle and reads only the central directory.
+     * All subsequent extractFile() calls use IPC for on-demand byte ranges.
+     */
+    async loadFromIpc(
+        openFn: (path: string) => Promise<{ handleId: string; size: number }>,
+        readFn: (handleId: string, offset: number, length: number) => Promise<Uint8Array>,
+        closeFn: (handleId: string) => Promise<void>,
+        filePath: string
+    ): Promise<number> {
+        const { handleId, size } = await openFn(filePath);
+        this._ipcHandleId = handleId;
+        this._ipcReadFn = (offset, length) => readFn(handleId, offset, length);
+        this._fileSize = size;
+        this._file = null;
+        this._rawData = null;
+        this._url = null;
+        this._fileCache = new Map();
+
+        await this._parseCentralDirectory();
+        return size;
+    }
+
+    /**
      * Load archive from an ArrayBuffer.
      * Only scans the central directory — no files are decompressed.
      */
@@ -371,6 +397,9 @@ export class ArchiveLoader {
         }
         if (this._rawData) {
             return this._rawData.subarray(offset, offset + length);
+        }
+        if (this._ipcReadFn) {
+            return this._ipcReadFn(offset, length);
         }
         if (this._url) {
             const end = offset + length - 1;
@@ -986,6 +1015,8 @@ export class ArchiveLoader {
         this._rawData = null;
         this._file = null;
         this._url = null;
+        this._ipcReadFn = null;
+        this._ipcHandleId = null;
         this._fileSize = 0;
         this._centralDir = null;
         this._fileCache?.clear();
