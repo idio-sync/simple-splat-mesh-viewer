@@ -403,12 +403,14 @@ export class ArchiveLoader {
             if (!this._bulkReadFn) return;
             log.info('Switching from IPC to in-memory mode for large file extraction');
             const data = await this._bulkReadFn();
+            log.info(`Bulk read complete: ${data.length} bytes (${(data.length / 1024 / 1024).toFixed(1)} MB)`);
             // Use Blob (not _rawData) so reads go through Blob.slice() → isolated
             // ArrayBuffers at offset 0. The _rawData.subarray() path returns views
             // with non-zero byteOffset which can cause silent corruption if any
             // downstream consumer (fflate, WASM) accesses .buffer directly.
             this._file = new Blob([data]);
             this._fileSize = data.length;
+            log.info(`Blob created: size=${this._file.size}, fileSize=${this._fileSize}`);
             this._ipcReadFn = null;
             this._bulkReadFn = null;
             if (this._ipcCloseFn) {
@@ -431,13 +433,19 @@ export class ArchiveLoader {
         // Auto-switch from IPC to in-memory buffer for large reads (>1MB).
         // IPC can't reliably transfer 150MB+ without crashing the webview.
         if (this._ipcReadFn && length > 1_000_000 && this._bulkReadFn) {
+            log.info(`Large read detected (${(length / 1024 / 1024).toFixed(1)} MB), triggering bulk read switch`);
             await this._switchToBuffer();
-            // _rawData is now set, _ipcReadFn is null — falls through to _rawData branch
+            // _file (Blob) is now set, _ipcReadFn is null — falls through to _file branch
         }
 
         if (this._file) {
             const slice = this._file.slice(offset, offset + length);
-            return new Uint8Array(await slice.arrayBuffer());
+            const ab = await slice.arrayBuffer();
+            const result = new Uint8Array(ab);
+            if (length > 1_000_000) {
+                log.info(`Blob.slice read: offset=${offset}, requested=${length}, got=${result.length}, first4=[${result[0]},${result[1]},${result[2]},${result[3]}]`);
+            }
+            return result;
         }
         if (this._rawData) {
             return this._rawData.subarray(offset, offset + length);
@@ -632,6 +640,9 @@ export class ArchiveLoader {
         const dataOffset = entry.offset + 30 + localNameLen + localExtraLen;
 
         // Read only the compressed data for this file
+        if (entry.compressedSize > 1_000_000) {
+            log.info(`Extracting "${filename}": offset=${dataOffset}, compressed=${(entry.compressedSize / 1024 / 1024).toFixed(1)}MB, method=${entry.method}`);
+        }
         const compressedData = await this._readBytes(dataOffset, entry.compressedSize);
 
         // Decompress based on compression method
@@ -641,9 +652,16 @@ export class ArchiveLoader {
             fileData = compressedData;
         } else if (entry.method === 8) {
             // Deflate — decompress with fflate inflateSync
+            if (entry.compressedSize > 1_000_000) {
+                log.info(`Decompressing "${filename}": ${(entry.compressedSize / 1024 / 1024).toFixed(1)}MB → ${(entry.uncompressedSize / 1024 / 1024).toFixed(1)}MB`);
+            }
             fileData = inflateSync(compressedData);
         } else {
             throw new Error(`Unsupported compression method ${entry.method} for ${filename}`);
+        }
+
+        if (entry.compressedSize > 1_000_000) {
+            log.info(`Extracted "${filename}": ${(fileData.length / 1024 / 1024).toFixed(1)}MB, first4=[${fileData[0]},${fileData[1]},${fileData[2]},${fileData[3]}]`);
         }
 
         // Cache for future access

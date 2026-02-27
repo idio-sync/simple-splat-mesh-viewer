@@ -1207,7 +1207,10 @@ async function loadArchiveFromIpc(filePath: string, name: string): Promise<void>
         // IPC crashes the webview on 150MB+ transfers; fs.readFile is proven reliable.
         // Called automatically by ArchiveLoader._readBytes() when a large read is needed.
         async () => {
+            log.info('Bulk read: starting fs.readFile for', filePath);
+            const t0 = performance.now();
             const contents = await window.__TAURI__!.fs.readFile(filePath);
+            log.info(`Bulk read: fs.readFile complete in ${((performance.now() - t0) / 1000).toFixed(1)}s, ${contents.length} bytes`);
             return new Uint8Array(contents as ArrayBufferLike);
         }
     );
