@@ -22,6 +22,7 @@ interface ArchiveAsset {
 
 interface Archive {
     hash: string;
+    uuid?: string;
     filename: string;
     path: string;
     title: string;
@@ -446,7 +447,9 @@ async function handleDelete(archive: Archive): Promise<void> {
 }
 
 async function handleCopyUrl(archive: Archive): Promise<void> {
-    const fullUrl = location.origin + archive.viewerUrl;
+    const fullUrl = archive.uuid
+        ? location.origin + '/view/' + archive.uuid
+        : location.origin + archive.viewerUrl;
     try {
         await navigator.clipboard.writeText(fullUrl);
         notify.success('URL copied');
@@ -645,6 +648,7 @@ function setupDetailActions(): void {
                     showShareDialog({
                         archiveUrl,
                         archiveHash: a.hash,
+                        archiveUuid: a.uuid || null,
                         archiveTitle: a.title || a.filename,
                     });
                 } else {

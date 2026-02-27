@@ -28,6 +28,7 @@ let currentState: ShareState | null = null;
 interface ShareState {
     archiveUrl?: string | null;
     archiveHash?: string | null;
+    archiveUuid?: string | null;
     archiveTitle?: string | null;
     splatUrl?: string | null;
     modelUrl?: string | null;
@@ -382,9 +383,10 @@ function buildShareUrl(state: ShareState, dialog: Element): string {
     const theme = (dialog.querySelector('[data-opt="theme"]') as HTMLSelectElement | null)?.value || 'editorial';
     const isKiosk = preset === 'kiosk' || preset === 'minimal';
 
-    // Kiosk mode with hash → clean URL /view/{hash}
-    if (isKiosk && state.archiveHash) {
-        const base = window.location.origin + '/view/' + state.archiveHash;
+    // Kiosk mode with UUID or hash → clean URL /view/{uuid|hash}
+    const viewId = state.archiveUuid || state.archiveHash;
+    if (isKiosk && viewId) {
+        const base = window.location.origin + '/view/' + viewId;
         const params: string[] = [];
         if (theme && theme !== 'default' && theme !== 'editorial') params.push('theme=' + theme);
         return base + (params.length ? '?' + params.join('&') : '');

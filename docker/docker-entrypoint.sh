@@ -205,8 +205,16 @@ if [ "${OG_ENABLED}" = "true" ] || [ "${ADMIN_ENABLED}" = "true" ]; then
     echo "Extracting metadata from archives..."
     /opt/extract-meta.sh /usr/share/nginx/html /usr/share/nginx/html
 
-    # Generate clean archive URL proxy: /view/{hash} → meta-server
+    # Generate clean archive URL proxy: /view/{hash|uuid} → meta-server
     cat > /etc/nginx/conf.d/view-proxy.conf.inc <<'VIEWEOF'
+# UUID v4 format: /view/{8-4-4-4-12 hex with dashes}
+location ~ "^/view/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" {
+    proxy_pass http://127.0.0.1:3001;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+# Legacy 16-hex-char hash format: /view/{hash}
 location ~ "^/view/[a-f0-9]{16}$" {
     proxy_pass http://127.0.0.1:3001;
     proxy_set_header Host $host;
@@ -214,7 +222,7 @@ location ~ "^/view/[a-f0-9]{16}$" {
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 VIEWEOF
-    echo "  Clean URLs: /view/{hash} enabled"
+    echo "  Clean URLs: /view/{uuid} and /view/{hash} enabled"
 
     SITE_NAME="${SITE_NAME}" \
     SITE_URL="${SITE_URL}" \
