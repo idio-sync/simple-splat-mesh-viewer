@@ -377,10 +377,20 @@ export class ArchiveLoader {
             const resp = await fetch(this._url, {
                 headers: { 'Range': `bytes=${offset}-${end}` }
             });
-            if (!resp.ok && resp.status !== 206) {
-                throw new Error(`Range request failed: HTTP ${resp.status}`);
+            if (resp.status === 206) {
+                // Range supported — return just the requested bytes
+                return new Uint8Array(await resp.arrayBuffer());
             }
-            return new Uint8Array(await resp.arrayBuffer());
+            if (resp.ok) {
+                // Server ignored Range header and returned the full file (status 200).
+                // Buffer it once and switch to in-memory mode so every subsequent
+                // read is an instant subarray — no more redundant full downloads.
+                log.info('Range not supported, switching to in-memory mode');
+                this._rawData = new Uint8Array(await resp.arrayBuffer());
+                this._url = null;
+                return this._rawData.subarray(offset, offset + length);
+            }
+            throw new Error(`Range request failed: HTTP ${resp.status}`);
         }
         throw new Error('No archive data available');
     }
