@@ -6,10 +6,10 @@
 
 /* --- Base Typography — inherited by all editorial elements --- */
 
-/* Bump root font-size so all rem values scale up 25% for readability.
-   16px default → 20px effective base. */
+/* Bump root font-size so all rem values scale up for readability.
+   16px default → 18px effective base. */
 html:has(body.kiosk-mode.kiosk-editorial) {
-    font-size: 125%;
+    font-size: 112.5%;
 }
 
 body.kiosk-mode.kiosk-editorial {
@@ -2431,7 +2431,7 @@ body.kiosk-mode.kiosk-editorial .editorial-slice-btn.active {
 
 @media (max-width: 1023px) {
     html:has(body.kiosk-mode.kiosk-editorial) {
-        font-size: 106%;
+        font-size: 100%;
     }
 
     /* Title block — tighter */
@@ -2553,6 +2553,22 @@ body.kiosk-mode.kiosk-editorial .editorial-slice-btn.active {
 
     body.kiosk-mode.kiosk-editorial #annotation-info-popup {
         max-width: 220px;
+        padding: 8px 12px;
+        max-height: calc(100vh - 100px);
+    }
+
+    body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-header {
+        padding-bottom: 6px;
+        margin-bottom: 6px;
+    }
+
+    body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-header::after {
+        width: 28px;
+    }
+
+    body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-body {
+        font-size: 0.68rem;
+        max-height: 160px;
     }
 
     /* Loading screen — scale down for compact viewports */
@@ -2653,6 +2669,28 @@ body.kiosk-mode.kiosk-editorial .editorial-slice-btn.active {
 
     body.kiosk-mode.kiosk-editorial #annotation-info-popup {
         max-width: 200px;
+        padding: 7px 10px;
+        max-height: calc(100vh - 80px);
+        border-radius: 4px;
+    }
+
+    body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-header {
+        padding-bottom: 5px;
+        margin-bottom: 5px;
+    }
+
+    body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-header::after {
+        width: 24px;
+    }
+
+    body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-title {
+        font-size: 0.75rem;
+    }
+
+    body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-body {
+        font-size: 0.62rem;
+        max-height: 120px;
+        line-height: 1.4;
     }
 
     /* Loading screen — stack vertically, shrink thumbnail */
@@ -2734,8 +2772,30 @@ body.kiosk-mode.kiosk-editorial .editorial-slice-btn.active {
     }
 
     body.kiosk-mode.kiosk-editorial #annotation-info-popup {
-        max-width: 180px;
-        padding: 8px 10px;
+        max-width: 160px;
+        padding: 6px 8px;
+        border-radius: 4px;
+        max-height: calc(100vh - 60px);
+    }
+
+    body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-header {
+        padding-bottom: 4px;
+        margin-bottom: 4px;
+    }
+
+    body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-header::after {
+        width: 20px;
+        height: 1.5px;
+    }
+
+    body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-title {
+        font-size: 0.65rem;
+    }
+
+    body.kiosk-mode.kiosk-editorial #annotation-info-popup .annotation-info-body {
+        font-size: 0.55rem;
+        max-height: 80px;
+        line-height: 1.35;
     }
 
     /* Loading screen — hide thumbnail, minimal text */
