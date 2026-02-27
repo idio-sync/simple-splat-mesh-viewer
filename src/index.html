@@ -17,8 +17,8 @@
         default-src 'self';
         script-src 'self' 'unsafe-inline' 'unsafe-eval';
         style-src 'self' 'unsafe-inline';
-        img-src 'self' blob: data: https://*.tile.openstreetmap.org;
-        connect-src 'self' https: blob: data:;
+        img-src 'self' blob: data: https://*.tile.openstreetmap.org https://asset.localhost;
+        connect-src 'self' https: blob: data: http://ipc.localhost http://asset.localhost;
         worker-src 'self' blob:;
         font-src 'self';
         media-src 'self' blob:;
