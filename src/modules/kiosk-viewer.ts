@@ -1,4 +1,9 @@
 /**
+ * @deprecated The downloadable offline HTML kiosk viewer has been removed from the product.
+ * This module is retained for reference only. Do not re-enable or extend it.
+ */
+
+/**
  * Generic Offline Viewer Generator
  *
  * Generates a self-contained HTML viewer that can open any .a3d/.a3z

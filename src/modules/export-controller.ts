@@ -646,6 +646,7 @@ export async function saveToLibrary(deps: ExportDeps): Promise<void> {
 
 /**
  * Download a generic offline viewer (standalone HTML that opens any .a3d/.a3z).
+ * @deprecated Downloadable offline viewer has been removed from the product.
  */
 export async function downloadGenericViewer(deps: ExportDeps): Promise<void> {
     const { ui, tauriBridge } = deps;
