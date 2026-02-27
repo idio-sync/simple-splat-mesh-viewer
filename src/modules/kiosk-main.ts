@@ -669,8 +669,9 @@ function setupFilePicker(): void {
                 log.info('Tauri: loading archive from filesystem path:', archiveUrl);
                 loadArchiveFromTauri(archiveUrl);
             } else {
-                log.info('Tauri: loading bundled archive via fetch:', archiveUrl);
-                loadBundledArchiveFromFetch(archiveUrl);
+                log.info('Tauri: loading bundled archive via Range:', archiveUrl);
+                const name = archiveUrl.split('/').pop()?.split('?')[0] || 'archive.a3d';
+                loadArchiveFromAssetUrl(archiveUrl, name, () => loadBundledArchiveFromFetch(archiveUrl));
             }
             return;
         }
@@ -712,7 +713,7 @@ function setupFilePicker(): void {
                         // Archive: use Range-based loading — reads only the ZIP central directory
                         // and individual entries on demand. Shows metadata screen in ~1s instead
                         // of 15-20s because we never read the whole file into memory upfront.
-                        await loadArchiveFromAssetUrl(result.assetUrl, result.name, result.filePath);
+                        await loadArchiveFromAssetUrl(result.assetUrl, result.name, () => loadArchiveFromTauri(result.filePath));
                     } else {
                         // Direct file (splat, mesh, etc.): full content needed by renderer.
                         // Read by path using the already-resolved filePath — no second dialog.
@@ -1147,7 +1148,7 @@ async function loadBundledArchiveFromFetch(url: string): Promise<void> {
  * Falls back to loadArchiveFromTauri(fallbackPath) if the asset server does not
  * support Range requests (e.g. older Tauri builds).
  */
-async function loadArchiveFromAssetUrl(assetUrl: string, name: string, fallbackPath: string): Promise<void> {
+async function loadArchiveFromAssetUrl(assetUrl: string, name: string, fallback: () => Promise<void>): Promise<void> {
     showLoading('Loading archive...', true);
     try {
         updateProgress(5, 'Indexing archive...');
@@ -1159,7 +1160,7 @@ async function loadArchiveFromAssetUrl(assetUrl: string, name: string, fallbackP
         await handleArchiveFile(new File([], name), archiveLoader);
     } catch (err) {
         log.warn('Range-based loading failed, falling back to full read:', (err as Error).message);
-        await loadArchiveFromTauri(fallbackPath);
+        await fallback();
     }
 }
 
