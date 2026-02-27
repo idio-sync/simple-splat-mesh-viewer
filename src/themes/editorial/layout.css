@@ -1523,6 +1523,8 @@ body.kiosk-mode.kiosk-editorial #annotation-info-popup {
     border-radius: 6px;
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
     padding: 10px 14px;
+    width: fit-content;
+    min-width: 140px;
     max-width: 260px;
     max-height: calc(100vh - 150px);
     overflow: visible;
@@ -2554,6 +2556,7 @@ body.kiosk-mode.kiosk-editorial .editorial-slice-btn.active {
 
     body.kiosk-mode.kiosk-editorial #annotation-info-popup {
         max-width: 220px;
+        min-width: 120px;
         padding: 8px 12px;
         max-height: calc(100vh - 100px);
     }
@@ -2670,6 +2673,7 @@ body.kiosk-mode.kiosk-editorial .editorial-slice-btn.active {
 
     body.kiosk-mode.kiosk-editorial #annotation-info-popup {
         max-width: 200px;
+        min-width: 100px;
         padding: 7px 10px;
         max-height: calc(100vh - 80px);
         border-radius: 4px;
@@ -2788,6 +2792,7 @@ body.kiosk-mode.kiosk-editorial .editorial-slice-btn.active {
 
     body.kiosk-mode.kiosk-editorial #annotation-info-popup {
         max-width: 160px;
+        min-width: 80px;
         padding: 6px 8px;
         border-radius: 4px;
         max-height: calc(100vh - 60px);
