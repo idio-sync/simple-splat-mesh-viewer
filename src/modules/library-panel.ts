@@ -180,6 +180,16 @@ async function deleteArchive(hash: string): Promise<void> {
     }
 }
 
+async function regenerateArchive(hash: string): Promise<Archive> {
+    const res = await apiFetch('/api/archives/' + hash + '/regenerate', { method: 'POST' });
+    if (res.status === 401) throw new AuthError();
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error || 'Regenerate failed');
+    }
+    return res.json();
+}
+
 async function renameArchive(hash: string, newFilename: string): Promise<Archive> {
     const res = await apiFetch('/api/archives/' + hash, {
         method: 'PATCH',
@@ -446,6 +456,20 @@ async function handleDelete(archive: Archive): Promise<void> {
     }
 }
 
+async function handleRegenerate(archive: Archive): Promise<void> {
+    try {
+        const updated = await regenerateArchive(archive.hash);
+        const idx = archives.findIndex(a => a.hash === archive.hash);
+        if (idx !== -1) archives[idx] = updated;
+        render();
+        selectArchive(archive.hash);
+        notify.success('Metadata regenerated');
+    } catch (err) {
+        if (err instanceof AuthError) { showAuth(); return; }
+        notify.error('Regenerate failed: ' + (err as Error).message);
+    }
+}
+
 async function handleCopyUrl(archive: Archive): Promise<void> {
     const fullUrl = archive.uuid
         ? location.origin + '/view/' + archive.uuid
@@ -673,6 +697,11 @@ function setupDetailActions(): void {
     document.getElementById('library-action-delete')?.addEventListener('click', () => {
         const a = getSelected();
         if (a) handleDelete(a);
+    });
+
+    document.getElementById('library-action-regenerate')?.addEventListener('click', () => {
+        const a = getSelected();
+        if (a) handleRegenerate(a);
     });
 }
 

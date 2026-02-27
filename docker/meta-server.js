@@ -759,6 +759,22 @@ function handleDeleteArchive(req, res, hash) {
 }
 
 /**
+ * POST /api/archives/:hash/regenerate — re-extract metadata and thumbnail
+ */
+function handleRegenerateArchive(req, res, hash) {
+    const archive = findArchiveByHash(hash);
+    if (!archive) return sendJson(res, 404, { error: 'Archive not found' });
+
+    // Delete existing sidecar files so extract-meta.sh does a full re-extract
+    try { fs.unlinkSync(path.join(META_DIR, hash + '.json')); } catch {}
+    try { fs.unlinkSync(path.join(THUMBS_DIR, hash + '.jpg')); } catch {}
+
+    runExtractMeta(archive.filePath);
+
+    sendJson(res, 200, buildArchiveObject(archive.filename));
+}
+
+/**
  * PATCH /api/archives/:hash — rename an archive
  */
 function handleRenameArchive(req, res, hash) {
@@ -924,6 +940,12 @@ const server = http.createServer((req, res) => {
         if (pathname === '/api/archives' && req.method === 'POST') {
             handleUploadArchive(req, res);
             return;
+        }
+
+        // Match /api/archives/:hash/regenerate
+        const regenMatch = pathname.match(/^\/api\/archives\/([a-f0-9]{16})\/regenerate$/);
+        if (regenMatch && req.method === 'POST') {
+            return handleRegenerateArchive(req, res, regenMatch[1]);
         }
 
         // Match /api/archives/:hash (16 hex chars)

@@ -51,10 +51,14 @@ process_archive() {
     local meta_file="$META_DIR/$hash.json"
     local thumb_file="$THUMBS_DIR/$hash.jpg"
 
-    # Skip if already extracted (idempotent)
+    # Skip if already extracted (idempotent) — but re-extract if thumbnail is missing
     if [ -f "$meta_file" ]; then
-        echo "  [skip] $rel_url (already extracted)"
-        return
+        if grep -q '"thumbnail": "/thumbs/' "$meta_file" 2>/dev/null && [ ! -f "$thumb_file" ]; then
+            echo "  [re-extract] $rel_url (thumbnail missing)"
+        else
+            echo "  [skip] $rel_url (already extracted)"
+            return
+        fi
     fi
 
     echo "  [extract] $rel_url -> $hash"
