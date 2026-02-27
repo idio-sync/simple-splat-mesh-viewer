@@ -657,9 +657,11 @@ function setupFilePicker(): void {
         // In Tauri, choose the right loader based on whether the URL is a local
         // filesystem path or an asset URL served by Tauri's asset server.
         // - Filesystem paths (C:\... or /absolute/path) → readFile() via Tauri FS plugin
-        // - Asset / network URLs (http:, https:, tauri:, asset:) → fetch() via loadArchiveFromUrl
-        //   This covers build-branded.mjs bundles, which are copied to dist/ and served
-        //   by Tauri's asset server (e.g. https://asset.localhost/bundled-archive.a3d).
+        // - Asset / network URLs → loadBundledArchiveFromFetch() — single fetch() call,
+        //   no Range-request attempt and no download progress stages. Bundled archives are
+        //   served locally by Tauri's asset server so they load near-instantly; the
+        //   "Connecting..." / "Downloading..." stages from loadArchiveFromUrl() are
+        //   unnecessary overhead that delay the loading screen with metadata.
         if (window.__TAURI__) {
             const archiveUrl = config.defaultArchiveUrl;
             const isFilesystemPath = /^[A-Za-z]:[\\\/]|^[\\\/]/.test(archiveUrl);
@@ -668,7 +670,7 @@ function setupFilePicker(): void {
                 loadArchiveFromTauri(archiveUrl);
             } else {
                 log.info('Tauri: loading bundled archive via fetch:', archiveUrl);
-                loadArchiveFromUrl(archiveUrl);
+                loadBundledArchiveFromFetch(archiveUrl);
             }
             return;
         }
@@ -1091,6 +1093,33 @@ async function loadArchiveFromTauri(filePath: string): Promise<void> {
         log.error('Failed to load archive from filesystem:', err);
         hideLoading();
         notify.error(`Failed to load archive: ${err.message}`);
+        const picker = document.getElementById('kiosk-file-picker');
+        if (picker) picker.classList.remove('hidden');
+    }
+}
+
+/**
+ * Load a bundled archive from Tauri's local asset server via a single fetch().
+ * Used for build-branded.mjs bundles: the archive is copied to dist/ and served
+ * at e.g. https://asset.localhost/bundled-archive.a3d. Unlike loadArchiveFromUrl(),
+ * this skips the Range-request attempt and download-progress stages entirely —
+ * the asset is local so it loads near-instantly with no "Connecting..." overhead.
+ */
+async function loadBundledArchiveFromFetch(url: string): Promise<void> {
+    showLoading('Loading archive...', true);
+    try {
+        updateProgress(5, 'Reading file...');
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+        const buffer = await response.arrayBuffer();
+        const fileName = url.split('/').pop()?.split('?')[0] || 'archive.a3d';
+        const file = new File([buffer], fileName);
+        state.archiveSourceUrl = null;
+        handleArchiveFile(file);
+    } catch (err) {
+        log.error('Failed to load bundled archive:', err);
+        hideLoading();
+        notify.error(`Failed to load archive: ${(err as Error).message}`);
         const picker = document.getElementById('kiosk-file-picker');
         if (picker) picker.classList.remove('hidden');
     }
