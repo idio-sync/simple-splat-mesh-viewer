@@ -4071,7 +4071,7 @@ function showRelevantSettings(hasSplat: boolean, hasMesh: boolean, hasPointcloud
 // =============================================================================
 
 function isMobileKiosk(): boolean {
-    return window.innerWidth <= 768 && document.body.classList.contains('kiosk-mode');
+    return window.innerWidth <= 699 && document.body.classList.contains('kiosk-mode');
 }
 
 function setSheetSnap(snap: SheetSnap): void {

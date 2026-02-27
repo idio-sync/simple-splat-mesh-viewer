@@ -2409,16 +2409,80 @@ body.kiosk-mode.kiosk-editorial .editorial-slice-btn.active {
     opacity: 1;
 }
 
-/* --- Mobile Fallback: revert to sidebar at narrow viewports --- */
+/* =================================================================
+   Responsive Tiers — graduated degradation for embedded iframes.
+   Tier 1 (≥1024px): full editorial (no overrides needed).
+   Tier 2 (700–1023px): compact editorial — tighter spacing/fonts.
+   Tier 3 (480–699px): minimal editorial — spine + compact title only.
+   Tier 4 (<480px): micro embed — spine only, maximum viewport.
+   ================================================================= */
 
-@media (max-width: 700px) {
+/* --- Tier 2: Compact Editorial (700–1023px) --- */
+
+@media (max-width: 1023px) {
+    html:has(body.kiosk-mode.kiosk-editorial) {
+        font-size: 112%;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-title-block {
+        padding: 20px 32px 14px 18px;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-title-block h1 {
+        font-size: 1.25rem;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-view-modes {
+        gap: 12px;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-bottom-ribbon {
+        padding: 0 16px;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-panel-inner {
+        min-width: 360px;
+    }
+
+    body.kiosk-mode.kiosk-editorial #annotation-info-popup {
+        max-width: 220px;
+    }
+}
+
+/* --- Tier 3: Minimal Editorial (480–699px) --- */
+
+@media (max-width: 699px) {
+    html:has(body.kiosk-mode.kiosk-editorial) {
+        font-size: 100%;
+    }
+
+    /* Keep spine — brand signature at zero cost */
+
+    /* Compact title block — single-line, tight padding */
+    body.kiosk-mode.kiosk-editorial .editorial-title-block {
+        padding: 12px 20px 10px 14px;
+        max-width: 70%;
+    }
+
+    body.kiosk-mode.kiosk-editorial .editorial-title-block h1 {
+        font-size: 1rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Hide date/author meta line — not essential at this width */
+    body.kiosk-mode.kiosk-editorial .editorial-title-meta {
+        display: none;
+    }
+
+    /* Hide ribbon and info panel */
     body.kiosk-mode.kiosk-editorial .editorial-bottom-ribbon,
-    body.kiosk-mode.kiosk-editorial .editorial-title-block,
-    body.kiosk-mode.kiosk-editorial .editorial-spine,
     body.kiosk-mode.kiosk-editorial .editorial-info-overlay {
         display: none !important;
     }
 
+    /* Revert viewer to block layout for sidebar fallback */
     body.kiosk-mode.kiosk-editorial #viewer-container {
         display: block !important;
     }
@@ -2428,9 +2492,35 @@ body.kiosk-mode.kiosk-editorial .editorial-slice-btn.active {
         flex: none;
     }
 
+    /* Show sidebar + view switcher for metadata access */
     body.kiosk-mode.kiosk-editorial #metadata-sidebar,
     body.kiosk-mode.kiosk-editorial .kiosk-view-switcher {
         display: block !important;
+    }
+
+    body.kiosk-mode.kiosk-editorial #annotation-info-popup {
+        max-width: 200px;
+    }
+}
+
+/* --- Tier 4: Micro Embed (<480px) --- */
+
+@media (max-width: 479px) {
+    /* Hide title block — too much chrome for micro embeds */
+    body.kiosk-mode.kiosk-editorial .editorial-title-block {
+        display: none !important;
+    }
+
+    /* Smaller annotation markers */
+    body.kiosk-mode.kiosk-editorial .annotation-marker {
+        width: 20px;
+        height: 20px;
+        font-size: 0.6rem;
+    }
+
+    body.kiosk-mode.kiosk-editorial #annotation-info-popup {
+        max-width: 180px;
+        padding: 8px 10px;
     }
 }
 
