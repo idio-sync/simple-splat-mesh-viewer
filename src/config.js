@@ -75,7 +75,9 @@
             const url = new URL(urlString, window.location.origin);
 
             // Block dangerous protocols (javascript:, data:, vbscript:, etc.)
-            const allowedProtocols = ['http:', 'https:'];
+            // tauri: and asset: are Tauri v2 same-origin protocols used when the app
+            // is served from the bundled frontend (tauri://localhost or asset://localhost).
+            const allowedProtocols = ['http:', 'https:', 'tauri:', 'asset:'];
             if (!allowedProtocols.includes(url.protocol)) {
                 console.warn(`[config] Blocked unsafe protocol for ${paramName}:`, url.protocol);
                 return '';

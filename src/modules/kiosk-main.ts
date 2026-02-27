@@ -654,10 +654,22 @@ function setupFilePicker(): void {
             return;
         }
 
-        // In Tauri, read local archive directly from filesystem (no HTTP fetch)
+        // In Tauri, choose the right loader based on whether the URL is a local
+        // filesystem path or an asset URL served by Tauri's asset server.
+        // - Filesystem paths (C:\... or /absolute/path) → readFile() via Tauri FS plugin
+        // - Asset / network URLs (http:, https:, tauri:, asset:) → fetch() via loadArchiveFromUrl
+        //   This covers build-branded.mjs bundles, which are copied to dist/ and served
+        //   by Tauri's asset server (e.g. https://asset.localhost/bundled-archive.a3d).
         if (window.__TAURI__) {
-            log.info('Tauri: loading archive directly from filesystem:', config.defaultArchiveUrl);
-            loadArchiveFromTauri(config.defaultArchiveUrl);
+            const archiveUrl = config.defaultArchiveUrl;
+            const isFilesystemPath = /^[A-Za-z]:[\\\/]|^[\\\/]/.test(archiveUrl);
+            if (isFilesystemPath) {
+                log.info('Tauri: loading archive from filesystem path:', archiveUrl);
+                loadArchiveFromTauri(archiveUrl);
+            } else {
+                log.info('Tauri: loading bundled archive via fetch:', archiveUrl);
+                loadArchiveFromUrl(archiveUrl);
+            }
             return;
         }
 
@@ -686,13 +698,20 @@ function setupFilePicker(): void {
             btn.addEventListener('click', async () => {
                 try {
                     const { openFileDialog } = await import('./tauri-bridge.js');
-                    const files = await openFileDialog({ filterKey: 'all', multiple: false });
+                    const files = await openFileDialog({
+                        filterKey: 'all',
+                        multiple: false,
+                        // Show loading immediately after the OS dialog closes and before
+                        // readFile() starts — large files can take several seconds to read.
+                        onDialogClose: () => showLoading('Reading file...'),
+                    });
                     if (files && files.length > 0) {
                         handlePickedFiles(files, picker);
                     }
                 } catch (err) {
-                    log.warn('Native file dialog failed, falling back to browser input:', err.message);
-                    input.click();
+                    log.error('Native file dialog failed:', err.message, err);
+                    hideLoading();
+                    notify.error('Could not open file dialog: ' + (err as Error).message);
                 }
             });
         } else {

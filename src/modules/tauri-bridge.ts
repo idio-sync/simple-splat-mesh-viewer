@@ -92,6 +92,8 @@ interface TauriFile extends File {
 export async function openFileDialog(options: {
     filterKey?: string;
     multiple?: boolean;
+    /** Called immediately after the OS dialog closes (file selected) but before reading file contents. Use to show a loading indicator. */
+    onDialogClose?: () => void;
 } = {}): Promise<TauriFile[] | null> {
     const { filterKey = 'all', multiple = false } = options;
 
@@ -109,6 +111,11 @@ export async function openFileDialog(options: {
     });
 
     if (!selected) return null;
+
+    // Notify caller that the dialog is closed and file reading is about to begin.
+    // This is the right moment to show a loading indicator — the user has chosen
+    // a file but readFile() hasn't started yet (can be several seconds for large files).
+    options.onDialogClose?.();
 
     const paths = Array.isArray(selected) ? selected : [selected];
 
