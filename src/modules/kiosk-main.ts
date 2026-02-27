@@ -699,21 +699,32 @@ function setupFilePicker(): void {
         if (window.__TAURI__) {
             btn.addEventListener('click', async () => {
                 try {
-                    const { openFileDialog } = await import('./tauri-bridge.js');
-                    const files = await openFileDialog({
+                    const { openFileDialogPathOnly } = await import('./tauri-bridge.js');
+                    const result = await openFileDialogPathOnly({
                         filterKey: 'all',
-                        multiple: false,
-                        // Show loading immediately after the OS dialog closes and before
-                        // readFile() starts — large files can take several seconds to read.
-                        onDialogClose: () => showLoading('Reading file...'),
+                        onDialogClose: () => showLoading('Loading archive...', true),
                     });
-                    if (files && files.length > 0) {
-                        handlePickedFiles(files, picker);
+                    if (!result) return;
+                    picker.classList.add('hidden');
+
+                    const ext = result.name.split('.').pop()?.toLowerCase() ?? '';
+                    if (ext === 'a3d' || ext === 'a3z') {
+                        // Archive: use Range-based loading — reads only the ZIP central directory
+                        // and individual entries on demand. Shows metadata screen in ~1s instead
+                        // of 15-20s because we never read the whole file into memory upfront.
+                        await loadArchiveFromAssetUrl(result.assetUrl, result.name, result.filePath);
+                    } else {
+                        // Direct file (splat, mesh, etc.): full content needed by renderer.
+                        // Read by path using the already-resolved filePath — no second dialog.
+                        updateProgress(5, 'Reading file...');
+                        const contents = await window.__TAURI__!.fs.readFile(result.filePath);
+                        const file = new File([contents as BlobPart], result.name);
+                        handlePickedFiles([file], null);
                     }
                 } catch (err) {
                     log.error('Native file dialog failed:', err.message, err);
                     hideLoading();
-                    notify.error('Could not open file dialog: ' + (err as Error).message);
+                    notify.error('Could not open file: ' + (err as Error).message);
                 }
             });
         } else {
@@ -1122,6 +1133,33 @@ async function loadBundledArchiveFromFetch(url: string): Promise<void> {
         notify.error(`Failed to load archive: ${(err as Error).message}`);
         const picker = document.getElementById('kiosk-file-picker');
         if (picker) picker.classList.remove('hidden');
+    }
+}
+
+/**
+ * Load an archive via HTTP Range requests to Tauri's local asset server.
+ *
+ * Instead of reading the entire file into memory (15-20s for large archives),
+ * this reads only the ZIP central directory (~100KB) to build an index, then
+ * extracts individual entries on demand. The manifest and thumbnail are fetched
+ * in a few KB — the branded loading screen with metadata appears in ~1s.
+ *
+ * Falls back to loadArchiveFromTauri(fallbackPath) if the asset server does not
+ * support Range requests (e.g. older Tauri builds).
+ */
+async function loadArchiveFromAssetUrl(assetUrl: string, name: string, fallbackPath: string): Promise<void> {
+    showLoading('Loading archive...', true);
+    try {
+        updateProgress(5, 'Indexing archive...');
+        const archiveLoader = new ArchiveLoader();
+        await archiveLoader.loadRemoteIndex(assetUrl);
+        state.archiveSourceUrl = null;
+        // Placeholder File — name is used for display; all content is read
+        // on demand via Range requests through the archiveLoader.
+        await handleArchiveFile(new File([], name), archiveLoader);
+    } catch (err) {
+        log.warn('Range-based loading failed, falling back to full read:', (err as Error).message);
+        await loadArchiveFromTauri(fallbackPath);
     }
 }
 

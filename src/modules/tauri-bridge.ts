@@ -41,6 +41,10 @@ interface TauriAPI {
     shell: {
         open: (url: string) => Promise<void>;
     };
+    core: {
+        /** Convert a filesystem path to a Tauri asset URL (https://asset.localhost/...) */
+        convertFileSrc: (filePath: string, protocol?: string) => string;
+    };
 }
 
 declare global {
@@ -130,6 +134,53 @@ export async function openFileDialog(options: {
 
     log.info(`Native dialog: ${files.length} file(s) selected via ${filterKey} filter`);
     return files;
+}
+
+// ============================================================
+// NATIVE FILE OPEN DIALOG — PATH ONLY (no file read)
+// ============================================================
+
+export interface TauriFilePath {
+    filePath: string;
+    assetUrl: string;
+    name: string;
+}
+
+/**
+ * Open a native file dialog and return the selected path + Tauri asset URL,
+ * WITHOUT reading any file contents. Used for large archives where reading
+ * the entire file upfront (readFile) would cause a 15-20s delay.
+ *
+ * The asset URL (https://asset.localhost/...) supports HTTP Range requests,
+ * enabling ArchiveLoader.loadRemoteIndex() to read only the ZIP central
+ * directory and individual entries on demand.
+ */
+export async function openFileDialogPathOnly(options: {
+    filterKey?: string;
+    onDialogClose?: () => void;
+} = {}): Promise<TauriFilePath | null> {
+    const { filterKey = 'all' } = options;
+    if (!isTauri()) return null;
+
+    const { open } = window.__TAURI__!.dialog;
+    const filter = FILE_FILTERS[filterKey] || FILE_FILTERS.all;
+
+    const selected = await open({
+        title: `Open ${filter.name}`,
+        filters: [filter, { name: 'All Files', extensions: ['*'] }],
+        multiple: false,
+    });
+
+    if (!selected) return null;
+
+    options.onDialogClose?.();
+
+    const filePath = Array.isArray(selected) ? selected[0] : selected;
+    const name = filePath.split(/[\\/]/).pop()!;
+    const assetUrl = window.__TAURI__!.core.convertFileSrc(filePath);
+
+    log.info(`Native dialog (path-only): ${name}`);
+    return { filePath, assetUrl, name };
 }
 
 // ============================================================
