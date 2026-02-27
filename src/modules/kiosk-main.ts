@@ -669,9 +669,22 @@ function setupFilePicker(): void {
                 log.info('Tauri: loading archive from filesystem path:', archiveUrl);
                 loadArchiveFromTauri(archiveUrl);
             } else {
-                log.info('Tauri: loading bundled archive via Range:', archiveUrl);
+                // Resolve relative dist URL to an absolute resource path, then convert
+                // to an asset protocol URL (https://asset.localhost/...) which supports
+                // HTTP Range requests. The frontend dist server (tauri://localhost/) does
+                // NOT support Range — it returns 200 with the full file every time.
                 const name = archiveUrl.split('/').pop()?.split('?')[0] || 'archive.a3d';
-                loadArchiveFromAssetUrl(archiveUrl, name, () => loadBundledArchiveFromFetch(archiveUrl));
+                (async () => {
+                    try {
+                        const absPath = await window.__TAURI__!.path.resolveResource(archiveUrl);
+                        const assetUrl = window.__TAURI__!.core.convertFileSrc(absPath);
+                        log.info('Tauri: loading bundled archive via asset protocol:', assetUrl);
+                        loadArchiveFromAssetUrl(assetUrl, name, () => loadBundledArchiveFromFetch(archiveUrl));
+                    } catch (err) {
+                        log.warn('Could not resolve resource path, using direct fetch:', (err as Error).message);
+                        loadBundledArchiveFromFetch(archiveUrl);
+                    }
+                })();
             }
             return;
         }

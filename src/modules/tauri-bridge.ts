@@ -45,6 +45,10 @@ interface TauriAPI {
         /** Convert a filesystem path to a Tauri asset URL (https://asset.localhost/...) */
         convertFileSrc: (filePath: string, protocol?: string) => string;
     };
+    path: {
+        /** Resolve a path relative to the app's resource directory */
+        resolveResource: (path: string) => Promise<string>;
+    };
 }
 
 declare global {
