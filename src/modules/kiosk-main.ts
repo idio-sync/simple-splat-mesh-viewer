@@ -1201,19 +1201,7 @@ async function loadArchiveFromIpc(filePath: string, name: string): Promise<void>
     const { ipcOpenFile, ipcReadBytes, ipcCloseFile } = await import('./tauri-bridge.js');
     updateProgress(5, 'Indexing archive...');
     const archiveLoader = new ArchiveLoader();
-    await archiveLoader.loadFromIpc(
-        ipcOpenFile, ipcReadBytes, ipcCloseFile, filePath,
-        // Bulk-read fallback for large file extraction (>1MB).
-        // IPC crashes the webview on 150MB+ transfers; fs.readFile is proven reliable.
-        // Called automatically by ArchiveLoader._readBytes() when a large read is needed.
-        async () => {
-            log.info('Bulk read: starting fs.readFile for', filePath);
-            const t0 = performance.now();
-            const contents = await window.__TAURI__!.fs.readFile(filePath);
-            log.info(`Bulk read: fs.readFile complete in ${((performance.now() - t0) / 1000).toFixed(1)}s, ${contents.length} bytes`);
-            return new Uint8Array(contents as ArrayBufferLike);
-        }
-    );
+    await archiveLoader.loadFromIpc(ipcOpenFile, ipcReadBytes, ipcCloseFile, filePath);
     state.archiveSourceUrl = null;
     await handleArchiveFile(new File([], name), archiveLoader);
 }
