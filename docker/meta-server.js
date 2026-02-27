@@ -45,6 +45,7 @@ const HTML_ROOT = '/usr/share/nginx/html';
 const META_DIR = path.join(HTML_ROOT, 'meta');
 const THUMBS_DIR = path.join(HTML_ROOT, 'thumbs');
 const ARCHIVES_DIR = path.join(HTML_ROOT, 'archives');
+const UUID_INDEX_PATH = path.join(META_DIR, '_uuid-index.json');
 
 // Admin HTML (loaded at startup if enabled)
 const ADMIN_HTML = ADMIN_ENABLED ? (() => {
@@ -133,6 +134,69 @@ function escapeHtml(str) {
         .replace(/"/g, '&quot;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
+}
+
+// --- UUID Index ---
+
+function loadUuidIndex() {
+    try { return JSON.parse(fs.readFileSync(UUID_INDEX_PATH, 'utf8')); }
+    catch { return {}; }
+}
+
+function saveUuidIndex(index) {
+    try {
+        if (!fs.existsSync(META_DIR)) fs.mkdirSync(META_DIR, { recursive: true });
+        fs.writeFileSync(UUID_INDEX_PATH, JSON.stringify(index, null, 2));
+    } catch (err) {
+        console.error('[meta-server] Failed to save UUID index:', err.message);
+    }
+}
+
+/**
+ * Get or create a stable UUID for an archive URL.
+ * UUIDs are persisted in _uuid-index.json so they survive server restarts.
+ */
+function getOrCreateUuid(archiveUrl) {
+    const index = loadUuidIndex();
+    if (index[archiveUrl]) return index[archiveUrl];
+    const uuid = crypto.randomUUID();
+    index[archiveUrl] = uuid;
+    saveUuidIndex(index);
+    return uuid;
+}
+
+/**
+ * Migrate a UUID from one archive URL to another (used on rename).
+ */
+function migrateUuid(oldArchiveUrl, newArchiveUrl) {
+    const index = loadUuidIndex();
+    const uuid = index[oldArchiveUrl];
+    if (uuid) {
+        delete index[oldArchiveUrl];
+        index[newArchiveUrl] = uuid;
+        saveUuidIndex(index);
+    }
+}
+
+/**
+ * Remove a UUID entry from the index (used on delete).
+ */
+function deleteUuidEntry(archiveUrl) {
+    const index = loadUuidIndex();
+    if (index[archiveUrl]) {
+        delete index[archiveUrl];
+        saveUuidIndex(index);
+    }
+}
+
+/**
+ * Find an archive by its UUID.
+ */
+function findArchiveByUuid(uuid) {
+    const index = loadUuidIndex();
+    const archiveUrl = Object.keys(index).find(k => index[k] === uuid);
+    if (!archiveUrl) return null;
+    return findArchiveByHash(archiveHash(archiveUrl));
 }
 
 // --- OG/oEmbed Route Handlers ---
@@ -315,6 +379,7 @@ function listArchives() {
 
         results.push({
             hash,
+            uuid: getOrCreateUuid(archiveUrl),
             filename: file,
             path: archiveUrl,
             title: (meta && meta.title) || file.replace(/\.(a3d|a3z)$/i, ''),
@@ -395,6 +460,7 @@ function buildArchiveObject(filename) {
 
     return {
         hash,
+        uuid: getOrCreateUuid(archiveUrl),
         filename,
         path: archiveUrl,
         title: (meta && meta.title) || filename.replace(/\.(a3d|a3z)$/i, ''),
@@ -683,6 +749,8 @@ function handleDeleteArchive(req, res, hash) {
 
     // Delete archive file
     try { fs.unlinkSync(archive.filePath); } catch {}
+    // Remove UUID index entry
+    deleteUuidEntry('/archives/' + archive.filename);
     // Delete sidecar files
     try { fs.unlinkSync(path.join(META_DIR, hash + '.json')); } catch {}
     try { fs.unlinkSync(path.join(THUMBS_DIR, hash + '.jpg')); } catch {}
@@ -731,6 +799,9 @@ function handleRenameArchive(req, res, hash) {
 
             // Rename the file
             fs.renameSync(archive.filePath, newPath);
+
+            // Migrate UUID to the new archive path so share links remain stable
+            migrateUuid('/archives/' + archive.filename, '/archives/' + sanitized);
 
             // Clean old sidecar files
             try { fs.unlinkSync(path.join(META_DIR, hash + '.json')); } catch {}
@@ -785,6 +856,39 @@ function handleViewArchive(req, res, hash) {
     res.end(html);
 }
 
+/**
+ * GET /view/:uuid — serve the viewer via UUID-based clean URL.
+ */
+function handleViewArchiveByUuid(req, res, uuid) {
+    const archive = findArchiveByUuid(uuid);
+    if (!archive) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Archive not found');
+        return;
+    }
+
+    const indexHtml = getIndexHtml();
+    if (!indexHtml) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('index.html not found');
+        return;
+    }
+
+    const archiveUrl = '/archives/' + archive.filename;
+    const inject = { archive: archiveUrl, kiosk: true, autoload: false };
+    if (DEFAULT_KIOSK_THEME) inject.theme = DEFAULT_KIOSK_THEME;
+    const injectTag = '<script>window.__VITRINE_CLEAN_URL=' + JSON.stringify(inject) + ';</script>\n';
+
+    let html = indexHtml.replace(/<head>/i, '<head>\n<base href="/">');
+    html = html.replace(/<script[\s>]/i, (m) => injectTag + m);
+
+    res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-cache'
+    });
+    res.end(html);
+}
+
 // --- Server ---
 
 const server = http.createServer((req, res) => {
@@ -797,7 +901,13 @@ const server = http.createServer((req, res) => {
     // oEmbed endpoint
     if (pathname === '/oembed') return handleOembed(req, res);
 
-    // Clean archive URLs: /view/{hash} (public, no auth)
+    // Clean archive URLs: /view/{uuid} (UUID v4, new format)
+    const viewUuidMatch = pathname.match(/^\/view\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+    if (viewUuidMatch && req.method === 'GET') {
+        return handleViewArchiveByUuid(req, res, viewUuidMatch[1]);
+    }
+
+    // Clean archive URLs: /view/{hash} (16 hex chars, legacy format)
     const viewMatch = pathname.match(/^\/view\/([a-f0-9]{16})$/);
     if (viewMatch && req.method === 'GET') {
         return handleViewArchive(req, res, viewMatch[1]);

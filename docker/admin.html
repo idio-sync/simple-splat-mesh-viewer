@@ -1562,8 +1562,8 @@ function buildViewerUrl(archive, opts) {
         // Editor mode: direct URL with archive param
         return location.origin + '/?archive=' + encodeURIComponent(archive.path);
     }
-    // Kiosk mode: clean URL /view/{hash} (defaults to kiosk=true, autoload=false, theme=editorial)
-    const base = location.origin + '/view/' + archive.hash;
+    // Kiosk mode: clean URL /view/{uuid} (defaults to kiosk=true, autoload=false, theme=editorial)
+    const base = location.origin + '/view/' + archive.uuid;
     const params = [];
     if (opts.theme && opts.theme !== 'default' && opts.theme !== 'editorial') params.push('theme=' + opts.theme);
     if (opts.autoload) params.push('autoload=true');
