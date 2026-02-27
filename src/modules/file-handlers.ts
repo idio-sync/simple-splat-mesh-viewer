@@ -457,93 +457,78 @@ const TEXTURE_EXTS = new Set(['png', 'jpg', 'jpeg', 'tga', 'bmp', 'webp']);
 
 /**
  * Load OBJ model with optional MTL and texture files.
- * When textureFiles are provided, a LoadingManager URL modifier maps
- * texture filenames referenced in the MTL to blob URLs so they resolve correctly.
+ * Uses the Three.js docs pattern: all files are mapped by original filename
+ * to blob URLs via a LoadingManager URL modifier, then loaded by name.
+ * This ensures MTLLoader resolves texture references correctly.
  */
 export function loadOBJ(objFile: File, mtlFile: File | null, textureFiles?: File[]): Promise<THREE.Group> {
-    const objUrl = URL.createObjectURL(objFile);
+    // Map all files by their original filename → blob URL (Three.js docs pattern)
+    const blobMap = new Map<string, string>();
+    const allBlobUrls: string[] = [];
 
-    // Build blob URL map for textures so MTLLoader can resolve them
-    const textureBlobMap = new Map<string, string>();
-    const cleanupUrls: string[] = [];
-    if (textureFiles && textureFiles.length > 0) {
-        for (const file of textureFiles) {
-            const blobUrl = URL.createObjectURL(file);
-            textureBlobMap.set(file.name.toLowerCase(), blobUrl);
-            cleanupUrls.push(blobUrl);
-        }
+    const mapFile = (file: File) => {
+        const blobUrl = URL.createObjectURL(file);
+        blobMap.set(file.name, blobUrl);
+        blobMap.set(file.name.toLowerCase(), blobUrl);
+        allBlobUrls.push(blobUrl);
+    };
+
+    mapFile(objFile);
+    if (mtlFile) mapFile(mtlFile);
+    if (textureFiles) {
+        for (const file of textureFiles) mapFile(file);
     }
 
-    const hasTextures = textureBlobMap.size > 0;
+    const hasTextures = textureFiles && textureFiles.length > 0;
 
-    // Custom LoadingManager to redirect texture path lookups to blob URLs.
-    // MTLLoader prepends a resourcePath (derived from the MTL's blob URL) to texture
-    // filenames, producing URLs like "blob:http://host/uuid-partTexture.png".
-    // The modifier must handle both bare filenames and garbled blob-prefixed paths.
+    // LoadingManager URL modifier maps filenames to blob URLs
     const manager = new THREE.LoadingManager();
-    if (hasTextures) {
-        manager.setURLModifier((url: string) => {
-            // Try exact match first (bare filename from setResourcePath(''))
-            const lower = url.toLowerCase();
-            if (textureBlobMap.has(lower)) {
-                log.info(`Texture resolved (exact): ${url}`);
-                return textureBlobMap.get(lower)!;
-            }
-            // Extract filename from path or garbled blob URL
-            const filename = url.split(/[/\\]/).pop()?.toLowerCase() || '';
-            if (textureBlobMap.has(filename)) {
-                log.info(`Texture resolved (filename): ${filename}`);
-                return textureBlobMap.get(filename)!;
-            }
-            // Last resort: check if any key is a suffix of the URL
-            for (const [key, blobUrl] of textureBlobMap) {
-                if (lower.endsWith(key)) {
-                    log.info(`Texture resolved (suffix): ${key}`);
-                    return blobUrl;
-                }
-            }
-            log.warn(`Texture not found in blob map: ${url}`);
-            return url;
-        });
-    }
+    manager.setURLModifier((url: string) => {
+        // Try exact match
+        if (blobMap.has(url)) return blobMap.get(url)!;
+        // Try case-insensitive
+        const lower = url.toLowerCase();
+        if (blobMap.has(lower)) return blobMap.get(lower)!;
+        // Try filename only (strips any path prefix)
+        const filename = url.split(/[/\\]/).pop() || '';
+        if (blobMap.has(filename)) return blobMap.get(filename)!;
+        if (blobMap.has(filename.toLowerCase())) return blobMap.get(filename.toLowerCase())!;
+        return url;
+    });
 
     const revokeAll = () => {
-        for (const url of cleanupUrls) URL.revokeObjectURL(url);
+        for (const url of allBlobUrls) URL.revokeObjectURL(url);
     };
 
     return new Promise((resolve, reject) => {
         const objLoader = new OBJLoader(manager);
 
         if (mtlFile) {
-            const mtlUrl = URL.createObjectURL(mtlFile);
             const mtlLoader = new MTLLoader(manager);
-            // Prevent MTLLoader from prepending the blob URL path to texture filenames
-            mtlLoader.setResourcePath('');
 
+            // Load by original filename — URL modifier maps to blob URL.
+            // This makes extractUrlBase('model.mtl') return '' so texture
+            // paths resolve as bare filenames through the modifier.
             mtlLoader.load(
-                mtlUrl,
+                mtlFile.name,
                 (materials) => {
                     materials.preload();
                     objLoader.setMaterials(materials);
 
                     objLoader.load(
-                        objUrl,
+                        objFile.name,
                         (object) => {
-                            URL.revokeObjectURL(objUrl);
-                            URL.revokeObjectURL(mtlUrl);
                             // Preserve textures when MTL loaded them; only force default if no textures
                             processMeshMaterials(object, {
                                 forceDefaultMaterial: !hasTextures,
                                 preserveTextures: true
                             });
-                            // Delay texture blob cleanup to ensure GPU upload completes
+                            // Delay blob cleanup to ensure GPU texture upload completes
                             setTimeout(revokeAll, TIMING.BLOB_REVOKE_DELAY || 5000);
                             resolve(object);
                         },
                         undefined,
                         (error) => {
-                            URL.revokeObjectURL(objUrl);
-                            URL.revokeObjectURL(mtlUrl);
                             revokeAll();
                             reject(error);
                         }
@@ -551,12 +536,12 @@ export function loadOBJ(objFile: File, mtlFile: File | null, textureFiles?: File
                 },
                 undefined,
                 () => {
-                    URL.revokeObjectURL(mtlUrl);
-                    loadOBJWithoutMaterials(objLoader, objUrl, resolve, reject, revokeAll);
+                    // MTL failed to load — fall back to OBJ without materials
+                    loadOBJWithoutMaterials(objLoader, objFile.name, resolve, reject, revokeAll);
                 }
             );
         } else {
-            loadOBJWithoutMaterials(objLoader, objUrl, resolve, reject, revokeAll);
+            loadOBJWithoutMaterials(objLoader, objFile.name, resolve, reject, revokeAll);
         }
     });
 }
@@ -574,14 +559,12 @@ function loadOBJWithoutMaterials(
     loader.load(
         url,
         (object) => {
-            URL.revokeObjectURL(url);
             processMeshMaterials(object, { forceDefaultMaterial: true });
             if (cleanupFn) cleanupFn();
             resolve(object);
         },
         undefined,
         (error) => {
-            URL.revokeObjectURL(url);
             if (cleanupFn) cleanupFn();
             reject(error);
         }
