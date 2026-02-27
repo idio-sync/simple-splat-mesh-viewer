@@ -476,16 +476,33 @@ export function loadOBJ(objFile: File, mtlFile: File | null, textureFiles?: File
 
     const hasTextures = textureBlobMap.size > 0;
 
-    // Custom LoadingManager to redirect texture path lookups to blob URLs
+    // Custom LoadingManager to redirect texture path lookups to blob URLs.
+    // MTLLoader prepends a resourcePath (derived from the MTL's blob URL) to texture
+    // filenames, producing URLs like "blob:http://host/uuid-partTexture.png".
+    // The modifier must handle both bare filenames and garbled blob-prefixed paths.
     const manager = new THREE.LoadingManager();
     if (hasTextures) {
         manager.setURLModifier((url: string) => {
-            const filename = url.split(/[/\\]/).pop()?.toLowerCase() || '';
-            const mapped = textureBlobMap.get(filename);
-            if (mapped) {
-                log.info(`Texture resolved: ${filename}`);
-                return mapped;
+            // Try exact match first (bare filename from setResourcePath(''))
+            const lower = url.toLowerCase();
+            if (textureBlobMap.has(lower)) {
+                log.info(`Texture resolved (exact): ${url}`);
+                return textureBlobMap.get(lower)!;
             }
+            // Extract filename from path or garbled blob URL
+            const filename = url.split(/[/\\]/).pop()?.toLowerCase() || '';
+            if (textureBlobMap.has(filename)) {
+                log.info(`Texture resolved (filename): ${filename}`);
+                return textureBlobMap.get(filename)!;
+            }
+            // Last resort: check if any key is a suffix of the URL
+            for (const [key, blobUrl] of textureBlobMap) {
+                if (lower.endsWith(key)) {
+                    log.info(`Texture resolved (suffix): ${key}`);
+                    return blobUrl;
+                }
+            }
+            log.warn(`Texture not found in blob map: ${url}`);
             return url;
         });
     }
@@ -500,6 +517,8 @@ export function loadOBJ(objFile: File, mtlFile: File | null, textureFiles?: File
         if (mtlFile) {
             const mtlUrl = URL.createObjectURL(mtlFile);
             const mtlLoader = new MTLLoader(manager);
+            // Prevent MTLLoader from prepending the blob URL path to texture filenames
+            mtlLoader.setResourcePath('');
 
             mtlLoader.load(
                 mtlUrl,
