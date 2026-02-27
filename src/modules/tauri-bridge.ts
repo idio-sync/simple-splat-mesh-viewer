@@ -330,13 +330,32 @@ export async function ipcOpenFile(path: string): Promise<{ handleId: string; siz
 
 /**
  * Read a byte range from an open file handle via Rust IPC.
- * Returns raw bytes (Rust side uses tauri::ipc::Response to avoid JSON serialization).
+ * Large reads are chunked into 4MB pieces to avoid crashing the webview —
+ * even with raw bytes (tauri::ipc::Response), a single 150MB+ IPC transfer
+ * can cause STATUS_BREAKPOINT in the renderer process.
  */
 export async function ipcReadBytes(handleId: string, offset: number, length: number): Promise<Uint8Array> {
-    const buffer = await window.__TAURI__!.core.invoke<ArrayBuffer>(
-        'ipc_read_bytes', { handleId, offset, length }
-    );
-    return new Uint8Array(buffer);
+    const CHUNK_SIZE = 4 * 1024 * 1024; // 4MB per IPC call
+
+    if (length <= CHUNK_SIZE) {
+        const buffer = await window.__TAURI__!.core.invoke<ArrayBuffer>(
+            'ipc_read_bytes', { handleId, offset, length }
+        );
+        return new Uint8Array(buffer);
+    }
+
+    // Chunked read for large files
+    const result = new Uint8Array(length);
+    let bytesRead = 0;
+    while (bytesRead < length) {
+        const chunkLen = Math.min(CHUNK_SIZE, length - bytesRead);
+        const buffer = await window.__TAURI__!.core.invoke<ArrayBuffer>(
+            'ipc_read_bytes', { handleId, offset: offset + bytesRead, length: chunkLen }
+        );
+        result.set(new Uint8Array(buffer), bytesRead);
+        bytesRead += chunkLen;
+    }
+    return result;
 }
 
 /**
