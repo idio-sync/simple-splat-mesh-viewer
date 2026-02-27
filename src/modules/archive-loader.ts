@@ -233,6 +233,9 @@ export class ArchiveLoader {
     private _url: string | null = null;
     private _ipcHandleId: string | null = null;
     private _ipcReadFn: ((offset: number, length: number) => Promise<Uint8Array>) | null = null;
+    private _ipcCloseFn: (() => Promise<void>) | null = null;
+    private _bulkReadFn: (() => Promise<Uint8Array>) | null = null;
+    private _switchingToBuffer: Promise<void> | null = null;
     private _fileSize: number = 0;
     private _fileCache: Map<string, Uint8Array> = new Map();
     private _fileIndex: FileIndexEntry[] = [];
@@ -347,11 +350,14 @@ export class ArchiveLoader {
         openFn: (path: string) => Promise<{ handleId: string; size: number }>,
         readFn: (handleId: string, offset: number, length: number) => Promise<Uint8Array>,
         closeFn: (handleId: string) => Promise<void>,
-        filePath: string
+        filePath: string,
+        bulkReadFn?: () => Promise<Uint8Array>
     ): Promise<number> {
         const { handleId, size } = await openFn(filePath);
         this._ipcHandleId = handleId;
         this._ipcReadFn = (offset, length) => readFn(handleId, offset, length);
+        this._ipcCloseFn = () => closeFn(handleId);
+        this._bulkReadFn = bulkReadFn || null;
         this._fileSize = size;
         this._file = null;
         this._rawData = null;
@@ -385,12 +391,45 @@ export class ArchiveLoader {
     // =========================================================================
 
     /**
+     * One-time switch from IPC to in-memory buffer mode.
+     * Called automatically when _readBytes detects a large read (>1MB) via IPC.
+     * Uses the bulk-read function (typically fs.readFile) which is proven reliable
+     * for large files, unlike IPC which crashes the webview on 150MB+ transfers.
+     * Deduplicates concurrent calls via _switchingToBuffer promise.
+     */
+    private async _switchToBuffer(): Promise<void> {
+        if (this._switchingToBuffer) return this._switchingToBuffer;
+        this._switchingToBuffer = (async () => {
+            if (!this._bulkReadFn) return;
+            log.info('Switching from IPC to in-memory mode for large file extraction');
+            this._rawData = await this._bulkReadFn();
+            this._fileSize = this._rawData.length;
+            this._ipcReadFn = null;
+            this._bulkReadFn = null;
+            if (this._ipcCloseFn) {
+                try { await this._ipcCloseFn(); } catch { /* ignore close errors */ }
+                this._ipcCloseFn = null;
+            }
+            this._ipcHandleId = null;
+        })();
+        return this._switchingToBuffer;
+    }
+
+    /**
      * Read bytes from the archive source (File or raw buffer).
      * For File sources, only the requested range is read from disk.
      * For ArrayBuffer sources, returns a zero-copy subarray view.
      */
     private async _readBytes(offset: number, length: number): Promise<Uint8Array> {
         if (length === 0) return new Uint8Array(0);
+
+        // Auto-switch from IPC to in-memory buffer for large reads (>1MB).
+        // IPC can't reliably transfer 150MB+ without crashing the webview.
+        if (this._ipcReadFn && length > 1_000_000 && this._bulkReadFn) {
+            await this._switchToBuffer();
+            // _rawData is now set, _ipcReadFn is null — falls through to _rawData branch
+        }
+
         if (this._file) {
             const slice = this._file.slice(offset, offset + length);
             return new Uint8Array(await slice.arrayBuffer());
@@ -1016,6 +1055,9 @@ export class ArchiveLoader {
         this._file = null;
         this._url = null;
         this._ipcReadFn = null;
+        this._ipcCloseFn = null;
+        this._bulkReadFn = null;
+        this._switchingToBuffer = null;
         this._ipcHandleId = null;
         this._fileSize = 0;
         this._centralDir = null;
