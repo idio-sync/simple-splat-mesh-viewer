@@ -12,7 +12,7 @@
  *   node scripts/build-branded.mjs --archive scene.a3z --name "Tour" --icon icon.png
  */
 
-import { readFileSync, writeFileSync, copyFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, copyFileSync, existsSync, unlinkSync } from 'node:fs';
 import { join, basename, resolve, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
@@ -273,7 +273,7 @@ async function build({ archivePath, productName, iconPath }) {
         console.log('[7/7] Restoring original tauri.conf.json...');
         if (existsSync(TAURI_CONF_BAK)) {
             copyFileSync(TAURI_CONF_BAK, TAURI_CONF);
-            execSync(`rm "${TAURI_CONF_BAK}"`, { stdio: 'ignore' });
+            unlinkSync(TAURI_CONF_BAK);
         }
     }
 }

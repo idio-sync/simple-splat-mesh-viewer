@@ -1,0 +1,15 @@
+# Optimize webview2-com in debug builds to prevent compiler OOM.
+# This crate generates massive type expansions that exhaust memory
+# during debug compilation on Windows (STATUS_STACK_BUFFER_OVERRUN).
+[profile.dev.package.webview2-com]
+opt-level = 1
+
+[profile.dev.package.webview2-com-sys]
+opt-level = 1
+
+# Same fix for release builds — LLVM OOM during opt-level=3 on these crates.
+[profile.release.package.webview2-com]
+opt-level = 1
+
+[profile.release.package.webview2-com-sys]
+opt-level = 1
