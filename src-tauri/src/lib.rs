@@ -36,6 +36,9 @@ fn ipc_open_file(path: String, store: State<FileHandleStore>) -> Result<(String,
 }
 
 /// Read `length` bytes starting at `offset` from an open file handle.
+/// Returns raw bytes via tauri::ipc::Response to avoid JSON serialization
+/// (Vec<u8> would be serialized as a JSON array of numbers, which for a 150MB
+/// file means ~600MB of JSON text — enough to crash the webview).
 /// If compiled with VITRINE_ARCHIVE_KEY, XOR-decodes the bytes on the fly.
 #[tauri::command]
 fn ipc_read_bytes(
@@ -43,7 +46,7 @@ fn ipc_read_bytes(
     offset: u64,
     length: u32,
     store: State<FileHandleStore>,
-) -> Result<Vec<u8>, String> {
+) -> Result<tauri::ipc::Response, String> {
     let mut handles = store.handles.lock().unwrap();
     let entry = handles
         .get_mut(&handle_id)
@@ -65,7 +68,7 @@ fn ipc_read_bytes(
         }
     }
 
-    Ok(buf)
+    Ok(tauri::ipc::Response::new(buf))
 }
 
 /// Close an open file handle and release its resources.

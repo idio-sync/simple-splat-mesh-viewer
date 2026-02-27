@@ -330,12 +330,13 @@ export async function ipcOpenFile(path: string): Promise<{ handleId: string; siz
 
 /**
  * Read a byte range from an open file handle via Rust IPC.
+ * Returns raw bytes (Rust side uses tauri::ipc::Response to avoid JSON serialization).
  */
 export async function ipcReadBytes(handleId: string, offset: number, length: number): Promise<Uint8Array> {
-    const bytes = await window.__TAURI__!.core.invoke<number[]>(
+    const buffer = await window.__TAURI__!.core.invoke<ArrayBuffer>(
         'ipc_read_bytes', { handleId, offset, length }
     );
-    return new Uint8Array(bytes);
+    return new Uint8Array(buffer);
 }
 
 /**
