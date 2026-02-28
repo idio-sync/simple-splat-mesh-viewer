@@ -52,6 +52,7 @@ let uploadQueue: File[] = [];
 let uploading = false;
 
 const CHUNK_SIZE = 50 * 1024 * 1024; // 50 MB — safely under Cloudflare's 100 MB request limit
+const CHUNK_CONCURRENCY = 3;          // parallel in-flight chunk uploads
 
 // ── DOM refs (cached on init) ──
 
@@ -136,25 +137,30 @@ class AuthError extends Error {
 function uploadFileChunked(file: File): Promise<Archive> {
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
     const uploadId = crypto.randomUUID();
+    const chunkBytes = new Array<number>(totalChunks).fill(0);
 
     const uploadChunk = (index: number): Promise<void> =>
         new Promise((resolve, reject) => {
             const start = index * CHUNK_SIZE;
-            const chunk = file.slice(start, Math.min(start + CHUNK_SIZE, file.size));
+            const end = Math.min(start + CHUNK_SIZE, file.size);
+            const chunk = file.slice(start, end);
             const params = new URLSearchParams({
                 uploadId, chunkIndex: String(index), totalChunks: String(totalChunks), filename: file.name
             });
             const xhr = new XMLHttpRequest();
             xhr.upload.addEventListener('progress', (e) => {
                 if (e.lengthComputable) {
-                    const overall = Math.round(((index + e.loaded / e.total) / totalChunks) * 100);
-                    if (progressFill) progressFill.style.width = overall + '%';
-                    if (progressPct) progressPct.textContent = overall + '%';
+                    chunkBytes[index] = e.loaded;
+                    const pct = Math.round((chunkBytes.reduce((s, b) => s + b, 0) / file.size) * 100);
+                    if (progressFill) progressFill.style.width = pct + '%';
+                    if (progressPct) progressPct.textContent = pct + '%';
                 }
             });
             xhr.addEventListener('load', () => {
-                if (xhr.status >= 200 && xhr.status < 300) resolve();
-                else if (xhr.status === 401) reject(new AuthError());
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    chunkBytes[index] = end - start;
+                    resolve();
+                } else if (xhr.status === 401) reject(new AuthError());
                 else {
                     let msg = `Chunk ${index + 1}/${totalChunks} failed`;
                     try { msg = JSON.parse(xhr.responseText).error || msg; } catch { /* ignore */ }
@@ -184,7 +190,9 @@ function uploadFileChunked(file: File): Promise<Archive> {
         });
 
     return (async () => {
-        for (let i = 0; i < totalChunks; i++) await uploadChunk(i);
+        let next = 0;
+        const worker = async () => { while (next < totalChunks) await uploadChunk(next++); };
+        await Promise.all(Array.from({ length: Math.min(CHUNK_CONCURRENCY, totalChunks) }, worker));
         return complete();
     })();
 }

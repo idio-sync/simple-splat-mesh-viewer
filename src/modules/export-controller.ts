@@ -18,6 +18,7 @@ import type { ExportDeps } from '@/types.js';
 const log = Logger.getLogger('export-controller');
 
 const CHUNK_SIZE = 50 * 1024 * 1024; // 50 MB — safely under Cloudflare's 100 MB request limit
+const CHUNK_CONCURRENCY = 3;          // parallel in-flight chunk uploads
 
 /**
  * Show the export panel and sync asset checkboxes.
@@ -582,36 +583,42 @@ export async function saveToLibrary(deps: ExportDeps): Promise<void> {
             const totalChunks = Math.ceil(blob.size / CHUNK_SIZE);
             const uploadId = crypto.randomUUID();
 
-            for (let i = 0; i < totalChunks; i++) {
+            const chunkBytes = new Array<number>(totalChunks).fill(0);
+            const uploadChunk = (i: number) => new Promise<void>((resolve, reject) => {
                 const start = i * CHUNK_SIZE;
-                const chunk = blob.slice(start, Math.min(start + CHUNK_SIZE, blob.size));
+                const end = Math.min(start + CHUNK_SIZE, blob.size);
+                const chunk = blob.slice(start, end);
                 const params = new URLSearchParams({
                     uploadId, chunkIndex: String(i), totalChunks: String(totalChunks), filename
                 });
-                await new Promise<void>((resolve, reject) => {
-                    const xhr = new XMLHttpRequest();
-                    xhr.upload.addEventListener('progress', (e) => {
-                        if (e.lengthComputable) {
-                            const overall = Math.round(((i + e.loaded / e.total) / totalChunks) * 100);
-                            deps.ui.updateProgress(82 + Math.round(overall * 0.16), 'Uploading to library...');
-                        }
-                    });
-                    xhr.addEventListener('load', () => {
-                        if (xhr.status >= 200 && xhr.status < 300) resolve();
-                        else {
-                            let msg = `Chunk ${i + 1}/${totalChunks} failed`;
-                            try { msg = JSON.parse(xhr.responseText).error || msg; } catch { /* ignore */ }
-                            reject(new Error(msg));
-                        }
-                    });
-                    xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
-                    xhr.open('POST', '/api/archives/chunks?' + params.toString());
-                    xhr.withCredentials = true;
-                    xhr.setRequestHeader('Authorization', 'Basic ' + creds);
-                    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-                    xhr.send(chunk);
+                const xhr = new XMLHttpRequest();
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        chunkBytes[i] = e.loaded;
+                        const pct = Math.round((chunkBytes.reduce((s, b) => s + b, 0) / blob.size) * 100);
+                        deps.ui.updateProgress(82 + Math.round(pct * 0.16), 'Uploading to library...');
+                    }
                 });
-            }
+                xhr.addEventListener('load', () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        chunkBytes[i] = end - start;
+                        resolve();
+                    } else {
+                        let msg = `Chunk ${i + 1}/${totalChunks} failed`;
+                        try { msg = JSON.parse(xhr.responseText).error || msg; } catch { /* ignore */ }
+                        reject(new Error(msg));
+                    }
+                });
+                xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
+                xhr.open('POST', '/api/archives/chunks?' + params.toString());
+                xhr.withCredentials = true;
+                xhr.setRequestHeader('Authorization', 'Basic ' + creds);
+                xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+                xhr.send(chunk);
+            });
+            let nextChunk = 0;
+            const worker = async () => { while (nextChunk < totalChunks) await uploadChunk(nextChunk++); };
+            await Promise.all(Array.from({ length: Math.min(CHUNK_CONCURRENCY, totalChunks) }, worker));
 
             // Trigger assembly; on 409 (file exists) delete and retry
             const doComplete = () => fetch('/api/archives/chunks/' + uploadId + '/complete', {
