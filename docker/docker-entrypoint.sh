@@ -7,6 +7,7 @@ envsubst '${DEFAULT_ARCHIVE_URL} ${DEFAULT_SPLAT_URL} ${DEFAULT_MODEL_URL} ${DEF
     > /usr/share/nginx/html/config.js
 
 # Substitute environment variables in the nginx config template
+SERVER_NAMES="${SERVER_NAMES:-localhost}"
 envsubst '${FRAME_ANCESTORS} ${SERVER_NAMES} ${SITE_URL}' \
     < /etc/nginx/templates/nginx.conf.template \
     > /etc/nginx/conf.d/default.conf
