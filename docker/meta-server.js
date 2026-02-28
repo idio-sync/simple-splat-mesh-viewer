@@ -147,7 +147,7 @@ function stripMarkdown(text) {
     return text
         .replace(/!\[[^\]]*\]\([^)]*\)/g, '')        // remove images entirely
         .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')     // links → link text
-        .replace(/^#{1,6}\s+/gm, '')                 // headings
+        .replace(/^#{1,6}\s+.*$/gm, '')              // remove entire heading lines
         .replace(/\*{1,3}([^*\n]+)\*{1,3}/g, '$1')  // bold/italic
         .replace(/_{1,3}([^_\n]+)_{1,3}/g, '$1')    // underscore bold/italic
         .replace(/`{3}[\s\S]*?`{3}/g, '')            // fenced code blocks

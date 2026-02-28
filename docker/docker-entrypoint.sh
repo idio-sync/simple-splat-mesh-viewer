@@ -7,7 +7,7 @@ envsubst '${DEFAULT_ARCHIVE_URL} ${DEFAULT_SPLAT_URL} ${DEFAULT_MODEL_URL} ${DEF
     > /usr/share/nginx/html/config.js
 
 # Substitute environment variables in the nginx config template
-envsubst '${FRAME_ANCESTORS}' \
+envsubst '${FRAME_ANCESTORS} ${SERVER_NAMES} ${SITE_URL}' \
     < /etc/nginx/templates/nginx.conf.template \
     > /etc/nginx/conf.d/default.conf
 
@@ -40,6 +40,7 @@ echo "  DEFAULT_POINTCLOUD_URL: ${DEFAULT_POINTCLOUD_URL:-<not set>}"
 echo "  SHOW_CONTROLS: ${SHOW_CONTROLS}"
 echo "  ALLOWED_DOMAINS: ${ALLOWED_DOMAINS:-<not set>}"
 echo "  FRAME_ANCESTORS: ${FRAME_ANCESTORS}"
+echo "  SERVER_NAMES: ${SERVER_NAMES:-localhost}"
 echo "  CORS_ORIGINS: ${CORS_ORIGINS:-<not set, same-origin only>}"
 echo "  ARCHIVE_PATH_PREFIX: ${ARCHIVE_PATH_PREFIX:-<not set>}"
 

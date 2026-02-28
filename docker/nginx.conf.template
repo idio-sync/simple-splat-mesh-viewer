@@ -31,7 +31,7 @@ map $http_user_agent $is_bot {
 
 server {
     listen 80;
-    server_name localhost;
+    server_name ${SERVER_NAMES};
     root /usr/share/nginx/html;
     index index.html;
 
@@ -66,6 +66,14 @@ server {
         add_header Access-Control-Allow-Methods "GET, OPTIONS" always;
         add_header Vary "Origin" always;
     }
+
+    # Rewrite absolute asset paths in HTML so browsers load them from the canonical origin.
+    # Required when this container is sub-path proxied (e.g. jakemarino.fyi/view/* → viewer.jakemarino.fyi).
+    # Driven by SITE_URL (e.g. https://viewer.jakemarino.fyi) — leave unset for normal direct access.
+    sub_filter_once off;
+    sub_filter_types text/html;
+    sub_filter 'href="/' 'href="${SITE_URL}/';
+    sub_filter 'src="/' 'src="${SITE_URL}/';
 
     # Enable gzip compression
     gzip on;
