@@ -388,7 +388,7 @@ function buildShareUrl(state: ShareState, dialog: Element): string {
     if (isKiosk && viewId) {
         const base = window.location.origin + '/view/' + viewId;
         const params: string[] = [];
-        if (theme && theme !== 'default') params.push('theme=' + theme);
+        if (theme && theme !== 'default' && theme !== 'editorial') params.push('theme=' + theme);
         return base + (params.length ? '?' + params.join('&') : '');
     }
 
