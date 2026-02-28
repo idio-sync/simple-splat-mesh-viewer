@@ -139,6 +139,65 @@ function escapeHtml(str) {
         .replace(/>/g, '&gt;');
 }
 
+/**
+ * Check if a request is from a known bot/crawler.
+ * Mirrors the $is_bot user-agent map in nginx.conf.template.
+ */
+const BOT_UA_RE = /googlebot|bingbot|slackbot|twitterbot|facebookexternalhit|linkedinbot|discordbot|whatsapp|applebot|iframely|embedly|pinterest|redditbot|telegrambot|viber|skypeuripreview|tumblr|vkshare|wordpress/i;
+
+function isBotRequest(req) {
+    return BOT_UA_RE.test(req.headers['user-agent'] || '');
+}
+
+/**
+ * Write an OG/Twitter Card HTML response.
+ * Shared by handleBotRequest (query-param URLs) and handleView* (clean URLs).
+ */
+function serveOgHtml(res, title, description, thumb, canonicalUrl, oembedUrl) {
+    const t = escapeHtml(title);
+    const d = escapeHtml(description);
+    const u = escapeHtml(canonicalUrl);
+    const oe = escapeHtml(oembedUrl);
+    const i = escapeHtml(thumb);
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>${t}</title>
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="${escapeHtml(SITE_NAME)}">
+    <meta property="og:title" content="${t}">
+    <meta property="og:description" content="${d}">
+    <meta property="og:url" content="${u}">
+    ${i ? `<meta property="og:image" content="${i}">` : ''}
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="${i ? 'summary_large_image' : 'summary'}">
+    <meta name="twitter:title" content="${t}">
+    <meta name="twitter:description" content="${d}">
+    ${i ? `<meta name="twitter:image" content="${i}">` : ''}
+
+    <!-- oEmbed discovery -->
+    <link rel="alternate" type="application/json+oembed" href="${oe}" title="${t}">
+
+    <!-- Redirect human visitors that somehow reach this page -->
+    <meta http-equiv="refresh" content="0;url=${u}">
+</head>
+<body>
+    <p>Redirecting to <a href="${u}">${t}</a>...</p>
+</body>
+</html>`;
+
+    res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'public, max-age=3600'
+    });
+    res.end(html);
+}
+
 // --- UUID Index ---
 
 function loadUuidIndex() {
@@ -212,48 +271,14 @@ function handleBotRequest(req, res) {
     const archiveUrl = parsed.query.archive || '';
     const meta = readMeta(archiveUrl);
 
-    const title = escapeHtml((meta && meta.title) || SITE_NAME);
-    const description = escapeHtml((meta && meta.description) || SITE_DESCRIPTION);
-    const thumb = escapeHtml(thumbnailUrl(meta, archiveUrl));
-    const canonicalUrl = escapeHtml(SITE_URL + (req.url || '/'));
-    const oembedUrl = escapeHtml(SITE_URL + '/oembed?url=' + encodeURIComponent(SITE_URL + req.url) + '&format=json');
-
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>${title}</title>
-
-    <!-- Open Graph -->
-    <meta property="og:type" content="website">
-    <meta property="og:site_name" content="${escapeHtml(SITE_NAME)}">
-    <meta property="og:title" content="${title}">
-    <meta property="og:description" content="${description}">
-    <meta property="og:url" content="${canonicalUrl}">
-    ${thumb ? `<meta property="og:image" content="${thumb}">` : ''}
-
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="${thumb ? 'summary_large_image' : 'summary'}">
-    <meta name="twitter:title" content="${title}">
-    <meta name="twitter:description" content="${description}">
-    ${thumb ? `<meta name="twitter:image" content="${thumb}">` : ''}
-
-    <!-- oEmbed discovery -->
-    <link rel="alternate" type="application/json+oembed" href="${oembedUrl}" title="${title}">
-
-    <!-- Redirect human visitors that somehow reach this page -->
-    <meta http-equiv="refresh" content="0;url=${canonicalUrl}">
-</head>
-<body>
-    <p>Redirecting to <a href="${canonicalUrl}">${title}</a>...</p>
-</body>
-</html>`;
-
-    res.writeHead(200, {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'public, max-age=3600'
-    });
-    res.end(html);
+    serveOgHtml(
+        res,
+        (meta && meta.title) || SITE_NAME,
+        (meta && meta.description) || SITE_DESCRIPTION,
+        thumbnailUrl(meta, archiveUrl),
+        SITE_URL + (req.url || '/'),
+        SITE_URL + '/oembed?url=' + encodeURIComponent(SITE_URL + req.url) + '&format=json'
+    );
 }
 
 /**
@@ -276,8 +301,24 @@ function handleOembed(req, res) {
         return;
     }
 
-    const archiveUrl = extractArchiveParam(viewerUrl);
-    const meta = readMeta(archiveUrl);
+    let archiveUrl = extractArchiveParam(viewerUrl);
+    let meta = readMeta(archiveUrl);
+
+    // For clean /view/{uuid|hash} URLs there is no ?archive= param — look up by path
+    if (!archiveUrl) {
+        try {
+            const parsedViewerUrl = new URL(viewerUrl);
+            const uuidMatch = parsedViewerUrl.pathname.match(/^\/view\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+            const hashMatch = parsedViewerUrl.pathname.match(/^\/view\/([a-f0-9]{16})$/);
+            let found = null;
+            if (uuidMatch) found = findArchiveByUuid(uuidMatch[1]);
+            else if (hashMatch) found = findArchiveByHash(hashMatch[1]);
+            if (found) {
+                archiveUrl = '/archives/' + found.filename;
+                meta = found.meta;
+            }
+        } catch { /* ignore invalid URL */ }
+    }
 
     const title = (meta && meta.title) || SITE_NAME;
     const thumb = thumbnailUrl(meta, archiveUrl);
@@ -851,6 +892,19 @@ function handleViewArchive(req, res, hash) {
         return;
     }
 
+    if (isBotRequest(req)) {
+        const archiveUrl = '/archives/' + archive.filename;
+        const meta = archive.meta;
+        return serveOgHtml(
+            res,
+            (meta && meta.title) || SITE_NAME,
+            (meta && meta.description) || SITE_DESCRIPTION,
+            thumbnailUrl(meta, archiveUrl),
+            SITE_URL + req.url,
+            SITE_URL + '/oembed?url=' + encodeURIComponent(SITE_URL + req.url) + '&format=json'
+        );
+    }
+
     const indexHtml = getIndexHtml();
     if (!indexHtml) {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
@@ -884,6 +938,19 @@ function handleViewArchiveByUuid(req, res, uuid) {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('Archive not found');
         return;
+    }
+
+    if (isBotRequest(req)) {
+        const archiveUrl = '/archives/' + archive.filename;
+        const meta = archive.meta;
+        return serveOgHtml(
+            res,
+            (meta && meta.title) || SITE_NAME,
+            (meta && meta.description) || SITE_DESCRIPTION,
+            thumbnailUrl(meta, archiveUrl),
+            SITE_URL + req.url,
+            SITE_URL + '/oembed?url=' + encodeURIComponent(SITE_URL + req.url) + '&format=json'
+        );
     }
 
     const indexHtml = getIndexHtml();
