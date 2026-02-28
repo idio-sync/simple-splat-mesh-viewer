@@ -51,6 +51,8 @@ let hasFetched = false;
 let uploadQueue: File[] = [];
 let uploading = false;
 
+const CHUNK_SIZE = 50 * 1024 * 1024; // 50 MB — safely under Cloudflare's 100 MB request limit
+
 // ── DOM refs (cached on init) ──
 
 let gallery: HTMLElement | null = null;
@@ -131,7 +133,66 @@ class AuthError extends Error {
     constructor() { super('Authentication required'); this.name = 'AuthError'; }
 }
 
+function uploadFileChunked(file: File): Promise<Archive> {
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    const uploadId = crypto.randomUUID();
+
+    const uploadChunk = (index: number): Promise<void> =>
+        new Promise((resolve, reject) => {
+            const start = index * CHUNK_SIZE;
+            const chunk = file.slice(start, Math.min(start + CHUNK_SIZE, file.size));
+            const params = new URLSearchParams({
+                uploadId, chunkIndex: String(index), totalChunks: String(totalChunks), filename: file.name
+            });
+            const xhr = new XMLHttpRequest();
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const overall = Math.round(((index + e.loaded / e.total) / totalChunks) * 100);
+                    if (progressFill) progressFill.style.width = overall + '%';
+                    if (progressPct) progressPct.textContent = overall + '%';
+                }
+            });
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) resolve();
+                else if (xhr.status === 401) reject(new AuthError());
+                else {
+                    let msg = `Chunk ${index + 1}/${totalChunks} failed`;
+                    try { msg = JSON.parse(xhr.responseText).error || msg; } catch { /* ignore */ }
+                    reject(new Error(msg));
+                }
+            });
+            xhr.addEventListener('error', () => reject(new Error('Network error')));
+            xhr.open('POST', '/api/archives/chunks?' + params.toString());
+            xhr.withCredentials = true;
+            if (authCredentials) xhr.setRequestHeader('Authorization', 'Basic ' + authCredentials);
+            xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+            xhr.send(chunk);
+        });
+
+    const complete = (): Promise<Archive> =>
+        fetch('/api/archives/chunks/' + uploadId + '/complete', {
+            method: 'POST',
+            credentials: 'include',
+            headers: authCredentials ? { 'Authorization': 'Basic ' + authCredentials } : {}
+        }).then(async (res) => {
+            if (res.status === 401) throw new AuthError();
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({})) as { error?: string };
+                throw new Error(data.error || 'Assembly failed');
+            }
+            return res.json() as Promise<Archive>;
+        });
+
+    return (async () => {
+        for (let i = 0; i < totalChunks; i++) await uploadChunk(i);
+        return complete();
+    })();
+}
+
 function uploadFile(file: File): Promise<Archive> {
+    const chunkedEnabled = (window as unknown as { APP_CONFIG?: { chunkedUpload?: boolean } }).APP_CONFIG?.chunkedUpload;
+    if (chunkedEnabled && file.size > CHUNK_SIZE) return uploadFileChunked(file);
+
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         const form = new FormData();

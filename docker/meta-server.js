@@ -39,6 +39,9 @@ const OEMBED_WIDTH = parseInt(process.env.OEMBED_WIDTH || '960', 10);
 const OEMBED_HEIGHT = parseInt(process.env.OEMBED_HEIGHT || '540', 10);
 const ADMIN_ENABLED = process.env.ADMIN_ENABLED === 'true';
 const MAX_UPLOAD_SIZE = parseInt(process.env.MAX_UPLOAD_SIZE || '1024', 10) * 1024 * 1024;
+const CHUNKED_UPLOAD = process.env.CHUNKED_UPLOAD === 'true';
+const MAX_CHUNK_SIZE = 100 * 1024 * 1024; // 100 MB per-chunk hard cap
+const CHUNKS_DIR = '/tmp/v3d_chunks';
 const DEFAULT_KIOSK_THEME = process.env.DEFAULT_KIOSK_THEME || '';
 
 const HTML_ROOT = '/usr/share/nginx/html';
@@ -905,6 +908,157 @@ function handleViewArchiveByUuid(req, res, uuid) {
     res.end(html);
 }
 
+// --- Chunked Upload ---
+
+/**
+ * Remove chunk directories older than 24 hours from CHUNKS_DIR.
+ */
+function cleanupStaleChunks() {
+    try {
+        if (!fs.existsSync(CHUNKS_DIR)) return;
+        const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+        for (const entry of fs.readdirSync(CHUNKS_DIR)) {
+            const dirPath = path.join(CHUNKS_DIR, entry);
+            try {
+                const stat = fs.statSync(dirPath);
+                if (stat.isDirectory() && stat.mtimeMs < cutoff) {
+                    fs.rmSync(dirPath, { recursive: true, force: true });
+                    console.log('[chunks] Cleaned stale upload dir:', entry);
+                }
+            } catch { /* ignore */ }
+        }
+    } catch (err) {
+        console.error('[chunks] Cleanup error:', err.message);
+    }
+}
+
+/**
+ * POST /api/archives/chunks?uploadId=&chunkIndex=&totalChunks=&filename=
+ * Body: raw binary chunk (application/octet-stream).
+ * Streams each chunk to /tmp/v3d_chunks/{uploadId}/{chunkIndex}.part
+ */
+async function handleUploadChunk(req, res) {
+    try {
+        const parsed = url.parse(req.url, true);
+        const uploadId = (parsed.query.uploadId || '').toString();
+        const chunkIndex = parseInt(parsed.query.chunkIndex, 10);
+        const totalChunks = parseInt(parsed.query.totalChunks, 10);
+        const filename = sanitizeFilename((parsed.query.filename || '').toString());
+
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uploadId)) {
+            return sendJson(res, 400, { error: 'Invalid upload ID' });
+        }
+        if (!filename || isNaN(chunkIndex) || isNaN(totalChunks)) {
+            return sendJson(res, 400, { error: 'Missing required parameters' });
+        }
+        if (chunkIndex < 0 || chunkIndex >= totalChunks || totalChunks < 1 || totalChunks > 200) {
+            return sendJson(res, 400, { error: 'Invalid chunk parameters' });
+        }
+
+        const chunkDir = path.join(CHUNKS_DIR, uploadId);
+        const metaPath = path.join(chunkDir, 'meta.json');
+        const chunkPath = path.join(chunkDir, chunkIndex + '.part');
+
+        if (!fs.existsSync(chunkDir)) fs.mkdirSync(chunkDir, { recursive: true });
+        if (!fs.existsSync(metaPath)) {
+            fs.writeFileSync(metaPath, JSON.stringify({ filename, totalChunks, created: Date.now() }));
+        }
+
+        let received = 0;
+        const writeStream = fs.createWriteStream(chunkPath);
+        await new Promise((resolve, reject) => {
+            req.on('data', (data) => {
+                received += data.length;
+                if (received > MAX_CHUNK_SIZE) {
+                    writeStream.destroy();
+                    try { fs.unlinkSync(chunkPath); } catch {}
+                    req.destroy();
+                    reject(new Error('CHUNK_LIMIT'));
+                    return;
+                }
+                writeStream.write(data);
+            });
+            req.on('end', () => writeStream.end(resolve));
+            req.on('error', reject);
+            writeStream.on('error', reject);
+        });
+
+        sendJson(res, 200, { received: true, chunkIndex });
+    } catch (err) {
+        if (err.message === 'CHUNK_LIMIT') {
+            sendJson(res, 413, { error: 'Chunk exceeds ' + Math.round(MAX_CHUNK_SIZE / 1024 / 1024) + ' MB limit' });
+        } else {
+            console.error('[chunks] Upload error:', err.message);
+            sendJson(res, 500, { error: err.message });
+        }
+    }
+}
+
+/**
+ * POST /api/archives/chunks/:uploadId/complete
+ * Assembles all .part files in order into the final archive, then runs extract-meta.
+ */
+async function handleCompleteChunk(req, res, uploadId) {
+    try {
+        const chunkDir = path.join(CHUNKS_DIR, uploadId);
+        const metaPath = path.join(chunkDir, 'meta.json');
+        if (!fs.existsSync(metaPath)) {
+            return sendJson(res, 404, { error: 'Upload session not found or expired' });
+        }
+
+        let meta;
+        try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')); }
+        catch { return sendJson(res, 500, { error: 'Corrupt upload session' }); }
+
+        const { filename, totalChunks } = meta;
+
+        for (let i = 0; i < totalChunks; i++) {
+            if (!fs.existsSync(path.join(chunkDir, i + '.part'))) {
+                return sendJson(res, 400, { error: 'Missing chunk ' + i + ' of ' + totalChunks });
+            }
+        }
+
+        if (!fs.existsSync(ARCHIVES_DIR)) fs.mkdirSync(ARCHIVES_DIR, { recursive: true });
+        const finalPath = path.join(ARCHIVES_DIR, filename);
+        if (fs.existsSync(finalPath)) {
+            return sendJson(res, 409, { error: 'File already exists: ' + filename });
+        }
+
+        // Assemble chunks in order via streaming
+        const tmpPath = path.join('/tmp', 'v3d_assembled_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex'));
+        const writeStream = fs.createWriteStream(tmpPath);
+        for (let i = 0; i < totalChunks; i++) {
+            await new Promise((resolve, reject) => {
+                const readStream = fs.createReadStream(path.join(chunkDir, i + '.part'));
+                readStream.on('error', reject);
+                readStream.on('end', resolve);
+                readStream.pipe(writeStream, { end: false });
+            });
+        }
+        await new Promise((resolve, reject) => {
+            writeStream.end();
+            writeStream.on('finish', resolve);
+            writeStream.on('error', reject);
+        });
+
+        // Clean up chunk dir before moving (best-effort)
+        try { fs.rmSync(chunkDir, { recursive: true, force: true }); } catch {}
+
+        try {
+            fs.renameSync(tmpPath, finalPath);
+        } catch {
+            fs.copyFileSync(tmpPath, finalPath);
+            try { fs.unlinkSync(tmpPath); } catch {}
+        }
+
+        runExtractMeta(finalPath);
+        sendJson(res, 201, buildArchiveObject(filename));
+    } catch (err) {
+        console.error('[chunks] Assembly error:', err.message);
+        sendJson(res, 500, { error: err.message });
+    }
+}
+
 // --- Server ---
 
 const server = http.createServer((req, res) => {
@@ -942,6 +1096,19 @@ const server = http.createServer((req, res) => {
             return;
         }
 
+        // Chunked upload routes (only when CHUNKED_UPLOAD=true)
+        if (CHUNKED_UPLOAD) {
+            if (pathname === '/api/archives/chunks' && req.method === 'POST') {
+                handleUploadChunk(req, res);
+                return;
+            }
+            const chunkCompleteMatch = pathname.match(/^\/api\/archives\/chunks\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/complete$/i);
+            if (chunkCompleteMatch && req.method === 'POST') {
+                handleCompleteChunk(req, res, chunkCompleteMatch[1].toLowerCase());
+                return;
+            }
+        }
+
         // Match /api/archives/:hash/regenerate
         const regenMatch = pathname.match(/^\/api\/archives\/([a-f0-9]{16})\/regenerate$/);
         if (regenMatch && req.method === 'POST') {
@@ -963,6 +1130,11 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, '127.0.0.1', () => {
     console.log(`[meta-server] Listening on 127.0.0.1:${PORT}`);
+    if (CHUNKED_UPLOAD) {
+        console.log(`[meta-server] Chunked upload: ENABLED (chunks dir: ${CHUNKS_DIR})`);
+        cleanupStaleChunks();
+        setInterval(cleanupStaleChunks, 60 * 60 * 1000);
+    }
     console.log(`[meta-server] SITE_NAME=${SITE_NAME}`);
     console.log(`[meta-server] SITE_URL=${SITE_URL || '(not set)'}`);
     if (ADMIN_ENABLED) {

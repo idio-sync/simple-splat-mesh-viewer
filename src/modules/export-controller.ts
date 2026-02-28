@@ -17,6 +17,8 @@ import type { ExportDeps } from '@/types.js';
 
 const log = Logger.getLogger('export-controller');
 
+const CHUNK_SIZE = 50 * 1024 * 1024; // 50 MB — safely under Cloudflare's 100 MB request limit
+
 /**
  * Show the export panel and sync asset checkboxes.
  */
@@ -574,60 +576,119 @@ export async function saveToLibrary(deps: ExportDeps): Promise<void> {
         deps.ui.updateProgress(82, 'Uploading to library...');
 
         // Upload via XHR for progress tracking
-        await new Promise<void>((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            const form = new FormData();
-            form.append('file', blob, filename);
+        const chunkedEnabled = (window as unknown as { APP_CONFIG?: { chunkedUpload?: boolean } }).APP_CONFIG?.chunkedUpload;
+        if (chunkedEnabled && blob.size > CHUNK_SIZE) {
+            // Chunked upload — split into 50 MB pieces to stay under Cloudflare's 100 MB request limit
+            const totalChunks = Math.ceil(blob.size / CHUNK_SIZE);
+            const uploadId = crypto.randomUUID();
 
-            xhr.upload.addEventListener('progress', (e) => {
-                if (e.lengthComputable) {
-                    const uploadPct = Math.round((e.loaded / e.total) * 100);
-                    deps.ui.updateProgress(82 + Math.round(uploadPct * 0.16), 'Uploading to library...');
-                }
-            });
-
-            xhr.addEventListener('load', () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    resolve();
-                } else if (xhr.status === 409) {
-                    // File exists — try overwrite (delete + re-upload)
-                    const retryXhr = new XMLHttpRequest();
-                    fetch('/api/archives/' + encodeURIComponent(filename), {
-                        method: 'DELETE',
-                        credentials: 'include',
-                        headers: { 'Authorization': 'Basic ' + creds }
-                    }).then(delRes => {
-                        if (!delRes.ok) {
-                            reject(new Error('Archive already exists and could not be overwritten'));
-                            return;
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * CHUNK_SIZE;
+                const chunk = blob.slice(start, Math.min(start + CHUNK_SIZE, blob.size));
+                const params = new URLSearchParams({
+                    uploadId, chunkIndex: String(i), totalChunks: String(totalChunks), filename
+                });
+                await new Promise<void>((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.upload.addEventListener('progress', (e) => {
+                        if (e.lengthComputable) {
+                            const overall = Math.round(((i + e.loaded / e.total) / totalChunks) * 100);
+                            deps.ui.updateProgress(82 + Math.round(overall * 0.16), 'Uploading to library...');
                         }
-                        // Re-upload after delete
-                        const retryForm = new FormData();
-                        retryForm.append('file', blob, filename);
-                        retryXhr.addEventListener('load', () => {
-                            if (retryXhr.status >= 200 && retryXhr.status < 300) resolve();
-                            else reject(new Error('Re-upload failed: ' + retryXhr.statusText));
-                        });
-                        retryXhr.addEventListener('error', () => reject(new Error('Re-upload network error')));
-                        retryXhr.open('POST', '/api/archives');
-                        retryXhr.withCredentials = true;
-                        retryXhr.setRequestHeader('Authorization', 'Basic ' + creds);
-                        retryXhr.send(retryForm);
-                    }).catch(reject);
-                } else {
-                    let msg = xhr.statusText;
-                    try { msg = JSON.parse(xhr.responseText).error || msg; } catch { /* ignore */ }
-                    reject(new Error(msg));
-                }
+                    });
+                    xhr.addEventListener('load', () => {
+                        if (xhr.status >= 200 && xhr.status < 300) resolve();
+                        else {
+                            let msg = `Chunk ${i + 1}/${totalChunks} failed`;
+                            try { msg = JSON.parse(xhr.responseText).error || msg; } catch { /* ignore */ }
+                            reject(new Error(msg));
+                        }
+                    });
+                    xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
+                    xhr.open('POST', '/api/archives/chunks?' + params.toString());
+                    xhr.withCredentials = true;
+                    xhr.setRequestHeader('Authorization', 'Basic ' + creds);
+                    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+                    xhr.send(chunk);
+                });
+            }
+
+            // Trigger assembly; on 409 (file exists) delete and retry
+            const doComplete = () => fetch('/api/archives/chunks/' + uploadId + '/complete', {
+                method: 'POST', credentials: 'include',
+                headers: { 'Authorization': 'Basic ' + creds }
             });
+            let completeRes = await doComplete();
+            if (completeRes.status === 409) {
+                const delRes = await fetch('/api/archives/' + encodeURIComponent(filename), {
+                    method: 'DELETE', credentials: 'include',
+                    headers: { 'Authorization': 'Basic ' + creds }
+                });
+                if (!delRes.ok) throw new Error('Archive already exists and could not be overwritten');
+                completeRes = await doComplete();
+            }
+            if (!completeRes.ok) {
+                let msg = completeRes.statusText;
+                try { const d = await completeRes.json(); msg = (d as { error?: string }).error || msg; } catch { /* ignore */ }
+                throw new Error(msg);
+            }
+        } else {
+            // Single upload
+            await new Promise<void>((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                const form = new FormData();
+                form.append('file', blob, filename);
 
-            xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const uploadPct = Math.round((e.loaded / e.total) * 100);
+                        deps.ui.updateProgress(82 + Math.round(uploadPct * 0.16), 'Uploading to library...');
+                    }
+                });
 
-            xhr.open('POST', '/api/archives');
-            xhr.withCredentials = true;
-            xhr.setRequestHeader('Authorization', 'Basic ' + creds);
-            xhr.send(form);
-        });
+                xhr.addEventListener('load', () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve();
+                    } else if (xhr.status === 409) {
+                        // File exists — try overwrite (delete + re-upload)
+                        const retryXhr = new XMLHttpRequest();
+                        fetch('/api/archives/' + encodeURIComponent(filename), {
+                            method: 'DELETE',
+                            credentials: 'include',
+                            headers: { 'Authorization': 'Basic ' + creds }
+                        }).then(delRes => {
+                            if (!delRes.ok) {
+                                reject(new Error('Archive already exists and could not be overwritten'));
+                                return;
+                            }
+                            // Re-upload after delete
+                            const retryForm = new FormData();
+                            retryForm.append('file', blob, filename);
+                            retryXhr.addEventListener('load', () => {
+                                if (retryXhr.status >= 200 && retryXhr.status < 300) resolve();
+                                else reject(new Error('Re-upload failed: ' + retryXhr.statusText));
+                            });
+                            retryXhr.addEventListener('error', () => reject(new Error('Re-upload network error')));
+                            retryXhr.open('POST', '/api/archives');
+                            retryXhr.withCredentials = true;
+                            retryXhr.setRequestHeader('Authorization', 'Basic ' + creds);
+                            retryXhr.send(retryForm);
+                        }).catch(reject);
+                    } else {
+                        let msg = xhr.statusText;
+                        try { msg = JSON.parse(xhr.responseText).error || msg; } catch { /* ignore */ }
+                        reject(new Error(msg));
+                    }
+                });
+
+                xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
+
+                xhr.open('POST', '/api/archives');
+                xhr.withCredentials = true;
+                xhr.setRequestHeader('Authorization', 'Basic ' + creds);
+                xhr.send(form);
+            });
+        }
 
         deps.ui.updateProgress(100, 'Saved');
         deps.ui.hideLoading();

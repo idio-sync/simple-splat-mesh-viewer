@@ -56,6 +56,7 @@ ENV ADMIN_ENABLED="false"
 ENV ADMIN_USER="admin"
 ENV ADMIN_PASS=""
 ENV MAX_UPLOAD_SIZE="1024"
+ENV CHUNKED_UPLOAD="false"
 
 # Clean URL defaults (see docs/DEPLOYMENT.md#clean-archive-urls)
 ENV DEFAULT_KIOSK_THEME=""

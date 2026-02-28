@@ -35,6 +35,7 @@ services:
       - ADMIN_USER=${ADMIN_USER:-admin}
       - ADMIN_PASS=${ADMIN_PASS:-}
       - MAX_UPLOAD_SIZE=${MAX_UPLOAD_SIZE:-1024}
+      - CHUNKED_UPLOAD=${CHUNKED_UPLOAD:-false}
 
       # Social link previews / oEmbed (optional — see docs/DEPLOYMENT.md#social-link-previews--oembed)
       - OG_ENABLED=${OG_ENABLED:-false}

@@ -2,7 +2,7 @@
 set -e
 
 # Substitute environment variables in the config template
-envsubst '${DEFAULT_ARCHIVE_URL} ${DEFAULT_SPLAT_URL} ${DEFAULT_MODEL_URL} ${DEFAULT_POINTCLOUD_URL} ${SHOW_CONTROLS} ${ALLOWED_DOMAINS} ${KIOSK_LOCK} ${ARCHIVE_PATH_PREFIX} ${LOD_BUDGET_SD} ${LOD_BUDGET_HD} ${ADMIN_ENABLED}' \
+envsubst '${DEFAULT_ARCHIVE_URL} ${DEFAULT_SPLAT_URL} ${DEFAULT_MODEL_URL} ${DEFAULT_POINTCLOUD_URL} ${SHOW_CONTROLS} ${ALLOWED_DOMAINS} ${KIOSK_LOCK} ${ARCHIVE_PATH_PREFIX} ${LOD_BUDGET_SD} ${LOD_BUDGET_HD} ${ADMIN_ENABLED} ${CHUNKED_UPLOAD}' \
     < /usr/share/nginx/html/config.js.template \
     > /usr/share/nginx/html/config.js
 
@@ -89,6 +89,7 @@ if [ "${ADMIN_ENABLED}" = "true" ]; then
     printf "%s:%s\n" "${ADMIN_USER:-admin}" "$(openssl passwd -apr1 "${ADMIN_PASS}")" > /etc/nginx/.htpasswd
     echo "  ADMIN_USER: ${ADMIN_USER:-admin}"
     echo "  MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-1024}MB"
+    echo "  CHUNKED_UPLOAD: ${CHUNKED_UPLOAD:-false}"
 
     # Generate admin nginx config snippet
     cat > /etc/nginx/conf.d/admin-auth.conf.inc <<ADMINEOF

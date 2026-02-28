@@ -284,7 +284,11 @@
         lodBudgetHd: envLodBudgetHd ? parseInt(envLodBudgetHd, 10) || 0 : 0,
 
         // Library (archive management) — enabled when ADMIN_ENABLED=true
-        libraryEnabled: "${ADMIN_ENABLED}" === "true"
+        libraryEnabled: "${ADMIN_ENABLED}" === "true",
+
+        // Chunked upload — splits large files into 50 MB chunks to work around
+        // Cloudflare Tunnel's 100 MB per-request body limit (CHUNKED_UPLOAD=true)
+        chunkedUpload: "${CHUNKED_UPLOAD}" === "true"
     };
 
     console.log('[config.js] Generated Config:', window.APP_CONFIG);
