@@ -140,6 +140,36 @@ function escapeHtml(str) {
 }
 
 /**
+ * Strip common Markdown syntax to produce plain text suitable for OG descriptions.
+ */
+function stripMarkdown(text) {
+    if (!text) return '';
+    return text
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, '')        // remove images entirely
+        .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')     // links → link text
+        .replace(/^#{1,6}\s+/gm, '')                 // headings
+        .replace(/\*{1,3}([^*\n]+)\*{1,3}/g, '$1')  // bold/italic
+        .replace(/_{1,3}([^_\n]+)_{1,3}/g, '$1')    // underscore bold/italic
+        .replace(/`{3}[\s\S]*?`{3}/g, '')            // fenced code blocks
+        .replace(/`([^`]+)`/g, '$1')                 // inline code
+        .replace(/^>\s+/gm, '')                      // blockquotes
+        .replace(/^[-*+]\s+/gm, '')                  // unordered list markers
+        .replace(/^\d+\.\s+/gm, '')                  // ordered list markers
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/**
+ * Truncate a plain-text description to maxLen characters, breaking at a word boundary.
+ */
+function truncateDescription(text, maxLen = 155) {
+    if (!text || text.length <= maxLen) return text;
+    const cut = text.slice(0, maxLen);
+    const lastSpace = cut.lastIndexOf(' ');
+    return (lastSpace > 80 ? cut.slice(0, lastSpace) : cut) + '\u2026';
+}
+
+/**
  * Check if a request is from a known bot/crawler.
  * Mirrors the $is_bot user-agent map in nginx.conf.template.
  */
@@ -155,7 +185,7 @@ function isBotRequest(req) {
  */
 function serveOgHtml(res, title, description, thumb, canonicalUrl, oembedUrl) {
     const t = escapeHtml(title);
-    const d = escapeHtml(description);
+    const d = escapeHtml(truncateDescription(stripMarkdown(description)));
     const u = escapeHtml(canonicalUrl);
     const oe = escapeHtml(oembedUrl);
     const i = escapeHtml(thumb);
